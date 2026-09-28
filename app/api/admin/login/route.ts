@@ -26,7 +26,10 @@ function adminClient() {
 }
 
 export async function POST(req: NextRequest) {
-  const ingress = await limitAdminIngress(req);
+  let netlifyIp: string | null | undefined;
+  try { netlifyIp = (await import("@netlify/functions")).getContext().ip ?? null; }
+  catch { if (process.env.NODE_ENV === "production" && process.env.VERCEL !== "1") netlifyIp = null; }
+  const ingress = await limitAdminIngress(req, netlifyIp);
   if (ingress.blocked) {
     ingress.blocked.headers.set("Connection", "close");
     return ingress.blocked;

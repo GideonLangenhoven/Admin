@@ -7,7 +7,8 @@ import { createHash } from "node:crypto";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
-const MAX_REQUEST_BYTES = 4_500_000;
+// Keep multipart below Netlify Functions' 6 MB buffered/base64 envelope.
+const MAX_REQUEST_BYTES = 4_250_000;
 const MAX_IMAGE_PIXELS = 40_000_000;
 const READ_TIMEOUT_MS = 15_000;
 const PROVIDER_TIMEOUT_MS = 10_000;

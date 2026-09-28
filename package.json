@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@date-fns/tz": "1.4.1",
+    "@netlify/functions": "^6.0.0",
     "@next/bundle-analyzer": "16.3.3",
     "@phosphor-icons/react": "^2.1.10",
     "@remotion/cli": "4.0.524",

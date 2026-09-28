@@ -184,9 +184,16 @@ async function databaseRateLimit(config: RateLimitConfig, key: string, url: stri
   return { allowed: result.allowed, limit: result.limit, remaining: result.remaining, retryAfterMs: result.retry_after_ms };
 }
 
-function getClientIp(req: NextRequest, deployed: boolean): string | null {
-  if (deployed && process.env.VERCEL !== "1") return null;
-  const ip = (req.headers.get("x-vercel-forwarded-for") || req.headers.get("x-forwarded-for") || "").trim();
+function getClientIp(req: NextRequest, deployed: boolean, netlifyRouteIp?: string | null): string | null {
+  // Next proxy runs as a Netlify Edge Function; auth route handlers run as
+  // Netlify Functions and pass getContext().ip through netlifyRouteIp.
+  const netlify = (globalThis as typeof globalThis & { Netlify?: { context?: { ip?: unknown } | null } }).Netlify;
+  if (process.env.VERCEL === "1" && (netlify !== undefined || netlifyRouteIp !== undefined)) return null;
+  let rawIp: unknown;
+  if (process.env.VERCEL === "1") rawIp = req.headers.get("x-vercel-forwarded-for") || req.headers.get("x-forwarded-for");
+  else if (deployed) rawIp = netlifyRouteIp === undefined ? netlify?.context?.ip : netlifyRouteIp;
+  else rawIp = req.headers.get("x-forwarded-for");
+  const ip = typeof rawIp === "string" ? rawIp.trim() : "";
   if (!ip || ip.length > 45 || !/^[0-9a-fA-F:.]+$/.test(ip)) return deployed ? null : "local";
   return ip;
 }
@@ -288,7 +295,7 @@ function checkPageRoleGate(req: NextRequest): NextResponse | null {
   return NextResponse.redirect(url);
 }
 
-async function checkRequest(req: NextRequest, parsedBody?: Record<string, unknown>) {
+async function checkRequest(req: NextRequest, parsedBody?: Record<string, unknown>, netlifyRouteIp?: string | null) {
   const mvpHidden = checkMvpHidden(req);
   if (mvpHidden) return mvpHidden;
 
@@ -296,7 +303,9 @@ async function checkRequest(req: NextRequest, parsedBody?: Record<string, unknow
   if (pageGate) return pageGate;
 
   if (!req.nextUrl.pathname.startsWith("/api/")) return NextResponse.next();
-  const deployed = process.env.VERCEL === "1" || process.env.NODE_ENV === "production" ||
+  const netlifyEdgeContext = (globalThis as typeof globalThis & { Netlify?: { context?: unknown } }).Netlify?.context;
+  const deployed = netlifyRouteIp !== undefined || Boolean(netlifyEdgeContext) ||
+    process.env.VERCEL === "1" || process.env.NODE_ENV === "production" ||
     process.env.VERCEL_ENV === "production" || process.env.VERCEL_ENV === "preview";
   if (deployed && process.env.E2E_BYPASS_RATE_LIMIT && process.env.E2E_BYPASS_RATE_LIMIT !== "0") {
     return unavailable("production rate-limit bypass configured");
@@ -325,8 +334,8 @@ async function checkRequest(req: NextRequest, parsedBody?: Record<string, unknow
   if (deployed && redisConfigured && (!redisUrl || !token)) return unavailable("invalid Redis configuration");
   if (deployed && !redisConfigured && (!databaseUrl || !serviceKey)) return unavailable("shared database limiter configuration required");
 
-  const ip = getClientIp(req, deployed);
-  if (!ip) return unavailable("trusted Vercel client IP required");
+  const ip = getClientIp(req, deployed, netlifyRouteIp);
+  if (!ip) return unavailable("trusted platform client IP required");
 
   const isLogin = req.nextUrl.pathname === "/api/admin/login";
   const isSetupLink = req.nextUrl.pathname === "/api/admin/setup-link";
@@ -441,7 +450,7 @@ export async function proxy(req: NextRequest) {
 // finalize(), even after this guard returns 408. These two routes call the
 // same guard inside their route handler, where the response can finish at the
 // body deadline. The matcher keeps every other path under proxy coverage.
-export async function limitAdminIngress(req: NextRequest): Promise<{ blocked: NextResponse | null; raw: string }> {
+export async function limitAdminIngress(req: NextRequest, netlifyRouteIp?: string | null): Promise<{ blocked: NextResponse | null; raw: string }> {
   if (Number(req.headers.get("content-length")) > BODY_BYTES) {
     void req.body?.cancel().catch(() => {});
     return { blocked: new NextResponse(JSON.stringify({ error: "Request body too large" }), { status: 413, headers: { "Content-Type": "application/json" } }), raw: "" };
@@ -460,7 +469,7 @@ export async function limitAdminIngress(req: NextRequest): Promise<{ blocked: Ne
     const body = JSON.parse(raw);
     if (body && typeof body === "object" && !Array.isArray(body)) parsed = body;
   } catch { /* malformed JSON still consumes the route's IP bucket */ }
-  const decision = await checkRequest(req, parsed);
+  const decision = await checkRequest(req, parsed, netlifyRouteIp);
   return { blocked: decision.status === 200 ? null : decision, raw };
 }
 

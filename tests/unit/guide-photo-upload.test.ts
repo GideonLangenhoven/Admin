@@ -8,7 +8,7 @@ const OPERATION_B = "44444444-4444-4444-8444-444444444444";
 const BUSINESS_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const BUSINESS_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const MAX_PHOTO_BYTES = 4 * 1024 * 1024;
-const MAX_REQUEST_BYTES = 4_500_000;
+const MAX_REQUEST_BYTES = 4_250_000;
 const READ_TIMEOUT_MS = 15_000;
 
 let pngBytes: Uint8Array;

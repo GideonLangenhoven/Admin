@@ -121,6 +121,84 @@ describe("proxy ingress limits", () => {
     expect((await load(production, redis().fetchImpl)(request("/api/admin/login", { email: "a@example.invalid" }, "", { "x-real-ip": "192.0.2.44" }))).status).toBe(503);
   });
 
+  it("uses Netlify's handler context IP and rejects spoofed request headers", () => {
+    const clientIp = (netlify: unknown, headers: Record<string, string>, env: Record<string, string> = {}, routeIp?: string | null) => {
+      const getClientIp = sourceFunction("proxy.ts", "getClientIp", {
+        process: { env }, Netlify: netlify,
+      });
+      return getClientIp({ headers: new Headers(headers) }, true, routeIp);
+    };
+    const spoofed = { "x-forwarded-for": "198.51.100.9", "x-nf-client-connection-ip": "198.51.100.10" };
+    expect(clientIp({ context: { ip: "192.0.2.44" } }, spoofed)).toBe("192.0.2.44");
+    expect(clientIp({ context: { ip: "2001:db8::1" } }, spoofed)).toBe("2001:db8::1");
+    expect(clientIp(undefined, spoofed)).toBeNull();
+    expect(clientIp({ context: null }, spoofed)).toBeNull();
+    expect(clientIp({ context: { ip: "192.0.2.44, 198.51.100.9" } }, spoofed)).toBeNull();
+    expect(clientIp({ context: { ip: "192.0.2.44" } }, { "x-vercel-forwarded-for": "203.0.113.8" }, { VERCEL: "1" })).toBeNull();
+    expect(clientIp(undefined, { "x-vercel-forwarded-for": "203.0.113.8" }, { VERCEL: "1" })).toBe("203.0.113.8");
+    expect(clientIp(undefined, { "x-vercel-forwarded-for": "203.0.113.8" }, { VERCEL: "1" }, "192.0.2.44")).toBeNull();
+    expect(clientIp({ context: { ip: "192.0.2.44" } }, spoofed, {}, null)).toBeNull();
+    expect(clientIp(undefined, spoofed, {}, "192.0.2.44")).toBe("192.0.2.44");
+  });
+
+  it("uses Netlify Functions context for login and setup-link on the Node route", async () => {
+    const env = {
+      NODE_ENV: "production",
+      NEXT_PUBLIC_SUPABASE_URL: "https://project.supabase.co",
+      SUPABASE_SERVICE_ROLE_KEY: "synthetic-service-key",
+    };
+    const shared = database();
+    const limitAdminIngress = sourceExports("proxy.ts", { "next/server": { NextResponse } }, env, shared.fetchImpl).limitAdminIngress;
+    let contextIp = "192.0.2.44";
+    let contextAvailable = true;
+    for (const [route, bucket] of [["login", "auth-ip"], ["setup-link", "setup-send-ip"]] as const) {
+      const handler = sourceHandler(`app/api/admin/${route}/route.ts`, {
+        "next/server": { NextResponse },
+        "@supabase/supabase-js": { createClient: () => { throw new Error("Unexpected database call"); } },
+        "@netlify/functions": { getContext: () => {
+          if (!contextAvailable) throw new Error("No function request context");
+          return { ip: contextIp };
+        } },
+        "../../../lib/api-auth": {}, "../../../lib/admin-password": {},
+        "../../../../proxy": { limitAdminIngress },
+      }, env);
+      for (const spoofedIp of ["198.51.100.9", "198.51.100.10"]) {
+        expect((await handler(request(`/api/admin/${route}`, {}, spoofedIp, {
+          "x-nf-client-connection-ip": spoofedIp,
+        }))).status).toBe(400);
+      }
+      expect([...shared.counters].filter(([key]) => key.startsWith(`${bucket}:`)).map(([, entry]) => entry.count)).toEqual([2]);
+      contextAvailable = false;
+      expect((await handler(request(`/api/admin/${route}`, {}, "198.51.100.9"))).status).toBe(503);
+      contextAvailable = true;
+      contextIp = "192.0.2.44, 198.51.100.9";
+      expect((await handler(request(`/api/admin/${route}`, {}, "198.51.100.9"))).status).toBe(503);
+      contextIp = "192.0.2.44";
+    }
+  });
+
+  it("fails closed on a mixed Vercel marker or a development bypass with real function context", async () => {
+    for (const route of ["login", "setup-link"] as const) {
+      for (const env of [
+        { ...productionDatabase, NODE_ENV: "production" },
+        { NODE_ENV: "development", E2E_BYPASS_RATE_LIMIT: "1",
+          NEXT_PUBLIC_SUPABASE_URL: "https://project.supabase.co", SUPABASE_SERVICE_ROLE_KEY: "synthetic-service-key" },
+      ]) {
+        const limitAdminIngress = sourceExports("proxy.ts", { "next/server": { NextResponse } }, env, database().fetchImpl).limitAdminIngress;
+        const handler = sourceHandler(`app/api/admin/${route}/route.ts`, {
+          "next/server": { NextResponse },
+          "@supabase/supabase-js": { createClient: () => { throw new Error("Unexpected database call"); } },
+          "@netlify/functions": { getContext: () => ({ ip: "192.0.2.44" }) },
+          "../../../lib/api-auth": {}, "../../../lib/admin-password": {},
+          "../../../../proxy": { limitAdminIngress },
+        }, env);
+        expect((await handler(request(`/api/admin/${route}`, {}, "198.51.100.9", {
+          "x-vercel-forwarded-for": "198.51.100.9",
+        }))).status).toBe(503);
+      }
+    }
+  });
+
   it("allows 500 distinct staff on one office IP but limits repeated guesses across instances", async () => {
     const shared = redis();
     const first = load(production, shared.fetchImpl);

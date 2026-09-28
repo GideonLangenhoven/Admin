@@ -2,7 +2,9 @@ import { createClient } from '@supabase/supabase-js';
 
 // Exercise the same server-to-email-service connection used by password resets.
 // An unknown template stops after authorization and never sends an email.
-if (process.env.VERCEL_ENV !== 'production' && !process.argv.includes('--force')) {
+const production = process.env.VERCEL_ENV === 'production' ||
+  (process.env.NETLIFY === 'true' && process.env.CONTEXT === 'production');
+if (!production && !process.argv.includes('--force')) {
   console.log('Email service authorization check: skipped outside production');
 } else {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
