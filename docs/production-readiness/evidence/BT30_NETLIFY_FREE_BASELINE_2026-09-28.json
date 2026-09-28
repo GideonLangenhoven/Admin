@@ -12,6 +12,7 @@
   },
   "payment_method": "No credit card info saved",
   "projects_observed": 0,
+  "default_new_project_visibility": "Private for new projects",
   "not_observed": [
     "future_usage_rate_for_three_candidate_apps",
     "function_memory_and_duration_on_deployed_adapter",
