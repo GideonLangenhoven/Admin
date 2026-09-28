@@ -44,6 +44,15 @@
     "suspended",
     "user_id"
   ],
+  "admin_web_push_subscriptions": [
+    "admin_user_id",
+    "auth",
+    "business_id",
+    "created_at",
+    "endpoint",
+    "id",
+    "p256dh"
+  ],
   "api_rate_limits": [
     "count",
     "endpoint",

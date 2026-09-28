@@ -20,7 +20,7 @@ function loadSource(
   }).outputText;
   runInNewContext(source, {
     module: sandboxModule, exports: sandboxModule.exports, console, Request, Response, Headers, URL, URLSearchParams, Date,
-    TextEncoder, TextDecoder, atob, btoa, crypto: webcrypto, setTimeout, clearTimeout, AbortSignal,
+    TextEncoder, TextDecoder, atob, btoa, crypto: webcrypto, Buffer, setTimeout, clearTimeout, AbortSignal,
     process: { env: { NEXT_PUBLIC_SUPABASE_URL: "https://test.invalid", SUPABASE_SERVICE_ROLE_KEY: "fixture-".repeat(8), ...env } },
     Deno: { serve: (fn: typeof handler) => { handler = fn; }, env: { get: (key: string) => env[key] || "" } },
     require: (name: string) => {

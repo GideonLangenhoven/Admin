@@ -27,6 +27,27 @@ const db = createClient(SU, SK);
 const BOOKING_SUCCESS_URL = Deno.env.get("BOOKING_SUCCESS_URL") || "";
 const BOOKING_CANCEL_URL = Deno.env.get("BOOKING_CANCEL_URL") || "";
 const VOUCHER_SUCCESS_URL = Deno.env.get("VOUCHER_SUCCESS_URL") || "";
+const ADMIN_PUSH_URL = Deno.env.get("ADMIN_PUSH_URL") || "";
+const ADMIN_PUSH_SECRET = Deno.env.get("ADMIN_PUSH_SECRET") || "";
+
+async function notifyOperatorOfWebChat(businessId: string, phone: string) {
+  if (!ADMIN_PUSH_URL || !ADMIN_PUSH_SECRET) return;
+  try {
+    const response = await fetch(ADMIN_PUSH_URL, {
+      method: "POST",
+      headers: { Authorization: "Bearer " + ADMIN_PUSH_SECRET, "Content-Type": "application/json" },
+      body: JSON.stringify({ business_id: businessId, phone }),
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!response.ok) console.error("WEB_CHAT_PUSH_FAILED", response.status);
+  } catch (error) { console.error("WEB_CHAT_PUSH_FAILED", error); }
+}
+async function scheduleOperatorWebChatNotification(businessId: string, phone: string) {
+  const task = notifyOperatorOfWebChat(businessId, phone);
+  const runtime = (globalThis as typeof globalThis & { EdgeRuntime?: { waitUntil: (promise: Promise<void>) => void } }).EdgeRuntime;
+  if (runtime) runtime.waitUntil(task);
+  else await task;
+}
 // L10: Request-scoped timezone. Set at the start of each request handler.
 // Deno edge functions process one request per isolate, so this is safe.
 let _requestTimezone = "UTC";
@@ -545,11 +566,13 @@ Deno.serve(withSentry("web-chat", async (req) => {
       const { data: humanConvo } = await db.from("conversations")
         .select("status").eq("business_id", requestedBusinessId).eq("phone", webPhone).maybeSingle();
       if (humanConvo?.status === "HUMAN") {
-        await db.from("chat_messages").insert({
+        const { error: messageError } = await db.from("chat_messages").insert({
           business_id: requestedBusinessId, phone: webPhone, direction: "IN",
           body: msg, sender: state.name || "Website visitor", sender_type: "CUSTOMER",
         });
+        if (messageError) return new Response(JSON.stringify({ error: "Message could not be sent. Please try again." }), { status: 500, headers: gCors(req) });
         await db.from("conversations").update({ updated_at: new Date().toISOString() }).eq("business_id", requestedBusinessId).eq("phone", webPhone);
+        await scheduleOperatorWebChatNotification(requestedBusinessId, webPhone);
         return new Response(JSON.stringify({ reply: "", human: true, state: { ...state, status: "HUMAN" } }), { status: 200, headers: gCors(req) });
       }
     }
@@ -568,16 +591,18 @@ Deno.serve(withSentry("web-chat", async (req) => {
         const { data: existing } = await db.from("conversations").select("id")
           .eq("business_id", requestedBusinessId).eq("phone", phoneKey).maybeSingle();
         if (existing) {
-          await db.from("conversations").update({
+          const { error: conversationError } = await db.from("conversations").update({
             status: "HUMAN", priority: "HIGH", current_intent: intent,
             last_classified_at: nowIso, updated_at: nowIso,
           }).eq("business_id", requestedBusinessId).eq("id", existing.id);
+          if (conversationError) throw conversationError;
         } else {
-          await db.from("conversations").insert({
+          const { error: conversationError } = await db.from("conversations").insert({
             business_id: requestedBusinessId, phone: phoneKey, customer_name: name,
             email: emailAddr, status: "HUMAN", current_state: "IDLE",
             priority: "HIGH", current_intent: intent, updated_at: nowIso,
           });
+          if (conversationError) throw conversationError;
         }
         // PostgREST bulk inserts require identical keys on every row (PGRST102),
         // so both rows must carry auto_replied — a mismatch silently dropped the
@@ -587,6 +612,7 @@ Deno.serve(withSentry("web-chat", async (req) => {
           { business_id: requestedBusinessId, phone: phoneKey, direction: "OUT", body: botReply, sender: "Bot", sender_type: "BOT", auto_replied: true, intent },
         ]);
         if (handoffMsgErr) console.error("WEBCHAT_HANDOFF_MSG_ERR", handoffMsgErr);
+        else await scheduleOperatorWebChatNotification(requestedBusinessId, phoneKey);
       } catch (e) { console.error("WEBCHAT_HANDOFF_ERR", e); }
     }
 

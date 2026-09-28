@@ -49,13 +49,15 @@
     "read-excel-file": "^9.3.10",
     "recharts": "^3.8.1",
     "remotion": "4.0.524",
-    "sharp": "0.35.4"
+    "sharp": "0.35.4",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
     "autoprefixer": "^10.4.24",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",

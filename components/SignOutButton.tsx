@@ -18,6 +18,13 @@ export default function SignOutButton({ variant = "sidebar" }: { variant?: "side
       if (!detail.handled) complete(false);
     });
     if (success) {
+      // Stop device alerts after this account signs out. The server discards
+      // the now-invalid endpoint when its push provider reports 404/410.
+      try {
+        const registration = await navigator.serviceWorker?.getRegistration("/");
+        const subscription = await registration?.pushManager.getSubscription();
+        await subscription?.unsubscribe();
+      } catch { /* Sign out must still finish if the browser push service fails. */ }
       window.location.reload();
       return;
     }

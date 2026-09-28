@@ -34,6 +34,8 @@ const satoshi = localFont({
 export const metadata: Metadata = {
   title: "BookingTours Admin",
   description: "BookingTours Admin Dashboard: built for adventure operators",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "BookingTours" },
 };
 
 const nav = [

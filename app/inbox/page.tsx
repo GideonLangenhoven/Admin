@@ -7,6 +7,7 @@ import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import IntentBadge from "../../components/inbox/IntentBadge";
+import PhoneAlerts from "../../components/inbox/PhoneAlerts";
 import { Virtuoso } from "react-virtuoso";
 import BotStatusBanner from "./components/BotStatusBanner";
 import { Warning, X as XIcon } from "@phosphor-icons/react";
@@ -369,6 +370,8 @@ function InboxContent() {
           </span>
         )}
       </div>
+
+      <div className="mb-3"><PhoneAlerts /></div>
 
       {loading ? <div className="space-y-3"><div className="ui-skeleton h-20 !rounded-xl" /><div className="ui-skeleton h-20 !rounded-xl" /><div className="ui-skeleton h-20 !rounded-xl" /></div> : (
         <div className="anim-fade-up anim-d1 flex min-h-0 flex-1 flex-col gap-3 md:gap-4">
