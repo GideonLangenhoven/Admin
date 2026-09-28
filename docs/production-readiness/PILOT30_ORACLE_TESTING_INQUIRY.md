@@ -1,6 +1,6 @@
 # OCI Always Free pilot testing inquiry
 
-Status: **DRAFT — NOT SENT** (28 September 2026). This asks Oracle to clarify permitted customer-application qualification before the [BT30 pilot proposal](PILOT30_PROFILE_PROPOSAL.md) is run on OCI. It contains no credentials or customer data.
+Status: **INACTIVE DRAFT — NOT SENT** (28 September 2026). OCI signup is blocked because the owner has no credit card for verification. Retain this only if OCI later becomes available. It asks Oracle to clarify permitted customer-application qualification before the [BT30 pilot proposal](PILOT30_PROFILE_PROPOSAL.md) is run there. It contains no credentials or customer data.
 
 **Subject:** Clarification of application qualification on OCI Always Free A1
 

@@ -1,0 +1,22 @@
+{
+  "status": "READ_ONLY_ACCOUNT_BASELINE",
+  "observed_at_utc": "2026-09-28T05:46:07Z",
+  "source": "Signed-in Netlify team Usage & billing page inspected through Safari UI",
+  "team": "CapeWeb",
+  "plan": "Free",
+  "credit_balance": {
+    "remaining": 300,
+    "total_granted": 300,
+    "granted_date": "2026-09-28",
+    "expires_date": "2026-10-28"
+  },
+  "payment_method": "No credit card info saved",
+  "projects_observed": 0,
+  "not_observed": [
+    "future_usage_rate_for_three_candidate_apps",
+    "function_memory_and_duration_on_deployed_adapter",
+    "monthly_bandwidth_and_web_request_fanout",
+    "commercial_pilot_capacity_at_30_active_staff"
+  ],
+  "conclusion": "Account exists without a card and has full Free credits; no deployment or workload qualification has occurred."
+}
