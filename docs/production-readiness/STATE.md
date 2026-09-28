@@ -3,6 +3,22 @@
 Rollout status: PAUSED_BY_USER on 2026-09-28. The user is focusing on the demo.
 Do not resume production qualification, migrations, load or soak tests, provider
 changes, or the public launch switch until the user explicitly resumes the rollout.
+The user separately approved phone push alerts for human web chats as a scoped
+exception on 2026-09-28. Migration `20260928102000_admin_web_push_subscriptions`
+is applied and verified with RLS; `web-chat` Edge function version 146 is active;
+the three Admin production push variables are stored in Vercel. Admin commit
+`27975a7` passed its preview build and local checks, but production deployments
+`dpl_8bCwiDTMVgvW5u2RR1vruxsB9RN2` and
+`dpl_GAWxNhsBXuqM1pQPfyxbAptZVHMK` were blocked before build because Vercel
+reports that commit author `info@capeweb.co.za` lacks deployment permission for
+the project (`TEAM_ACCESS_REQUIRED`). The live Admin alias remains on healthy
+deployment `dpl_J4YaSoG8hocjsDiRnzoSEXZR5ApC`. Edge secrets `ADMIN_PUSH_URL`
+and `ADMIN_PUSH_SECRET` were unset until the matching Admin route can be
+deployed, so guest chat behavior remains unchanged. To finish this exception,
+verify/approve the commit author in Vercel, redeploy commit `27975a7`, restore
+the Edge secrets from the protected rollout bundle, and test a phone opt-in and
+human chat notification. This does not change FAILED_GATE or resume the broader
+rollout.
 The user separately authorized the 2026-09-28 Google Drive/media deployment:
 admin app commit `bd0fac5` (Vercel `dpl_B7oUczno61wb1tRRz66VFTHX4GYn`) and
 `google-drive` Edge function version 35. This does not change the FAILED_GATE
