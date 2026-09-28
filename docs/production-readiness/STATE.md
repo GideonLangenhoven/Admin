@@ -11,7 +11,12 @@ the three Admin production push variables are stored in Vercel. Admin commit
 `dpl_8bCwiDTMVgvW5u2RR1vruxsB9RN2` and
 `dpl_GAWxNhsBXuqM1pQPfyxbAptZVHMK` were blocked before build because Vercel
 reports that commit author `info@capeweb.co.za` lacks deployment permission for
-the project (`TEAM_ACCESS_REQUIRED`). The live Admin alias remains on healthy
+the project (`TEAM_ACCESS_REQUIRED`). After the user updated account access,
+retry `dpl_3qWFey85bPToZ8b6LjLtxzDKxzvM` hit the same block. The project is
+owned by a one-member Vercel Hobby team; its owner must be recognized as the
+commit author through the connected GitHub account or a verified matching
+email. The live Admin
+alias remains on healthy
 deployment `dpl_J4YaSoG8hocjsDiRnzoSEXZR5ApC`. Edge secrets `ADMIN_PUSH_URL`
 and `ADMIN_PUSH_SECRET` were unset until the matching Admin route can be
 deployed, so guest chat behavior remains unchanged. To finish this exception,
