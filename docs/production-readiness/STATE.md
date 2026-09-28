@@ -7,6 +7,13 @@ The user separately authorized the 2026-09-28 Google Drive/media deployment:
 admin app commit `bd0fac5` (Vercel `dpl_B7oUczno61wb1tRRz66VFTHX4GYn`) and
 `google-drive` Edge function version 35. This does not change the FAILED_GATE
 verdict or qualify the broader release.
+The follow-up demo navigation update, commit `470ff08`, is deployed to the
+Admin production alias as Vercel `dpl_J4YaSoG8hocjsDiRnzoSEXZR5ApC`.
+The preview and production builds passed; the production alias and Guide/Photos
+routes returned HTTP 200, and the unauthenticated Data Requests count endpoint
+returned HTTP 401. The scoped authenticated browser smoke could not start
+because its Supabase test sign-in token was rejected as expired. This UI
+deployment does not resume production qualification or change FAILED_GATE.
 
 Updated: 2026-09-22T09:15:55Z
 Verdict: FAILED_GATE.
