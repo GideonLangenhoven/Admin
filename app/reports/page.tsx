@@ -7,6 +7,7 @@ import { amountReceived, amountRefunded, netReceived, derivePaymentMethod, finan
 import { fetchAllRowsResult } from "../../supabase/functions/_shared/pagination";
 import { zonedToUtc } from "../lib/admin-timezone";
 import { notify } from "../lib/app-notify";
+import SectionTabs from "../../components/SectionTabs";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell, LabelList,
@@ -907,6 +908,8 @@ export default function Reports() {
           </button>
         </div>
       </div>
+
+      <SectionTabs section="reports" />
 
       {/* ── Tabs — segmented control ── */}
       <div className="anim-fade-up anim-d1 -mx-4 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:px-0">

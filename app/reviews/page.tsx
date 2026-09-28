@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { notify } from "../lib/app-notify";
 import { Star } from "@phosphor-icons/react";
+import SectionTabs from "../../components/SectionTabs";
 
 type Review = {
     id: string;
@@ -62,9 +63,10 @@ export default function ReviewsPage() {
 
     return (
         <div className="p-4 sm:p-6 max-w-5xl mx-auto">
+            <SectionTabs section="reports" />
             <div className="anim-fade-up mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <p className="ui-mono-label mb-2">Customers · Reviews</p>
+                    <p className="ui-mono-label mb-2">Reports · Reviews</p>
                     <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Reviews</h1>
                 </div>
                 <div className="-mx-4 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:overflow-visible sm:px-0">

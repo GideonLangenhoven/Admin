@@ -55,6 +55,7 @@ export default function DataRequestsPage() {
     if (r.ok) {
       const data = await r.json();
       setRequests(data.requests ?? []);
+      window.dispatchEvent(new Event("data-requests-updated"));
     }
     setLoading(false);
   }

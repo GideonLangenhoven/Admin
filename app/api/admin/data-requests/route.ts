@@ -17,6 +17,15 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const status = url.searchParams.get("status");
 
+  if (url.searchParams.get("summary") === "actionable") {
+    const { count, error } = await db.from("data_subject_requests")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", caller.business_id)
+      .in("status", ["CONFIRMED", "IN_REVIEW"]);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ count: count ?? 0 });
+  }
+
   let query = db.from("data_subject_requests")
     .select("id, email, request_type, status, reason, confirmed_at, scheduled_for, fulfilled_at, cancelled_at, cancellation_reason, created_at, customer_id, customers(name, total_bookings, total_spent)")
     .eq("business_id", caller.business_id)

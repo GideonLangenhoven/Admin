@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { getAuthHeaders } from "../lib/admin-auth";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { notify } from "../lib/app-notify";
+import SectionTabs from "../../components/SectionTabs";
 
 // AM3/AM5: minimal admin surface for inspecting failed outbox messages and
 // retrying them. The outbox table is the project's notification queue —
@@ -89,8 +90,9 @@ export default function NotificationsPage() {
 
   return (
     <div className="anim-fade-up max-w-5xl space-y-6">
+      <SectionTabs section="broadcasts" />
       <div>
-        <p className="ui-mono-label mb-2">Outbox queue</p>
+        <p className="ui-mono-label mb-2">Broadcasts · Outbox queue</p>
         <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Failed Notifications</h1>
       </div>
       <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>

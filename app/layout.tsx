@@ -43,32 +43,21 @@ const nav = [
   { href: "/bookings", label: "Bookings", icon: "ClipboardList" },
   { href: "/new-booking", label: "New Booking", icon: "PlusSquare" },
   { href: "/slots", label: "Slots", icon: "CalendarRange" },
-  { href: "/guide", label: "Guide App", icon: "Check", demoOnly: true },
-  { href: "/photos", label: "Trip Photos", icon: "Camera", demoOnly: true },
   { href: "/refunds", label: "Refunds", icon: "Landmark" },
   { href: "/inbox", label: "Inbox", icon: "MessageSquareText" },
-  { href: "/customers", label: "Customers", icon: "Users", demoOnly: true },
-  { href: "/vouchers", label: "Vouchers", icon: "Ticket" },
   { href: "/invoices", label: "Invoices", icon: "Receipt" },
   { href: "/broadcasts", label: "Broadcasts", icon: "Megaphone" },
   { href: "/pricing", label: "Peak Pricing", icon: "BadgeDollarSign" },
   { href: "/reports", label: "Reports", icon: "LineChart" },
   { href: "/marketing", label: "Marketing", icon: "Mail" },
-  { href: "/ai-usage", label: "AI Usage", icon: "LineChart", privilegedOnly: true },
+  { href: "/ai-usage", label: "AI", icon: "LineChart", privilegedOnly: true },
   { href: "/partnerships", label: "Partners", icon: "Users", privilegedOnly: true },
-  { href: "/reviews", label: "Reviews", icon: "Star" },
   // privilegedOnly — hidden from ADMIN; visible to MAIN_ADMIN and SUPER_ADMIN
   { href: "/billing", label: "Billing", icon: "Receipt", privilegedOnly: true },
-  // MVP: temporarily hidden — uncomment + remove from HIDDEN_FOR_MVP in proxy.ts to re-enable
-  // { href: "/settings/ota", label: "OTA Channels", icon: "Globe", privilegedOnly: true },
-  { href: "/settings/chat-faq", label: "Chat FAQ", icon: "MessageCircle", privilegedOnly: true },
-  { href: "/notifications", label: "Failed Notifications", icon: "Warning", privilegedOnly: true, demoOnly: true },
-  { href: "/settings/ota", label: "OTA Channels", icon: "Globe", privilegedOnly: true, demoOnly: true },
   { href: "/settings", label: "Settings", icon: "Settings", privilegedOnly: true },
   // superAdminOnly — visible to SUPER_ADMIN only
   // MVP: temporarily hidden — uncomment + remove from HIDDEN_FOR_MVP in proxy.ts to re-enable
   // { href: "/ota-drift", label: "OTA Drift", icon: "Warning", superAdminOnly: true },
-  { href: "/privacy/data-requests", label: "Data Requests", icon: "Shield", privilegedOnly: true },
   { href: "/super-admin", label: "Super Admin", icon: "Shield", superAdminOnly: true },
 ];
 

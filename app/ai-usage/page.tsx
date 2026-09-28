@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { AI_QUOTA_FNS, AI_HARD_CEILING_MULTIPLE, computeAiOverage } from "../lib/platform-billing";
+import SectionTabs from "../../components/SectionTabs";
 
 // Live per-tenant AI usage, read straight from llm_usage (tenant-scoped by RLS
 // policy llm_usage_auth_select — an operator sees their own rows and no one
@@ -81,7 +82,7 @@ export default function AiUsage() {
   }, [load]);
 
   if (loading) {
-    return <div className="space-y-4 py-2"><div className="ui-skeleton h-8 w-48" /><div className="ui-skeleton h-[140px] !rounded-2xl" /><div className="ui-skeleton h-[320px] !rounded-2xl" /></div>;
+    return <div className="space-y-4 py-2"><SectionTabs section="ai" /><div className="ui-skeleton h-8 w-48" /><div className="ui-skeleton h-[140px] !rounded-2xl" /><div className="ui-skeleton h-[320px] !rounded-2xl" /></div>;
   }
 
   const ceiling = included * AI_HARD_CEILING_MULTIPLE;
@@ -110,9 +111,10 @@ export default function AiUsage() {
 
   return (
     <div className="max-w-4xl space-y-6">
+      <SectionTabs section="ai" />
       <div className="anim-fade-up flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="ui-mono-label mb-2">Growth · AI Usage</p>
+          <p className="ui-mono-label mb-2">AI · Usage</p>
           <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>AI Assistant Usage</h2>
           <p className="mt-2 text-[13px]" style={{ color: "var(--ck-text-muted)" }}>
             Customer-facing bot replies this month. Updates every 30 seconds{updatedAt ? " · last checked " + updatedAt : ""}.

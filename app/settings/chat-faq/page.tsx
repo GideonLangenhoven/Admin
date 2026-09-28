@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabase";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { CHAT_INTENTS, INTENT_LABELS, type ChatIntent } from "../../lib/intent-types";
+import SectionTabs from "../../../components/SectionTabs";
 
 type FaqEntry = {
   id: string;
@@ -128,6 +129,7 @@ export default function ChatFaqPage() {
   if (loading) {
     return (
       <div className="max-w-4xl space-y-6">
+        <SectionTabs section="ai" />
         <div className="flex items-center justify-between">
           <div className="space-y-2.5">
             <div className="ui-skeleton h-3 w-32" />
@@ -143,9 +145,10 @@ export default function ChatFaqPage() {
 
   return (
     <div className="max-w-4xl space-y-6">
+      <SectionTabs section="ai" />
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="ui-mono-label mb-2">Chat Automation</p>
+          <p className="ui-mono-label mb-2">AI · Chat FAQ</p>
           <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Quick Answers</h1>
           <p className="text-sm mt-2 max-w-2xl" style={{ color: "var(--ck-text-muted)" }}>
             Set up automatic replies for questions your customers ask all the time. When someone sends a WhatsApp message that matches one of these, the reply goes out instantly, with no waiting for you to type it.

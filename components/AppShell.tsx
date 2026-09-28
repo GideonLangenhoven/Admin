@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import NotificationBadge from "./NotificationBadge";
 import RefundBadge from "./RefundBadge";
+import DataRequestBadge from "./DataRequestBadge";
 import SignOutButton from "./SignOutButton";
 import MobileMenuDrawer from "./MobileMenuDrawer";
 import ThemeToggle from "./ThemeToggle";
@@ -62,16 +63,15 @@ function isSuspendedAllowed(path: string) {
   return SUSPENDED_ALLOWED.some((p) => path === p || path.startsWith(p + "/"));
 }
 
-/* Presentation-only grouping of the nav — the items, order and visibility
-   rules are unchanged; groups whose items are all hidden don't render. */
+/* Presentation-only grouping of the nav; empty groups don't render. */
 const NAV_GROUPS: Array<{ label: string | null; hrefs: string[] }> = [
   { label: null, hrefs: ["/"] },
   { label: "Customer view", hrefs: [DEMO_BOOKING_SITE_URL] },
-  { label: "Operations", hrefs: ["/simple", "/bookings", "/new-booking", "/slots", "/guide", "/photos"] },
-  { label: "Customers", hrefs: ["/inbox", "/customers", "/refunds", "/vouchers", "/reviews", "/notifications"] },
+  { label: "Operations", hrefs: ["/bookings", "/new-booking", "/slots"] },
+  { label: "Guest care", hrefs: ["/inbox", "/refunds"] },
   { label: "Revenue", hrefs: ["/invoices", "/pricing", "/reports", "/billing"] },
   { label: "Growth", hrefs: ["/marketing", "/broadcasts", "/partnerships", "/ai-usage"] },
-  { label: "Admin", hrefs: ["/settings/chat-faq", "/settings", "/settings/ota", "/privacy/data-requests", "/super-admin"] },
+  { label: "Admin", hrefs: ["/settings", "/super-admin"] },
 ];
 
 function groupNav(items: NavItem[]) {
@@ -207,12 +207,12 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
   }
 
   // Longest-prefix match against the visible nav → topbar breadcrumb label
+  const visibleHrefs = visibleNav.map((n) => n.href);
   const sectionLabel = visibleNav
-    .filter((n) => (n.href === "/" ? pathname === "/" : pathname === n.href || pathname.startsWith(n.href + "/")))
-    .sort((a, b) => b.href.length - a.href.length)[0]?.label
+    .find((n) => isNavItemActive(pathname, n.href, visibleHrefs))?.label
     || (pathname.split("/")[1] ? pathname.split("/")[1].replace(/-/g, " ") : "Dashboard");
 
-  const visibleHrefs = visibleNav.map((n) => n.href);
+  const desktopNav = visibleNav.filter((n) => n.href !== "/simple");
   const mobilePrimaryHrefs = ["/", "/bookings", "/new-booking", "/inbox"];
   const mobilePrimaryNav = mobilePrimaryHrefs
     .map((href) => visibleNav.find((item) => item.href === href))
@@ -224,8 +224,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
 
   return (
     <div className="flex h-dvh min-h-0 overflow-hidden">
-      {/* Surfaces failed WhatsApp sends as in-the-moment toasts (replaces the
-          removed Notifications tab). Renders nothing. */}
+      {/* Surfaces failed WhatsApp sends as in-the-moment toasts. Renders nothing. */}
       <WaFailureWatcher />
       {/* Floating help assistant + one-time first-login welcome. */}
       <HelpChat />
@@ -292,7 +291,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
         )}
 
         <div className="flex-1 overflow-auto px-3.5 pb-4">
-          {groupNav(visibleNav).map((group, gi) => {
+          {groupNav(desktopNav).map((group, gi) => {
             const isCollapsedGroup = group.label ? collapsedGroups.has(group.label) : false;
             const hasActiveItem = group.items.some((n) => isNavActive(n.href));
             const showItems = collapsed || !isCollapsedGroup || hasActiveItem || !group.label;
@@ -338,6 +337,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
                       {!collapsed && n.external && <span aria-hidden="true" className="text-[12px]">↗</span>}
                       {n.href === "/inbox" && <NotificationBadge />}
                       {n.href === "/refunds" && <RefundBadge />}
+                      {n.href === "/settings" && !readOnly && <DataRequestBadge />}
                     </Link>
                   );
                 })}

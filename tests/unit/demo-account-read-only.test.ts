@@ -101,7 +101,7 @@ describe("shared demo account boundaries", () => {
     expect(drawer).toContain('target={n.external ? "_blank" : undefined}');
   });
 
-  it("keeps the demo chatbot tour and applies the demo route exclusions", () => {
+  it("keeps the demo chatbot tour while removing hidden destinations from navigation", () => {
     const layout = readFileSync("app/layout.tsx", "utf8");
     for (const route of [
       "/guide",
@@ -110,8 +110,10 @@ describe("shared demo account boundaries", () => {
       "/notifications",
       "/settings/ota",
     ]) {
-      expect(layout).toContain(`href: "${route}"`);
+      expect(layout).not.toContain(`href: "${route}"`);
     }
+    expect(readFileSync("app/guide/page.tsx", "utf8")).toContain("export default");
+    expect(readFileSync("app/photos/page.tsx", "utf8")).toContain("export default");
     const chat = readFileSync("components/HelpChat.tsx", "utf8");
     expect(chat).toContain("Show me every part of the operator system");
     expect(chat).toContain("DEMO_SUGGESTED");

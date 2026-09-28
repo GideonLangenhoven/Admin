@@ -5,6 +5,7 @@ import { confirmAction } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
+import SectionTabs from "../../components/SectionTabs";
 import dynamic from "next/dynamic";
 const RichTextEditor = dynamic(() => import("../../components/RichTextEditor"), { ssr: false, loading: () => <div className="ui-skeleton h-40" /> });
 
@@ -209,6 +210,8 @@ export default function BroadcastsPage() {
           {weatherMode ? "Weather Mode ON" : "Weather Cancel"}
         </button>
       </div>
+
+      <SectionTabs section="broadcasts" />
 
       <div className="anim-fade-up anim-d1 grid gap-6 lg:grid-cols-12">
         {/* Calendar */}

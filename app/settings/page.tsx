@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, ReactNode } from "react";
+import Link from "next/link";
 import { confirmAction, notify } from "../lib/app-notify";
 import { formatDuration } from "../lib/duration";
 import { OPERATOR_HIDEABLE_SECTIONS } from "../lib/operator-sections";
@@ -9,6 +10,7 @@ import { HIDDEN_SUPERADMIN_EMAILS } from "../lib/hidden-superadmin-emails";
 import { SETTINGS_SECTIONS } from "../lib/settings-sections";
 import { getAdminTimezone, setAdminTimezone, zonedToUtc } from "../lib/admin-timezone";
 import { useBusinessContext } from "../../components/BusinessContext";
+import DataRequestBadge from "../../components/DataRequestBadge";
 import { computeTheme as computeGlassTheme } from "../lib/theme-engine";
 import dynamic from "next/dynamic";
 import { CaretDown } from "@phosphor-icons/react";
@@ -1633,6 +1635,18 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-4">
+
+            {isPrivileged(role) && <nav aria-label="Settings tools" className="ui-card divide-y divide-[var(--ck-border-subtle)] px-5">
+                <Link href="/privacy/data-requests" className="flex items-center gap-3 py-4 text-sm hover:text-[var(--ck-accent)]">
+                    <span className="font-semibold">Data Requests</span>
+                    <span className="text-xs text-[var(--ck-text-muted)]">Review customer privacy requests</span>
+                    <DataRequestBadge />
+                </Link>
+                <div className="py-4">
+                    <p className="text-sm font-semibold text-[var(--ck-text-strong)]">OTA Channels</p>
+                    <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Direct Viator and GetYourGuide connections are not available yet.</p>
+                </div>
+            </nav>}
 
             {isPrivileged(role) && <CollapsibleSection id="admins" title="Admin Users" openSections={openSections} toggle={toggleSection}>
                 {/* Business logo — shown in the dashboard sidebar, the booking

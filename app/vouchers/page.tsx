@@ -5,6 +5,7 @@ import { getAdminTimezone } from "../lib/admin-timezone";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { buildAdminVoucherPurchase } from "./voucher-purchase";
+import SectionTabs from "../../components/SectionTabs";
 
 const STATUS_PILL: Record<string, string> = {
   ACTIVE: "ui-pill-success",
@@ -223,8 +224,9 @@ export default function Vouchers() {
 
   return (
     <div className="space-y-4">
+      <SectionTabs section="marketing" />
       <div className="anim-fade-up">
-        <p className="ui-mono-label mb-2">Customers · Vouchers</p>
+        <p className="ui-mono-label mb-2">Marketing · Vouchers</p>
         <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Vouchers</h2>
       </div>
 

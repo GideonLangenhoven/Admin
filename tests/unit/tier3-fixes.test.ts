@@ -77,13 +77,14 @@ describe("item 20 — Close vs Cancel are distinct slot actions", () => {
   });
 });
 
-describe("item 21 — Notifications tab removed, WA-failure toast + email fallback", () => {
+describe("item 21 — Failed notifications under Broadcasts, WA-failure toast + email fallback", () => {
   const layout = readFileSync("app/layout.tsx", "utf8");
   const appShell = readFileSync("components/AppShell.tsx", "utf8");
+  const sectionTabs = readFileSync("components/SectionTabs.tsx", "utf8");
   const adminReply = readFileSync("supabase/functions/admin-reply/index.ts", "utf8");
-  it("keeps Notifications out of ordinary operator navigation", () => {
-    expect(layout).toContain('{ href: "/notifications", label: "Failed Notifications", icon: "Warning", privilegedOnly: true, demoOnly: true }');
-    expect(appShell).toContain("n.demoOnly && !readOnly");
+  it("keeps failed notifications out of the sidebar and under Broadcasts", () => {
+    expect(layout).not.toContain('href: "/notifications"');
+    expect(sectionTabs).toContain('{ href: "/notifications", label: "Failed Notifications", privilegedOnly: true }');
   });
   it("the WA-failure watcher is mounted", () => {
     expect(appShell).toContain("<WaFailureWatcher />");

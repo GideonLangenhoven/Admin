@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import NotificationBadge from "./NotificationBadge";
 import RefundBadge from "./RefundBadge";
+import DataRequestBadge from "./DataRequestBadge";
 import SignOutButton from "./SignOutButton";
 import ThemeToggle from "./ThemeToggle";
 import { useBusinessContext } from "./BusinessContext";
@@ -29,11 +30,11 @@ const iconMap: Record<string, PhosphorIcon> = {
 type NavItem = { href: string; label: string; icon: string; external?: boolean };
 
 const GROUPS = [
-  { label: "Operations", hrefs: ["/", "/simple", "/bookings", "/new-booking", "/slots", "/guide", "/photos"] },
-  { label: "Customers", hrefs: ["/inbox", "/customers", "/refunds", "/vouchers", "/reviews", "/notifications"] },
+  { label: "Operations", hrefs: ["/", "/simple", "/bookings", "/new-booking", "/slots"] },
+  { label: "Guest care", hrefs: ["/inbox", "/refunds"] },
   { label: "Revenue", hrefs: ["/invoices", "/pricing", "/reports", "/billing"] },
   { label: "Growth", hrefs: ["/marketing", "/broadcasts", "/partnerships", "/ai-usage"] },
-  { label: "Admin", hrefs: ["/settings/chat-faq", "/settings", "/settings/ota", "/privacy/data-requests", "/super-admin"] },
+  { label: "Admin", hrefs: ["/settings", "/super-admin"] },
 ];
 
 function groupedNav(nav: NavItem[]) {
@@ -60,7 +61,7 @@ export default function MobileMenuDrawer({ nav, active = false }: { nav: NavItem
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
-  const { businessName } = useBusinessContext();
+  const { businessName, readOnly } = useBusinessContext();
 
   useEffect(() => setMounted(true), []);
 
@@ -175,6 +176,7 @@ export default function MobileMenuDrawer({ nav, active = false }: { nav: NavItem
                 {n.external && <span aria-hidden="true" className="text-xs">↗</span>}
                 {n.href === "/inbox" && <NotificationBadge />}
                 {n.href === "/refunds" && <RefundBadge />}
+                {n.href === "/settings" && !readOnly && <DataRequestBadge />}
               </Link>
                 );
               })}
@@ -209,6 +211,7 @@ export default function MobileMenuDrawer({ nav, active = false }: { nav: NavItem
       >
         <DotsThree size={23} weight={active ? "bold" : "regular"} />
         <span>More</span>
+        {!readOnly && <span className="absolute right-1 top-0"><DataRequestBadge /></span>}
         {active && <span className="absolute bottom-0 h-[3px] w-[3px] rounded-full" style={{ background: "var(--ck-amber-bright)" }} aria-hidden="true" />}
       </button>
 
