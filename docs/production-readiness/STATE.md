@@ -1,5 +1,13 @@
 # BookingTours production-readiness checkpoint
 
+Rollout status: PAUSED_BY_USER on 2026-09-28. The user is focusing on the demo.
+Do not resume production qualification, migrations, load or soak tests, provider
+changes, or the public launch switch until the user explicitly resumes the rollout.
+The user separately authorized the 2026-09-28 Google Drive/media deployment:
+admin app commit `bd0fac5` (Vercel `dpl_B7oUczno61wb1tRRz66VFTHX4GYn`) and
+`google-drive` Edge function version 35. This does not change the FAILED_GATE
+verdict or qualify the broader release.
+
 Updated: 2026-09-22T09:15:55Z
 Verdict: FAILED_GATE.
 

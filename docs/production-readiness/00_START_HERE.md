@@ -1,5 +1,10 @@
 # BookingTours readiness: resume here
 
+**Paused by user on 2026-09-28:** Focus on the demo. Do not follow the resume
+instructions below or resume production qualification or launch rollout until
+the user explicitly requests it. The user separately authorized deployment of
+the Google Drive connection and photo/video upload changes on 2026-09-28.
+
 Current status: `FAILED_GATE`. Read [STATE.md](STATE.md), [APPROVALS.json](APPROVALS.json), [RELEASE_MANIFEST.json](RELEASE_MANIFEST.json), and [ISSUES.json](ISSUES.json) before assigning work.
 
 Current scoped outputs: [Section6 functionality and continuity](SECTION6_FUNCTIONALITY.md), [Section7 qualification](SECTION7_QUALIFICATION.md), [Section8 recovery and release packet](SECTION8_RELEASE_RECOVERY.md), and [Section9 final handoff](SECTION9_HANDOFF.md). The exact candidates and migrations are deployed, local continuity and the 500-session read smoke pass, but the deployed 500-VU staff smoke failed. Follow-up telemetry confirms target-side queueing; a local dashboard snapshot correction passes expanded local verification but is neither reviewed nor deployed and receives no qualification credit. Role/provider, full mixed-load, Realtime, restore and 24-hour canary gates remain open.
