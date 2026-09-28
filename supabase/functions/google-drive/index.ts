@@ -2,11 +2,15 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isAllowedDriveReturnOrigin } from "../_shared/google-drive-oauth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || Deno.env.get("SERVICE_ROLE_KEY")!;
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID") || "";
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET") || "";
+// One registered callback serves every operator subdomain. Set this to the
+// canonical admin URL after registering it in Google Cloud.
+const GOOGLE_REDIRECT_URI = Deno.env.get("GOOGLE_OAUTH_REDIRECT_URI") || "https://caepweb-admin.vercel.app/google-callback";
 const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
 
 const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
@@ -31,20 +35,20 @@ function fail(req: any, msg: string, status = 400) {
 
 // ── Google OAuth helpers ──
 
-function buildAuthUrl(businessId: string, redirectUri: string, returnTo?: string) {
+function buildAuthUrl(businessId: string, returnOrigin: string, nonce: string) {
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
-    redirect_uri: redirectUri,
+    redirect_uri: GOOGLE_REDIRECT_URI,
     response_type: "code",
     scope: "https://www.googleapis.com/auth/drive.file email",
     access_type: "offline",
     prompt: "consent",
-    state: btoa(JSON.stringify({ business_id: businessId, return_to: returnTo })),
+    state: btoa(JSON.stringify({ business_id: businessId, return_origin: returnOrigin, nonce })),
   });
   return "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString();
 }
 
-async function exchangeCode(code: string, redirectUri: string) {
+async function exchangeCode(code: string) {
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -52,7 +56,7 @@ async function exchangeCode(code: string, redirectUri: string) {
       code,
       client_id: GOOGLE_CLIENT_ID,
       client_secret: GOOGLE_CLIENT_SECRET,
-      redirect_uri: redirectUri,
+      redirect_uri: GOOGLE_REDIRECT_URI,
       grant_type: "authorization_code",
     }),
   });
@@ -102,7 +106,7 @@ async function createFolder(accessToken: string, name: string, parentId?: string
 }
 
 async function shareFolder(accessToken: string, folderId: string) {
-  await fetch("https://www.googleapis.com/drive/v3/files/" + folderId + "/permissions", {
+  const res = await fetch("https://www.googleapis.com/drive/v3/files/" + folderId + "/permissions", {
     method: "POST",
     headers: {
       Authorization: "Bearer " + accessToken,
@@ -110,6 +114,7 @@ async function shareFolder(accessToken: string, folderId: string) {
     },
     body: JSON.stringify({ role: "reader", type: "anyone" }),
   });
+  if (!res.ok) throw new Error("Google Drive could not share this trip folder (" + res.status + ")");
   return "https://drive.google.com/drive/folders/" + folderId;
 }
 
@@ -152,33 +157,35 @@ Deno.serve(async (req: any) => {
     if (jwt && jwt !== SERVICE_ROLE_KEY) {
       const { data: { user: gUser }, error: gAuthErr } = await supabase.auth.getUser(jwt);
       if (gAuthErr || !gUser) return fail(req, "Unauthorized", 401);
-      const { data: gAdmin } = await supabase.from("admin_users").select("id, read_only").eq("user_id", gUser.id).eq("business_id", businessId).maybeSingle();
-      if (!gAdmin) return fail(req, "You are not an admin of this business", 403);
+      const { data: gAdmin } = await supabase.from("admin_users").select("id, role, suspended, read_only").eq("user_id", gUser.id).eq("business_id", businessId).maybeSingle();
+      if (!gAdmin || gAdmin.suspended) return fail(req, "You are not an active admin of this business", 403);
       if (gAdmin.read_only && action !== "status") return fail(req, "This demonstration account is read-only", 403);
+      if (["auth_url", "exchange", "disconnect"].includes(action) && !["MAIN_ADMIN", "SUPER_ADMIN"].includes(gAdmin.role)) {
+        return fail(req, "MAIN_ADMIN or SUPER_ADMIN required", 403);
+      }
     } else if (!jwt) {
       return fail(req, "Authorization required", 401);
     }
 
     // ── Generate OAuth URL ──
     if (action === "auth_url") {
-      const redirectUri = String(body.redirect_uri || "");
-      if (!redirectUri) return fail(req, "redirect_uri required");
-      const returnTo = String(body.return_to || "/settings");
-      return ok(req, { url: buildAuthUrl(businessId, redirectUri, returnTo) });
+      const returnOrigin = String(body.return_origin || "");
+      const nonce = String(body.nonce || "");
+      if (!isAllowedDriveReturnOrigin(returnOrigin) || req.headers.get("origin") !== returnOrigin) return fail(req, "Invalid admin origin", 403);
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(nonce)) return fail(req, "Invalid OAuth nonce");
+      return ok(req, { url: buildAuthUrl(businessId, returnOrigin, nonce) });
     }
 
     // ── Exchange auth code for tokens ──
     if (action === "exchange") {
       const code = String(body.code || "");
-      const redirectUri = String(body.redirect_uri || "");
       if (!code) return fail(req, "code required");
-      if (!redirectUri) return fail(req, "redirect_uri required");
 
       if (!SETTINGS_ENCRYPTION_KEY || SETTINGS_ENCRYPTION_KEY.length < 32) {
         return fail(req, "Encryption key not configured. Contact support.", 503);
       }
 
-      const tokens = await exchangeCode(code, redirectUri);
+      const tokens = await exchangeCode(code);
       if (tokens.error) {
         console.error("GOOGLE_TOKEN_ERR:", tokens);
         return fail(req, "Google auth failed: " + (tokens.error_description || tokens.error));

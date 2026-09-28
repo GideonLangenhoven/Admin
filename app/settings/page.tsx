@@ -1367,12 +1367,14 @@ export default function SettingsPage() {
     async function handleConnectGdrive() {
         setGdriveLoading(true);
         try {
+            const nonce = crypto.randomUUID();
+            sessionStorage.setItem("google-drive-oauth-nonce", nonce);
             const { data, error } = await supabase.functions.invoke("google-drive", {
                 body: {
                     action: "auth_url",
                     business_id: businessId,
-                    redirect_uri: window.location.origin + "/google-callback",
-                    return_to: "/settings",
+                    return_origin: window.location.origin,
+                    nonce,
                 },
             });
             if (error || data?.error) {

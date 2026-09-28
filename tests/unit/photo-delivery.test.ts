@@ -90,16 +90,20 @@ describe("trip photo delivery", () => {
     const state: any = { Urls: [photoUrls[0]] };
     const setters = Object.fromEntries(["Uploading", "UploadProgress", "UploadedFolderUrl", "Urls", "UploadFiles"].map(key => ["set" + key, (value: any) => { state[key] = typeof value === "function" ? value(state[key]) : value; }]));
     const notify = vi.fn();
-    const responses = [new Response("Uploaded"), new Response("Rejected", { status: 403 })];
+    const uploadDriveMedia = vi.fn()
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("Drive rejected the file"));
     const upload = sourceFunction("app/photos/page.tsx", "uploadToDrive", {
-      ...setters, notify, selectedSlot: slot, uploadFiles: files, uploading: false, businessId: "a", FormData, Blob,
-      fmtDate: () => "10 Sep", loadHistory: vi.fn(), fetch: async () => responses.shift(),
+      ...setters, notify, selectedSlot: slot, uploadFiles: files, uploading: false, businessId: "a", uploadDriveMedia,
+      fmtDate: () => "10 Sep", loadHistory: vi.fn(),
       supabase: {
         functions: { invoke: async (_name: string, { body }: any) => ({ data: body.action === "token" ? { access_token: "fixture" } : { folder_id: "folder-two", folder_url: photoUrls[1] } }) },
         from: () => ({ insert: async () => ({ error: null }) }),
       },
     });
     await upload();
+    expect(uploadDriveMedia).toHaveBeenNthCalledWith(1, files[0], "fixture", "folder-two");
+    expect(uploadDriveMedia).toHaveBeenNthCalledWith(2, files[1], "fixture", "folder-two");
     expect(state.UploadFiles).toEqual([files[1]]);
     expect(state.Urls).toEqual(photoUrls);
     expect(state.Uploading).toBe(false);

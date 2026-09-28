@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { confirmAction, notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
+import { uploadDriveMedia } from "../lib/google-drive-upload";
 import { useBusinessContext } from "../../components/BusinessContext";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -72,7 +73,7 @@ export default function PhotosPage() {
   }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files || []);
+    const files = Array.from(e.target.files || []).filter(f => f.type.startsWith("image/") || f.type.startsWith("video/"));
     if (files.length > 0) setUploadFiles(prev => [...prev, ...files]);
     e.target.value = "";
   }
@@ -119,18 +120,8 @@ export default function PhotosPage() {
       const failed: File[] = [];
       for (let i = 0; i < uploadFiles.length; i++) {
         const file = uploadFiles[i];
-        const metadata = JSON.stringify({ name: file.name, parents: [folderId] });
-        const form = new FormData();
-        form.append("metadata", new Blob([metadata], { type: "application/json" }));
-        form.append("file", file);
-
         try {
-          const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
-            method: "POST",
-            headers: { Authorization: "Bearer " + accessToken },
-            body: form,
-          });
-          if (!res.ok) throw new Error("Google Drive rejected the upload (" + res.status + ").");
+          await uploadDriveMedia(file, accessToken, folderId);
         } catch (error) {
           failed.push(file);
           console.error("Drive upload failed:", error);
@@ -361,7 +352,7 @@ export default function PhotosPage() {
               >
                 <input data-demo-action="photo.upload" ref={fileInputRef} type="file" multiple accept="image/*,video/*" onChange={handleFileSelect} className="hidden" />
                 <p className="text-sm font-medium" style={{ color: "var(--ck-text)" }}>
-                  {dragOver ? "Drop files here" : "Drag & drop photos or click to browse"}
+                  {dragOver ? "Drop files here" : "Drag & drop photos or videos, or click to browse"}
                 </p>
                 <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>Images and videos accepted</p>
               </div>
@@ -376,7 +367,9 @@ export default function PhotosPage() {
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-48 overflow-auto">
                     {uploadFiles.map((f, i) => (
                       <div key={f.name + i} className="relative group">
-                        <img src={URL.createObjectURL(f)} alt={f.name} className="h-20 w-full rounded-lg object-cover" style={{ border: "1px solid var(--ck-border-subtle)" }} />
+                        {f.type.startsWith("video/")
+                          ? <video src={URL.createObjectURL(f)} muted playsInline className="h-20 w-full rounded-lg object-cover" style={{ border: "1px solid var(--ck-border-subtle)" }} />
+                          : <img src={URL.createObjectURL(f)} alt={f.name} className="h-20 w-full rounded-lg object-cover" style={{ border: "1px solid var(--ck-border-subtle)" }} />}
                         <button onClick={(e) => { e.stopPropagation(); removeFile(i); }}
                           className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                           ✕

@@ -186,7 +186,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
     });
   }
 
-  if (isMarketingPath(pathname) && !(pathname === "/operators" && businessId)) {
+  if (pathname === "/google-callback" || (isMarketingPath(pathname) && !(pathname === "/operators" && businessId))) {
     return <main className="min-h-screen">{children}</main>;
   }
 
