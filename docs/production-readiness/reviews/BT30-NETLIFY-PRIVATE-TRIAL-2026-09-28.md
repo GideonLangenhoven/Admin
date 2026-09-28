@@ -1,6 +1,6 @@
 # BT30 Netlify Free private adapter trial
 
-Status: **OWNER-APPROVED PRIVATE TRIAL WINDOW; NOT DEPLOYED OR APPROVED FOR PUBLIC USE.** The owner approved the exact scope in chat on 28 September; receipt was recorded at 06:06:38 UTC, so the conservative two-hour action window ends at **08:06:38 UTC**. This trial measures host compatibility only. It cannot pass `BT30-REALPAY-PILOT-V1` or `BT500-LAUNCH-V1`.
+Status: **PAUSED BY OWNER; PRIOR APPROVAL REVOKED; NOT DEPLOYED OR APPROVED FOR PUBLIC USE.** The owner approved the exact scope in chat on 28 September; receipt was recorded at 06:06:38 UTC. The owner then explicitly paused the production rollout before any Netlify project, GitHub access grant or credential transfer. The former two-hour window is no longer actionable. This trial measures host compatibility only. It cannot pass `BT30-REALPAY-PILOT-V1` or `BT500-LAUNCH-V1`.
 
 ## Exact scope
 
@@ -12,7 +12,9 @@ Status: **OWNER-APPROVED PRIVATE TRIAL WINDOW; NOT DEPLOYED OR APPROVED FOR PUBL
 
 ## Approval and stop conditions
 
-Release contract §A4/H7 requires a fresh exact environment/action/window/cost decision. The owner's current approval includes Netlify's access to the three selected GitHub repositories and the Supabase service-role key in Admin and Storefront Build/Function environments; both materially expand a third party's access. The approved window and scope are above. Stop on a different source SHA, public project, unexpected permission scope, nonzero spend, credential exposure, missing fail-closed ingress, build/adapter mismatch, or Netlify credit threshold. Rollback for this trial is to leave the three projects private, stop deploys, remove their service keys and revoke the Netlify GitHub app's selected-repository access if the trial fails; live aliases and database stay as they were.
+Release contract §A4/H7 requires a fresh exact environment/action/window/cost decision. The former approval included Netlify's access to the three selected GitHub repositories and the Supabase service-role key in Admin and Storefront Build/Function environments; the owner's pause revoked it before either action. A later trial needs a new owner decision. Stop on a different source SHA, public project, unexpected permission scope, nonzero spend, credential exposure, missing fail-closed ingress, build/adapter mismatch, or Netlify credit threshold. Rollback for this trial would leave the three projects private, stop deploys, remove their service keys and revoke the Netlify GitHub app's selected-repository access if the trial fails; live aliases and database stay as they were.
+
+Pause checkpoint: exact-source CI [run 36384779416](https://github.com/GideonLangenhoven/Admin/actions/runs/36384779416) failed its PostgreSQL R18 pagination expectation on both attempts; source builds and earlier checks passed. The expected query includes an earlier date-dependent fixture that the RPC excludes under the September window. A local test correction is uncommitted in the isolated Admin Netlify worktree; no new CI dispatch or Netlify deployment followed the pause. Release verdict remains **FAILED_GATE**.
 
 ## Still required for a public pilot
 
