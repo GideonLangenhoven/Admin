@@ -69,9 +69,7 @@ async function sendEmail(type: string, data: Record<string, unknown>) {
 // notified the tenant and nobody on the platform side, which is the half that
 // actually needs to act on it.
 //
-// HIDDEN_SUPERADMIN_EMAILS deliberately does NOT apply: that list keeps
-// platform staff off tenant-facing mail. This is platform-facing mail, so the
-// platform's own addresses are exactly the right recipients.
+// This is platform-facing mail, so SUPER_ADMIN addresses are the recipients.
 async function platformAlertRecipients(): Promise<string[]> {
   if (PLATFORM_ALERT_EMAIL) return [PLATFORM_ALERT_EMAIL];
   const { data, error } = await supabase

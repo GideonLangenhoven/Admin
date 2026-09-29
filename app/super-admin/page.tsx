@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { notify, confirmAction } from "../lib/app-notify";
 import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
-import { HIDDEN_SUPERADMIN_EMAILS } from "../lib/hidden-superadmin-emails";
 import { SETTINGS_SECTIONS } from "../lib/settings-sections";
 import { useBusinessContext } from "../../components/BusinessContext";
 import PlatformOperations from "../../components/PlatformOperations";
@@ -233,7 +232,7 @@ export default function SuperAdminPage() {
     if (!data || data.id !== bizId) throw new Error("Business details could not be verified. Refresh and try again.");
     setBizDetail({ ...data, billing_plan: plan.data || null });
     setBizTours(tours.data || []);
-    setBizAdmins((admins.data || []).filter(a => !HIDDEN_SUPERADMIN_EMAILS.includes(a.email)));
+    setBizAdmins((admins.data || []).filter(a => a.role !== "SUPER_ADMIN"));
 
     // Parse FAQs
     const faqRaw = data?.faq_json;

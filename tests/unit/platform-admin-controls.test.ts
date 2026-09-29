@@ -35,7 +35,7 @@ describe("business detail response race",()=>{
       return obj;};
     const setBizDetail=vi.fn(),setBizDetailLoading=vi.fn();
     const load=sourceFunction("app/super-admin/page.tsx","loadBizDetail",{
-      detailRequest:{current:0},expandedBiz:null,setExpandedBiz:vi.fn(),setBizDetail,setBizDetailLoading,setBizTours:vi.fn(),setBizAdmins:vi.fn(),setBizFaqs:vi.fn(),notify:vi.fn(),HIDDEN_SUPERADMIN_EMAILS:[],supabase:{from:q},
+      detailRequest:{current:0},expandedBiz:null,setExpandedBiz:vi.fn(),setBizDetail,setBizDetailLoading,setBizTours:vi.fn(),setBizAdmins:vi.fn(),setBizFaqs:vi.fn(),notify:vi.fn(),supabase:{from:q},
     });
     const first=load(A),second=load(B);await Promise.resolve();
     for(const table of ["businesses","tours","admin_users","subscriptions"]) pending[table+B]();

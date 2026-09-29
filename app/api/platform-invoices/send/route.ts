@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCallerAdmin } from "@/app/lib/api-auth";
-import { HIDDEN_SUPERADMIN_EMAILS } from "@/app/lib/hidden-superadmin-emails";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -36,19 +35,20 @@ export async function POST(req: NextRequest) {
   let target: { email: string; name: string } | null = null;
   if (business?.billing_admin_user_id) {
     const { data: chosen } = await db.from("admin_users")
-      .select("email, name")
+      .select("email, name, role")
       .eq("id", business.billing_admin_user_id)
       .eq("business_id", invoice.business_id)
       .maybeSingle();
-    if (chosen && !HIDDEN_SUPERADMIN_EMAILS.includes(chosen.email)) target = chosen;
+    if (chosen && chosen.role !== "SUPER_ADMIN") target = chosen;
   }
   if (!target) {
     const { data: recipients, error: recErr } = await db.from("admin_users")
       .select("email, name")
       .eq("business_id", invoice.business_id)
+      .neq("role", "SUPER_ADMIN")
       .order("created_at", { ascending: true });
     if (recErr) return NextResponse.json({ error: recErr.message }, { status: 500 });
-    target = (recipients || []).find((a) => !HIDDEN_SUPERADMIN_EMAILS.includes(a.email)) || null;
+    target = recipients?.[0] || null;
   }
   if (!target) {
     return NextResponse.json({ error: "This business has no admins to email." }, { status: 400 });

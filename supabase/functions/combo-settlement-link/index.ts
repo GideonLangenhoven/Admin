@@ -27,10 +27,6 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createServiceClient();
 
-// Mirrors app/lib/hidden-superadmin-emails.ts — the platform superadmin's
-// backup logins must never receive operator-facing settlement emails.
-const HIDDEN_SUPERADMIN_EMAILS = ["gidslang89@gmail.com", "info@capeweb.co.za"];
-
 function getCors(req?: any) {
   const origins = getAdminAppOrigins();
   const origin = req?.headers?.get("origin") || "";
@@ -237,7 +233,7 @@ Deno.serve(async (req: any) => {
         .eq("role", "MAIN_ADMIN")
         .eq("suspended", false);
       partnerEmail = (partnerAdmins || []).map((a: any) => String(a.email || ""))
-        .find((e: string) => e && !HIDDEN_SUPERADMIN_EMAILS.includes(e.toLowerCase())) || "";
+        .find(Boolean) || "";
     }
     let emailSent = false;
     if (partnerEmail) {

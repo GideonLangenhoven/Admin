@@ -307,6 +307,7 @@
     "nav_gift_voucher_label",
     "nav_my_bookings_label",
     "notification_email",
+    "onboarding_request_id",
     "operator_email",
     "paysafe_account_id",
     "paysafe_api_key_encrypted",

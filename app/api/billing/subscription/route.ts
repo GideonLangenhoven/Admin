@@ -89,7 +89,8 @@ export async function GET(req: NextRequest) {
   const { count: usedSeats } = await db.from("admin_users")
     .select("*", { count: "exact", head: true })
     .eq("business_id", caller.business_id)
-    .eq("suspended", false);
+    .eq("suspended", false)
+    .neq("role", "SUPER_ADMIN");
 
   // Monthly total = plan base + extra-seat overage. Overage formula matches
   // the super-admin "Email Usage & Billing" panel so the two views agree.

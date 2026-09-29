@@ -6,7 +6,6 @@ import { formatDuration } from "../lib/duration";
 import { OPERATOR_HIDEABLE_SECTIONS } from "../lib/operator-sections";
 import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
-import { HIDDEN_SUPERADMIN_EMAILS } from "../lib/hidden-superadmin-emails";
 import { SETTINGS_SECTIONS } from "../lib/settings-sections";
 import { getAdminTimezone, setAdminTimezone, zonedToUtc } from "../lib/admin-timezone";
 import { useBusinessContext } from "../../components/BusinessContext";
@@ -252,6 +251,7 @@ interface AddOn {
 export default function SettingsPage() {
     const { businessId, refreshBusiness, readOnly } = useBusinessContext();
     const [admins, setAdmins] = useState<any[]>([]);
+    const usedAdminSeats = admins.filter(a => !a.suspended).length;
     const [billingAdminId, setBillingAdminId] = useState<string>("");
     const [loading, setLoading] = useState(true);
     const [role, setRole] = useState<string | null>(null);
@@ -444,8 +444,8 @@ export default function SettingsPage() {
 
     async function fetchAdmins() {
         setLoading(true);
-        const { data, error } = await supabase.from("admin_users").select("id, name, email, role, created_at, password_set_at, must_set_password, invite_sent_at, settings_permissions").eq("business_id", businessId).order("created_at");
-        if (data) setAdmins(data.filter(a => !HIDDEN_SUPERADMIN_EMAILS.includes(a.email)));
+        const { data, error } = await supabase.from("admin_users").select("id, name, email, role, suspended, created_at, password_set_at, must_set_password, invite_sent_at, settings_permissions").eq("business_id", businessId).order("created_at");
+        if (data) setAdmins(data.filter(a => a.role !== "SUPER_ADMIN"));
         const { data: biz } = await supabase.from("businesses").select("billing_admin_user_id").eq("id", businessId).maybeSingle();
         setBillingAdminId(biz?.billing_admin_user_id || "");
         setLoading(false);
@@ -473,7 +473,7 @@ export default function SettingsPage() {
         e.preventDefault();
         if (!newName.trim() || !newEmail.trim()) return setError("Name and email are required.");
         const seatLimit = usageSnapshot?.seat_limit || 10;
-        if (admins.length >= seatLimit) return setError("Admin seat limit reached for your current plan (" + seatLimit + "). Upgrade to add more admins.");
+        if (usedAdminSeats >= seatLimit) return setError("Admin seat limit reached for your current plan (" + seatLimit + "). Upgrade to add more admins.");
 
         setAdding(true);
         setError("");
@@ -1686,7 +1686,7 @@ export default function SettingsPage() {
                 <div>
                     <div className="flex items-center justify-between mb-4">
                         <span className="inline-flex items-center gap-2 rounded-full bg-[var(--ck-surface-sunken)] px-3 py-1">
-                            <span className="font-display text-[15px] font-semibold tabular-nums text-[var(--ck-text-strong)] leading-none">{admins.length}</span>
+                            <span className="font-display text-[15px] font-semibold tabular-nums text-[var(--ck-text-strong)] leading-none">{usedAdminSeats}</span>
                             <span className="ui-mono-label !text-[9.5px]">/ {usageSnapshot?.seat_limit || 10} seats</span>
                         </span>
                         <label className="flex items-center gap-2 text-xs text-[var(--ck-text-muted)]" title="Who receives BookingTours subscription invoices. Defaults to the first admin created on this account.">
@@ -1834,7 +1834,7 @@ export default function SettingsPage() {
                         </button>
                     </div>
                     <form data-demo-submit="admin.add" onSubmit={handleAddAdmin} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
-                        {admins.length >= (usageSnapshot?.seat_limit || 10) ? (
+                        {usedAdminSeats >= (usageSnapshot?.seat_limit || 10) ? (
                             <div className="p-3 rounded-xl text-sm" style={{ background: "var(--ck-warning-soft)", color: "var(--ck-warning)", border: "1px solid color-mix(in srgb, var(--ck-warning) 25%, transparent)" }}>
                                 You have reached the admin seat limit for your plan ({usageSnapshot?.seat_limit || 10}).
                             </div>

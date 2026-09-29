@@ -18,7 +18,9 @@ export async function fetchUsageSnapshot(businessId: string): Promise<UsageSnaps
     supabase
       .from("admin_users")
       .select("id", { count: "exact", head: true })
-      .eq("business_id", businessId),
+      .eq("business_id", businessId)
+      .eq("suspended", false)
+      .neq("role", "SUPER_ADMIN"),
   ]);
 
   if (adminCountRes.error) throw adminCountRes.error;
