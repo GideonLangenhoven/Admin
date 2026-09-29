@@ -1818,9 +1818,9 @@ export default function Bookings() {
                   </label>
                 </div>
 
-                <div className="ui-card overflow-x-auto no-scrollbar lg:overflow-visible">
-                  <table className="w-full text-sm">
-                    <thead className="hidden lg:table-header-group">
+                <div className="ui-card max-w-full overflow-x-auto no-scrollbar 2xl:overflow-visible">
+                  <table className="w-full table-fixed text-sm">
+                    <thead className="hidden 2xl:table-header-group">
                       <tr className="border-b" style={{ background: "var(--ck-surface-sunken)" }}>
                         <th className="w-8 p-1.5 lg:p-3 text-center">
                           <input type="checkbox"
@@ -1876,7 +1876,7 @@ export default function Bookings() {
                         );
                       })}
 
-                      <tr className="hidden border-t-2 font-semibold text-gray-700 lg:table-row" style={{ background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-strong)" }}>
+                      <tr className="hidden border-t-2 font-semibold text-gray-700 2xl:table-row" style={{ background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-strong)" }}>
                         <td className="p-3"></td>
                         <td className="p-3"><span className="ui-mono-label">Totals</span></td>
                         <td className="p-3 font-display tabular-nums">{day.totalPax}</td>
@@ -2325,7 +2325,7 @@ function SlotRows({
 
   return (
     <>
-      <tr className="border-t border-gray-100 lg:hidden">
+      <tr className="border-t border-gray-100 2xl:hidden">
         <td colSpan={9} className="p-0">
           <div className="px-4 py-4">
             <div className="flex items-start justify-between gap-4">
@@ -2334,14 +2334,14 @@ function SlotRows({
                   <span className="text-base font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{slot.timeLabel}</span>
                   <span className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{slot.totalPax} {slot.totalPax === 1 ? "guest" : "guests"}</span>
                 </span>
-                <span className="mt-1 block text-base font-semibold leading-snug" style={{ color: "var(--ck-text)" }}>{services || "No activity assigned"}</span>
+                <span className="mt-1 block text-base font-semibold leading-snug [overflow-wrap:anywhere]" style={{ color: "var(--ck-text)" }}>{services || "No activity assigned"}</span>
                 <span className="mt-2 flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>
                   <span>Paid {fmtCurrency(slot.totalPaid)}</span>
                   <span className={slot.totalDue > 0 ? "font-semibold text-red-700" : "font-semibold text-green-700"}>Due {fmtCurrency(slot.totalDue)}</span>
                 </span>
               </button>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <button type="button" onClick={onToggle} aria-expanded={isOpen} className="ui-btn ui-btn-ghost min-h-11 w-full">
                 {isOpen ? "Hide guests" : "View guests"}
               </button>
@@ -2364,7 +2364,7 @@ function SlotRows({
           )}
         </td>
       </tr>
-      <tr className="hidden cursor-pointer border-t border-gray-100 transition-colors hover:bg-[var(--ck-surface-sunken)] lg:table-row" onClick={onToggle}>
+      <tr className="hidden cursor-pointer border-t border-gray-100 transition-colors hover:bg-[var(--ck-surface-sunken)] 2xl:table-row" onClick={onToggle}>
         <td className="w-8 p-1.5 lg:p-3 text-center" onClick={e => e.stopPropagation()}></td>
         <td className="p-1.5 lg:p-3 font-medium text-[12px] lg:text-sm" style={{ color: "var(--ck-ocean)" }}>
           <span className="mr-0.5 inline-block w-3 text-gray-400 transition-transform" style={{ transform: isOpen ? "rotate(90deg)" : "none" }}>
@@ -2417,7 +2417,7 @@ function SlotRows({
           ];
           return (
             <Fragment key={b.id}>
-            <tr className={"border-t border-gray-100 text-gray-600 lg:hidden " + (selected.has(b.id) ? "bg-[var(--ck-ocean-soft)]" : "bg-[var(--ck-surface-sunken)]")}>
+            <tr className={"border-t border-gray-100 text-gray-600 2xl:hidden " + (selected.has(b.id) ? "bg-[var(--ck-ocean-soft)]" : "bg-[var(--ck-surface-sunken)]")}>
               <td colSpan={9} className="p-0">
                 <div className="px-4 py-4">
                   <div className="flex items-start gap-3">
@@ -2428,11 +2428,11 @@ function SlotRows({
                     </label>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="text-base font-semibold leading-snug" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</p>
+                        <p className="text-base font-semibold leading-snug [overflow-wrap:anywhere]" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</p>
                         <StatusBadge status={b.status} />
                       </div>
                       <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>{b.qty} {b.qty === 1 ? "guest" : "guests"} · Due {fmtCurrency(due)}</p>
-                      <p className="mt-1 break-words text-sm" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "No mobile number"} · {b.waiver_status === "SIGNED" ? "Waiver signed" : "Waiver outstanding"}</p>
+                      <p className="mt-1 text-sm [overflow-wrap:anywhere]" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "No mobile number"} · {b.waiver_status === "SIGNED" ? "Waiver signed" : "Waiver outstanding"}</p>
                       <div className="mt-2 flex flex-wrap gap-1.5"><SourceBadge source={b.source} /><RefundBadge status={b.refund_status} /></div>
                     </div>
                   </div>
@@ -2449,7 +2449,7 @@ function SlotRows({
                 )}
               </td>
             </tr>
-            <tr className={"hidden border-t border-gray-100 text-xs text-gray-600 lg:table-row " + (selected.has(b.id) ? "bg-[var(--ck-ocean-soft)]" : "bg-gray-50/60")}>
+            <tr className={"hidden border-t border-gray-100 text-xs text-gray-600 2xl:table-row " + (selected.has(b.id) ? "bg-[var(--ck-ocean-soft)]" : "bg-gray-50/60")}>
               <td className="w-8 p-1.5 lg:p-3 text-center align-top" onClick={e => e.stopPropagation()}>
                 <input type="checkbox" checked={selected.has(b.id)} onChange={() => onToggleSelect(b.id)}
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -2457,10 +2457,10 @@ function SlotRows({
               </td>
               <td className="p-1.5 lg:p-3 pl-2 lg:pl-10 text-gray-400" colSpan={1}>
                 <div className="flex flex-col gap-0.5">
-                  <div className="flex items-center gap-1 text-left">
+                  <div className="flex flex-wrap items-center gap-1 text-left">
                     <span
                       title={customerNotesTooltip(b.custom_fields)}
-                      className={"font-medium text-gray-700 truncate max-w-[80px] sm:max-w-none lg:pointer-events-auto" + (customerNotesTooltip(b.custom_fields) ? " cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2" : "")}
+                      className={"max-w-full truncate font-medium text-gray-700 lg:pointer-events-auto" + (customerNotesTooltip(b.custom_fields) ? " cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2" : "")}
                     >{b.customer_name}</span>
                     {customerNotesTooltip(b.custom_fields) && (
                       <span title={customerNotesTooltip(b.custom_fields)} className="shrink-0 text-[11px] cursor-help lg:pointer-events-auto" aria-label="Customer added notes">📝</span>
@@ -2500,10 +2500,10 @@ function SlotRows({
                     const newWhen = pr.newSlotStart ? new Date(pr.newSlotStart).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: getAdminTimezone() }) : "new slot";
                     const label = `Pending reschedule → ${pr.newTourName || "Tour"} ${newWhen}${minsLeft !== null ? ` · hold ${minsLeft > 0 ? minsLeft + "m" : "expired"}` : ""} · +R${pr.diff.toFixed(0)}`;
                     return (
-                      <span className="mt-1 flex flex-wrap items-center gap-1.5 pl-[18px] lg:pl-0">
+                      <span className="mt-1 flex max-w-full flex-wrap items-center gap-1.5 pl-[18px] lg:pl-0">
                         <span
                           title={label + ". The customer received a payment link for the difference. If they don't pay before the hold expires, the original slot stays as it was."}
-                          className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${minsLeft && minsLeft > 0 ? "bg-amber-50 text-amber-800 border border-amber-200" : "bg-gray-100 text-gray-600 border border-gray-200"}`}
+                          className={`inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold [overflow-wrap:anywhere] ${minsLeft && minsLeft > 0 ? "bg-amber-50 text-amber-800 border border-amber-200" : "bg-gray-100 text-gray-600 border border-gray-200"}`}
                         >
                           {label}
                         </span>
@@ -2521,7 +2521,7 @@ function SlotRows({
                     );
                   })()}
                   {b.external_ref && (
-                    <span className="text-[10px] text-gray-400 font-mono lg:pl-0 pl-[18px]">
+                    <span className="text-[10px] text-gray-400 font-mono [overflow-wrap:anywhere] lg:pl-0 pl-[18px]">
                       Ref: {b.external_ref}
                     </span>
                   )}
@@ -2534,13 +2534,13 @@ function SlotRows({
                 </div>
               </td>
               <td className="p-1.5 lg:p-3 align-top text-[11px] lg:text-sm">{b.qty}</td>
-              <td className="hidden p-3 align-top md:table-cell text-[11px] text-gray-500">
+              <td className="hidden p-3 align-top md:table-cell text-[11px] text-gray-500 [overflow-wrap:anywhere]">
                 <div className="flex flex-col mt-0.5">
                   <span>{b.phone || "No mobile"}</span>
                   <span>{b.email || "No email"}</span>
                 </div>
               </td>
-              <td className="hidden p-3 align-top md:table-cell">{b.tours?.name || "—"}</td>
+              <td className="hidden p-3 align-top md:table-cell [overflow-wrap:anywhere]">{b.tours?.name || "—"}</td>
               <td className="hidden p-3 text-right align-top sm:table-cell">{fmtCurrency(bookingValue(b))}</td>
               <td className="hidden p-3 text-right align-top sm:table-cell">{fmtCurrency(paid)}</td>
               <td className={`p-1.5 lg:p-3 text-right align-top font-medium text-[11px] lg:text-sm ${refundAmt > 0 ? "text-amber-600" : due > 0 ? "text-red-600" : "text-green-600"}`}>
@@ -2601,11 +2601,11 @@ function MobileActionSheet({ title, onClose, children }: { title: string; onClos
     };
   }, []);
   return (
-    <div className="fixed inset-0 z-50 lg:hidden" onClick={(event) => event.stopPropagation()}>
+    <div className="fixed inset-0 z-50 2xl:hidden" onClick={(event) => event.stopPropagation()}>
       <button type="button" aria-label="Close actions" onClick={onClose} className="absolute inset-0 h-full w-full bg-slate-950/45" />
       <div ref={panelRef} role="dialog" aria-modal="true" aria-label={`Actions for ${title}`} data-mobile-action-sheet className="absolute inset-x-0 bottom-0 max-h-[min(80dvh,42rem)] overflow-y-auto rounded-t-2xl border-t px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl" style={{ background: "var(--ck-surface-elevated)", borderColor: "var(--ck-border-strong)" }}>
         <div className="mb-2 flex min-h-12 items-center justify-between gap-4 border-b pb-2" style={{ borderColor: "var(--ck-border-subtle)" }}>
-          <div className="min-w-0"><p className="ui-mono-label mb-1">Available actions</p><h3 className="text-base font-semibold leading-snug" style={{ color: "var(--ck-text-strong)" }}>{title}</h3></div>
+          <div className="min-w-0"><p className="ui-mono-label mb-1">Available actions</p><h3 className="text-base font-semibold leading-snug [overflow-wrap:anywhere]" style={{ color: "var(--ck-text-strong)" }}>{title}</h3></div>
           <button type="button" onClick={onClose} aria-label="Close actions" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl" style={{ color: "var(--ck-text-muted)" }}>×</button>
         </div>
         <div className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>{children}</div>
