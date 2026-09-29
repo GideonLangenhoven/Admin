@@ -37,6 +37,10 @@ interface OperatorOption {
 
 type AuthSession = Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"];
 
+function isClaireDemoHost(hostname: string) {
+  return hostname === "claires-hiking.admin.bookingtours.co.za";
+}
+
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [authed, setAuthed] = useState(false);
@@ -69,12 +73,14 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [readOnly, setReadOnly] = useState(false);
   const [notice, setNotice] = useState("");
   const [demoLoginAttempted, setDemoLoginAttempted] = useState(false);
+  const [claireDemoHost, setClaireDemoHost] = useState(false);
   // Set when the host names a different operator than the signed-in session.
   const [hostMismatch, setHostMismatch] = useState<{ hostSub: string; ownSub: string } | null>(null);
 
   useEffect(() => {
     const authTransitionAbort = new AbortController();
     authTransitionAbortRef.current = authTransitionAbort;
+    setClaireDemoHost(isClaireDemoHost(window.location.hostname));
     setHasHint(document.cookie.includes("ck_session_hint=1"));
     validateSession(authTransitionAbort.signal).catch((error) => {
       if (authTransitionAbort.signal.aborted) return;
@@ -104,14 +110,14 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (checking || authed || demoLoginAttempted || new URLSearchParams(window.location.search).get("demo") !== "1") return;
+    if (checking || authed || demoLoginAttempted || (!claireDemoHost && new URLSearchParams(window.location.search).get("demo") !== "1")) return;
     setDemoLoginAttempted(true);
     setEmail(DEMO_EMAIL);
     setPass(DEMO_PASSWORD);
     login(DEMO_EMAIL, DEMO_PASSWORD);
   // login is intentionally omitted: the one-shot flag prevents repeat attempts.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checking, authed, demoLoginAttempted]);
+  }, [checking, authed, demoLoginAttempted, claireDemoHost]);
 
   function checkLockout() {
     const lockUntil = Number(localStorage.getItem("ck_lock_until") || "0");
@@ -656,6 +662,17 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (!authed && MARKETING_OPTIONAL_AUTH_PATHS.includes(pathname)) {
     return <BusinessProvider value={{ businessId: "", businessName: "", role: "", logoUrl: "", timezone: "UTC", operators: [] }}>{children}</BusinessProvider>;
+  }
+
+  if (!authed && claireDemoHost && (!demoLoginAttempted || loading)) {
+    return (
+      <div role="main" className="flex min-h-screen items-center justify-center px-4">
+        <div className="ui-card w-full max-w-sm p-8 text-center">
+          <BrandMark size={40} className="mx-auto mb-4 animate-pulse" />
+          <p className="text-sm ui-text-muted">Opening Claire&apos;s demo...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!authed) return (

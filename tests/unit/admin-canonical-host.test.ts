@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { sourceFunction } from "../helpers/source-handler";
 
 // Wildcard DNS serves every *.admin.bookingtours.co.za host and the admin app
 // resolves the tenant from the session, so any subdomain "works". Host wins:
@@ -33,5 +34,13 @@ describe("admin canonical-host handling", () => {
     expect(gate).toContain("This console belongs to another operator");
     expect(gate).toContain("Go to my console");
     expect(gate).toContain("Sign out and use this one instead");
+  });
+
+  it("auto-enters the demo only on Claire's exact admin hostname", () => {
+    const isClaireDemoHost = sourceFunction("components/AuthGate.tsx", "isClaireDemoHost", {});
+    expect(isClaireDemoHost("claires-hiking.admin.bookingtours.co.za")).toBe(true);
+    expect(isClaireDemoHost("admin.bookingtours.co.za")).toBe(false);
+    expect(isClaireDemoHost("other.admin.bookingtours.co.za")).toBe(false);
+    expect(isClaireDemoHost("claires-hiking.admin.bookingtours.co.za.evil.example")).toBe(false);
   });
 });
