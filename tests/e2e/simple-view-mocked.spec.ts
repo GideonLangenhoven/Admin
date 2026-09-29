@@ -246,6 +246,37 @@ async function resetScroll(page: Page) {
 }
 
 test.describe("Simple view mocked responsive acceptance", () => {
+  test("keeps the selected day and check-in date controls usable on a phone", async ({ page }) => {
+    test.setTimeout(180_000);
+    await installMockBackend(page);
+    await page.setViewportSize({ width: 320, height: 700 });
+    await page.goto("/simple", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Welcome, Taylor Operator" })).toBeVisible();
+    const initialDate = await page.getByLabel("Selected date").inputValue();
+    const nextDate = new Date(initialDate + "T12:00:00Z");
+    nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+    const selectedDate = nextDate.toISOString().slice(0, 10);
+    await page.getByRole("button", { name: "Next day" }).click();
+    await expect(page).toHaveURL(`/simple?date=${selectedDate}`);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByLabel("Selected date")).toHaveValue(selectedDate);
+    const bookUrl = new URL(await page.getByRole("link", { name: "Book", exact: true }).first().getAttribute("href") || "", page.url());
+    expect(bookUrl.searchParams.get("returnTo")).toBe(`/simple?date=${selectedDate}`);
+
+    await page.goto(`/simple/check-ins?date=${selectedDate}`, { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Check-ins" })).toBeVisible();
+    const dateBox = await page.getByLabel("Selected date").boundingBox();
+    const arrowBox = await page.getByRole("button", { name: "Next day" }).boundingBox();
+    expect(dateBox!.x + dateBox!.width).toBeLessThanOrEqual(arrowBox!.x);
+    await expectNoHorizontalOverflow(page);
+
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto(`/simple/calendar?date=${selectedDate}`, { waitUntil: "domcontentloaded" });
+    const calendarDateBox = await page.getByLabel("Selected date").boundingBox();
+    const calendarArrowBox = await page.getByRole("button", { name: "Next day" }).boundingBox();
+    expect(calendarArrowBox!.x - (calendarDateBox!.x + calendarDateBox!.width)).toBeLessThanOrEqual(16);
+  });
+
   test("renders Today, Calendar, and Check-ins safely across target devices", async ({ page }) => {
     test.setTimeout(120_000);
     await installMockBackend(page);
@@ -268,11 +299,22 @@ test.describe("Simple view mocked responsive acceptance", () => {
       const value = Object.fromEntries(parts.map(part => [part.type, part.value]));
       return `${value.year}-${value.month}-${value.day}`;
     });
+    await page.getByLabel("Selected date").fill(tomorrow);
+    await expect(page).toHaveURL(`/simple?date=${tomorrow}`);
+    await expect(page.getByText("Selected day ·", { exact: false })).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel("Selected date")).toHaveValue(tomorrow);
+    const dayBookUrl = new URL(await page.getByRole("link", { name: "Book", exact: true }).first().getAttribute("href") || "", page.url());
+    expect(dayBookUrl.searchParams.get("returnTo")).toBe(`/simple?date=${tomorrow}`);
+
     await page.goto(`/simple/check-ins?date=${tomorrow}&slot=${SLOT_ID}`);
     await expect(page.getByRole("heading", { name: "Check-ins" })).toBeVisible();
     await expect(page.getByText("4 of 6 arrived")).toBeVisible();
     await expect(page.getByText("Confirm payment received")).toBeVisible();
     await expect(page.getByRole("button", { name: /Confirm R.*received/ })).toBeVisible();
+    const selectedDateBox = await page.getByLabel("Selected date").boundingBox();
+    const nextDayBox = await page.getByRole("button", { name: "Next day" }).boundingBox();
+    expect(selectedDateBox!.x + selectedDateBox!.width).toBeLessThanOrEqual(nextDayBox!.x);
     await expectNoHorizontalOverflow(page);
     await resetScroll(page);
     await page.screenshot({ path: "/tmp/simple-view-phone-check-ins.png", fullPage: true });
@@ -338,4 +380,21 @@ test.describe("Simple view mocked responsive acceptance", () => {
       await page.screenshot({ path: `/tmp/simple-view-${state}.png`, fullPage: true });
     });
   }
+
+  test("shows Simple view in a landscape tablet sidebar and keeps AI help clear of More in portrait", async ({ page }) => {
+    test.setTimeout(180_000);
+    await installMockBackend(page);
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await page.goto("/bookings", { waitUntil: "domcontentloaded" });
+    const more = page.getByRole("button", { name: "More navigation" });
+    const help = page.getByRole("button", { name: "Open AI help" });
+    await expect(more).toBeVisible();
+    await expect(help).toBeVisible();
+    const moreBox = await more.boundingBox();
+    const helpBox = await help.boundingBox();
+    expect(helpBox!.y + helpBox!.height).toBeLessThan(moreBox!.y);
+
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await expect(page.getByRole("link", { name: "Simple view", exact: true })).toBeVisible();
+  });
 });

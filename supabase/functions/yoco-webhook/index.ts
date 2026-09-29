@@ -233,10 +233,10 @@ async function createInvoice(booking: any, tourName: string, slotTime: string, p
     payment_method: "Yoco", payment_reference: paymentRef,
   }).select().single();
 
-  if (inv.data) {
-    await supabase.from("bookings").update({ invoice_id: inv.data.id }).eq("id", booking.id);
-  }
-  return { ...inv.data, invoice_number: invNum };
+  if (inv.error || !inv.data) throw new Error("Invoice insert failed: " + (inv.error?.message || "No invoice returned"));
+
+  await supabase.from("bookings").update({ invoice_id: inv.data.id }).eq("id", booking.id);
+  return inv.data;
 }
 
 async function sendBookingConfirmation(booking: any, yocoPaymentId: string, checkoutId: string, amount: number) {
@@ -387,7 +387,7 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
             qty: booking.qty,
             total_amount: booking.total_amount,
             invoice_number: invoice?.invoice_number || "",
-            invoice_date: tenant ? formatTenantDate(tenant.business, invoice?.created_at || slotTime || new Date().toISOString()) : "",
+            invoice_date: tenant ? formatTenantDate(tenant.business, invoice?.created_at || new Date().toISOString()) : "",
           }
         }),
       });

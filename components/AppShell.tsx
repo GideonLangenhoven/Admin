@@ -67,7 +67,7 @@ function isSuspendedAllowed(path: string) {
 const NAV_GROUPS: Array<{ label: string | null; hrefs: string[] }> = [
   { label: null, hrefs: ["/"] },
   { label: "Customer view", hrefs: [DEMO_BOOKING_SITE_URL] },
-  { label: "Operations", hrefs: ["/bookings", "/new-booking", "/slots"] },
+  { label: "Operations", hrefs: ["/simple", "/bookings", "/new-booking", "/slots"] },
   { label: "Guest care", hrefs: ["/inbox", "/refunds"] },
   { label: "Revenue", hrefs: ["/invoices", "/pricing", "/reports", "/billing"] },
   { label: "Growth", hrefs: ["/marketing", "/broadcasts", "/partnerships", "/ai-usage"] },
@@ -212,7 +212,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
     .find((n) => isNavItemActive(pathname, n.href, visibleHrefs))?.label
     || (pathname.split("/")[1] ? pathname.split("/")[1].replace(/-/g, " ") : "Dashboard");
 
-  const desktopNav = visibleNav.filter((n) => n.href !== "/simple");
+  const desktopNav = visibleNav;
   const mobilePrimaryHrefs = ["/", "/bookings", "/new-booking", "/inbox"];
   const mobilePrimaryNav = mobilePrimaryHrefs
     .map((href) => visibleNav.find((item) => item.href === href))

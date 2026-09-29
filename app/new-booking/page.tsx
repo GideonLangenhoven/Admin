@@ -690,7 +690,7 @@ export default function NewBookingPage() {
       const mapsUrl = meetingPoint ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(meetingPoint) : "";
 
       // ── Create invoice for every booking ──
-      let invoiceNumber = ref;
+      let invoiceNumber = "";
       try {
         const invNumRes = await supabase.rpc("next_invoice_number", { p_business_id: businessId });
         invoiceNumber = invNumRes.data || ref;
@@ -717,12 +717,13 @@ export default function NewBookingPage() {
           discount_notes: discountType === "manual" ? discountReason.trim() : null,
         };
 
-        const { data: invData } = await supabase.from("invoices").insert(invPayload).select("id").single();
-        if (invData?.id) {
-          await supabase.from("bookings").update({ invoice_id: invData.id }).eq("id", bookingId);
-        }
+        const { data: invData, error: invError } = await supabase.from("invoices").insert(invPayload).select("id").single();
+        if (invError || !invData) throw new Error(invError?.message || "Invoice was not saved");
+        await supabase.from("bookings").update({ invoice_id: invData.id }).eq("id", bookingId);
       } catch (invErr) {
         console.error("Invoice creation failed:", invErr);
+        invoiceNumber = "";
+        notify({ title: "Invoice not created", message: "The booking was saved, but its invoice could not be saved. Retry from the bookings page.", tone: "error" });
       }
 
       // ── Auto-send payment link for PENDING bookings ──
@@ -862,7 +863,7 @@ export default function NewBookingPage() {
           }
 
           // Send invoice email with pro forma PDF attachment
-          try {
+          if (invoiceNumber) try {
             const invoiceRes = await supabase.functions.invoke("send-email", {
               body: {
                 type: "INVOICE",
@@ -872,7 +873,7 @@ export default function NewBookingPage() {
                   customer_name: customerName.trim(),
                   customer_email: email.trim().toLowerCase(),
                   invoice_number: invoiceNumber,
-                  invoice_date: tourDateLabel,
+                  invoice_date: new Date().toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric", timeZone: getAdminTimezone() }),
                   tour_name: tourObj?.name || "Tour",
                   tour_date: tourDateLabel,
                   qty,

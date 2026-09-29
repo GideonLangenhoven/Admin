@@ -93,6 +93,7 @@ type SlotRel = {
 
 interface Booking {
   id: string;
+  confirmation_sent_at?: string | null;
   slot_id: string | null;
   customer_name: string;
   phone: string;
@@ -398,7 +399,7 @@ export default function Bookings() {
           p_limit: limit,
           p_offset: from,
         })
-          .select("id, created_at, slot_id, customer_name, phone, email, qty, total_amount, voucher_amount_paid, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
+          .select("id, created_at, confirmation_sent_at, slot_id, customer_name, phone, email, qty, total_amount, voucher_amount_paid, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
           .order("created_at", { ascending: true }).order("id");
         if (error) throw error;
         if (requestId !== loadRequestRef.current) return;
@@ -712,12 +713,13 @@ export default function Bookings() {
       };
       const { data: existingInv } = await supabase
         .from("invoices")
-        .select("id, invoice_number")
+        .select("id, invoice_number, created_at")
         .eq("booking_id", bookingId)
         .order("created_at", { ascending: true })
         .limit(1)
         .maybeSingle();
 
+      let invoiceDate = existingInv?.created_at || (isPaid(b.status) && b.confirmation_sent_at) || new Date().toISOString();
       if (existingInv?.invoice_number) {
         invoiceNumber = padInv(existingInv.invoice_number);
       } else {
@@ -726,10 +728,11 @@ export default function Bookings() {
           const invNumRes = await supabase.rpc("next_invoice_number", { p_business_id: businessId });
           invoiceNumber = padInv(invNumRes.data || ref);
 
-          const { data: invData } = await supabase.from("invoices").insert({
+          const { data: invData, error: invError } = await supabase.from("invoices").insert({
             business_id: businessId,
             booking_id: bookingId,
             invoice_number: invoiceNumber,
+            created_at: invoiceDate,
             customer_name: b.customer_name || "Customer",
             customer_email: b.email,
             customer_phone: b.phone || null,
@@ -740,13 +743,17 @@ export default function Bookings() {
             subtotal: total,
             total_amount: total,
             payment_method: isPaid(b.status) ? paidMethod : "Pending",
-          }).select("id").single();
+          }).select("id, created_at").single();
 
-          if (invData?.id) {
-            await supabase.from("bookings").update({ invoice_id: invData.id }).eq("id", bookingId);
-          }
+          if (invError || !invData) throw new Error(invError?.message || "Invoice was not saved");
+          invoiceDate = invData.created_at;
+
+          await supabase.from("bookings").update({ invoice_id: invData.id }).eq("id", bookingId);
         } catch (invErr) {
           console.error("Invoice creation failed:", invErr);
+          notify({ title: "Invoice send failed", message: "Could not save invoice. Please try again.", tone: "error" });
+          setResendingInvoiceId(null);
+          return;
         }
       }
 
@@ -759,7 +766,7 @@ export default function Bookings() {
             customer_name: b.customer_name || "Customer",
             customer_email: b.email,
             invoice_number: invoiceNumber,
-            invoice_date: startTime,
+            invoice_date: fmtDate(invoiceDate),
             tour_name: tourName,
             tour_date: startTime,
             qty: b.qty,

@@ -184,7 +184,7 @@ export default function HelpChat() {
   // HelpChat is mounted in the root layout, so client-side navigation never
   // unmounts it.
   function handleNavigate() {
-    if (typeof window !== "undefined" && !window.matchMedia("(min-width: 768px)").matches) {
+    if (typeof window !== "undefined" && !window.matchMedia("(min-width: 1024px)").matches) {
       setOpen(false);
     }
   }
@@ -272,11 +272,11 @@ export default function HelpChat() {
           type="button"
           onClick={() => setOpen(true)}
           aria-label={readOnly ? "Open AI bot" : "Open AI help"}
-          className="fixed bottom-20 right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full transition-transform hover:scale-105 md:bottom-6 md:right-6 md:h-12 md:w-auto md:gap-2 md:px-4"
+          className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full transition-transform hover:scale-105 lg:bottom-6 lg:right-6 lg:h-12 lg:w-auto lg:gap-2 lg:px-4"
           style={{ background: "var(--ck-accent)", color: "#fff", boxShadow: "var(--ck-shadow-lg)" }}
         >
           <ChatCircleDots size={22} weight="fill" />
-          <span className="hidden md:inline text-sm font-semibold">{readOnly ? "AI bot" : "AI help"}</span>
+          <span className="hidden lg:inline text-sm font-semibold">{readOnly ? "AI bot" : "AI help"}</span>
         </button>
       )}
 
@@ -284,7 +284,7 @@ export default function HelpChat() {
         <div
           role="dialog"
           aria-label={readOnly ? "AI bot" : "AI help"}
-          className="fixed inset-x-0 bottom-0 z-50 flex max-h-[75dvh] flex-col overflow-hidden rounded-t-2xl md:inset-x-auto md:bottom-6 md:right-6 md:h-[560px] md:max-h-[calc(100dvh-48px)] md:w-[380px] md:rounded-2xl"
+          className="fixed inset-x-0 bottom-0 z-50 flex max-h-[75dvh] flex-col overflow-hidden rounded-t-2xl lg:inset-x-auto lg:bottom-6 lg:right-6 lg:h-[560px] lg:max-h-[calc(100dvh-48px)] lg:w-[380px] lg:rounded-2xl"
           style={{ background: "var(--ck-surface)", border: "1px solid var(--ck-border-subtle)", boxShadow: "var(--ck-shadow-lg)" }}
         >
           {/* Header */}

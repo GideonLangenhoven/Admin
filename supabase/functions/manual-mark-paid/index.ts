@@ -52,10 +52,9 @@ async function createInvoice(supabase: any, booking: any, tenant: any, paymentMe
     payment_reference: paymentReference,
   }).select().single();
 
-  if (inv.data) {
-    await supabase.from("bookings").update({ invoice_id: inv.data.id }).eq("id", booking.id);
-  }
-  return { ...inv.data, invoice_number: invNum };
+  if (inv.error || !inv.data) throw new Error("Invoice insert failed: " + (inv.error?.message || "No invoice returned"));
+  await supabase.from("bookings").update({ invoice_id: inv.data.id }).eq("id", booking.id);
+  return inv.data;
 }
 
 Deno.serve(async (req: Request) => {
@@ -152,7 +151,7 @@ Deno.serve(async (req: Request) => {
               qty: booking.qty,
               total_amount: booking.total_amount,
               invoice_number: invoice?.invoice_number || "",
-              invoice_date: formatTenantDate(tenant.business, invoice?.created_at || slotTime || new Date().toISOString()),
+              invoice_date: formatTenantDate(tenant.business, invoice?.created_at || new Date().toISOString()),
             },
           }),
         });

@@ -201,10 +201,9 @@ async function createComboInvoice(supabase: any, booking: any, tourName: string,
     payment_reference: paymentRef,
   }).select().single();
 
-  if (inv.data) {
-    await supabase.from("bookings").update({ invoice_id: inv.data.id }).eq("id", booking.id);
-  }
-  return { ...inv.data, invoice_number: invNum };
+  if (inv.error || !inv.data) throw new Error("Invoice insert failed: " + (inv.error?.message || "No invoice returned"));
+  await supabase.from("bookings").update({ invoice_id: inv.data.id }).eq("id", booking.id);
+  return inv.data;
 }
 
 async function sendComboLegConfirmation(supabase: any, booking: any, paymentRef: string, paymentMethod: string) {

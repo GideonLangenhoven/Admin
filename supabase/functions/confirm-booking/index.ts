@@ -212,7 +212,7 @@ Deno.serve(async (req: any) => {
               qty: booking.qty,
               total_amount: booking.total_amount,
               invoice_number: invoice?.invoice_number || "",
-              invoice_date: formatTenantDate(tenant.business, invoice?.created_at || slotTime || new Date().toISOString()),
+              invoice_date: formatTenantDate(tenant.business, invoice?.created_at || new Date().toISOString()),
             },
           },
         });
