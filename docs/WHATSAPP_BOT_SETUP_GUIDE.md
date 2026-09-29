@@ -202,11 +202,13 @@ fixing it later is not.
 
 Check what is actually set with the `verified_name` field in the A1 read.
 
-#### A7. Generate the permanent token
+#### A7. Generate the system-user token
 
-Business Manager → **System Users** → generate a token with
-**`whatsapp_business_messaging`** and **`whatsapp_business_management`**, scoped
-to that operator's WABA. This is the permanent `wa_token`.
+Meta Business Suite → Settings → Users → **System users**. Give the system user
+access to the shared CapeKayakBookings app and the operator's WABA, then generate
+a token for that app with **`whatsapp_business_messaging`** and
+**`whatsapp_business_management`**. Choose a non-expiring token if Meta offers
+that option. This is the operator's `wa_token`.
 
 > [!IMPORTANT]
 > Do NOT use the temporary 24-hour token from the API Setup tab. It expires
@@ -259,9 +261,11 @@ callback URL or app secret changes — **not** per operator.
 Credentials → WhatsApp**, paste the Access Token and Phone Number ID, save.
 That posts to `app/api/credentials/route.ts` with `section: "wa"`, which is
 MAIN_ADMIN/SUPER_ADMIN gated and **validates the pair against Meta Graph before
-storing anything** (`GET /v19.0/{phone_id}?fields=display_phone_number`). A
-token Meta rejects is refused with Meta's own error text and nothing is saved,
-so a wrong paste cannot sit there reading "✓ Configured" while every send fails.
+storing anything** when Meta is reachable (`GET
+/v19.0/{phone_id}?fields=display_phone_number`). A token Meta rejects is
+refused with Meta's own error text and nothing is saved. If Meta is unreachable,
+the save can still succeed; "✓ Configured" only proves values are stored, not
+that the number is connected or inbound webhooks are working.
 It then calls the narrow `set_wa_credentials` RPC.
 
 **For a brand-new tenant**, create the tenant first — see

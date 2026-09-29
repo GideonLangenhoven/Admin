@@ -293,8 +293,14 @@ Deno.serve(withSentry("create-checkout", async (req: any) => {
     console.log("CREATING CHECKOUT: amount=" + amount + " type=" + type);
 
     if (!tenant.credentials.activeYocoSecretKey) {
+      const credentials = tenant.credentials;
+      const reason = !credentials.yocoTestMode && credentials.yocoTestSecretKey && credentials.yocoTestWebhookSecret
+        ? "Yoco test credentials are saved, but Test Mode is off. Enable Test Mode in Settings → Integration Credentials before creating test payment links."
+        : credentials.yocoTestMode
+        ? "Test Mode is on, but its Yoco payment key and webhook secret are not both configured in Settings → Integration Credentials."
+        : "Live Yoco payment key and webhook secret are not both configured in Settings → Integration Credentials.";
       return new Response(
-        JSON.stringify({ error: "BUSINESS_PAYMENT_CONFIG_MISSING", reason: "Matching Yoco payment and webhook credentials are required for this business's payment mode." }),
+        JSON.stringify({ error: "BUSINESS_PAYMENT_CONFIG_MISSING", reason }),
         { status: 503, headers: corsHeaders },
       );
     }

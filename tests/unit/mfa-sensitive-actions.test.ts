@@ -156,14 +156,27 @@ describe("credentials handler", () => {
 });
 
 describe("MFA inline UI", () => {
-  it("renders enrollment, recovery guidance, and a cancel path without owning form values", () => {
+  it("distinguishes first-time authenticator setup from an existing code", () => {
     const markup = renderToStaticMarkup(React.createElement(MfaSensitiveActionPanel, {
       mode: "enroll", actionLabel: "Save bank details", code: "", qrCode: "data:image/svg+xml,fixture",
       secret: "FIXTURE", error: "", busy: false, onCodeChange: () => {}, onVerify: () => {}, onCancel: () => {},
     }));
     expect(markup).toContain("Set up an authenticator");
-    expect(markup).toContain("Continue bookings");
+    expect(markup).toContain("Other account");
+    expect(markup).toContain("Google Authenticator");
+    expect(markup).toContain("Confirm BookingTours appears in the app");
+    expect(markup).toContain("https://www.microsoft.com/en-us/security/authenticator/mobile-app");
     expect(markup).toContain("Cancel");
     expect(markup).not.toContain("bank_account_number");
+
+    const challenge = renderToStaticMarkup(React.createElement(MfaSensitiveActionPanel, {
+      mode: "challenge", actionLabel: "Save WhatsApp credentials", code: "", error: "", busy: false,
+      onCodeChange: () => {}, onVerify: () => {}, onCancel: () => {},
+    }));
+    expect(challenge).toContain("Look for a BookingTours entry");
+    expect(challenge).toContain("BookingTours cannot tell which app you chose");
+    expect(challenge).toContain("Google&#x27;s transfer guide");
+    expect(challenge).toContain("https://support.microsoft.com/en-us/authenticator/restore-account-credentials-from-microsoft-authenticator");
+    expect(challenge).not.toContain("Get Microsoft Authenticator");
   });
 });

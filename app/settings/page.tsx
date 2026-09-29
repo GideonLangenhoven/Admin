@@ -1345,7 +1345,7 @@ export default function SettingsPage() {
             });
             const d = await res.json();
             if (!res.ok || d.error) throw new Error(d.error || "Save failed");
-            setCredMessage({ type: "success", text: "Yoco test credentials saved and encrypted successfully." });
+            setCredMessage({ type: "success", text: "Yoco test credentials saved and encrypted successfully." + (credStatus?.yoco_test_mode ? "" : " Enable Test Mode above before creating test payment links.") });
             setYocoTestForm({ secretKey: "", webhookSecret: "" });
             fetchCredStatus();
         } catch (err: any) {
@@ -3271,6 +3271,7 @@ export default function SettingsPage() {
                                 </span>
                             )}
                         </div>
+                        <p className="text-xs text-[var(--ck-text-muted)]">Ask BookingTours to connect your WhatsApp Business Account to our Meta app before entering credentials here. A token from a separate Meta app will not work with this bot.</p>
                         <div>
                             <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Access Token</label>
                             <input
@@ -3281,6 +3282,7 @@ export default function SettingsPage() {
                                 placeholder={credStatus?.wa ? "●●●●●●●● (set; enter a new value to replace)" : "EAAG..."}
                                 autoComplete="new-password"
                             />
+                            <p className="mt-1 text-xs text-[var(--ck-text-muted)]">BookingTours setup: Meta Business Suite → Settings → Users → System users → Generate token for the BookingTours app. Grant WhatsApp messaging and management access to this business account. The token shown in the app&apos;s WhatsApp API Setup is temporary.</p>
                         </div>
                         <div>
                             <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Phone Number ID</label>
@@ -3292,7 +3294,7 @@ export default function SettingsPage() {
                                 placeholder={credStatus?.wa ? "●●●●●●●● (set; enter a new value to replace)" : "123456789012345"}
                                 autoComplete="off"
                             />
-                            <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Found in Meta Business Manager → WhatsApp → API Setup → Phone number ID.</p>
+                            <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Find the Phone Number ID in WhatsApp Manager → Phone numbers, or in the connected Meta app → WhatsApp → API Setup. Use the numeric ID, not your phone number or WhatsApp Business Account ID.</p>
                         </div>
                         <button
                             type="submit"
@@ -3364,6 +3366,9 @@ export default function SettingsPage() {
                         <p className="text-xs text-[var(--ck-text-muted)] leading-relaxed">
                             When enabled, all Yoco payments will use sandbox (test) keys. No real charges will be processed. Use this to test the payment flow with Yoco test cards.
                         </p>
+                        {credStatus?.yoco_test && !credStatus.yoco_test_mode && (
+                            <p className="text-xs text-amber-600">Test credentials are saved, but checkout still uses live mode. Enable Test Mode to create test payment links.</p>
+                        )}
                         <button data-demo-action={credStatus?.yoco_test_mode ? "credentials.test-off" : "credentials.test-on"}
                             type="button"
                             onClick={handleToggleTestMode}

@@ -52,6 +52,8 @@ The company information and banking details printed on customer pro forma invoic
 
 WhatsApp (access token and phone number ID), Yoco payments (live keys plus a test mode toggle), and Google Drive connection for trip photos. Credentials are encrypted at rest and can only ever be edited by MAIN_ADMIN and above — this section is never delegatable to sub-admins.
 
+BookingTours must first connect your WhatsApp Business Account to its shared Meta app. Ask the BookingTours onboarding team to do this with you; a token from a separate Meta app will not work with the bot. The Phone Number ID is the numeric ID shown for your number in WhatsApp Manager (or in the connected app's WhatsApp API Setup), not the displayed phone number or the WhatsApp Business Account ID. For production, BookingTours generates a system-user access token for its app with `whatsapp_business_messaging` and `whatsapp_business_management` access to your account. The token displayed in API Setup is temporary and should not be saved here.
+
 ## Chat FAQ (Quick Answers)
 
 Quick Answers for the customer chatbot are NOT managed inside Settings. They live on their own Chat FAQ page in the sidebar, under the Admin group. See the Chat FAQ article.

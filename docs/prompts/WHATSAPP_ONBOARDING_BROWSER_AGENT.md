@@ -105,11 +105,13 @@ Three phases. Do them in order and confirm each before moving on.
 6. **Confirm CONNECTED from Meta, not from the response.** Read the pill in
    WhatsApp Manager, or `GET /{PHONE_NUMBER_ID}?fields=display_phone_number,verified_name,status`.
    Check `verified_name` here too: if it reads "CapeWeb", step 3 was missed.
-7. **Create a permanent token**: `business.facebook.com` → Business settings →
-   **System Users** → generate a token with `whatsapp_business_messaging` and
-   `whatsapp_business_management`, scoped to that operator's WABA. Never use the
-   temporary 24-hour token from the API Setup tab; it expires overnight and
-   every send starts failing the next morning.
+7. **Create a long-lived system-user token**: Meta Business Suite → Settings →
+   Users → **System users**. Give the system user access to the shared
+   CapeKayakBookings app and the operator's WABA, then generate a token for
+   that app with `whatsapp_business_messaging` and
+   `whatsapp_business_management`. Choose a non-expiring token if Meta offers
+   that option. Never use the temporary 24-hour token from the app's WhatsApp
+   API Setup; it expires overnight and sends start failing.
 8. **Subscribe the app to their WABA** (WhatsApp → Configuration → the WABA's
    subscribed apps). Skipping this is the most common cause of "I sent a message
    and nothing happened": the number is fine, the token is fine, and Meta simply

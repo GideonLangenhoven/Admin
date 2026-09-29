@@ -38,11 +38,18 @@ export function MfaSensitiveActionPanel({
         </p>
       </div>
 
+      {mode === "challenge" && (
+        <p className="mt-4 max-w-[70ch] text-xs leading-relaxed text-[var(--ck-text-muted)]">
+          On the phone used for setup, open the authenticator app that scanned the BookingTours QR code or saved its manual key. Look for a BookingTours entry and enter the current six-digit number shown there. BookingTours cannot tell which app you chose.
+        </p>
+      )}
+
       {mode === "enroll" && qrCode && (
         <div className="mt-4 grid gap-4 sm:grid-cols-[160px_1fr] sm:items-center">
           <img src={qrCode} alt="Authenticator setup QR code" className="h-40 w-40 rounded-lg bg-[var(--ck-surface)] p-2" />
           <div className="text-xs leading-relaxed text-[var(--ck-text-muted)]">
-            <p>Scan this code with an authenticator app, then enter its six-digit code below.</p>
+            <p>Open Google Authenticator or Microsoft Authenticator on your phone and add an account by scanning this QR code. In Microsoft Authenticator, choose Other account. Confirm BookingTours appears in the app, then enter its current six-digit code below.</p>
+            <p className="mt-2">Need an app? <a href="https://support.google.com/accounts/answer/1066447" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--ck-text-strong)]">Google Authenticator</a> or <a href="https://www.microsoft.com/en-us/security/authenticator/mobile-app" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--ck-text-strong)]">Microsoft Authenticator</a>.</p>
             {secret && <p className="mt-2 break-all"><span className="font-medium text-[var(--ck-text-strong)]">Manual key:</span> <code>{secret}</code></p>}
           </div>
         </div>
@@ -74,8 +81,8 @@ export function MfaSensitiveActionPanel({
         <button type="button" onClick={onCancel} className="ui-btn ui-btn-ghost mt-4">Close</button>
       )}
       {error && <p role="alert" className="mt-3 text-xs font-medium text-[var(--ck-danger)]">{error}</p>}
-      {(mode === "enroll" || mode === "challenge") && (
-        <p className="mt-3 text-xs text-[var(--ck-text-muted)]">Can&apos;t access your authenticator? Ask a Super Admin for verified MFA recovery. Continue bookings and ordinary settings work while recovery is pending.</p>
+      {mode === "challenge" && (
+        <p className="mt-3 text-xs leading-relaxed text-[var(--ck-text-muted)]">Lost the BookingTours entry? Check <a href="https://support.google.com/accounts/answer/1066447" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--ck-text-strong)]">Google&apos;s transfer guide</a> or <a href="https://support.microsoft.com/en-us/authenticator/restore-account-credentials-from-microsoft-authenticator" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[var(--ck-text-strong)]">Microsoft&apos;s backup recovery guide</a> before changing the app on your phone. If the code cannot be restored, operators can ask a Super Admin for verified MFA recovery. Super Admins cannot reset their own MFA here.</p>
       )}
     </section>
   );

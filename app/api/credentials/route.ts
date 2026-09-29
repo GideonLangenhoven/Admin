@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
                 const metaMsg = metaData?.error?.message || "Meta rejected the credentials.";
                 return NextResponse.json({
                     error: "WhatsApp credentials rejected by Meta. Nothing was saved. " + metaMsg +
-                        " Generate a fresh token in Meta (WhatsApp → API Setup) and check the Phone Number ID.",
+                        " Check the Phone Number ID and generate a system-user token for the BookingTours Meta app with access to this WhatsApp Business Account.",
                 }, { status: 400 });
             }
         } catch {

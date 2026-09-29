@@ -116,7 +116,7 @@ describe("R01 actual confirmation handler", () => {
   });
 });
 
-function checkoutFixture(webhookSecret = "fixture-webhook-secret") {
+function checkoutFixture(webhookSecret = "fixture-webhook-secret", credentialOverrides: Record<string, unknown> = {}) {
   const db = queryClient((table, calls) => {
     if (table === "bookings") return { data: { ...booking, tour_id: "tour-a", qty: 1, unit_price: 100, total_amount: 100 }, error: null };
     if (table === "tours") return { data: { base_price_per_person: 100 }, error: null };
@@ -140,7 +140,7 @@ function checkoutFixture(webhookSecret = "fixture-webhook-secret") {
     "../_shared/subscription.ts": { blockIfNotTrading: async () => null },
     "../_shared/tenant.ts": {
       createServiceClient: () => db,
-      getTenantByBusinessId: async () => ({ business: { id: "a" }, credentials: { activeYocoSecretKey: "fixture-provider-key", yocoSecretKey: "fixture-provider-key", yocoWebhookSecret: webhookSecret } }),
+      getTenantByBusinessId: async () => ({ business: { id: "a" }, credentials: { activeYocoSecretKey: "fixture-provider-key", yocoSecretKey: "fixture-provider-key", yocoWebhookSecret: webhookSecret, ...credentialOverrides } }),
       getBusinessAllowedOrigins: () => ["https://a.fixture.invalid"], isAllowedOrigin: () => true,
       resolveBusinessSiteUrls: () => ({ bookingSuccessUrl: "https://a.fixture.invalid/success", bookingCancelUrl: "https://a.fixture.invalid/cancel" }),
     },
@@ -151,6 +151,13 @@ function checkoutFixture(webhookSecret = "fixture-webhook-secret") {
 }
 
 describe("R01 confirmation issuance must not bypass booking ownership", () => {
+  it("explains when saved test credentials cannot be used because Test Mode is off", async () => {
+    const f = checkoutFixture("", { activeYocoSecretKey: "", yocoTestMode: false, yocoTestSecretKey: "sk_test_fixture", yocoTestWebhookSecret: "test-hook" });
+    const response = await f.request("admin-a");
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: "BUSINESS_PAYMENT_CONFIG_MISSING", reason: expect.stringContaining("Enable Test Mode") });
+    expect(f.gateway).not.toHaveBeenCalled();
+  });
   it("does not create a payment when the saved checkout mode has no webhook secret", async () => {
     const f = checkoutFixture("");
     const response = await f.request("admin-a");
