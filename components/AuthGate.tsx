@@ -541,10 +541,9 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete("demo");
         window.history.replaceState({}, "", cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
-      } else if (pathname === "/simple" || pathname.startsWith("/simple/")) {
-        // Simple view is entered deliberately from the full app. A restored
-        // authenticated session may keep a deep link, but a fresh sign-in
-        // always starts on the full dashboard.
+      } else if (!claireDemoHost && (pathname === "/simple" || pathname.startsWith("/simple/"))) {
+        // Normal fresh sign-ins start on the full dashboard. Claire's public
+        // demo keeps a Simple view deep link for tablet and phone visitors.
         window.history.replaceState({}, "", "/");
         window.location.reload();
       }

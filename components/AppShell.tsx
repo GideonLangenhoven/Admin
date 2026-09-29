@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import NotificationBadge from "./NotificationBadge";
 import RefundBadge from "./RefundBadge";
@@ -96,13 +96,30 @@ const SIDEBAR_BG = [
 
 export default function AppShell({ children, nav }: { children: React.ReactNode; nav: NavItem[] }) {
   const pathname = usePathname() || "";
+  const router = useRouter();
+  const isSimplePath = pathname === "/simple" || pathname.startsWith("/simple/");
   const { businessId, businessName, logoUrl, role, subscriptionStatus, yocoTestMode, readOnly, operators, switchOperator } = useBusinessContext();
   const displayName = businessName || "Admin";
   const [collapsed, setCollapsed] = useState(false);
+  const [simpleAvailable, setSimpleAvailable] = useState<boolean | null>(null);
   const [clock, setClock] = useState("");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const isSuspended = subscriptionStatus === "SUSPENDED" && !/super/i.test(role);
   const routeBlocked = isSuspended && !isSuspendedAllowed(pathname);
+
+  useEffect(() => {
+    const update = () => {
+      const width = window.innerWidth;
+      setSimpleAvailable(width <= 1024 || (navigator.maxTouchPoints > 0 && width <= 1366));
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  useEffect(() => {
+    if (isSimplePath && simpleAvailable === false) router.replace("/");
+  }, [isSimplePath, simpleAvailable, router]);
 
   useEffect(() => {
     const tick = () =>
@@ -134,6 +151,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
   } catch { /* SSR / malformed — treat as nothing hidden */ }
 
   const visibleNav = nav.filter((n) => {
+    if (n.href === "/simple" && simpleAvailable !== true) return false;
     if (readOnly) return n.external === true || isDemoPathVisible(n.href);
     // The external Claire storefront link belongs only to the guided demo.
     // Internal destinations tagged in layout remain available to entitled
@@ -190,8 +208,11 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
     return <main className="min-h-screen">{children}</main>;
   }
 
-  if (!readOnly && (pathname === "/simple" || pathname.startsWith("/simple/"))) {
-    return <SimpleViewShell>{children}</SimpleViewShell>;
+  if (isSimplePath) {
+    if (simpleAvailable !== true) {
+      return <main role="status" className="flex min-h-screen items-center justify-center text-sm text-[var(--ck-text-muted)]">Opening full dashboard...</main>;
+    }
+    return <SimpleViewShell>{readOnly ? <DemoActionGuide>{children}</DemoActionGuide> : children}</SimpleViewShell>;
   }
 
   // The Guide app renders standalone (its own full-screen PWA shell) — no admin

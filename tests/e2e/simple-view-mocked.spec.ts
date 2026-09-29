@@ -144,7 +144,7 @@ async function fulfillJson(route: Route, body: unknown, status = 200, extraHeade
   });
 }
 
-async function installMockBackend(page: Page, state: "populated" | "empty" | "error" = "populated", staffName: string | null = "Taylor Operator") {
+async function installMockBackend(page: Page, state: "populated" | "empty" | "error" = "populated", staffName: string | null = "Taylor Operator", readOnly = false) {
   const session = fakeSession();
   const projectRef = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fixture.supabase.co").hostname.split(".")[0];
 
@@ -191,7 +191,7 @@ async function installMockBackend(page: Page, state: "populated" | "empty" | "er
       return;
     }
     if (url.pathname.endsWith("/rest/v1/admin_users")) {
-      await fulfillJson(route, { id: ADMIN_ID, role: "ADMIN", business_id: BUSINESS_ID, name: staffName, settings_permissions: {}, suspended: false, read_only: false });
+      await fulfillJson(route, { id: ADMIN_ID, role: "ADMIN", business_id: BUSINESS_ID, name: staffName, settings_permissions: {}, suspended: false, read_only: readOnly });
       return;
     }
     if (url.pathname.endsWith("/rest/v1/businesses")) {
@@ -294,6 +294,10 @@ test.describe("Simple view mocked responsive acceptance", () => {
     await resetScroll(page);
     await page.screenshot({ path: "/tmp/simple-view-phone.png", fullPage: true });
 
+    await page.setViewportSize({ width: 844, height: 390 });
+    await expect(page.locator(".simple-view")).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
     const tomorrow = await page.evaluate(() => {
       const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(Date.now() + 86_400_000));
       const value = Object.fromEntries(parts.map(part => [part.type, part.value]));
@@ -349,12 +353,13 @@ test.describe("Simple view mocked responsive acceptance", () => {
 
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(`/simple/check-ins?date=${tomorrow}`);
-    await expect(page.getByRole("heading", { name: "Check-ins" })).toBeVisible();
+    await expect(page).toHaveURL("/");
+    await expect(page.getByRole("heading", { name: "Dashboard", exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: "Simple view", exact: true })).toHaveCount(0);
+
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto("/simple");
     await expect(page.getByRole("link", { name: "Full dashboard" })).toBeVisible();
-    await page.keyboard.press("Tab");
-    await expect.poll(() => page.evaluate(() => document.activeElement !== document.body)).toBe(true);
-    await expectNoHorizontalOverflow(page);
-    await page.screenshot({ path: "/tmp/simple-view-desktop.png", fullPage: true });
     await page.getByRole("button", { name: "Switch to dark mode" }).click();
     await expect(page.locator("html")).toHaveClass(/dark/);
     await page.screenshot({ path: "/tmp/simple-view-dark.png", fullPage: true, animations: "disabled" });
@@ -365,6 +370,7 @@ test.describe("Simple view mocked responsive acceptance", () => {
 
   test("uses a neutral welcome when the signed-in staff member has no name", async ({ page }) => {
     await installMockBackend(page, "empty", null);
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/simple");
     await expect(page.getByRole("heading", { name: "Welcome", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Cape Kayak Co., Simple view" })).toBeVisible();
@@ -396,5 +402,15 @@ test.describe("Simple view mocked responsive acceptance", () => {
 
     await page.setViewportSize({ width: 1024, height: 768 });
     await expect(page.getByRole("link", { name: "Simple view", exact: true })).toBeVisible();
+  });
+
+  test("uses the dedicated tablet style for a read-only demo", async ({ page }) => {
+    await installMockBackend(page, "populated", "Demo Operator", true);
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto("/simple");
+    await expect(page.locator(".simple-view")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Cape Kayak Co., Simple view" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Add walk-in" })).toHaveCount(0);
+    await page.screenshot({ path: "/tmp/simple-view-readonly-tablet.png", fullPage: true });
   });
 });
