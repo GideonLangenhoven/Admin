@@ -60,7 +60,7 @@ Deno.serve(withSentry("generate-invite-token", async (req) => {
 
     const { data: requester, error: requesterError } = await supabase
       .from("admin_users")
-      .select("id, role, suspended")
+      .select("id, role, suspended, read_only")
       .eq("user_id", auth.userId)
       .maybeSingle();
 
@@ -68,8 +68,8 @@ Deno.serve(withSentry("generate-invite-token", async (req) => {
     if (!requester || requester.role !== "SUPER_ADMIN") {
       return respond(403, { success: false, error: "Only super admins can manage invite tokens" });
     }
-    if (requester.suspended) {
-      return respond(403, { success: false, error: "Account is suspended" });
+    if (requester.suspended || requester.read_only) {
+      return respond(403, { success: false, error: "This account cannot manage onboarding invites" });
     }
 
     if (action === "generate") {
@@ -80,6 +80,7 @@ Deno.serve(withSentry("generate-invite-token", async (req) => {
       const clientName = String(body.client_name || "").trim();
       const clientEmail = String(body.client_email || "").trim().toLowerCase();
       const subdomain = String(body.subdomain || "").trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+      const existingBusinessId = String(body.business_id || "").trim();
 
       if (!clientName || !clientEmail || !subdomain) {
         return respond(400, {
@@ -91,35 +92,51 @@ Deno.serve(withSentry("generate-invite-token", async (req) => {
       const expiresInHours = Math.min(Math.max(Number(body.expires_in_hours) || 48, 1), 720); // 1h to 30 days
       const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000).toISOString();
 
-      const base = `https://${subdomain}.${BOOKING_DOMAIN}`;
-      const { data: business, error: businessError } = await supabase
-        .from("businesses")
-        .insert({
-          name: clientName,
-          business_name: clientName,
-          operator_email: clientEmail,
-          subdomain,
-          timezone: DEFAULT_TIMEZONE,
-          currency: DEFAULT_CURRENCY,
-          // Explicit, not the column default ('ACTIVE'): a half-provisioned
-          // tenant must not be able to trade or be invoiced. ONBOARDING is
-          // outside the TRADING set, so every payment gate fails closed until
-          // the wizard's go-live step flips it.
-          subscription_status: "ONBOARDING",
-          max_admin_seats: 1,
-          ...derivedUrls(base),
-        })
-        .select("id, business_name, subdomain")
-        .single();
-
-      if (businessError) {
-        if (businessError.code === "23505") {
-          return respond(409, {
-            success: false,
-            error: `Subdomain "${subdomain}" is already taken. Pick a different one.`,
-          });
+      let business;
+      if (existingBusinessId) {
+        const { data, error } = await supabase.from("businesses")
+          .select("id, business_name, subdomain, subscription_status, onboarding_request_id")
+          .eq("id", existingBusinessId).maybeSingle();
+        if (error) throw error;
+        if (!data || data.subdomain !== subdomain || !data.onboarding_request_id || data.subscription_status !== "ACTIVE") {
+          return respond(409, { success: false, error: "Select a newly created client with the same subdomain before inviting them to finish setup." });
         }
-        throw businessError;
+        const { data: owner, error: ownerError } = await supabase.from("admin_users")
+          .select("id").eq("business_id", data.id).eq("role", "MAIN_ADMIN").ilike("email", clientEmail).maybeSingle();
+        if (ownerError) throw ownerError;
+        if (!owner) return respond(409, { success: false, error: "Client email must match this business's Main Admin email." });
+        const { count: bookings, error: bookingError } = await supabase.from("bookings")
+          .select("id", { count: "exact", head: true }).eq("business_id", data.id);
+        if (bookingError) throw bookingError;
+        if (bookings) return respond(409, { success: false, error: "This business already has bookings. Its owner should finish setup in the admin dashboard." });
+        const { data: activeInvite, error: inviteError } = await supabase.from("invite_tokens")
+          .select("id").eq("business_id", data.id).is("used_at", null)
+          .gt("expires_at", new Date().toISOString()).limit(1).maybeSingle();
+        if (inviteError) throw inviteError;
+        if (activeInvite) return respond(409, { success: false, error: "This business already has an active invite. Refresh the list and copy its link." });
+        business = data;
+      } else {
+        const base = `https://${subdomain}.${BOOKING_DOMAIN}`;
+        const { data, error } = await supabase.from("businesses")
+          .insert({
+            name: clientName,
+            business_name: clientName,
+            operator_email: clientEmail,
+            subdomain,
+            timezone: DEFAULT_TIMEZONE,
+            currency: DEFAULT_CURRENCY,
+            subscription_status: "ONBOARDING",
+            max_admin_seats: 1,
+            ...derivedUrls(base),
+          }).select("id, business_name, subdomain").single();
+        if (error) {
+          if (error.code === "23505") return respond(409, {
+            success: false,
+            error: `Subdomain "${subdomain}" already belongs to a business. Select that client to finish setup, or choose a different subdomain.`,
+          });
+          throw error;
+        }
+        business = data;
       }
 
       const { data: tokenRow, error: tokenError } = await supabase
@@ -135,11 +152,21 @@ Deno.serve(withSentry("generate-invite-token", async (req) => {
         .single();
 
       if (tokenError) {
-        // Same manual rollback super-admin-onboard uses: no transaction spans
-        // these two inserts, and an orphan skeleton tenant would squat the
-        // subdomain with no way to reach it.
-        await supabase.from("businesses").delete().eq("id", business.id);
+        if (!existingBusinessId) await supabase.from("businesses").delete().eq("id", business.id);
         throw tokenError;
+      }
+
+      if (existingBusinessId) {
+        // The link stays private until we return it, so fence trading after
+        // minting the token; a failed insert cannot strand the live business.
+        const { data: fenced, error } = await supabase.from("businesses")
+          .update({ subscription_status: "ONBOARDING" }).eq("id", business.id)
+          .eq("subscription_status", "ACTIVE").select("id").maybeSingle();
+        if (error || !fenced) {
+          await supabase.from("invite_tokens").delete().eq("id", tokenRow.id);
+          if (error) throw error;
+          return respond(409, { success: false, error: "This business changed status. Refresh and try again." });
+        }
       }
 
       return respond(200, {
@@ -165,7 +192,7 @@ Deno.serve(withSentry("generate-invite-token", async (req) => {
 
       const { data: business, error: businessError } = await supabase
         .from("businesses")
-        .select("id, business_name, operator_email")
+        .select("id, business_name, operator_email, subscription_status")
         .eq("id", businessId)
         .maybeSingle();
       if (businessError) throw businessError;
@@ -173,11 +200,15 @@ Deno.serve(withSentry("generate-invite-token", async (req) => {
 
       const { data: prior } = await supabase
         .from("invite_tokens")
-        .select("client_name, client_email")
+        .select("client_name, client_email, wizard_step, used_at")
         .eq("business_id", businessId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+      if (business.subscription_status !== "ONBOARDING" &&
+          !(business.subscription_status === "ACTIVE" && prior?.wizard_step === "go-live" && !prior.used_at)) {
+        return respond(409, { success: false, error: "This business is already live. Its owner can finish setup in the admin dashboard." });
+      }
 
       const expiresInHours = Math.min(Math.max(Number(body.expires_in_hours) || 48, 1), 720);
       const { data: tokenRow, error: tokenError } = await supabase
@@ -188,6 +219,7 @@ Deno.serve(withSentry("generate-invite-token", async (req) => {
           business_id: businessId,
           client_name: prior?.client_name || business.business_name,
           client_email: prior?.client_email || business.operator_email,
+          wizard_step: prior?.wizard_step || null,
         })
         .select("id, token, expires_at, created_at")
         .single();
@@ -250,15 +282,17 @@ Deno.serve(withSentry("generate-invite-token", async (req) => {
         return respond(404, { success: false, error: "No unused invite found with that id (already used or revoked)." });
       }
 
-      // Free the subdomain the skeleton was holding, but only while the tenant
-      // never went live — once it is trading it belongs to the client, not to
-      // the invite. Any other invite still pointing at it blocks the cleanup.
+      // Only an invite-created skeleton may be deleted. A manually created
+      // client is kept and returned to ACTIVE when its last link is revoked.
       let businessDeleted = false;
+      let businessRestored = false;
       if (revoked.business_id) {
         const { count: siblingTokens } = await supabase
           .from("invite_tokens")
           .select("id", { count: "exact", head: true })
-          .eq("business_id", revoked.business_id);
+          .eq("business_id", revoked.business_id)
+          .is("used_at", null)
+          .gt("expires_at", new Date().toISOString());
 
         if (!siblingTokens) {
           const { data: gone } = await supabase
@@ -266,13 +300,23 @@ Deno.serve(withSentry("generate-invite-token", async (req) => {
             .delete()
             .eq("id", revoked.business_id)
             .eq("subscription_status", "ONBOARDING")
+            .is("onboarding_request_id", null)
             .select("id")
             .maybeSingle();
           businessDeleted = Boolean(gone);
+          if (!businessDeleted) {
+            const { data: restored } = await supabase.from("businesses")
+              .update({ subscription_status: "ACTIVE" })
+              .eq("id", revoked.business_id)
+              .eq("subscription_status", "ONBOARDING")
+              .not("onboarding_request_id", "is", null)
+              .select("id").maybeSingle();
+            businessRestored = Boolean(restored);
+          }
         }
       }
 
-      return respond(200, { success: true, revoked: tokenId, business_deleted: businessDeleted });
+      return respond(200, { success: true, revoked: tokenId, business_deleted: businessDeleted, business_restored: businessRestored });
     }
 
     return respond(400, { success: false, error: "Unknown action. Use 'generate', 'reissue', 'list', or 'revoke'." });

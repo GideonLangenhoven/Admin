@@ -295,6 +295,12 @@ Deno.serve(async (req) => {
 
     // ── save-step ──
     if (action === "save-step") {
+      const { data: currentBusiness, error: currentBusinessError } = await supabase
+        .from("businesses").select("subscription_status").eq("id", businessId).maybeSingle();
+      if (currentBusinessError) throw currentBusinessError;
+      if (currentBusiness?.subscription_status !== "ONBOARDING") {
+        return respond(409, { success: false, error: "This business is already live. Sign in to the admin dashboard to make further changes." });
+      }
       const step = String(body.step || "").trim();
       const data = (body.data && typeof body.data === "object") ? body.data as Record<string, unknown> : {};
 
@@ -472,7 +478,7 @@ Deno.serve(async (req) => {
         // carrying on would reset that person's password token and email them.
         // Better to stop and let the agent sort the address out.
         const { data: existingAdmin } = await supabase
-          .from("admin_users").select("id, business_id").eq("email", clientEmail).maybeSingle();
+          .from("admin_users").select("id, business_id, password_set_at").eq("email", clientEmail).maybeSingle();
 
         if (existingAdmin && existingAdmin.business_id !== businessId) {
           return respond(409, {
@@ -495,39 +501,41 @@ Deno.serve(async (req) => {
           adminId = created.id;
         }
 
-        const rawToken = Array.from(crypto.getRandomValues(new Uint8Array(24)))
-          .map((b) => b.toString(16).padStart(2, "0")).join("");
-        const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
-        const { data: issued, error: tokErr } = await supabase.rpc("issue_admin_setup_token", {
-          p_admin_id: adminId,
-          p_token_hash: await sha256Hex(rawToken),
-          p_expires_at: expiresAt,
-          p_force_setup: true,
-        });
-        if (tokErr) throw tokErr;
-        const tokenIssued = issued?.status === "ISSUED";
-        if (!tokenIssued && issued?.status !== "BUSY") throw new Error("Password setup link could not be issued");
-
-        const adminOrigin = adminOriginFor(business.subdomain);
-        if (adminOrigin && tokenIssued) {
-          const setupUrl = `${adminOrigin}/change-password?mode=setup&email=${encodeURIComponent(clientEmail)}&token=${encodeURIComponent(rawToken)}`;
-          const { error: mailErr } = await supabase.functions.invoke("send-email", {
-            body: {
-              type: "ADMIN_WELCOME",
-              data: {
-                email: clientEmail,
-                name: invite.client_name || business.business_name,
-                change_password_url: setupUrl,
-                expires_at: expiresAt,
-                reason: "ADMIN_INVITE",
-                business_id: businessId,
-              },
-            },
+        if (!existingAdmin?.password_set_at) {
+          const rawToken = Array.from(crypto.getRandomValues(new Uint8Array(24)))
+            .map((b) => b.toString(16).padStart(2, "0")).join("");
+          const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+          const { data: issued, error: tokErr } = await supabase.rpc("issue_admin_setup_token", {
+            p_admin_id: adminId,
+            p_token_hash: await sha256Hex(rawToken),
+            p_expires_at: expiresAt,
+            p_force_setup: true,
           });
-          // A bounced welcome email must not undo a completed provision — CS can
-          // resend from super-admin.
-          if (mailErr) console.error("ONBOARDING_WELCOME_EMAIL_FAILED", businessId, mailErr);
-          else adminEmailSent = true;
+          if (tokErr) throw tokErr;
+          const tokenIssued = issued?.status === "ISSUED";
+          if (!tokenIssued && issued?.status !== "BUSY") throw new Error("Password setup link could not be issued");
+
+          const adminOrigin = adminOriginFor(business.subdomain);
+          if (adminOrigin && tokenIssued) {
+            const setupUrl = `${adminOrigin}/change-password?mode=setup&email=${encodeURIComponent(clientEmail)}&token=${encodeURIComponent(rawToken)}`;
+            const { error: mailErr } = await supabase.functions.invoke("send-email", {
+              body: {
+                type: "ADMIN_WELCOME",
+                data: {
+                  email: clientEmail,
+                  name: invite.client_name || business.business_name,
+                  change_password_url: setupUrl,
+                  expires_at: expiresAt,
+                  reason: "ADMIN_INVITE",
+                  business_id: businessId,
+                },
+              },
+            });
+            // A bounced welcome email must not undo a completed provision — CS can
+            // resend from super-admin.
+            if (mailErr) console.error("ONBOARDING_WELCOME_EMAIL_FAILED", businessId, mailErr);
+            else adminEmailSent = true;
+          }
         }
       }
 

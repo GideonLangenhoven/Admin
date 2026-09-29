@@ -481,6 +481,7 @@ export default function SuperAdminPage() {
       // The sidebar's tenant switcher fetches operators once on session load —
       // without this, a newly created tenant stays invisible until a hard reload.
       await refreshBusiness?.();
+      await loadBusinesses();
     } catch (error) {
       notify({
         title: "Onboarding failed",
@@ -608,7 +609,7 @@ export default function SuperAdminPage() {
       </form>
 
       {/* ── Onboarding Invites (client-driven wizard links) ── */}
-      <OnboardingInvitesPanel />
+      <OnboardingInvitesPanel businesses={businesses} onInviteCreated={loadBusinesses} />
 
       {/* ── Business Management ── */}
       <div className="ui-card anim-fade-up anim-d2 p-4 sm:p-6">
@@ -1152,13 +1153,14 @@ type InviteRow = {
 
 const INVITE_FORM = { clientName: "", clientEmail: "", subdomain: "", expiresInHours: "48" };
 
-function OnboardingInvitesPanel() {
+function OnboardingInvitesPanel({ businesses, onInviteCreated }: { businesses: BusinessRow[]; onInviteCreated: () => Promise<void> }) {
   const [form, setForm] = useState(INVITE_FORM);
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState<{ businessName: string; token: string; inviteLink: string | null; expiresAt: string } | null>(null);
   const [rows, setRows] = useState<InviteRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const existingBusiness = businesses.find((business) => business.subdomain === form.subdomain);
 
   async function callInvites(body: Record<string, unknown>) {
     const res = await supabase.functions.invoke("generate-invite-token", {
@@ -1197,12 +1199,14 @@ function OnboardingInvitesPanel() {
         client_name: form.clientName,
         client_email: form.clientEmail,
         subdomain: form.subdomain,
+        business_id: existingBusiness?.id,
         expires_in_hours: Number(form.expiresInHours) || 48,
       });
       setGenerated({ businessName: data.business_name, token: data.token, inviteLink: data.invite_link, expiresAt: data.expires_at });
       setForm(INVITE_FORM);
-      notify({ title: "Invite created", message: `${data.business_name} is provisioned and waiting on the wizard.`, tone: "success" });
+      notify({ title: "Invite created", message: `${data.business_name} is ready for the operator to finish in the wizard.`, tone: "success" });
       await loadInvites();
+      await onInviteCreated();
     } catch (err: any) {
       notify({ title: "Could not create invite", message: err.message, tone: "error" });
     }
@@ -1227,7 +1231,7 @@ function OnboardingInvitesPanel() {
     const label = row.businesses?.business_name || row.client_name || row.client_email || "this invite";
     if (!await confirmAction({
       title: "Revoke invite",
-      message: `Revoke the invite for ${label}? If that tenant never went live, its skeleton is deleted too and the subdomain is freed for reuse.`,
+      message: `Revoke the invite for ${label}? A new skeleton client is deleted if it never went live. A client you created earlier is kept and reopened.`,
       tone: "warning",
       confirmLabel: "Revoke invite",
     })) return;
@@ -1239,7 +1243,9 @@ function OnboardingInvitesPanel() {
         title: "Invite revoked",
         message: data.business_deleted
           ? `The skeleton tenant was deleted and ${row.businesses?.subdomain || "its subdomain"} is free again.`
-          : "The invite link no longer works. The tenant was kept because it is already live.",
+          : data.business_restored
+            ? "The invite link no longer works. The existing client was kept and reopened."
+            : "The invite link no longer works. The business was kept.",
         tone: "success",
       });
       await loadInvites();
@@ -1270,7 +1276,7 @@ function OnboardingInvitesPanel() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Onboarding Invites</h2>
-          <p className="text-xs text-[var(--ck-text-muted)] mt-1">Single-use wizard links. Generating one provisions a skeleton tenant the client fills in themselves.</p>
+          <p className="text-xs text-[var(--ck-text-muted)] mt-1">Invite an operator to finish a client you already created, or create a new client with a wizard link.</p>
         </div>
         <button onClick={loadInvites} disabled={loading} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">
           {loading ? "Loading..." : "Refresh"}
@@ -1306,9 +1312,15 @@ function OnboardingInvitesPanel() {
           </div>
         </div>
 
+        {existingBusiness && (
+          <p className="text-sm text-[var(--ck-text-muted)]">
+            This subdomain belongs to <strong>{existingBusiness.business_name}</strong>. Use its Main Admin email. If the business is newly created and has no bookings, the booking site pauses until the operator finishes the wizard.
+          </p>
+        )}
+
         <div className="flex justify-end">
           <button type="submit" disabled={generating} className="ui-btn ui-btn-primary disabled:opacity-50">
-            {generating ? "Creating invite..." : "Generate Invite Link"}
+            {generating ? "Creating invite..." : existingBusiness ? "Invite Existing Client" : "Generate Invite Link"}
           </button>
         </div>
       </form>
@@ -1333,7 +1345,7 @@ function OnboardingInvitesPanel() {
         {rows.length === 0 ? (
           <div className="ui-empty">
             <p className="text-sm font-medium text-[var(--ck-text-strong)]">No invites loaded</p>
-            <p className="text-xs text-[var(--ck-text-muted)]">Enter your password and hit Refresh to see the 50 most recent invites.</p>
+            <p className="text-xs text-[var(--ck-text-muted)]">Select Refresh to see the 50 most recent invites.</p>
           </div>
         ) : (
           <div className="space-y-2">

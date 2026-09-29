@@ -14,7 +14,7 @@ Perform the six client tests and record only what you actually verified. Every c
 
 If billing or policies are missing, use **Complete missing setup** once. It creates only missing records from today, preserves existing records, and does not send an invoice or take money.
 
-Use one onboarding route per client: **Onboard New Client** for assisted setup, or **Onboarding Invites** for self-service. Each creates a separate business and Main Admin. A retried assisted submission uses the same request ID to avoid duplicates. Do not start a second business after an interrupted setup without checking the list.
+**Add New Client** creates the business and Main Admin immediately. If that operator should finish the guided wizard, enter the same booking subdomain and Main Admin email under **Onboarding Invites**. The invite attaches to the existing business; it does not create a second one. The booking site pauses until the operator completes the wizard. Businesses with bookings cannot use this handoff; their owners finish setup in the admin dashboard. For a new operator, you can start directly with **Onboarding Invites**, which creates a fenced skeleton business. A retried assisted submission uses the same request ID to avoid duplicates.
 
 ## Support and staff access
 

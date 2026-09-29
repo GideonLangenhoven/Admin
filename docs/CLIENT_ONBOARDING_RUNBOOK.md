@@ -17,15 +17,18 @@ secrets and cannot reach any tenant other than the one their invite points at.
    The subdomain is fixed at this point, so confirm it with them first.
 3. Copy the invite link and email it to them. Default expiry is 48 hours.
 
-Generating the invite immediately creates their tenant in a fenced
-`ONBOARDING` state. It cannot take payments or be invoiced until the wizard
-finishes, so there is no risk in creating it early.
+For a new subdomain, generating the invite creates their tenant in a fenced
+`ONBOARDING` state. If **Add New Client** already created the business, use the
+same subdomain and its Main Admin email. The invite attaches to that business
+and pauses its booking site until the wizard finishes. This handoff is only
+available before the business has bookings. Do not make another tenant or use
+a different subdomain to get around an existing one.
 
 If the link expires mid-call, use **Reissue** on that row. It mints a fresh
 token against the same half-filled tenant, so nothing they have already entered
 is lost. **Revoke** is for abandoned onboardings: it deletes the token and, if
-the tenant never went live, the skeleton business too, which frees the
-subdomain for reuse.
+the tenant was created by the invite and never went live, the skeleton business
+too. A business created earlier with **Add New Client** is kept and reopened.
 
 ---
 
