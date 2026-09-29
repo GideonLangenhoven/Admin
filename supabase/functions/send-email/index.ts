@@ -6,7 +6,7 @@ import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { Webhook } from "npm:standardwebhooks";
 import { withSentry } from "../_shared/sentry.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
-import { formatTenantDateTime, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
+import { formatTenantDate, formatTenantDateTime, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 import { tourEndDate } from "../_shared/duration.ts";
 import { fillMarketingTokens } from "../_shared/marketing-tokens.ts";
 import { replaceLegacyMarketingSocialIcons } from "../_shared/marketing-email-html.ts";
@@ -1054,6 +1054,14 @@ function invoiceAmountPaid(d: Record<string, unknown>, total: number): number {
   return String(d.payment_method || "").trim().toLowerCase() === "pending" ? 0 : total;
 }
 
+function invoiceServiceDate(value: unknown, timezone: string) {
+  const date = String(value || "-").trim();
+  if (/^\d{4}-\d{2}-\d{2}T/.test(date) && !Number.isNaN(Date.parse(date))) {
+    return formatTenantDate({ id: "", timezone }, date, { month: "short" });
+  }
+  return date.replace(/\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b,?\s*/gi, "").trim();
+}
+
 function invoiceHtml(d: Record<string, unknown>, invCtx?: InvoiceContext) {
   // Always compute the VAT breakdown locally so the email is a compliant
   // SA tax invoice regardless of what the caller passed for `subtotal`.
@@ -1107,7 +1115,7 @@ function invoiceHtml(d: Record<string, unknown>, invCtx?: InvoiceContext) {
                 <th style="padding: 12px 0; border-bottom: 2px solid #E5E5E5; color: #888; font-weight: 500; text-align: right;">Amount</th>
               </tr>
               <tr>
-                <td style="padding: 15px 0; border-bottom: 1px solid #E5E5E5; color: #333;"><strong style="color: #1b3b36;">${d.tour_name}</strong><br><span style="color: #888; font-size: 13px;">${d.tour_date}</span></td>
+                <td style="padding: 15px 0; border-bottom: 1px solid #E5E5E5; color: #333;"><strong style="color: #1b3b36;">${d.tour_name}</strong><br><span style="color: #888; font-size: 13px;">${invoiceServiceDate(d.tour_date, String(d._invoiceTimezone || "UTC"))}</span></td>
                 <td style="padding: 15px 0; border-bottom: 1px solid #E5E5E5; color: #333; text-align: right;">${d.qty}</td>
                 <td style="padding: 15px 0; border-bottom: 1px solid #E5E5E5; color: #333; text-align: right;">R${d.unit_price}</td>
                 <td style="padding: 15px 0; border-bottom: 1px solid #E5E5E5; color: #333; text-align: right;">R${totalStrFmt}</td>
@@ -2219,13 +2227,13 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
   const toCompany = String(d.customer_company_name || "");
   const toVat = String(d.customer_vat_number || "");
   const tourName = String(d.tour_name || "Booking");
-  const tourDate = String(d.tour_date || d.invoice_date || "-");
+  const tourDate = invoiceServiceDate(d.tour_date || d.invoice_date, String(d._invoiceTimezone || "UTC"));
   const qty = Number(d.qty) || 1;
   const totalStr = String(d.total_amount || "0").replace(/[^0-9.,]/g, "").replace(/,/g, "");
   const total = parseFloat(totalStr) || 0;
   const subtotal = total / (1 + VAT_RATE);
   const vatAmt = total - subtotal;
-  const invDate = String(d.invoice_date || "-");
+  const invDate = invoiceServiceDate(d.invoice_date, String(d._invoiceTimezone || "UTC"));
   const amountPaid = invoiceAmountPaid(d, total);
   function m(n: number) { return "R" + n.toFixed(2); }
 
@@ -2689,6 +2697,23 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     d._manageUrl = branding.manageBookingUrl || (branding.bookingSiteUrl ? branding.bookingSiteUrl.replace(/\/+$/, "") + "/my-bookings" : "");
     d._siteUrl = branding.bookingSiteUrl || "";
     d._emailTagline = branding.emailTagline || "";
+    d._invoiceTimezone = branding.timezone;
+    if ((type === "INVOICE" || type === "BOOKING_CONFIRM") && d.invoice_number) {
+      // Invoice issue date comes from the stored invoice, never the trip date
+      // supplied by a caller. Both the email and attached PDF use this value.
+      let issuedAt = new Date().toISOString();
+      if (supabase && branding.businessId) {
+        let invoiceQuery = supabase.from("invoices").select("created_at")
+          .eq("business_id", branding.businessId)
+          .eq("invoice_number", String(d.invoice_number));
+        if (d.booking_id) invoiceQuery = invoiceQuery.eq("booking_id", String(d.booking_id));
+        const { data: invoice, error: invoiceError } = await invoiceQuery
+          .order("created_at", { ascending: false }).limit(1).maybeSingle();
+        if (invoiceError) console.error("INVOICE_DATE_LOOKUP_ERR", invoiceError);
+        if (invoice?.created_at) issuedAt = invoice.created_at;
+      }
+      d.invoice_date = formatTenantDate({ id: branding.businessId, timezone: branding.timezone }, issuedAt, { month: "short" });
+    }
     // Per-tour tagline wins over the account-wide one. Every BOOKING_CONFIRM
     // caller passes booking_id, and send-email already does bookings→tours
     // joins by id (see below), so this needs no changes on the sending side.

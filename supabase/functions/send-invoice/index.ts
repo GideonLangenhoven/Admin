@@ -184,7 +184,7 @@ Deno.serve(async (req: Request) => {
       customer_name: customerName,
       customer_email: customerEmail,
       invoice_number: invNumber,
-      invoice_date: fmtDate(invoiceRow?.created_at as string | null || startTime as string | null || new Date().toISOString(), businessTimezone),
+      invoice_date: fmtDate(invoiceRow?.created_at as string | null || new Date().toISOString(), businessTimezone),
       tour_name: tourName,
       tour_date: tourDate,
       qty: qty,
