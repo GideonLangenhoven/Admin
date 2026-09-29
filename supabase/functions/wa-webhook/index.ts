@@ -1035,13 +1035,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // Marketing opt-out stop words — always processed regardless of conversation state
     const STOP_WORDS = ["stop", "unsubscribe", "opt out"];
     if (STOP_WORDS.includes(input)) {
-      // Set marketing_opt_in = false on all bookings for this phone number
-      await supabase.from("bookings")
-        .update({ marketing_opt_in: false })
-        .eq("business_id", tenant.business.id)
-        .eq("phone", phone);
+      // Stop both promotional and booking-related WhatsApp messages.
+      const { error: stopError } = await supabase.rpc("stop_optional_whatsapp_messages", {
+        p_business_id: tenant.business.id, p_phone: phone,
+      });
+      if (stopError) console.error("WA_STOP_ERR", tenant.business.id, stopError);
       await sendText(tenant, phone,
-        "You've been unsubscribed from marketing messages. You'll still receive booking confirmations."
+        "You've been unsubscribed from optional WhatsApp messages. You'll still receive essential booking confirmations."
       );
       return;
     }

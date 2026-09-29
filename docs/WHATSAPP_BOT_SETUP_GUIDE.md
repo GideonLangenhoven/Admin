@@ -1,5 +1,21 @@
 # WhatsApp Booking Bot Setup & Onboarding Guide
 
+## First booking: My Bookings messages
+
+When a customer makes their first paid booking with an operator, BookingTours sends a My Bookings introduction on WhatsApp if that customer selected **WhatsApp booking updates** at checkout. A separate email about My Bookings is sent within the 24 hours before departure. The booking confirmation also explains My Bookings, including for bookings made shortly before departure. Customers sign in at the operator's `/my-bookings` page with their booking email and phone number, then receive a one-time code by email.
+
+For WhatsApp delivery, each operator needs a connected Cloud API number, a working access token, and the following **approved template on that operator's WhatsApp Business Account**. Create it in WhatsApp Manager → Message templates. Use category **Utility**, name `first_booking_my_bookings_v1`, language **English (`en`)**, and this body, keeping the variables in order:
+
+```text
+Hi {{1}}, thanks for booking with {{2}}! Your reference is {{3}}.
+
+My Bookings is your private page for trip details, waivers, and requesting changes or cancellations when available. Open {{4}} and enter your booking email and phone number. We will email a one-time code to sign in.
+
+Reply STOP to opt out of optional WhatsApp updates.
+```
+
+Variables are the customer's first name, operator name, booking reference, and the operator's My Bookings URL. Provide representative sample values when submitting the template. Meta must approve the template before a customer outside the 24-hour service window can receive this message. A missing or unapproved template appears as a failed template send in the WhatsApp message log; an access token alone does not complete setup. The same WhatsApp consent can be withdrawn by replying `STOP`.
+
 This guide documents how the multi-tenant WhatsApp Booking Bot works and details the exact steps required to set up and configure the same automated flow for any new tour operator.
 
 ---

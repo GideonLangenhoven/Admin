@@ -851,6 +851,7 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
           </td>
         </tr>
         ${waiverBlock}
+        ${d.first_operator_booking ? myBookingsIntroHtml(d) : ""}
         <!-- CTA -->
         <tr>
           <td style="padding: 10px 40px 40px; text-align: center;">
@@ -1526,6 +1527,15 @@ function cancellationHtml(d: Record<string, unknown>) {
     </html>`;
 }
 
+function myBookingsIntroHtml(d: Record<string, unknown>) {
+  const manageUrl = escHtml(String(d._manageUrl || "{{BOOKING_URL}}/my-bookings"));
+  return `<tr><td style="padding: 0 40px 28px; text-align: center;">
+    <h3 style="font-family: Georgia, serif; color: #1b3b36; font-size: 21px; margin: 0 0 10px;">Your My Bookings page</h3>
+    <p style="font-size: 15px; color: #555; line-height: 1.6; margin: 0 0 18px;">View your trip details, complete waivers, and request changes or cancellation when the operator's booking rules allow it. Sign in with the email and phone number used for this booking. We will email you a one-time code.</p>
+    <a href="${manageUrl}" style="display: inline-block; background-color: #1b3b36; color: #ffffff !important; text-decoration: none; padding: 14px 28px; border-radius: 30px; font-weight: 600; font-size: 14px;">Open My Bookings</a>
+  </td></tr>`;
+}
+
 function indemnityHtml(d: Record<string, unknown>) {
   const waiverUrl = String(d.waiver_url || "");
   const waiverPending = String(d.waiver_status || "PENDING") !== "SIGNED";
@@ -1541,7 +1551,7 @@ function indemnityHtml(d: Record<string, unknown>) {
         <tr>
           <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
             <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
-            <h1 style="margin: 10px 0 0 0; font-size: 28px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Your trip is tomorrow</h1>
+            <h1 style="margin: 10px 0 0 0; font-size: 28px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">${d.first_operator_booking ? "Your trip is coming up" : "Your trip is tomorrow"}</h1>
           </td>
         </tr>
         <!-- Hero Image -->
@@ -1550,7 +1560,7 @@ function indemnityHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
             <h2 style="font-size: 22px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Hi ${d.customer_name},</h2>
-            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 10px 0;">Your <strong>${d.tour_name}</strong> is tomorrow. This is a reminder to arrive early and finish any outstanding pre-trip steps.</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 10px 0;">Your <strong>${d.tour_name}</strong> is ${d.first_operator_booking ? "coming up soon" : "tomorrow"}. This is a reminder to arrive early and finish any outstanding pre-trip steps.</p>
             <p style="font-size: 15px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">${waiverPending ? "Your waiver is still outstanding. Please complete it before the trip so check-in stays quick on the day." : "Your waiver has already been completed. You are all set for check-in."}</p>
           </td>
         </tr>
@@ -1605,6 +1615,7 @@ function indemnityHtml(d: Record<string, unknown>) {
           </td>
         </tr>
         `}
+        ${d.first_operator_booking ? myBookingsIntroHtml(d) : ""}
         <!-- Reminder Section -->
         <tr>
           <td style="padding: 0 40px 20px; text-align: center;">
@@ -2623,7 +2634,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       if (!auth.isServiceRole) {
         // Identity, privacy and platform billing messages are issued only by
         // their verified server workflows, never as arbitrary admin payloads.
-        if (["ADMIN_WELCOME", "MY_BOOKINGS_OTP", "MAGIC_LINK", "PLATFORM_INVOICE_OUTSTANDING"].includes(type) || type.startsWith("POPIA_")) {
+        if (["ADMIN_WELCOME", "MY_BOOKINGS_OTP", "MAGIC_LINK", "PLATFORM_INVOICE_OUTSTANDING", "FIRST_BOOKING_TRIP"].includes(type) || type.startsWith("POPIA_")) {
           return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: getCors(req) });
         }
         const businessId = String(d.business_id || auth.businessId || "");
@@ -2659,7 +2670,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       branding = { businessId: "", brandName: fb, timezone: "UTC", shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", locationPhrase: "", emailTagline: "", logoUrl: "", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
     }
 
-    if (type === "BOOKING_CONFIRM" || type === "INDEMNITY" || type === "REMINDER") {
+    if (type === "BOOKING_CONFIRM" || type === "INDEMNITY" || type === "REMINDER" || type === "FIRST_BOOKING_TRIP") {
       try { d = await enrichWaiverEmailData(d); } catch (wErr) { console.error("WAIVER_ENRICH_ERR:", wErr); }
     }
 
@@ -2683,8 +2694,10 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     // joins by id (see below), so this needs no changes on the sending side.
     if (type === "BOOKING_CONFIRM" && d.booking_id && supabase) {
       try {
-        const tt = await supabase.from("bookings").select("tours(confirmation_tagline)").eq("id", String(d.booking_id)).eq("business_id", branding.businessId).maybeSingle();
-        const tag = (tt.data as { tours?: { confirmation_tagline?: string } } | null)?.tours?.confirmation_tagline;
+        const tt = await supabase.from("bookings").select("first_operator_booking, tours(confirmation_tagline)").eq("id", String(d.booking_id)).eq("business_id", branding.businessId).maybeSingle();
+        const booking = tt.data as { first_operator_booking?: boolean; tours?: { confirmation_tagline?: string } } | null;
+        d.first_operator_booking = booking?.first_operator_booking === true;
+        const tag = booking?.tours?.confirmation_tagline;
         if (tag && String(tag).trim()) d._emailTagline = String(tag).trim();
       } catch (tagErr) {
         console.error("TOUR_TAGLINE_LOOKUP_ERR:", tagErr);
@@ -2811,6 +2824,10 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         // handles both signed and unsigned waiver states.
         subject = "Cape Kayak - Your trip is tomorrow (Ref: " + d.ref + ")";
         html = indemnityHtml(d);
+        break;
+      case "FIRST_BOOKING_TRIP":
+        subject = "Cape Kayak - Your trip is coming up: My Bookings (Ref: " + d.ref + ")";
+        html = indemnityHtml({ ...d, first_operator_booking: true });
         break;
       case "VOUCHER":
         subject = "Cape Kayak - Your Voucher Code";

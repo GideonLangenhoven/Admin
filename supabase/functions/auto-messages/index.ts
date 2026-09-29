@@ -1,7 +1,7 @@
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, getTenantByBusinessId as getTenantContext, resolveManageBookingsUrl, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
+import { createServiceClient, fetchAllRows, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, getTenantByBusinessId as getTenantContext, resolveManageBookingsUrl, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
 import { resolveWaiverLink } from "../_shared/waiver.ts";
 import { withSentry } from "../_shared/sentry.ts";
 import { requireAuth } from "../_shared/auth.ts";
@@ -69,6 +69,97 @@ async function mapWithConcurrency<T>(items: T[], limit: number, worker: (item: T
   await Promise.all(runners);
 }
 
+async function sendFirstBookingWhatsappsForBusiness(businessId: string) {
+  const tenant = await getTenantContext(db, businessId);
+  if (!tenant.credentials.waToken || !tenant.credentials.waPhoneId) return 0;
+  const now = new Date().toISOString();
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const bookings = await fetchAllRows<any>((from, to) => db.from("bookings")
+    .select("id, customer_name, email, phone, first_operator_booked_at, slots!inner(start_time)")
+    .eq("business_id", businessId).eq("first_operator_booking", true)
+    .eq("whatsapp_booking_updates_opt_in", true)
+    .in("status", ["PAID", "CONFIRMED"])
+    .gte("first_operator_booked_at", cutoff).gt("slots.start_time", now)
+    .not("phone", "is", null).not("email", "is", null)
+    .order("first_operator_booked_at", { ascending: true }).order("id").range(from, to));
+  const brandName = getBusinessDisplayName(tenant.business);
+  const myBookingsUrl = resolveManageBookingsUrl(tenant.business);
+  let sent = 0;
+  for (const booking of bookings) {
+    if (!booking.phone || !booking.email || await alreadySent(booking.id, "FIRST_BOOKING_MY_BOOKINGS_WA")) continue;
+    const { data: lastFailure } = await db.from("auto_messages").select("created_at")
+      .eq("business_id", businessId).eq("booking_id", booking.id)
+      .eq("type", "FIRST_BOOKING_MY_BOOKINGS_WA_FAILED").maybeSingle();
+    if (lastFailure?.created_at && Date.now() - Date.parse(lastFailure.created_at) < 60 * 60 * 1000) continue;
+    // Claim before calling Meta so overlapping sweeps cannot double-send.
+    if (!await logSent(businessId, booking.id, booking.phone, "FIRST_BOOKING_MY_BOOKINGS_WA")) continue;
+    const firstName = String(booking.customer_name || "").split(" ")[0] || "there";
+    const ref = String(booking.id).slice(0, 8).toUpperCase();
+    const message = `Hi ${firstName}, thanks for booking with ${brandName}! Your reference is ${ref}.\n\nMy Bookings is your private page for trip details, waivers, and requesting changes or cancellations when available. Open ${myBookingsUrl} and enter your booking email and phone number. We will email a one-time code to sign in.\n\nReply STOP to opt out of optional WhatsApp updates.`;
+    try {
+      await sendWhatsappTextForTenant(tenant, booking.phone, message, {
+        name: "first_booking_my_bookings_v1",
+        params: [firstName, brandName, ref, myBookingsUrl],
+      });
+      sent++;
+    } catch (error) {
+      console.error("FIRST_BOOKING_WA_ERR", businessId, booking.id, error);
+      // Permit an hourly retry during the first day, including after an
+      // operator's Meta template is approved, without a five-minute send storm.
+      await db.from("auto_messages").delete().eq("business_id", businessId)
+        .eq("booking_id", booking.id).eq("type", "FIRST_BOOKING_MY_BOOKINGS_WA");
+      await db.from("auto_messages").upsert({ business_id: businessId, booking_id: booking.id,
+        phone: booking.phone, type: "FIRST_BOOKING_MY_BOOKINGS_WA_FAILED", created_at: new Date().toISOString() },
+        { onConflict: "booking_id,type" });
+    }
+  }
+  return sent;
+}
+
+async function sendFirstBookingTripEmailsForBusiness(businessId: string) {
+  const tenant = await getTenantContext(db, businessId);
+  const now = Date.now();
+  const bookings = await fetchAllRows<any>((from, to) => db.from("bookings")
+    .select("id, business_id, customer_name, email, phone, qty, first_operator_booked_at, waiver_status, waiver_token, tours(name), slots!inner(start_time)")
+    .eq("business_id", businessId).eq("first_operator_booking", true)
+    .in("status", ["PAID", "CONFIRMED"])
+    .gt("slots.start_time", new Date(now).toISOString())
+    .lte("slots.start_time", new Date(now + 24 * 60 * 60 * 1000).toISOString())
+    .not("email", "is", null)
+    .order("first_operator_booked_at", { ascending: true }).order("id").range(from, to));
+  let sent = 0;
+  for (const booking of bookings) {
+    if (!booking.email || !booking.slots?.start_time || await alreadySent(booking.id, "FIRST_BOOKING_TRIP_EMAIL")) continue;
+    // Confirmation already covers a booking made inside the 24-hour window.
+    if (now - Date.parse(booking.first_operator_booked_at) < 2 * 60 * 60 * 1000) continue;
+    try {
+      const response = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_SERVICE_ROLE_KEY },
+        body: JSON.stringify({ type: "FIRST_BOOKING_TRIP", data: {
+          business_id: businessId, booking_id: booking.id, email: booking.email,
+          customer_name: booking.customer_name || "Guest",
+          ref: String(booking.id).slice(0, 8).toUpperCase(),
+          tour_name: booking.tours?.name || "Your trip",
+          start_time: formatTenantDateTime(tenant.business, booking.slots.start_time),
+          qty: booking.qty, waiver_status: booking.waiver_status,
+          waiver_token: booking.waiver_token,
+          delivery_idempotency_key: "first-booking-trip/" + booking.id,
+        } }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.ok !== true || !result.id) {
+        console.error("FIRST_BOOKING_EMAIL_ERR", businessId, booking.id, result.error || response.status);
+        continue;
+      }
+      if (await logSent(businessId, booking.id, booking.phone || "", "FIRST_BOOKING_TRIP_EMAIL")) sent++;
+    } catch (error) {
+      console.error("FIRST_BOOKING_EMAIL_ERR", businessId, booking.id, error);
+    }
+  }
+  return sent;
+}
+
 // Trip-reminder orchestration. One function decides, per booking with a trip
 // in the next 24 hours, exactly which messages go out:
 //   1. WhatsApp first; the reminder EMAIL is sent only when WhatsApp fails
@@ -91,7 +182,7 @@ async function orchestrateTripRemindersForBusiness(businessId: string) {
   const createdCutoffIso = new Date(now - 2 * 60 * 60 * 1000).toISOString();
 
   const { data: bookings } = await db.from("bookings")
-    .select("id, business_id, customer_name, phone, email, qty, created_at, waiver_status, waiver_token, tours(name), slots!inner(start_time)")
+    .select("id, business_id, customer_name, phone, email, qty, created_at, waiver_status, waiver_token, first_operator_booking, whatsapp_booking_updates_opt_in, tours(name), slots!inner(start_time)")
     .eq("business_id", businessId)
     .in("status", ["PAID", "CONFIRMED"])
     .gt("slots.start_time", nowIso)
@@ -126,7 +217,7 @@ async function orchestrateTripRemindersForBusiness(businessId: string) {
       "Need to make changes? " + myBookingsUrl;
 
     let waChannel: string | null = null;
-    if (booking.phone) {
+    if (booking.phone && (!booking.first_operator_booking || booking.whatsapp_booking_updates_opt_in)) {
       try {
         const waResult = await sendWhatsappTextForTenant(tenant, booking.phone, message, {
           name: "booking_reminder",
@@ -157,7 +248,8 @@ async function orchestrateTripRemindersForBusiness(businessId: string) {
       qty: booking.qty,
     };
 
-    let delivered = !!waChannel;
+    const firstBookingEmailSent = booking.first_operator_booking && await alreadySent(booking.id, "FIRST_BOOKING_TRIP_EMAIL");
+    let delivered = !!waChannel || firstBookingEmailSent;
     if (!delivered && booking.email) {
       // WhatsApp failed or no phone on file — email is the fallback channel.
       try {
@@ -170,7 +262,7 @@ async function orchestrateTripRemindersForBusiness(businessId: string) {
       } catch (error) {
         console.error("REMINDER_EMAIL_ERR", businessId, booking.id, error);
       }
-    } else if (waChannel === "template" && needsWaiver && booking.email && !(await alreadySent(booking.id, "INDEMNITY"))) {
+    } else if (waChannel === "template" && needsWaiver && booking.email && !firstBookingEmailSent && !(await alreadySent(booking.id, "INDEMNITY"))) {
       // The approved template has fixed params and can't carry the waiver
       // link — deliver the waiver ask by email so it isn't lost.
       try {
@@ -639,6 +731,8 @@ Deno.serve(withSentry("auto-messages", async (req) => {
 
     const businesses = await getBusinesses(businessId);
     const results: Record<string, number> = {
+      first_booking_whatsapp: 0,
+      first_booking_email: 0,
       reminders: 0,
       reviews: 0,
       review_reminders: 0,
@@ -652,6 +746,8 @@ Deno.serve(withSentry("auto-messages", async (req) => {
       const businessId = String(biz.id || "");
       if (!businessId) return;
       try {
+        if (action === "all" || action === "first_booking") results.first_booking_whatsapp += await sendFirstBookingWhatsappsForBusiness(businessId);
+        if (action === "all" || action === "reminders" || action === "first_booking") results.first_booking_email += await sendFirstBookingTripEmailsForBusiness(businessId);
         // "indemnity" stays accepted as an alias: the waiver ask now rides in
         // the reminder itself (see orchestrateTripRemindersForBusiness).
         if (action === "all" || action === "reminders" || action === "indemnity") results.reminders += await orchestrateTripRemindersForBusiness(businessId);

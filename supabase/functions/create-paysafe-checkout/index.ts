@@ -193,6 +193,7 @@ async function handleCreate(body: any, cors: Record<string, string>) {
       customer_name: customer_name || "",
       email: customer_email || "",
       phone: customer_phone || "",
+      whatsapp_booking_updates_opt_in: body.whatsapp_booking_updates_opt_in === true,
       qty: qty,
       total_amount: splits[i],
       unit_price: splits[i] / qty,
