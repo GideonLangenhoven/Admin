@@ -117,6 +117,7 @@ async function sendFirstBookingWhatsappsForBusiness(businessId: string) {
 }
 
 async function sendFirstBookingTripEmailsForBusiness(businessId: string) {
+  // Trip information is transactional: marketing_opt_in does not gate it.
   const tenant = await getTenantContext(db, businessId);
   const now = Date.now();
   const bookings = await fetchAllRows<any>((from, to) => db.from("bookings")
