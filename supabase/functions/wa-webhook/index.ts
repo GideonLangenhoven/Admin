@@ -358,6 +358,13 @@ async function sendText(tenant: TenantContext, to: any, t: any) { return sendWA(
 async function sendButtons(tenant: TenantContext, to: any, bt: any, btns: any) {
   return sendWA(tenant, to, { type: "interactive", interactive: { type: "button", body: { text: bt }, action: { buttons: btns.map(function (b: any) { return { type: "reply", reply: { id: b.id, title: b.title.substring(0, 20) } }; }) } } });
 }
+async function askBookingWhatsappConsent(tenant: TenantContext, phone: string, repeat = false) {
+  const operator = getBusinessDisplayName(tenant.business);
+  const prompt = repeat
+    ? "Please choose whether you want booking-related WhatsApp updates from " + operator + "."
+    : "May " + operator + " send booking-related WhatsApp updates, including how to use My Bookings? No promotions. Reply STOP any time to opt out.";
+  return sendButtons(tenant, phone, prompt, [{ id: "WA_UPDATES_YES", title: "Yes, send updates" }, { id: "WA_UPDATES_NO", title: "No thanks" }]);
+}
 async function sendList(tenant: TenantContext, to: any, bt: any, btnTxt: any, secs: any) {
   return sendWA(tenant, to, { type: "interactive", interactive: { type: "list", body: { text: bt }, action: { button: btnTxt.substring(0, 20), sections: secs } } });
 }
@@ -2329,8 +2336,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         // Details already collected (e.g. re-confirm after a price update) —
         // go straight to finalize instead of asking for name/email again.
         if (sd.customer_name && sd.email) {
-          await setConvo(convo.id, { current_state: "FINALIZE_BOOKING", state_data: sd });
-          await handleMsg(tenant, phone, "internal_proceed", "text", null);
+          if (typeof sd.whatsapp_booking_updates_opt_in !== "boolean") {
+            await setConvo(convo.id, { current_state: "ASK_WHATSAPP_UPDATES", state_data: sd });
+            await askBookingWhatsappConsent(tenant, phone);
+          } else {
+            await setConvo(convo.id, { current_state: "FINALIZE_BOOKING", state_data: sd });
+            await handleMsg(tenant, phone, "internal_proceed", "text", null);
+          }
           return;
         }
         await typingDelay();
@@ -2380,9 +2392,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await sendText(tenant, phone, "Almost done.\n\n" + promptForCustomField(customDefs[0]));
         return;
       }
-      await setConvo(convo.id, { current_state: "FINALIZE_BOOKING", state_data: { ...sd, customer_name: dName, email: dEmail, partial_name: undefined, partial_email: undefined } });
+      await setConvo(convo.id, { current_state: "ASK_WHATSAPP_UPDATES", state_data: { ...sd, customer_name: dName, email: dEmail, partial_name: undefined, partial_email: undefined } });
       await typingDelay();
-      await handleMsg(tenant, phone, "internal_proceed", "text", null); // Auto-advance to finalize
+      await askBookingWhatsappConsent(tenant, phone);
     }
 
     else if (state === "ASK_CUSTOM_FIELDS") {
@@ -2390,9 +2402,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const values = { ...(sd.custom_fields || {}) };
       const currentField = nextCustomField(defs, values);
       if (!currentField) {
-        await setConvo(convo.id, { current_state: "FINALIZE_BOOKING", state_data: { ...sd, custom_fields: values } });
+        await setConvo(convo.id, { current_state: "ASK_WHATSAPP_UPDATES", state_data: { ...sd, custom_fields: values } });
         await typingDelay();
-        await handleMsg(tenant, phone, "internal_proceed", "text", null);
+        await askBookingWhatsappConsent(tenant, phone);
         return;
       }
 
@@ -2410,8 +2422,20 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         return;
       }
 
-      await setConvo(convo.id, { current_state: "FINALIZE_BOOKING", state_data: { ...sd, custom_fields: values } });
+      await setConvo(convo.id, { current_state: "ASK_WHATSAPP_UPDATES", state_data: { ...sd, custom_fields: values } });
       await typingDelay();
+      await askBookingWhatsappConsent(tenant, phone);
+      return;
+    }
+
+    else if (state === "ASK_WHATSAPP_UPDATES") {
+      const consent = rid === "WA_UPDATES_YES" || ["yes", "y"].includes(input) ? true
+        : rid === "WA_UPDATES_NO" || ["no", "n"].includes(input) ? false : null;
+      if (consent === null) {
+        await askBookingWhatsappConsent(tenant, phone, true);
+        return;
+      }
+      await setConvo(convo.id, { current_state: "FINALIZE_BOOKING", state_data: { ...sd, whatsapp_booking_updates_opt_in: consent } });
       await handleMsg(tenant, phone, "internal_proceed", "text", null);
       return;
     }
@@ -2480,7 +2504,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         original_total: verifiedSd.base_total, discount_type: verifiedSd.discount_type || null, discount_percent: verifiedSd.discount_percent || 0,
         voucher_amount_paid: Number(verifiedSd.voucher_deduction || 0),
         status: "PENDING", source: "WHATSAPP", custom_fields: sd.custom_fields || {},
-        marketing_opt_in: null, total_captured: 0, total_refunded: 0,
+        marketing_opt_in: null, whatsapp_booking_updates_opt_in: sd.whatsapp_booking_updates_opt_in === true,
+        total_captured: 0, total_refunded: 0,
         terms_accepted_at: new Date().toISOString(),
       }).select().single();
       if (br2.error || !br2.data) { console.error("Err:", JSON.stringify(br2.error)); await sendText(tenant, phone, "Something went wrong. Let me connect you to our team."); await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" }); return; }
