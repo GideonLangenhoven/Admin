@@ -231,7 +231,7 @@ export default function SimpleCheckInsPage() {
         <p className="sv-intro-copy">Welcome your guests. Confirm payment and waivers, then record arrivals.</p>
       </header>
 
-      <section className="ui-card sv-filters grid gap-4 md:grid-cols-[auto_minmax(12rem,1fr)] md:items-end" aria-label="Check-in filters">
+      <section className="ui-card sv-filters grid gap-4 md:grid-cols-[minmax(0,340px)_minmax(0,1fr)] md:items-end" aria-label="Check-in filters">
         <div className="sv-date-filter">
           <button type="button" onClick={() => selectDate(addDaysToDateKey(date, -1))} className="sv-day-picker-button" aria-label="Previous day"><CaretLeft size={20} /></button>
           <label>
@@ -240,7 +240,7 @@ export default function SimpleCheckInsPage() {
           </label>
           <button type="button" onClick={() => selectDate(addDaysToDateKey(date, 1))} className="sv-day-picker-button" aria-label="Next day"><CaretRight size={20} /></button>
         </div>
-        <label className="text-xs font-semibold">
+        <label className="min-w-0 text-xs font-semibold">
           Departure
           <select value={validSlotFilter} onChange={event => selectSlot(event.target.value)} className="ui-control mt-1 h-11 w-full rounded-xl px-3 text-sm">
             <option value="">All departures</option>

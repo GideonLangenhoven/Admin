@@ -135,7 +135,7 @@ async function fulfillJson(route: Route, body: unknown, status = 200, extraHeade
     status,
     contentType: "application/json",
     headers: {
-      "access-control-allow-origin": "http://127.0.0.1:3000",
+      "access-control-allow-origin": route.request().headers().origin || "http://127.0.0.1:3000",
       "access-control-allow-headers": "authorization, apikey, content-profile, x-client-info",
       "access-control-allow-methods": "GET, POST, OPTIONS",
       ...extraHeaders,
@@ -147,10 +147,11 @@ async function fulfillJson(route: Route, body: unknown, status = 200, extraHeade
 async function installMockBackend(page: Page, state: "populated" | "empty" | "error" = "populated", staffName: string | null = "Taylor Operator", readOnly = false) {
   const session = fakeSession();
   const projectRef = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || "https://fixture.supabase.co").hostname.split(".")[0];
+  const baseURL = String(test.info().project.use.baseURL || "http://127.0.0.1:3000");
 
   await page.context().addCookies([
-    { name: "ck_session_hint", value: "1", url: "http://127.0.0.1:3000" },
-    { name: "ck_admin_role", value: "ADMIN", url: "http://127.0.0.1:3000" },
+    { name: "ck_session_hint", value: "1", url: baseURL },
+    { name: "ck_admin_role", value: "ADMIN", url: baseURL },
   ]);
   await page.addInitScript(({ storageKey, storedSession }) => {
     localStorage.setItem(storageKey, JSON.stringify(storedSession));
@@ -234,8 +235,16 @@ async function installMockBackend(page: Page, state: "populated" | "empty" | "er
 }
 
 async function expectNoHorizontalOverflow(page: Page) {
-  const dimensions = await page.evaluate(() => ({ width: window.innerWidth, scrollWidth: document.documentElement.scrollWidth }));
+  await page.evaluate(() => document.fonts.ready);
+  const dimensions = await page.evaluate(() => ({
+    width: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    clipped: Array.from(document.querySelectorAll(".sv-main, .sv-content, .sv-filters, .sv-date-filter, .sv-date-filter > label, .sv-date-filter input, .sv-readiness > div, .sv-count-control"))
+      .filter(element => element.scrollWidth > element.clientWidth + 1)
+      .map(element => ({ element: element.className || element.tagName, width: element.clientWidth, scrollWidth: element.scrollWidth })),
+  }));
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.width);
+  expect(dimensions.clipped).toEqual([]);
 }
 
 async function resetScroll(page: Page) {
@@ -246,6 +255,89 @@ async function resetScroll(page: Page) {
 }
 
 test.describe("Simple view mocked responsive acceptance", () => {
+  test.describe("touch layouts", () => {
+    test.use({ hasTouch: true, locale: "en-ZA", viewport: { width: 320, height: 844 } });
+
+    test.beforeEach(async ({ page, browserName }) => {
+      // Desktop WebKit keeps maxTouchPoints at zero under touch emulation.
+      // Supply the tablet capability used by the app's responsive routing.
+      if (browserName === "webkit") {
+        await page.addInitScript(() => Object.defineProperty(navigator, "maxTouchPoints", { value: 1 }));
+      }
+    });
+
+    test("keeps walk-in fields and button labels inside the form", async ({ page }, testInfo) => {
+      await installMockBackend(page);
+      await page.goto("/simple/new-booking?date=2026-10-01&returnTo=%2Fsimple", { waitUntil: "domcontentloaded" });
+      await expect(page.getByRole("heading", { name: "Add walk-in", exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Atlantic Ocean Kayak Adventure", exact: true })).toBeVisible();
+      for (const width of [320, 640, 768, 1024]) {
+        await page.setViewportSize({ width, height: 900 });
+        await expectNoHorizontalOverflow(page);
+        const clippedLabels = await page.locator(".sv-booking-form button > span").evaluateAll(labels => labels.flatMap(label => {
+          const text = label.getBoundingClientRect();
+          const button = label.parentElement!.getBoundingClientRect();
+          return text.top < button.top - 1 || text.bottom > button.bottom + 1 || text.right > button.right + 1
+            ? [label.textContent]
+            : [];
+        }));
+        expect(clippedLabels, `Walk-in button labels at ${width}px`).toEqual([]);
+        if (width === 320 || width === 768) {
+          await page.getByRole("button", { name: "Apply", exact: true }).scrollIntoViewIfNeeded();
+          await page.screenshot({ path: testInfo.outputPath(`walk-in-${width}.png`), animations: "disabled" });
+        }
+      }
+    });
+
+    test("keeps date fields and action groups separated across phone and tablet widths", async ({ page }, testInfo) => {
+      test.setTimeout(180_000);
+      await page.clock.setFixedTime(new Date("2026-09-30T04:00:00Z"));
+      await installMockBackend(page);
+      await page.setViewportSize({ width: 320, height: 844 });
+      await page.goto("/simple?date=2026-09-30", { waitUntil: "domcontentloaded" });
+      for (const width of [320, 390, 640, 768, 820, 1024, 1180, 1366]) {
+        await page.setViewportSize({ width, height: width < 640 ? 844 : 900 });
+        for (const [path, label, heading] of [["/simple", "Today", "Welcome, Taylor Operator"], ["/simple/calendar", "Calendar", "Calendar"], ["/simple/check-ins", "Check-ins", "Check-ins"]]) {
+          await test.step(`${path} at ${width}px`, async () => {
+            await page.getByRole("navigation", { name: "Simple view" }).filter({ visible: true }).getByRole("link", { name: label, exact: true }).click();
+            await resetScroll(page);
+            await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+            await expect(page.locator(".sv-departure, .sv-check-in").first()).toBeVisible();
+            await expectNoHorizontalOverflow(page);
+
+            const date = await page.getByLabel("Selected date").boundingBox();
+            const previous = await page.getByRole("button", { name: "Previous day" }).boundingBox();
+            const next = await page.getByRole("button", { name: "Next day" }).boundingBox();
+            expect(date!.x - (previous!.x + previous!.width), `${path} at ${width}px: previous-day gap`).toBeGreaterThanOrEqual(8);
+            expect(next!.x - (date!.x + date!.width), `${path} at ${width}px: next-day gap`).toBeGreaterThanOrEqual(8);
+            expect(Math.abs(date!.height - next!.height), `${path} at ${width}px: date height`).toBeLessThanOrEqual(1);
+
+            const overlaps = await page.evaluate(() => {
+              const selectors = ".sv-header-inner, .sv-filters, .sv-departure-main, .sv-arrival-editor, .sv-payment-fields, .sv-mobile-nav-inner";
+              return Array.from(document.querySelectorAll(selectors)).flatMap(group => {
+                const controls = Array.from(group.querySelectorAll("a, button, input, select"))
+                  .filter(element => element.getBoundingClientRect().width > 0);
+                return controls.flatMap((control, index) => controls.slice(index + 1).flatMap(other => {
+                  const a = control.getBoundingClientRect();
+                  const b = other.getBoundingClientRect();
+                  return Math.min(a.right, b.right) - Math.max(a.left, b.left) > 1 && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 1
+                    ? [{ group: group.className, first: control.getAttribute("aria-label") || control.textContent?.trim(), second: other.getAttribute("aria-label") || other.textContent?.trim() }]
+                    : [];
+                }));
+              });
+            });
+            expect(overlaps, `${path} at ${width}px`).toEqual([]);
+            if ((width === 320 || width === 820 || width === 1180) && path === "/simple/check-ins") {
+              await page.screenshot({ path: testInfo.outputPath(`check-ins-${width}.png`), animations: "disabled" });
+              await page.getByRole("button", { name: /Confirm R.*received/ }).scrollIntoViewIfNeeded();
+              await page.screenshot({ path: testInfo.outputPath(`payment-${width}.png`), animations: "disabled" });
+            }
+          });
+        }
+      }
+    });
+  });
+
   test("keeps the selected day and check-in date controls usable on a phone", async ({ page }) => {
     test.setTimeout(180_000);
     await installMockBackend(page);

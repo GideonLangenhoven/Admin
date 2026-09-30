@@ -43,10 +43,9 @@ export default function SimpleCalendarPage() {
           <button type="button" onClick={() => selectDate(addDaysToDateKey(date, -1))} className="sv-day-picker-button" aria-label="Previous day">
             <CaretLeft size={20} />
           </button>
-          <label className="relative min-w-0 flex-1 sm:w-52 sm:flex-none">
+          <label>
             <span className="sr-only">Selected date</span>
-            <CalendarBlank size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--ck-text-muted)" }} />
-            <input type="date" value={date} onChange={event => selectDate(event.target.value)} className="ui-control h-11 w-full rounded-xl pl-10 pr-3 text-sm font-semibold" />
+            <input type="date" value={date} onChange={event => selectDate(event.target.value)} className="ui-control w-full font-semibold" />
           </label>
           <button type="button" onClick={() => selectDate(addDaysToDateKey(date, 1))} className="sv-day-picker-button" aria-label="Next day">
             <CaretRight size={20} />
