@@ -15,7 +15,8 @@ const INTENT_PILL: Record<ChatIntent, string> = {
 
 export default function IntentBadge({ intent, size = "sm" }: { intent: string | null; size?: "sm" | "xs" }) {
   if (!intent) return null;
-  const label = INTENT_LABELS[intent as ChatIntent] || intent;
+  // Handoff reasons have no label: "CHECKOUT_FAILED" reads "Checkout failed".
+  const label = INTENT_LABELS[intent as ChatIntent] || intent.charAt(0) + intent.slice(1).toLowerCase().replace(/_/g, " ");
   const pill = INTENT_PILL[intent as ChatIntent] || "ui-pill-neutral";
   const cls = size === "xs" ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-0.5";
   return <span className={`inline-flex items-center rounded-md font-medium ${cls} ${pill}`}>{label}</span>;

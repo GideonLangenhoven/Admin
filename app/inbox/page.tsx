@@ -7,6 +7,7 @@ import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import IntentBadge from "../../components/inbox/IntentBadge";
+import { CHAT_INTENTS } from "../lib/intent-types";
 import { Virtuoso } from "react-virtuoso";
 import BotStatusBanner from "./components/BotStatusBanner";
 import { Warning, X as XIcon } from "@phosphor-icons/react";
@@ -67,7 +68,9 @@ function ConvoRow({ c, isSelected, onClick }: { c: any; isSelected: boolean; onC
       <div className="flex items-center gap-2">
         {needsAttention(c) && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ck-accent)]" aria-hidden="true" />}
         <p className="font-semibold text-sm truncate" style={{ color: "var(--ck-text-strong)" }}>{c.customer_name || "Unknown"}</p>
-        <IntentBadge intent={c.current_intent} size="xs" />
+        {/* A handoff reason (ESCALATE_HUMAN, CHECKOUT_FAILED...) stays on the row
+            after the bot takes over again; show it only while a reply is needed. */}
+        {(needsAttention(c) || CHAT_INTENTS.includes(c.current_intent)) && <IntentBadge intent={c.current_intent} size="xs" />}
         <span className={`ui-status ml-auto shrink-0 ${needsAttention(c) ? "ui-pill-warning" : "ui-pill-neutral"}`}>
           {needsAttention(c) ? "Needs reply" : c.status === "CLOSED" ? "Conversation closed" : "Bot replying"}
         </span>
@@ -263,7 +266,7 @@ function InboxContent() {
         }
       } else {
         // Refresh updated_at on every admin reply to keep the 2-hour bot-silence window active
-        await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("id", target.id);
+        await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("business_id", businessId).eq("id", target.id);
         window.dispatchEvent(new Event("inbox-updated"));
         if (target.status !== "HUMAN") {
           setSelected({ ...target, status: "HUMAN" });
