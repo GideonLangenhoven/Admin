@@ -222,10 +222,14 @@ body {
 
 /* Every table header in the app speaks data: mono, tracked, uppercase.
    Page-level classes may override size/color; the voice stays. */
-th {
-  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+/* Table headers: the text face, sentence case, 12px grey. :root raises the
+   specificity above a single page utility (uppercase, tracking-*, text-[10px]). */
+:root th {
+  font-family: inherit;
+  font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 /* Default numeric rendering: proportional for prose, but opt-in tabular via utility */
@@ -350,20 +354,17 @@ th {
   /* ── Type voices ──────────────────────────────────────────── */
 
   .ui-section-title {
-    @apply text-[11px] font-medium uppercase;
-    font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-    letter-spacing: 0.12em;
+    @apply text-xs font-medium;
     color: var(--ck-text-muted);
   }
 
-  /* Mono micro-label — the instrument voice (timestamps, chips, captions) */
+  /* Small label (timestamps, chips, captions): the text face, sentence case.
+     The class keeps its old name; it is no longer monospace. */
   .ui-mono-label {
-    font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
     color: var(--ck-text-muted);
+    font-variant-numeric: tabular-nums;
   }
 
   .ui-title-lg {
@@ -431,15 +432,13 @@ th {
     @apply inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium;
   }
 
-  /* Status vocabulary — mono, uppercase, soft wash. One voice for every
+  /* Status vocabulary — sentence case on a soft wash. One voice for every
      status badge in the app. Combine: "ui-status ui-pill-success". */
   .ui-status {
     @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5;
-    font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 500;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    white-space: nowrap;
   }
 
   .ui-pill-success { background: var(--ck-success-soft); color: var(--ck-success); }

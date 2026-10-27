@@ -289,7 +289,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
                   type="button"
                   onClick={() => toggleGroup(group.label!)}
                   aria-expanded={showItems}
-                  className="ui-mono-label mt-6 mb-1.5 flex w-full items-center justify-between px-2.5 !text-[10px] transition-colors hover:!text-[var(--ck-sidebar-text)]"
+                  className="ui-mono-label mt-6 mb-1.5 flex w-full items-center justify-between px-2.5 transition-colors hover:!text-[var(--ck-sidebar-text)]"
                   style={{ color: "var(--ck-sidebar-muted)" }}
                 >
                   <span>{group.label}</span>
@@ -348,7 +348,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
           <BrandMark size={14} variant="ivory" className="shrink-0 opacity-70" />
           {!collapsed && (
             <span className="flex items-baseline gap-1.5">
-              <span className="text-[9px] font-medium uppercase" style={{ letterSpacing: "0.1em" }}>Powered by</span>
+              <span className="text-[11px] font-medium">Powered by</span>
               <BrandWordmark className="text-[12px]" />
             </span>
           )}
@@ -378,7 +378,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
               <Link href="/simple" className="ui-btn ui-btn-soft min-h-11 !px-3 !text-[13px]">Simple View</Link>
             )}
             {clock && (
-              <span className="ui-mono-label hidden lg:flex items-center gap-2 !normal-case !tracking-[0.04em]">
+              <span className="ui-mono-label hidden lg:flex items-center gap-2">
                 <span className="h-[5px] w-[5px] rounded-full motion-safe:animate-pulse" style={{ background: "var(--ck-accent)" }} aria-hidden="true" />
                 {clock}
               </span>
