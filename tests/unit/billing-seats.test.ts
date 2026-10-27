@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { periodBounds } from "../../app/lib/billing-period";
 import { sourceHandler } from "../helpers/source-handler";
 
@@ -47,20 +47,24 @@ describe("atomic billing controls", () => {
 // this exact class of runtime-dependent date math is what the function
 // itself needed fixing for (see billing-period.ts).
 describe("periodBounds (shared by subscription GET and seats POST)", () => {
+  afterEach(() => { vi.useRealTimers(); });
+
   it("computes correct bounds for a fresh subscription (period_start a few days into its cycle)", () => {
+    vi.useFakeTimers({ now: new Date("2026-07-10T10:00:00Z") });
     const { billing_cycle_start, billing_cycle_end } = periodBounds("2026-07-03", null);
     expect(billing_cycle_start).toBe("2026-07-03");
-    // No period_end on a fresh, still-open subscription — falls back to the
-    // end of that start month, not today's month.
+    // No period_end on a fresh, still-open subscription: the first period runs
+    // from signup to the end of that month.
     expect(billing_cycle_end).toBe("2026-07-31");
   });
 
   it("computes correct bounds for a long-standing subscription (period_start many months ago)", () => {
-    const { billing_cycle_start, billing_cycle_end } = periodBounds("2026-01-15", null);
-    expect(billing_cycle_start).toBe("2026-01-15");
-    // Still anchored to ITS OWN period, not the current calendar month —
-    // a subscription created long ago must prorate against its own cycle.
-    expect(billing_cycle_end).toBe("2026-01-31");
+    // P2: Billing showed "This month 2026-09-29 → 2026-09-30" on 27 Oct, and
+    // proration against that ended period was zero. period_start is the
+    // signup date and never advances, so later periods are calendar months.
+    vi.useFakeTimers({ now: new Date("2026-10-27T10:00:00Z") });
+    expect(periodBounds("2026-01-15", null)).toEqual({ billing_cycle_start: "2026-10-01", billing_cycle_end: "2026-10-31" });
+    expect(periodBounds("2026-09-29", null)).toEqual({ billing_cycle_start: "2026-10-01", billing_cycle_end: "2026-10-31" });
   });
 
   it("uses the real period_end when the subscription has one, regardless of age", () => {
@@ -84,6 +88,7 @@ describe("periodBounds (shared by subscription GET and seats POST)", () => {
     // computed end date was silently one calendar day short. Every one of
     // the fixed-date assertions above already exercises this, but this test
     // makes the guard explicit rather than incidental.
+    vi.useFakeTimers({ now: new Date("2026-04-15T10:00:00Z") });
     const { billing_cycle_end } = periodBounds("2026-04-01", null);
     expect(billing_cycle_end).toBe("2026-04-30");
   });
