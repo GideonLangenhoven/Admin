@@ -185,6 +185,8 @@ interface SlotGroup {
   totalPrice: number;
   totalPaid: number;
   totalDue: number;
+  heldPax: number;
+  heldDue: number;
 }
 
 interface DayGroup {
@@ -673,6 +675,9 @@ export default function Bookings() {
         const totalPaid = activeBks.reduce((s, b) => s + bookingPaidAmount(b), 0);
         // Unpaid reschedule-upgrade fees are outstanding funds too
         const rescheduleDue = activeBks.reduce((s, b) => s + Math.max(0, Number(b.pending_reschedule?.diff || 0)), 0);
+        // Held bookings aren't guests or money due yet, but the departure
+        // header shows them separately so a hold is never invisible.
+        const heldBks = bks.filter((b) => b.status === "HELD" && !activeBks.includes(b));
         slots.push({
           timeLabel: tk,
           sortKey: tk,
@@ -681,6 +686,8 @@ export default function Bookings() {
           totalPrice,
           totalPaid,
           totalDue: totalPrice - totalPaid + rescheduleDue,
+          heldPax: heldBks.reduce((s, b) => s + Number(b.qty || 0), 0),
+          heldDue: heldBks.reduce((s, b) => s + bookingValue(b) - bookingPaidAmount(b), 0),
         });
       }
       slots.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
@@ -2284,6 +2291,7 @@ function SlotRows({
   onToggleSelect: (id: string) => void;
 }) {
   const [openActions, setOpenActions] = useState<string | null>(null);
+  const heldLine = `${slot.heldPax} held · ${fmtCurrency(slot.heldDue)} pending`;
   useEffect(() => {
     if (!openActions) return;
     const desktop = window.matchMedia("(min-width: 1024px)");
@@ -2314,6 +2322,7 @@ function SlotRows({
                   <span>Paid {fmtCurrency(slot.totalPaid)}</span>
                   <span className={slot.totalDue > 0 ? "font-semibold text-red-700" : "font-semibold text-green-700"}>Due {fmtCurrency(slot.totalDue)}</span>
                 </span>
+                {slot.heldPax > 0 && <span className="mt-1 block text-sm font-semibold text-amber-700">{heldLine}</span>}
               </button>
             </div>
             <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -2347,6 +2356,7 @@ function SlotRows({
           </span>
           {slot.timeLabel}
           <span className="mt-1 block text-[11px] font-normal text-gray-500 sm:hidden">{services || "No services"} · Due {fmtCurrency(slot.totalDue)}</span>
+          {slot.heldPax > 0 && <span className="mt-1 block text-[11px] font-semibold text-amber-700">{heldLine}</span>}
         </td>
         <td className="p-1.5 lg:p-3 font-semibold text-[11px] lg:text-sm">{slot.totalPax}</td>
         <td className="hidden p-3 text-gray-500 md:table-cell"></td>
