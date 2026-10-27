@@ -34,7 +34,8 @@ async function compose(page: Page) {
     return route.continue();
   });
   await page.goto("/broadcasts");
-  await page.getByRole("button", { name: /^17\d*$/ }).click();
+  // The day button reads "17", or "17 2" with its booked-guests badge.
+  await page.getByRole("button", { name: /^17( \d+)?$/ }).click();
   await page.getByRole("button", { name: /Harbour paddle/ }).click();
   await expect(page.getByText("Customers (1)")).toBeVisible();
   return page.locator(".ui-card", { has: page.getByRole("heading", { name: "Compose" }) });
