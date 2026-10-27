@@ -8,6 +8,8 @@ import { requireAuth } from "../_shared/auth.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const supabase = createServiceClient();
+// Supabase returns query errors as plain { message } objects, not Error instances.
+const errorText = (error: unknown) => error instanceof Error ? error.message : (error as { message?: string })?.message || String(error);
 const CRON_BATCH_SIZE = 500;
 // The dedicated minute schedule can start at least 50 healthy deliveries per
 // minute. Calls are still bounded so a slow provider cannot exhaust the Edge
@@ -72,7 +74,7 @@ async function cleanupExpiredManualBookings() {
   const results = { expired_manual: 0 };
 
   // Find PENDING bookings with a payment_deadline that has passed
-  const { data: expiredBookings } = await supabase
+  const { data: expiredBookings, error: expiredErr } = await supabase
     .from("bookings")
     .select("id, slot_id, qty, business_id, customer_name, phone, email, tours(name), slots(start_time)")
     .eq("status", "PENDING")
@@ -84,6 +86,7 @@ async function cleanupExpiredManualBookings() {
     .lt("payment_deadline", new Date().toISOString())
     .order("payment_deadline", { ascending: true })
     .limit(CRON_BATCH_SIZE);
+  if (expiredErr) throw expiredErr;
 
   for (const booking of expiredBookings || []) {
     const cancelled = await supabase.rpc("cancel_booking_transaction", {
@@ -313,13 +316,14 @@ async function completePastBookings() {
   const GRACE_MS = 2 * 60 * 60 * 1000;
   const now = Date.now();
 
-  const { data: candidates } = await supabase
+  const { data: candidates, error: candidatesErr } = await supabase
     .from("bookings")
     .select("id, business_id, slots!inner(start_time), tours(duration_minutes)")
     .in("status", ["PAID", "CONFIRMED"])
     .lt("slots.start_time", new Date(now).toISOString())
     .order("created_at", { ascending: true })
     .limit(CRON_BATCH_SIZE);
+  if (candidatesErr) throw candidatesErr;
 
   for (const b of (candidates || [])) {
     const slot = Array.isArray((b as any).slots) ? (b as any).slots[0] : (b as any).slots;
@@ -595,10 +599,7 @@ async function cleanupStaleDraftBookings() {
     .eq("status", "DRAFT")
     .lt("created_at", cutoffIso)
     .select("id");
-  if (error) {
-    console.error("DRAFT_CLEANUP_ERR", error.message);
-    return results;
-  }
+  if (error) throw error;
   results.drafts_cleaned = (staleDrafts || []).length;
   if (results.drafts_cleaned > 0) console.log("DRAFT_CLEANUP removed=" + results.drafts_cleaned);
   return results;
@@ -623,7 +624,7 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     } catch (error) {
       console.error("NOTIFICATION_JOB_ERR", error);
       await captureCheckIn("cron-tasks", "error", checkInId);
-      return new Response(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }), { headers: headers(), status: 500 });
+      return new Response(JSON.stringify({ error: errorText(error) }), { headers: headers(), status: 500 });
     }
   }
   const results: any = { reminders: null, hold_cleanup: 0, expired_manual: 0, vouchers_cleaned: 0, notification_jobs: null, otp_attempts_cleaned: 0, drafts_cleaned: 0, bookings_completed: 0, auto_tags: null, errors: [] };
@@ -636,7 +637,7 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     results.hold_cleanup = cleanup.hold_cleanup;
   } catch (error) {
     console.error("HOLD_CLEANUP_ERR", error);
-    results.errors.push(error instanceof Error ? error.message : String(error));
+    results.errors.push(errorText(error));
   }
 
   try {
@@ -645,7 +646,7 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     results.ota_hold_cleanup = Number(otaExpiry.data || 0);
   } catch (error) {
     console.error("OTA_HOLD_CLEANUP_ERR", error);
-    results.errors.push(error instanceof Error ? error.message : String(error));
+    results.errors.push(errorText(error));
   }
 
   try {
@@ -653,7 +654,7 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     results.expired_manual = manualCleanup.expired_manual;
   } catch (error) {
     console.error("MANUAL_BOOKING_CLEANUP_ERR", error);
-    results.errors.push(error instanceof Error ? error.message : String(error));
+    results.errors.push(errorText(error));
   }
 
   try {
@@ -666,7 +667,7 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     if (!reminderRes.ok || results.reminders?.ok === false || !results.reminders) throw new Error("Scheduled notifications did not complete successfully");
   } catch (error) {
     console.error("AUTO_MESSAGES_INVOKE_ERR", error);
-    results.errors.push(error instanceof Error ? error.message : String(error));
+    results.errors.push(errorText(error));
   }
 
   try {
@@ -674,14 +675,14 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     results.vouchers_cleaned = voucherCleanup.vouchers_cleaned;
   } catch (error) {
     console.error("VOUCHER_CLEANUP_ERR", error);
-    results.errors.push(error instanceof Error ? error.message : String(error));
+    results.errors.push(errorText(error));
   }
 
   try {
     results.notification_jobs = await processNotificationJobs();
   } catch (error) {
     console.error("NOTIFICATION_JOB_ERR", error);
-    results.errors.push(error instanceof Error ? error.message : String(error));
+    results.errors.push(errorText(error));
   }
 
   try {
@@ -689,7 +690,7 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     results.bookings_completed = completed.completed;
   } catch (error) {
     console.error("BOOKING_COMPLETE_ERR", error);
-    results.errors.push(error instanceof Error ? error.message : String(error));
+    results.errors.push(errorText(error));
   }
 
   try {
@@ -697,7 +698,7 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     results.otp_attempts_cleaned = otpCleanup.otp_attempts_cleaned;
   } catch (error) {
     console.error("OTP_ATTEMPT_CLEANUP_ERR", error);
-    results.errors.push(error instanceof Error ? error.message : String(error));
+    results.errors.push(errorText(error));
   }
 
   try {
@@ -705,7 +706,7 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     results.drafts_cleaned = draftCleanup.drafts_cleaned;
   } catch (error) {
     console.error("DRAFT_CLEANUP_ERR", error);
-    results.errors.push(error instanceof Error ? error.message : String(error));
+    results.errors.push(errorText(error));
   }
 
   // R20: 7-day retention for cron.job_run_details + net._http_response
@@ -716,21 +717,21 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     results.operational_logs_purged = purged;
   } catch (error) {
     console.error("OPERATIONAL_LOG_PURGE_ERR", error);
-    results.errors.push(error instanceof Error ? error.message : String(error));
+    results.errors.push(errorText(error));
   }
 
   try {
     results.auto_tags = await autoTagContacts();
   } catch (error) {
     console.error("AUTO_TAG_ERR", error);
-    results.errors.push(error instanceof Error ? error.message : String(error));
+    results.errors.push(errorText(error));
   }
 
   try {
     results.popia = await processPOPIARequests();
   } catch (error) {
     console.error("POPIA_CRON_ERR", error);
-    results.errors.push(error instanceof Error ? error.message : String(error));
+    results.errors.push(errorText(error));
   }
 
   // Last-minute deals: one SQL statement stamps every tenant's discounted
@@ -743,7 +744,7 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     if (lmCount) console.log("LAST_MINUTE_DEALS_APPLIED slots=" + lmCount);
   } catch (error) {
     console.error("LAST_MINUTE_DEALS_ERR", error);
-    results.errors.push(error instanceof Error ? error.message : String(error));
+    results.errors.push(errorText(error));
   }
 
   // H2b: triggers recount slots.booked/held from bookings and holds, so drift
@@ -759,7 +760,7 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     }
   } catch (error) {
     console.error("SLOT_COUNTER_DRIFT_ERR", error);
-    results.errors.push(error instanceof Error ? error.message : String(error));
+    results.errors.push(errorText(error));
   }
 
   await captureCheckIn("cron-tasks", results.errors.length ? "error" : "ok", checkInId);
@@ -770,37 +771,41 @@ async function processPOPIARequests() {
   const result = { promoted_to_review: 0, expired_unconfirmed: 0, expired_exports: 0 };
 
   // Promote confirmed requests past their scheduled_for date to IN_REVIEW
-  const { data: due } = await supabase
+  const { data: due, error: dueErr } = await supabase
     .from("data_subject_requests")
     .select("id, business_id")
     .eq("status", "CONFIRMED")
     .lte("scheduled_for", new Date().toISOString());
+  if (dueErr) throw dueErr;
 
   if (due && due.length > 0) {
-    await supabase
+    const { error: promoteErr } = await supabase
       .from("data_subject_requests")
       .update({ status: "IN_REVIEW", updated_at: new Date().toISOString() })
       .in("id", due.map((d: { id: string }) => d.id));
+    if (promoteErr) throw promoteErr;
     result.promoted_to_review = due.length;
     console.log("POPIA_PROMOTE_TO_REVIEW count=" + due.length);
   }
 
   // Expire unconfirmed requests after 24h
-  const { data: expired } = await supabase
+  const { data: expired, error: expiredErr } = await supabase
     .from("data_subject_requests")
     .update({ status: "CANCELLED", cancellation_reason: "Confirmation expired", updated_at: new Date().toISOString() })
     .eq("status", "PENDING_CONFIRMATION")
     .lt("confirmation_expires_at", new Date().toISOString())
     .select("id");
+  if (expiredErr) throw expiredErr;
   result.expired_unconfirmed = expired?.length ?? 0;
 
   // Expire old export URLs
-  const { data: expiredExports } = await supabase
+  const { data: expiredExports, error: exportsErr } = await supabase
     .from("data_subject_requests")
     .update({ export_url: null, updated_at: new Date().toISOString() })
     .lt("export_expires_at", new Date().toISOString())
     .not("export_url", "is", null)
     .select("id");
+  if (exportsErr) throw exportsErr;
   result.expired_exports = expiredExports?.length ?? 0;
 
   return result;
