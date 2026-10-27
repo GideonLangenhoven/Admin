@@ -71,7 +71,7 @@ describe("item 30 — operator-cancellation remediation", () => {
   });
   it("party size may shrink on a credit-claim reschedule, refunding the difference", () => {
     expect(rebook).toContain("body.new_qty ?? booking.qty");
-    expect(rebook).toContain("newUnitPrice * newQty");
+    expect(rebook).toContain("listUnitPrice * newQty + carried");
     // the excess refund skips the 5% fee when the operator cancelled
     expect(readFileSync("supabase/migrations/20260911180000_immediate_booking_changes.sql", "utf8")).toContain("CASE WHEN cancelled THEN 100");
   });

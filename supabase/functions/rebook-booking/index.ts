@@ -121,7 +121,7 @@ function isUnpaidBooking(booking: any): boolean {
   return ["PENDING", "PENDING PAYMENT", "HELD"].includes(String(booking.status || ""));
 }
 
-async function handleReschedule(req: any, booking: any, body: any, claimEligible: boolean) {
+async function handleReschedule(req: any, booking: any, body: any, claimEligible: boolean, isAdmin = false) {
   const newSlotId = body.new_slot_id;
   if (!newSlotId) return fail(req, "new_slot_id required for RESCHEDULE", 400);
 
@@ -166,11 +166,10 @@ async function handleReschedule(req: any, booking: any, body: any, claimEligible
   // re-priced upward), the slot's own price stands, or we would undercharge.
   const slotOverride = newSlot.price_per_person_override != null ? Number(newSlot.price_per_person_override) : null;
   const isLastMinuteDeal = !!newSlot.last_minute_at && slotOverride != null && slotOverride < newBasePrice;
-  const newUnitPrice = (slotOverride != null && !isLastMinuteDeal) ? slotOverride : newBasePrice;
+  const listUnitPrice = (slotOverride != null && !isLastMinuteDeal) ? slotOverride : newBasePrice;
   const extras = await supabase.from("booking_add_ons").select("unit_price, qty").eq("booking_id", booking.id);
   if (extras.error) return fail(req, "Could not verify booking extras", 503);
   const extrasTotal = (extras.data || []).reduce((sum: number, item: any) => sum + Number(item.unit_price) * Number(item.qty), 0);
-  const newTotalAmount = Math.round((newUnitPrice * newQty + extrasTotal) * 100) / 100;
   // A cancelled booking only carries credit while its payout is still parked
   // (refund_status ACTION_REQUIRED). Once the refund/voucher was issued the
   // money already left — rebooking charges the full new price.
@@ -181,8 +180,29 @@ async function handleReschedule(req: any, booking: any, body: any, claimEligible
   // longer holds that money — it never counts as credit twice.
   const portions = getPaidPortions(booking);
   const liveVoucherPaid = booking.converted_to_voucher_id ? 0 : portions.voucherPaid;
-  const credit = isCreditClaim && !claimEligible ? 0 : portions.cashPaid + liveVoucherPaid;
-  const diff = newTotalAmount - credit;
+  const hasCredit = !isCreditClaim || claimEligible;
+  const credit = hasCredit ? portions.cashPaid + liveVoucherPaid : 0;
+  // unit_price is the list price the booking was made at; an admin price
+  // override or promo lives only in the agreed total. Carry that difference
+  // (per guest) onto the new departure so a same-price move costs nothing,
+  // unless an admin explicitly reprices at the new list price.
+  const bookedListUnit = Number(booking.unit_price || 0);
+  const carried = hasCredit && bookedListUnit > 0 && !(isAdmin && body.reprice === true)
+    ? (portions.paidValue - extrasTotal - bookedListUnit * Number(booking.qty)) * newQty / Number(booking.qty)
+    : 0;
+  const newTotalAmount = Math.round((Math.max(0, listUnitPrice * newQty + carried) + extrasTotal) * 100) / 100;
+  const diff = Math.round((newTotalAmount - credit) * 100) / 100;
+
+  if (body.preview === true) {
+    return ok(req, {
+      ok: true, preview: true, list_unit_price: listUnitPrice, new_qty: newQty, extras_total: extrasTotal,
+      carried: Math.round(carried * 100) / 100,
+      carried_reason: Math.round(carried * 100) === 0 ? null
+        : booking.discount_type === "MANUAL" ? (booking.discount_notes || "Admin price override")
+        : booking.promo_code ? "Promo code " + booking.promo_code : "Agreed price",
+      new_total: newTotalAmount, credit, diff,
+    });
+  }
 
   const result: any = { ok: true, action: "RESCHEDULE", diff: diff };
 
@@ -190,7 +210,7 @@ async function handleReschedule(req: any, booking: any, body: any, claimEligible
     const changed = await supabase.rpc("apply_booking_change", {
       p_booking_id: booking.id, p_old_slot_id: booking.slot_id, p_old_qty: booking.qty,
       p_old_value: portions.cashPaid + liveVoucherPaid, p_new_slot_id: newSlotId, p_new_qty: newQty,
-      p_new_unit_price: newUnitPrice, p_new_total: newTotalAmount, p_excess_action: body.excess_action ?? null,
+      p_new_unit_price: listUnitPrice, p_new_total: newTotalAmount, p_excess_action: body.excess_action ?? null,
     });
     if (changed.error || !changed.data?.ok) return fail(req, changed.data?.error || "Could not change this booking", 409);
     booking.slots = { ...(booking.slots || {}), start_time: newSlot.start_time };
@@ -208,7 +228,7 @@ async function handleReschedule(req: any, booking: any, body: any, claimEligible
 
     const prepared = await supabase.rpc("prepare_booking_amendment", {
       p_booking_id: booking.id, p_new_slot_id: newSlotId, p_new_qty: newQty,
-      p_new_unit_price: newUnitPrice, p_new_total_amount: newTotalAmount, p_diff: diff,
+      p_new_unit_price: listUnitPrice, p_new_total_amount: newTotalAmount, p_diff: diff,
     });
     if (prepared.error || !prepared.data?.ok) return fail(req, prepared.data?.error || "Could not reserve the new departure", 409);
     const holdExpiry = prepared.data.expires_at;
@@ -1344,7 +1364,7 @@ Deno.serve(async function (req: any) {
       }
     }
 
-    if (action === "RESCHEDULE") return await handleReschedule(req, booking, body, claimEligible);
+    if (action === "RESCHEDULE") return await handleReschedule(req, booking, body, claimEligible, authz.isAdmin === true);
     if (action === "ADD_GUESTS") return await handleAddGuests(req, booking, body);
     if (action === "REMOVE_GUESTS") return await handleRemoveGuests(req, booking, body);
     if (action === "UPDATE_CONTACT") return await handleUpdateContact(req, booking, body);

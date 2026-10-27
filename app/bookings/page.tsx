@@ -15,7 +15,6 @@ import { contactPhoneNumber } from "../lib/contact-links";
 import { bookingDemoAction } from "../lib/demo-guide";
 import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
-import { rescheduleUnitPrice } from "../lib/reschedule-price";
 import { PaperPlaneTilt, SpinnerGap, CheckCircle, XCircle, Spinner, ArrowLeft, ArrowRight } from "@phosphor-icons/react";
 import { cancelBookingAction, refundBookingAction, processRefundAction, markPaidAction, checkInAction, type ActionResult } from "../lib/booking-actions";
 import { DatePicker } from "../../components/DatePicker";
@@ -276,6 +275,10 @@ export default function Bookings() {
   const [rebookSlotId, setRebookSlotId] = useState("");
   const [rebookExcessAction, setRebookExcessAction] = useState<"REFUND" | "VOUCHER">("REFUND");
   const [loadingRebookSlots, setLoadingRebookSlots] = useState(false);
+  const [rebookReprice, setRebookReprice] = useState(false);
+  // The server prices the move (and charges exactly this), so the preview
+  // can never disagree with what the customer is asked to pay.
+  const [rebookPreview, setRebookPreview] = useState<null | { error?: string; list_unit_price?: number; new_qty?: number; extras_total?: number; carried?: number; carried_reason?: string | null; new_total?: number; credit?: number; diff?: number }>(null);
   const [paymentLinkBookingId, setPaymentLinkBookingId] = useState<string | null>(null);
   const [paymentLinkUrl, setPaymentLinkUrl] = useState<string | null>(null);
   const [paymentLinkRef, setPaymentLinkRef] = useState<string>("");
@@ -1319,6 +1322,7 @@ export default function Bookings() {
     setRebookBooking(b);
     setRebookDate(b.slots?.start_time ? toDateInput(b.slots.start_time) : toDateInput(new Date().toISOString()));
     setRebookSlotId("");
+    setRebookReprice(false);
     setRebookExcessAction("REFUND");
     setRebookSlots([]);
   }
@@ -1458,6 +1462,20 @@ export default function Bookings() {
     return () => clearTimeout(t);
   }, [rebookBooking, rebookDate]);
 
+  useEffect(() => {
+    setRebookPreview(null);
+    if (!rebookBooking || !rebookSlotId) return;
+    let live = true;
+    (async () => {
+      const res = await supabase.functions.invoke("rebook-booking", {
+        body: { booking_id: rebookBooking.id, action: "RESCHEDULE", new_slot_id: rebookSlotId, preview: true, reprice: rebookReprice },
+      });
+      const failure = await functionError(res, "The new price could not be worked out. Try another departure.");
+      if (live) setRebookPreview(failure ? { error: failure } : res.data);
+    })();
+    return () => { live = false; };
+  }, [rebookBooking, rebookSlotId, rebookReprice]);
+
 
   // A cancelled booking only carries credit while its payout is still parked
   // (weather-cancel refund_status ACTION_REQUIRED). Once a refund/voucher was
@@ -1477,25 +1495,25 @@ export default function Bookings() {
     // Only include excess_action when the new slot actually costs less — the
     // field is irrelevant on same-price / upgrade rebooks and was being sent
     // by default (harmless but noisy in network panel).
-    const selectedSlot = rebookSlots.find((s) => s.id === rebookSlotId);
-    const currentUnitPrice = rebookHasNoCredit(rebookBooking) ? 0 : (rebookBooking.qty > 0 ? rebookBooking.total_amount / rebookBooking.qty : 0);
-    const newUnitPrice = rescheduleUnitPrice(selectedSlot, currentUnitPrice);
-    const willBeDowngrade = newUnitPrice < currentUnitPrice;
-    const { data, error } = await supabase.functions.invoke("rebook-booking", {
+    const willBeDowngrade = Number(rebookPreview?.diff || 0) < 0;
+    const res = await supabase.functions.invoke("rebook-booking", {
       body: {
         booking_id: rebookBooking.id,
         // E1: explicit action — rebook-booking routes on this field; without
         // it the function returns 400 "action required".
         action: "RESCHEDULE",
         new_slot_id: rebookSlotId,
+        reprice: rebookReprice,
         ...(willBeDowngrade ? { excess_action: rebookExcessAction } : {}),
       }
     });
+    const data = res.data;
+    const problem = await functionError(res, "The booking could not be rebooked. Please try again.");
 
     setActionBookingId(null);
     rebookSubmittingRef.current = false;
-    if (error || data?.error) {
-      notify({ title: "Rebook failed", message: error?.message || data?.error, tone: "error" });
+    if (problem) {
+      notify({ title: "Rebook failed", message: problem, tone: "error" });
       return;
     }
 
@@ -2100,88 +2118,56 @@ export default function Bookings() {
               }
             </p>
 
-            {/* Price comparison preview */}
+            {/* Price preview, priced by the server exactly as the rebook will be */}
             {rebookSlotId && (() => {
-              const selectedSlot = rebookSlots.find((s) => s.id === rebookSlotId);
-              if (!selectedSlot) return null;
-              const newUnitPrice = rescheduleUnitPrice(selectedSlot, 0);
-              if (rebookHasNoCredit(rebookBooking)) {
-                return (
-                  <div className="mt-3 rounded-lg border px-4 py-3 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Price</span>
-                      <span className="font-medium tabular-nums">{fmtCurrency(newUnitPrice)}/pp</span>
-                    </div>
-                    <div className="mt-1 flex justify-between border-t border-gray-200 pt-1">
-                      <span className="text-gray-600">Total due ({rebookBooking.qty} pax)</span>
-                      <span className="font-semibold tabular-nums">{fmtCurrency(newUnitPrice * rebookBooking.qty)}</span>
-                    </div>
-                    <p className="mt-2 text-xs text-gray-500">Refund or voucher already issued. No credit remains; the customer pays the full price.</p>
-                  </div>
-                );
-              }
-              const currentUnitPrice = rebookBooking.qty > 0 ? rebookBooking.total_amount / rebookBooking.qty : 0;
-              const diff = newUnitPrice - currentUnitPrice;
-              const totalDiff = diff * rebookBooking.qty;
+              const p = rebookPreview;
+              if (!p) return <p className="mt-3 text-xs text-gray-500">Working out the price...</p>;
+              if (p.error) return <p className="mt-3 text-sm" role="alert" style={{ color: "var(--ck-danger)" }}>{p.error}</p>;
+              const noCredit = rebookHasNoCredit(rebookBooking);
+              const diff = Number(p.diff || 0);
+              const qty = Number(p.new_qty || rebookBooking.qty);
+              const row = (label: string, value: string, strong = false) => (
+                <div className={"flex justify-between gap-3" + (strong ? " mt-1 border-t border-gray-200 pt-1" : "")}>
+                  <span className="text-gray-600">{label}</span>
+                  <span className={(strong ? "font-semibold" : "font-medium") + " tabular-nums"}>{value}</span>
+                </div>
+              );
               return (
-                <div className="mt-3 rounded-lg border px-4 py-3 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Current</span>
-                    <span className="font-medium tabular-nums">{fmtCurrency(currentUnitPrice)}/pp</span>
+                <>
+                  <div className="mt-3 space-y-1 rounded-lg border px-4 py-3 text-sm" aria-label="Price preview" style={{ background: "var(--ck-surface-sunken)" }}>
+                    {row("New departure (" + qty + " × " + fmtCurrency(Number(p.list_unit_price || 0)) + ")", fmtCurrency(Number(p.list_unit_price || 0) * qty))}
+                    {Number(p.extras_total || 0) > 0 && row("Extras", fmtCurrency(Number(p.extras_total)))}
+                    {Number(p.carried || 0) !== 0 && row("Kept from this booking: " + (p.carried_reason || "agreed price"), (Number(p.carried) < 0 ? "-" : "+") + fmtCurrency(Math.abs(Number(p.carried))))}
+                    {row("New total", fmtCurrency(Number(p.new_total || 0)), true)}
+                    {row(noCredit ? "Credit (none remains)" : "Current booking value", "-" + fmtCurrency(Number(p.credit || 0)))}
+                    {row(diff > 0 ? "Customer pays" : diff < 0 ? "Back to the customer" : "Difference", fmtCurrency(Math.abs(diff)), true)}
                   </div>
-                  <div className="mt-1 flex justify-between">
-                    <span className="text-gray-600">New</span>
-                    <span className="font-medium tabular-nums">{fmtCurrency(newUnitPrice)}/pp</span>
-                  </div>
-                  {diff !== 0 && (
-                    <div className="mt-1 flex justify-between border-t border-gray-200 pt-1">
-                      <span className="text-gray-600">Difference ({rebookBooking.qty} pax)</span>
-                      <span className={`font-semibold ${diff > 0 ? "text-red-600" : "text-green-600"}`}>
-                        {diff > 0 ? "+" : ""}{fmtCurrency(totalDiff)}
-                      </span>
+                  {(Number(p.carried || 0) !== 0 || rebookReprice) && (
+                    <label className="mt-2 flex items-start gap-2 text-xs text-gray-600">
+                      <input type="checkbox" className="mt-0.5" checked={rebookReprice} onChange={(e) => setRebookReprice(e.target.checked)} />
+                      Charge the new departure&apos;s list price instead of keeping this booking&apos;s agreed price
+                    </label>
+                  )}
+                  {diff > 0 && (
+                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                      <p className="font-semibold">{noCredit ? "Customer will be charged the full price" : "Customer will be charged the difference"}</p>
+                      <p className="mt-1 text-xs text-amber-800">A payment link for <strong>{fmtCurrency(diff)}</strong> will be sent to {rebookBooking.email || rebookBooking.phone || "the customer"}. {noCredit ? "Booking confirms after payment. Refund or voucher already issued, so no credit remains." : "Original places stay reserved until payment."}</p>
                     </div>
                   )}
-                </div>
-              );
-            })()}
-
-            {/* Upgrade copy when new slot is more expensive — customer pays the difference */}
-            {rebookSlotId && (() => {
-              const selectedSlot = rebookSlots.find((s) => s.id === rebookSlotId);
-              if (!selectedSlot) return null;
-              const noCredit = rebookHasNoCredit(rebookBooking);
-              const currentUnitPrice = noCredit ? 0 : (rebookBooking.qty > 0 ? rebookBooking.total_amount / rebookBooking.qty : 0);
-              const newUnitPrice = rescheduleUnitPrice(selectedSlot, 0);
-              const totalDiff = (newUnitPrice - currentUnitPrice) * rebookBooking.qty;
-              if (totalDiff <= 0) return null;
-              return (
-                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  <p className="font-semibold">{noCredit ? "Customer will be charged the full price" : "Customer will be charged the difference"}</p>
-                  <p className="mt-1 text-xs text-amber-800">A payment link for <strong>{fmtCurrency(totalDiff)}</strong> will be sent to {rebookBooking.email || rebookBooking.phone || "the customer"}. {noCredit ? "Booking confirms after payment." : "Original places stay reserved until payment."}</p>
-                </div>
-              );
-            })()}
-
-            {/* Downgrade controls — only relevant when the customer gets credit back */}
-            {(() => {
-              if (rebookHasNoCredit(rebookBooking)) return null;
-              const selectedSlot = rebookSlots.find((s) => s.id === rebookSlotId);
-              const currentUnitPrice = rebookBooking.qty > 0 ? rebookBooking.total_amount / rebookBooking.qty : 0;
-              const newUnitPrice = rescheduleUnitPrice(selectedSlot, currentUnitPrice);
-              const isDowngrade = !selectedSlot || newUnitPrice < currentUnitPrice;
-              if (!isDowngrade) return null;
-              return (
-                <label className="mt-3 block text-sm text-gray-600">
-                  Return leftover credit as:
-                  <select
-                    value={rebookExcessAction}
-                    onChange={(e) => setRebookExcessAction(e.target.value as "REFUND" | "VOUCHER")}
-                    className="ui-control mt-1 w-full"
-                  >
-                    <option value="REFUND">Request Refund</option>
-                    <option value="VOUCHER">Issue Gift Voucher (Store Credit)</option>
-                  </select>
-                </label>
+                  {diff < 0 && !noCredit && (
+                    <label className="mt-3 block text-sm text-gray-600">
+                      Return leftover credit as:
+                      <select
+                        value={rebookExcessAction}
+                        onChange={(e) => setRebookExcessAction(e.target.value as "REFUND" | "VOUCHER")}
+                        className="ui-control mt-1 w-full"
+                      >
+                        <option value="REFUND">Request Refund</option>
+                        <option value="VOUCHER">Issue Gift Voucher (Store Credit)</option>
+                      </select>
+                    </label>
+                  )}
+                </>
               );
             })()}
             <div className="mt-4 grid grid-cols-1 gap-2 sm:flex sm:justify-end">
@@ -2190,7 +2176,7 @@ export default function Bookings() {
               </button>
               <button data-demo-action="booking.rebook"
                 onClick={saveRebook}
-                disabled={!rebookSlotId || actionBookingId === rebookBooking.id}
+                disabled={!rebookSlotId || !rebookPreview || !!rebookPreview.error || actionBookingId === rebookBooking.id}
                 className="ui-btn ui-btn-primary disabled:opacity-50"
               >
                 {actionBookingId === rebookBooking.id ? "Saving..." : "Rebook"}

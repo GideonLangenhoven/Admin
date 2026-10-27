@@ -40,7 +40,8 @@ describe("voucher-aware reschedule and WA flows", () => {
   });
 
   it("reschedule credit counts cash + voucher portions", () => {
-    expect(fn).toContain("const credit = isCreditClaim && !claimEligible ? 0 : portions.cashPaid + liveVoucherPaid");
+    expect(fn).toContain("const hasCredit = !isCreditClaim || claimEligible;");
+    expect(fn).toContain("const credit = hasCredit ? portions.cashPaid + liveVoucherPaid : 0;");
   });
 
   it("reschedule swap keeps total_amount as the cash portion", () => {

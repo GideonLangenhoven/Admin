@@ -46,8 +46,9 @@ describe("settled-cancelled rebook charges full price", () => {
   });
 
   it("credit is zeroed when the payout was already issued", () => {
-    expect(rebook).toContain("handleReschedule(req, booking, body, claimEligible)");
-    expect(rebook).toContain("isCreditClaim && !claimEligible ? 0");
+    expect(rebook).toContain("handleReschedule(req, booking, body, claimEligible, authz.isAdmin === true)");
+    expect(rebook).toContain("const hasCredit = !isCreditClaim || claimEligible;");
+    expect(rebook).toContain("const credit = hasCredit ? portions.cashPaid + liveVoucherPaid : 0;");
   });
 
   it("admin rebook modal hides credit math for settled cancellations", () => {
