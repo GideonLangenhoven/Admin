@@ -12,6 +12,7 @@ import {
 import { blockIfNotTrading } from "../_shared/subscription.ts";
 import { requireAuth, canAccessBusiness } from "../_shared/auth.ts";
 import { bookingSuccessUrl } from "../_shared/booking-success.ts";
+import { withinIpRateLimit } from "../_shared/otp-attempts.ts";
 import { applicableBookingQuestions, captureQuestionFields, questionConfigurationChanged, validateQuestionAnswers } from "../_shared/booking-custom-fields.ts";
 
 const BOOKING_SUCCESS_URL = Deno.env.get("BOOKING_SUCCESS_URL") || "";
@@ -116,6 +117,13 @@ Deno.serve(withSentry("create-checkout", async (req: any) => {
         .select("id, business_id, waiver_token, tour_id, qty, status, custom_fields").eq("id", bookingId).maybeSingle();
       if (error) return new Response(JSON.stringify({ error: "Could not verify booking access" }), { status: 503, headers: buildCors(req?.headers?.get("origin")) });
       let allowed = Boolean(booking?.waiver_token && typeof body.booking_token === "string" && body.booking_token === booking.waiver_token);
+      // A public checkout holds seats until its hold expires, so one visitor may
+      // start only a few a minute. Operators and the chat bots authenticate below.
+      // ponytail: per minute only; one checkout can still hold a whole departure
+      // until the hold expires. A bot challenge on checkout is the upgrade path.
+      if (allowed && !(await withinIpRateLimit(supabase, req, "create-checkout", 10))) {
+        return new Response(JSON.stringify({ error: "TOO_MANY_CHECKOUTS", reason: "Too many checkout attempts. Wait a minute, then try again." }), { status: 429, headers: buildCors(req?.headers?.get("origin")) });
+      }
       if (!allowed && booking) {
         try { allowed = canAccessBusiness(await requireAuth(req), booking.business_id); } catch { /* not an operator or service caller */ }
       }

@@ -57,6 +57,20 @@ export function getClientIp(req: Request) {
     || "";
 }
 
+// Per-IP, per-minute bucket (public.check_rate_limit) for public endpoints. A
+// guard rail, not the auth boundary: with no usable IP, or if the check itself
+// fails, the request goes through and the failure is logged.
+export async function withinIpRateLimit(supabase: SupabaseLike, req: Request, endpoint: string, max: number) {
+  const ip = getClientIp(req);
+  if (!ip) return true;
+  const { data, error } = await supabase.rpc("check_rate_limit", { p_ip: ip, p_endpoint: endpoint, p_max: max });
+  if (error) {
+    console.error("RATE_LIMIT_CHECK_ERR", endpoint, error.message);
+    return true;
+  }
+  return data !== false;
+}
+
 export async function sha256Hex(value: string) {
   return toHex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
 }

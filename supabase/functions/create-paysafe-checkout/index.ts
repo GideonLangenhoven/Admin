@@ -17,6 +17,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, getBusinessCredentials, getTenantByBusinessId, resolveBookingSiteUrl } from "../_shared/tenant.ts";
 import { confirmComboAndNotify, validateComboDates } from "../_shared/combo.ts";
 import { blockIfNotTrading } from "../_shared/subscription.ts";
+import { withinIpRateLimit } from "../_shared/otp-attempts.ts";
 
 const supabase = createServiceClient();
 const HOLD_MINUTES = 15;
@@ -492,6 +493,10 @@ Deno.serve(async (req: any) => {
       return await handleProcess(body, cors);
     }
 
+    // Each new combo checkout holds seats on every leg for HOLD_MINUTES.
+    if (!(await withinIpRateLimit(supabase, req, "create-paysafe-checkout", 10))) {
+      return jsonRes({ error: "Too many checkout attempts. Wait a minute, then try again." }, 429, cors);
+    }
     return await handleCreate(body, cors);
   } catch (err: any) {
     console.error("CREATE_PAYSAFE_CHECKOUT_ERR:", err);
