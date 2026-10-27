@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-09-12T17:02:37.430Z",
-  "note": "Pre-launch security audit fixes (2026-07-13): admin_users UPDATE fully revoked from authenticated (was: any admin could self-promote to SUPER_ADMIN via business_id-only RLS check with no role restriction); combo_bookings anon/public INSERT policies dropped (was: anon could insert payment_status=PAID directly, bypassing Paysafe); combo_booking_items_anon_insert dropped (settlement forgery); promotion_uses_anon_insert dropped (promo abuse); holds_authenticated_all split into select/update/delete (tenant-scoped, matching prior qual) with INSERT now default-deny (was: with_check=true let any authenticated session write holds against any tenant); zero-policy tables (processed_wa_messages, wa_messages, business_partnerships, combo_settlements, invite_tokens, ngt_intake_submissions, ngt_payments, tenant_invoice_sequences) had broad anon/authenticated grants revoked (RLS already default-denied these, but grants were unnecessarily broad). Migrations: 20260713144334_security_audit_fixes, 20260713144422_security_audit_fixes_c1_correction, plus an admin_setup_token_used_hash column addition. | 2026-08-15 (20260815120000_close_anon_cross_tenant_booking_reads): bookings_read POST/PATCH read-back clause scoped to the writing tenant + DRAFT/PENDING (was: ANY POST or PATCH — including every /rpc/* call — disabled the policy entirely, exposing all tenants' bookings to anon; proven live via check_loyalty); search_bookings_by_ref dropped (SECURITY DEFINER + PUBLIC EXECUTE + caller-supplied business_id, no caller in repo); calculate_booking_refund and check_loyalty EXECUTE revoked from PUBLIC and anon. | 2026-08-15 (20260815140000_onboarding_wizard): new anonymous write path for client onboarding. Edge fn onboarding-wizard is verify_jwt=false and reachable by anyone; its gate is a single-use, unexpired invite_tokens row that resolves to exactly one business_id, plus per-IP check_rate_limit. No request may supply a business_id and writable columns are whitelisted per step, so the encrypted credential columns, subdomain and subscription_status are unreachable from the wizard. Skeleton tenants are created with subscription_status='ONBOARDING' (outside the TRADING set) so a half-finished onboarding cannot take money. New storage bucket onboarding-assets grants anon INSERT, bounded by a 5MB cap and an image-only mime allowlist; the bucket is public-read by design. No public-schema grants, policies or RLS state changed, which is why this snapshot's arrays are unchanged. | 2026-09-12: reviewed deployed first-five release: independent booking proof, tenant-scoped insert/read policy, service-only durable refund operations. | 2026-10-27 (20261027120000_operator_directory_security_invoker): operator_directory was an owner-rights, auto-updatable view with Supabase's default ALL grant, so anon could PATCH/DELETE businesses rows through it past RLS (proven live via PostgREST, nil-id no-op). It is now security_invoker over SECURITY DEFINER app_private.operator_directory_rows() (not updatable) and anon/authenticated hold SELECT only; clears lint 0010.",
+  "generated_at": "2026-10-27T06:36:01.208600+00:00",
+  "note": "Pre-launch security audit fixes (2026-07-13): admin_users UPDATE fully revoked from authenticated (was: any admin could self-promote to SUPER_ADMIN via business_id-only RLS check with no role restriction); combo_bookings anon/public INSERT policies dropped (was: anon could insert payment_status=PAID directly, bypassing Paysafe); combo_booking_items_anon_insert dropped (settlement forgery); promotion_uses_anon_insert dropped (promo abuse); holds_authenticated_all split into select/update/delete (tenant-scoped, matching prior qual) with INSERT now default-deny (was: with_check=true let any authenticated session write holds against any tenant); zero-policy tables (processed_wa_messages, wa_messages, business_partnerships, combo_settlements, invite_tokens, ngt_intake_submissions, ngt_payments, tenant_invoice_sequences) had broad anon/authenticated grants revoked (RLS already default-denied these, but grants were unnecessarily broad). Migrations: 20260713144334_security_audit_fixes, 20260713144422_security_audit_fixes_c1_correction, plus an admin_setup_token_used_hash column addition. | 2026-08-15 (20260815120000_close_anon_cross_tenant_booking_reads): bookings_read POST/PATCH read-back clause scoped to the writing tenant + DRAFT/PENDING (was: ANY POST or PATCH — including every /rpc/* call — disabled the policy entirely, exposing all tenants' bookings to anon; proven live via check_loyalty); search_bookings_by_ref dropped (SECURITY DEFINER + PUBLIC EXECUTE + caller-supplied business_id, no caller in repo); calculate_booking_refund and check_loyalty EXECUTE revoked from PUBLIC and anon. | 2026-08-15 (20260815140000_onboarding_wizard): new anonymous write path for client onboarding. Edge fn onboarding-wizard is verify_jwt=false and reachable by anyone; its gate is a single-use, unexpired invite_tokens row that resolves to exactly one business_id, plus per-IP check_rate_limit. No request may supply a business_id and writable columns are whitelisted per step, so the encrypted credential columns, subdomain and subscription_status are unreachable from the wizard. Skeleton tenants are created with subscription_status='ONBOARDING' (outside the TRADING set) so a half-finished onboarding cannot take money. New storage bucket onboarding-assets grants anon INSERT, bounded by a 5MB cap and an image-only mime allowlist; the bucket is public-read by design. No public-schema grants, policies or RLS state changed, which is why this snapshot's arrays are unchanged. | 2026-09-12: reviewed deployed first-five release: independent booking proof, tenant-scoped insert/read policy, service-only durable refund operations. | 2026-10-08: deployed reviewed OTA transaction candidate (20261008120000). Four new tables have RLS; events, reservations and availability snapshots are service-only. Runtime boundary grants are revoked from service/anon/authenticated and remain BLOCKED; activation is not enabled. | 2026-10-27 (20261027120000_operator_directory_security_invoker): operator_directory was an owner-rights, auto-updatable view with Supabase's default ALL grant, so anon could PATCH/DELETE businesses rows through it past RLS (proven live via PostgREST, nil-id no-op). It is now security_invoker over SECURITY DEFINER app_private.operator_directory_rows() (not updatable) and anon/authenticated hold SELECT only; clears lint 0010. | 2026-10-27 baseline refresh after 20261027120000, regenerated from live at the owner's request: the Sept and Oct deploys never refreshed this file, so the drift gate was already red before that fix. Recorded without a separate review: 20 new tables and views (190 grants, 18 RLS-enabled tables, 16 new policies); every public table has RLS enabled. Tightenings already live: authenticated lost table-level UPDATE on businesses (20260921120000) and all write grants on slot_check_ins (20260920100000), and platform_public_settings_super_admin_all now requires role SUPER_ADMIN, not suspended, not read_only (changed by a migration in the remote ledger that is not in this repo).",
   "grants": [
     {
       "grantee": "anon",
@@ -269,6 +269,146 @@
     },
     {
       "grantee": "anon",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "anon",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "anon",
       "table_name": "operator_directory",
       "privilege_type": "SELECT"
     },
@@ -639,6 +779,11 @@
     },
     {
       "grantee": "authenticated",
+      "table_name": "agent_connection_grants",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "authenticated",
       "table_name": "audit_logs",
       "privilege_type": "DELETE"
     },
@@ -779,6 +924,11 @@
     },
     {
       "grantee": "authenticated",
+      "table_name": "booking_arrival_approvals",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "authenticated",
       "table_name": "bookings",
       "privilege_type": "DELETE"
     },
@@ -876,11 +1026,6 @@
       "grantee": "authenticated",
       "table_name": "businesses",
       "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "businesses",
-      "privilege_type": "UPDATE"
     },
     {
       "grantee": "authenticated",
@@ -1589,6 +1734,41 @@
     },
     {
       "grantee": "authenticated",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "authenticated",
       "table_name": "marketing_automation_steps",
       "privilege_type": "DELETE"
     },
@@ -1729,6 +1909,81 @@
     },
     {
       "grantee": "authenticated",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_delivery_policy",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_eligible_contacts",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_eligible_contacts",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_eligible_contacts",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_eligible_contacts",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_eligible_contacts",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_eligible_contacts",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_eligible_contacts",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "authenticated",
       "table_name": "marketing_events",
       "privilege_type": "DELETE"
     },
@@ -1760,6 +2015,76 @@
     {
       "grantee": "authenticated",
       "table_name": "marketing_events",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "marketing_permission_events",
       "privilege_type": "UPDATE"
     },
     {
@@ -1936,6 +2261,11 @@
       "grantee": "authenticated",
       "table_name": "messages",
       "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "authenticated",
+      "table_name": "operator_booking_requests",
+      "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
@@ -2154,6 +2484,11 @@
     },
     {
       "grantee": "authenticated",
+      "table_name": "payment_recovery_bookings",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "authenticated",
       "table_name": "peak_period_prices",
       "privilege_type": "DELETE"
     },
@@ -2610,37 +2945,7 @@
     {
       "grantee": "authenticated",
       "table_name": "slot_check_ins",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "slot_check_ins",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "slot_check_ins",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "slot_check_ins",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "slot_check_ins",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "slot_check_ins",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "slot_check_ins",
-      "privilege_type": "UPDATE"
     },
     {
       "grantee": "authenticated",
@@ -3134,6 +3439,76 @@
     },
     {
       "grantee": "service_role",
+      "table_name": "admin_web_push_subscriptions",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_web_push_subscriptions",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_web_push_subscriptions",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_web_push_subscriptions",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_web_push_subscriptions",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_web_push_subscriptions",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "admin_web_push_subscriptions",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "agent_connection_grants",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "agent_connection_grants",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "agent_connection_grants",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "agent_connection_grants",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "agent_connection_grants",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "agent_connection_grants",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "agent_connection_grants",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
       "table_name": "api_rate_limits",
       "privilege_type": "DELETE"
     },
@@ -3306,6 +3681,11 @@
       "grantee": "service_role",
       "table_name": "booking_add_ons",
       "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "booking_arrival_approvals",
+      "privilege_type": "SELECT"
     },
     {
       "grantee": "service_role",
@@ -4009,6 +4389,76 @@
     },
     {
       "grantee": "service_role",
+      "table_name": "guide_accounts",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "guide_accounts",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "guide_accounts",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "guide_accounts",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "guide_accounts",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "guide_accounts",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "guide_accounts",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "guide_photo_uploads",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "guide_photo_uploads",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "guide_photo_uploads",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "guide_photo_uploads",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "guide_photo_uploads",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "guide_photo_uploads",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "guide_photo_uploads",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
       "table_name": "holds",
       "privilege_type": "DELETE"
     },
@@ -4075,6 +4525,41 @@
     {
       "grantee": "service_role",
       "table_name": "idempotency_keys",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ingress_rate_limits",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ingress_rate_limits",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ingress_rate_limits",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ingress_rate_limits",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ingress_rate_limits",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ingress_rate_limits",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ingress_rate_limits",
       "privilege_type": "UPDATE"
     },
     {
@@ -4359,6 +4844,41 @@
     },
     {
       "grantee": "service_role",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_automation_revisions",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
       "table_name": "marketing_automation_steps",
       "privilege_type": "DELETE"
     },
@@ -4499,6 +5019,111 @@
     },
     {
       "grantee": "service_role",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_deliveries",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_delivery_policy",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_delivery_policy",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_delivery_policy",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_delivery_policy",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_delivery_policy",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_delivery_policy",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_delivery_policy",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_eligible_contacts",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_eligible_contacts",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_eligible_contacts",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_eligible_contacts",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_eligible_contacts",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_eligible_contacts",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_eligible_contacts",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
       "table_name": "marketing_events",
       "privilege_type": "DELETE"
     },
@@ -4530,6 +5155,146 @@
     {
       "grantee": "service_role",
       "table_name": "marketing_events",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_journey_status_events",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_offer_limits",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_offer_limits",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_offer_limits",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_offer_limits",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_offer_limits",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_offer_limits",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_offer_limits",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_permission_events",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_provider_events",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_provider_events",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_provider_events",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_provider_events",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_provider_events",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_provider_events",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "marketing_provider_events",
       "privilege_type": "UPDATE"
     },
     {
@@ -4709,6 +5474,41 @@
     },
     {
       "grantee": "service_role",
+      "table_name": "mfa_recovery_state",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "mfa_recovery_state",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "mfa_recovery_state",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "mfa_recovery_state",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "mfa_recovery_state",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "mfa_recovery_state",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "mfa_recovery_state",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
       "table_name": "ngt_intake_submissions",
       "privilege_type": "DELETE"
     },
@@ -4779,6 +5579,81 @@
     },
     {
       "grantee": "service_role",
+      "table_name": "notification_jobs",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "notification_jobs",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "notification_jobs",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "notification_jobs",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "notification_jobs",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "notification_jobs",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "notification_jobs",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "operator_booking_requests",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "operator_dashboard_layouts",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "operator_dashboard_layouts",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "operator_dashboard_layouts",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "operator_dashboard_layouts",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "operator_dashboard_layouts",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "operator_dashboard_layouts",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "operator_dashboard_layouts",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
       "table_name": "operator_directory",
       "privilege_type": "DELETE"
     },
@@ -4810,6 +5685,76 @@
     {
       "grantee": "service_role",
       "table_name": "operator_directory",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_availability_snapshots",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_availability_snapshots",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_availability_snapshots",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_availability_snapshots",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_availability_snapshots",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_availability_snapshots",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_availability_snapshots",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_events",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_events",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_events",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_events",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_events",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_events",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_events",
       "privilege_type": "UPDATE"
     },
     {
@@ -4919,6 +5864,41 @@
     },
     {
       "grantee": "service_role",
+      "table_name": "ota_reservations",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_reservations",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_reservations",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_reservations",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_reservations",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_reservations",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "ota_reservations",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
       "table_name": "otp_attempts",
       "privilege_type": "DELETE"
     },
@@ -5021,6 +6001,11 @@
       "grantee": "service_role",
       "table_name": "paid_booking_events",
       "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "payment_recovery_bookings",
+      "privilege_type": "SELECT"
     },
     {
       "grantee": "service_role",
@@ -5510,6 +6495,41 @@
     {
       "grantee": "service_role",
       "table_name": "referrals",
+      "privilege_type": "UPDATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "refund_batches",
+      "privilege_type": "DELETE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "refund_batches",
+      "privilege_type": "INSERT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "refund_batches",
+      "privilege_type": "REFERENCES"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "refund_batches",
+      "privilege_type": "SELECT"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "refund_batches",
+      "privilege_type": "TRIGGER"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "refund_batches",
+      "privilege_type": "TRUNCATE"
+    },
+    {
+      "grantee": "service_role",
+      "table_name": "refund_batches",
       "privilege_type": "UPDATE"
     },
     {
@@ -6161,6 +7181,16 @@
     },
     {
       "schema": "public",
+      "table_name": "admin_web_push_subscriptions",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "agent_connection_grants",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
       "table_name": "api_rate_limits",
       "rls_enabled": true
     },
@@ -6182,6 +7212,11 @@
     {
       "schema": "public",
       "table_name": "booking_add_ons",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "booking_arrival_approvals",
       "rls_enabled": true
     },
     {
@@ -6281,12 +7316,27 @@
     },
     {
       "schema": "public",
+      "table_name": "guide_accounts",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "guide_photo_uploads",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
       "table_name": "holds",
       "rls_enabled": true
     },
     {
       "schema": "public",
       "table_name": "idempotency_keys",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "ingress_rate_limits",
       "rls_enabled": true
     },
     {
@@ -6331,6 +7381,11 @@
     },
     {
       "schema": "public",
+      "table_name": "marketing_automation_revisions",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
       "table_name": "marketing_automation_steps",
       "rls_enabled": true
     },
@@ -6351,7 +7406,37 @@
     },
     {
       "schema": "public",
+      "table_name": "marketing_deliveries",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "marketing_delivery_policy",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
       "table_name": "marketing_events",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "marketing_journey_status_events",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "marketing_offer_limits",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "marketing_permission_events",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "marketing_provider_events",
       "rls_enabled": true
     },
     {
@@ -6381,12 +7466,42 @@
     },
     {
       "schema": "public",
+      "table_name": "mfa_recovery_state",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
       "table_name": "ngt_intake_submissions",
       "rls_enabled": true
     },
     {
       "schema": "public",
       "table_name": "ngt_payments",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "notification_jobs",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "operator_booking_requests",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "operator_dashboard_layouts",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "ota_availability_snapshots",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "ota_events",
       "rls_enabled": true
     },
     {
@@ -6402,6 +7517,16 @@
     {
       "schema": "public",
       "table_name": "ota_reconciliation_runs",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "ota_reservations",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "ota_runtime_boundary",
       "rls_enabled": true
     },
     {
@@ -6487,6 +7612,11 @@
     {
       "schema": "public",
       "table_name": "referrals",
+      "rls_enabled": true
+    },
+    {
+      "schema": "public",
+      "table_name": "refund_batches",
       "rls_enabled": true
     },
     {
@@ -6641,6 +7771,15 @@
     },
     {
       "schemaname": "public",
+      "tablename": "agent_connection_grants",
+      "policyname": "agent_grant_own_read",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "((user_id = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1\n   FROM admin_users a\n  WHERE ((a.user_id = ( SELECT auth.uid() AS uid)) AND (a.business_id = agent_connection_grants.business_id) AND (NOT a.suspended) AND (a.role = 'MAIN_ADMIN'::text)))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
       "tablename": "audit_logs",
       "policyname": "audit_logs_select_own_business",
       "cmd": "SELECT",
@@ -6791,6 +7930,15 @@
       "roles": "{authenticated}",
       "qual": "(booking_id IN ( SELECT bookings.id\n   FROM bookings\n  WHERE (bookings.business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))))",
       "with_check": "(booking_id IN ( SELECT bookings.id\n   FROM bookings\n  WHERE (bookings.business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "booking_arrival_approvals",
+      "policyname": "arrival_approvals_read",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(business_id = ANY (current_business_ids()))",
+      "with_check": null
     },
     {
       "schemaname": "public",
@@ -7262,6 +8410,15 @@
     },
     {
       "schemaname": "public",
+      "tablename": "guide_accounts",
+      "policyname": "guide_self",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "((user_id = auth.uid()) AND (NOT suspended) AND (NOT must_set_password))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
       "tablename": "holds",
       "policyname": "holds_authenticated_delete",
       "cmd": "DELETE",
@@ -7487,6 +8644,24 @@
     },
     {
       "schemaname": "public",
+      "tablename": "marketing_automation_revisions",
+      "policyname": "revision_own",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(business_id = ANY (( SELECT current_business_ids() AS current_business_ids)::uuid[]))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "marketing_automation_revisions",
+      "policyname": "revision_service",
+      "cmd": "SELECT",
+      "roles": "{service_role}",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
       "tablename": "marketing_automation_steps",
       "policyname": "marketing_automation_steps_delete_own",
       "cmd": "DELETE",
@@ -7667,6 +8842,42 @@
     },
     {
       "schemaname": "public",
+      "tablename": "marketing_deliveries",
+      "policyname": "deliveries_own",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(business_id = ANY (( SELECT current_business_ids() AS current_business_ids)::uuid[]))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "marketing_deliveries",
+      "policyname": "deliveries_service",
+      "cmd": "ALL",
+      "roles": "{service_role}",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "marketing_delivery_policy",
+      "policyname": "delivery_policy_own",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(business_id = ANY (( SELECT current_business_ids() AS current_business_ids)::uuid[]))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "marketing_delivery_policy",
+      "policyname": "delivery_policy_service",
+      "cmd": "ALL",
+      "roles": "{service_role}",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
       "tablename": "marketing_events",
       "policyname": "marketing_events_select_own",
       "cmd": "SELECT",
@@ -7682,6 +8893,60 @@
       "roles": "{public}",
       "qual": "(( SELECT auth.role() AS role) = 'service_role'::text)",
       "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "marketing_journey_status_events",
+      "policyname": "journey_status_own",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(business_id = ANY (( SELECT current_business_ids() AS current_business_ids)::uuid[]))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "marketing_journey_status_events",
+      "policyname": "journey_status_service",
+      "cmd": "SELECT",
+      "roles": "{service_role}",
+      "qual": "true",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "marketing_offer_limits",
+      "policyname": "offer_limits_service",
+      "cmd": "ALL",
+      "roles": "{service_role}",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "marketing_permission_events",
+      "policyname": "permission_own",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(business_id = ANY (( SELECT current_business_ids() AS current_business_ids)::uuid[]))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "marketing_permission_events",
+      "policyname": "permission_service",
+      "cmd": "ALL",
+      "roles": "{service_role}",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "marketing_provider_events",
+      "policyname": "provider_events_service",
+      "cmd": "ALL",
+      "roles": "{service_role}",
+      "qual": "true",
+      "with_check": "true"
     },
     {
       "schemaname": "public",
@@ -7802,6 +9067,33 @@
     },
     {
       "schemaname": "public",
+      "tablename": "operator_booking_requests",
+      "policyname": "operator_booking_requests_read",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "(business_id = ANY (current_business_ids()))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "ota_availability_snapshots",
+      "policyname": "ota_snapshots_service",
+      "cmd": "ALL",
+      "roles": "{service_role}",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "ota_events",
+      "policyname": "ota_events_service",
+      "cmd": "ALL",
+      "roles": "{service_role}",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
       "tablename": "ota_integrations",
       "policyname": "ota_int_admin",
       "cmd": "ALL",
@@ -7849,6 +9141,15 @@
       "schemaname": "public",
       "tablename": "ota_reconciliation_runs",
       "policyname": "recon_service",
+      "cmd": "ALL",
+      "roles": "{service_role}",
+      "qual": "true",
+      "with_check": "true"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "ota_reservations",
+      "policyname": "ota_reservations_service",
       "cmd": "ALL",
       "roles": "{service_role}",
       "qual": "true",
@@ -8058,8 +9359,8 @@
       "policyname": "platform_public_settings_super_admin_all",
       "cmd": "ALL",
       "roles": "{authenticated}",
-      "qual": "(EXISTS ( SELECT 1\n   FROM admin_users au\n  WHERE ((au.user_id = ( SELECT auth.uid() AS uid)) AND (upper(COALESCE(au.role, ''::text)) ~~ 'SUPER%'::text))))",
-      "with_check": "(EXISTS ( SELECT 1\n   FROM admin_users au\n  WHERE ((au.user_id = ( SELECT auth.uid() AS uid)) AND (upper(COALESCE(au.role, ''::text)) ~~ 'SUPER%'::text))))"
+      "qual": "(EXISTS ( SELECT 1\n   FROM admin_users a\n  WHERE ((a.user_id = ( SELECT auth.uid() AS uid)) AND (a.role = 'SUPER_ADMIN'::text) AND (NOT COALESCE(a.suspended, false)) AND (NOT COALESCE(a.read_only, false)))))",
+      "with_check": "(EXISTS ( SELECT 1\n   FROM admin_users a\n  WHERE ((a.user_id = ( SELECT auth.uid() AS uid)) AND (a.role = 'SUPER_ADMIN'::text) AND (NOT COALESCE(a.suspended, false)) AND (NOT COALESCE(a.read_only, false)))))"
     },
     {
       "schemaname": "public",
