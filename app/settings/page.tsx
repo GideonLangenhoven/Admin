@@ -3005,11 +3005,16 @@ export default function SettingsPage() {
                         what_to_bring: opsConfig.what_to_bring || null,
                         what_to_wear: opsConfig.what_to_wear || null,
                         arrival_instructions: opsConfig.arrival_instructions || null,
-                        ai_system_prompt: opsConfig.ai_system_prompt || null,
+                        // Blank means the standard assistant; the column is NOT NULL, so store "".
+                        ai_system_prompt: opsConfig.ai_system_prompt.trim(),
                         faq_json: faqObj,
                     }).eq("id", businessId);
                     setOpsSaving(false);
-                    if (error) { notify({ message: error.message, tone: "error" }); return; }
+                    if (error) {
+                        console.error("Operations settings save failed:", error);
+                        notify({ title: "Settings not saved", message: "The operations and AI settings could not be saved. Please try again.", tone: "error" });
+                        return;
+                    }
                     notify({ message: "Operations & AI settings saved.", tone: "success" });
                 }} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3034,7 +3039,7 @@ export default function SettingsPage() {
 
                     <label className="block">
                         <span className="text-xs font-medium text-[var(--ck-text-muted)]">AI chatbot personality &amp; knowledge</span>
-                        <p className="text-[11px] text-[var(--ck-text-muted)] mb-1">Instructions for your website and WhatsApp chatbot: role, business rules and answers.</p>
+                        <p className="text-[11px] text-[var(--ck-text-muted)] mb-1">Instructions for your website and WhatsApp chatbot: role, business rules and answers. Leave blank to use the standard assistant.</p>
                         <textarea value={opsConfig.ai_system_prompt} onChange={e => setOpsConfig({ ...opsConfig, ai_system_prompt: e.target.value })}
                             rows={8} placeholder="You are a friendly booking assistant for [business]. You help customers book tours, answer FAQs..." className="ui-control mt-1 w-full font-mono text-xs" />
                     </label>
