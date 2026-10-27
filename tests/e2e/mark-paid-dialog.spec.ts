@@ -9,7 +9,7 @@ type Notice = { title?: string; message: string; tone?: string };
 
 test.use({ viewport: { width: 662, height: 555 } });
 
-async function openMarkPaid(page: Page, answer: { status: number; json: unknown }) {
+async function openMarkPaid(page: Page, answer: { status: number; json: unknown }, patch?: Record<string, unknown>) {
   await page.addInitScript(() => {
     localStorage.setItem("ck_admin_role", "MAIN_ADMIN");
     localStorage.setItem("ck_admin_email", "operator@example.invalid");
@@ -19,12 +19,18 @@ async function openMarkPaid(page: Page, answer: { status: number; json: unknown 
   await page.clock.setFixedTime(new Date("2026-10-15T05:00:00Z"));
   await page.routeWebSocket(/realtime/, () => {});
   const calls: unknown[] = [];
-  await page.route("**/*", route => {
+  await page.route("**/*", async route => {
     const req = route.request();
     const url = new URL(req.url());
     if (url.hostname !== "127.0.0.1" || !["3190", "3191"].includes(url.port)) return route.abort();
     if (url.pathname.startsWith("/api/")) return route.fulfill({ status: 403, json: { error: "Operational actions disabled in synthetic preview" } });
     if (url.pathname === "/functions/v1/manual-mark-paid") { calls.push(req.postDataJSON()); return route.fulfill(answer); }
+    if (patch && (url.pathname === "/rest/v1/rpc/list_operator_bookings" || (url.pathname === "/rest/v1/bookings" && req.method() === "GET"))) {
+      const res = await route.fetch();
+      const rows = await res.json();
+      const edit = (row: { id?: string }) => row.id === BOOKING ? { ...row, ...patch } : row;
+      return route.fulfill({ response: res, json: Array.isArray(rows) ? rows.map(edit) : edit(rows) });
+    }
     return route.continue();
   });
   // The preview has no notification layer, so notify() logs its payload to the console.
@@ -82,3 +88,13 @@ for (const [label, error, shown] of [
     await expect(dialog).toBeVisible();
   });
 }
+
+test("a booking with nothing due is marked paid without an amount", async ({ page }) => {
+  const { calls, seen, dialog } = await openMarkPaid(page, { status: 200, json: { ok: true, amount: 0, balance_due: 0, paid_in_full: true, notified: "confirmation" } }, { status: "PENDING", total_amount: 0, total_captured: 0 });
+  await expect(dialog).toContainText("Nothing is due. The booking will be marked paid.");
+  await expect(dialog.getByLabel("Amount received (R)")).toHaveCount(0);
+  await expect(dialog).toContainText("The guest is emailed their booking confirmation.");
+  await dialog.getByRole("button", { name: "Mark paid", exact: true }).click();
+  await expect.poll(() => seen.find(n => n.title === "Payment recorded")).toMatchObject({ tone: "success", message: "The booking is paid in full. Booking confirmation email queued." });
+  expect(calls).toEqual([{ action: "mark_paid", booking_id: BOOKING, expected_captured: 0 }]);
+});

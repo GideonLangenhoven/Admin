@@ -51,11 +51,13 @@ export default function MarkPaidDialog({ booking, onClose, onRecorded }: {
   const [error, setError] = useState<string | null>(null);
 
   const value = Number(amount.trim().replace(/\s/g, "").replace(",", "."));
-  const amountError = !amount.trim() ? "Enter the amount received."
+  // Nothing due (a voucher covers it): confirm without an amount.
+  const nothingDue = due <= 0;
+  const amountError = nothingDue ? null : !amount.trim() ? "Enter the amount received."
     : !Number.isFinite(value) || value <= 0 || Math.abs(Math.round(value * 100) - value * 100) > 1e-6 ? "Enter the amount in rand and cents, for example 500.00."
       : value > due + 0.005 ? "That is more than the " + rand(due) + " still due."
         : null;
-  const part = !amountError && value < due - 0.005;
+  const part = !nothingDue && !amountError && value < due - 0.005;
   const methodLabel = METHODS.find(m => m.value === method)?.label || method;
   const guestNotice = !booking.email ? "No email on file: the guest gets a WhatsApp message if WhatsApp is connected."
     : ["PENDING", "PENDING PAYMENT", "HELD"].includes(booking.status) ? "The guest is emailed their booking confirmation."
@@ -67,7 +69,7 @@ export default function MarkPaidDialog({ booking, onClose, onRecorded }: {
     setError(null);
     try {
       const res = await supabase.functions.invoke("manual-mark-paid", {
-        body: {
+        body: nothingDue ? { action: "mark_paid", booking_id: booking.id, expected_captured: received } : {
           action: "mark_paid", booking_id: booking.id, amount: Math.round(value * 100) / 100, payment_method: method,
           payment_reference: reference.trim() || undefined, expected_captured: received,
         },
@@ -83,7 +85,7 @@ export default function MarkPaidDialog({ booking, onClose, onRecorded }: {
         notify({ title: "Already paid", message: "This booking was already marked paid.", tone: "info" });
       } else {
         const message = [
-          rand(Number(out.amount || 0)) + " by " + methodLabel + ".",
+          nothingDue ? "" : rand(Number(out.amount || 0)) + " by " + methodLabel + ".",
           out.paid_in_full ? "The booking is paid in full." : rand(Number(out.balance_due || 0)) + " still due.",
           out.warning || NOTIFIED[out.notified || ""] || "",
         ].filter(Boolean).join(" ");
@@ -108,32 +110,38 @@ export default function MarkPaidDialog({ booking, onClose, onRecorded }: {
           {booking.customer_name || "Guest"} · {booking.id.substring(0, 8).toUpperCase()} · {rand(due)} due{received > 0 ? " (" + rand(received) + " already received)" : ""}
         </p>
         <div className="space-y-3">
-          <label className="block text-xs font-medium" style={{ color: "var(--ck-text)" }}>
-            Amount received (R)
-            <input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} disabled={saving}
-              aria-invalid={!!amountError} aria-describedby="mark-paid-amount-help" className="ui-control mt-1 w-full" />
-          </label>
-          <p id="mark-paid-amount-help" role={amountError ? "alert" : undefined} className="text-xs" style={{ color: amountError ? "var(--ck-danger)" : "var(--ck-text-muted)" }}>
-            {amountError || (part ? rand(due - value) + " will still be due. The booking stays confirmed." : "The booking will be marked paid.")}
-          </p>
-          <label className="block text-xs font-medium" style={{ color: "var(--ck-text)" }}>
-            Payment method
-            <select value={method} onChange={e => setMethod(e.target.value)} disabled={saving} className="ui-control mt-1 w-full">
-              {METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-            </select>
-          </label>
-          <label className="block text-xs font-medium" style={{ color: "var(--ck-text)" }}>
-            Reference (optional)
-            <input value={reference} onChange={e => setReference(e.target.value)} maxLength={80} disabled={saving}
-              placeholder="Bank reference or receipt number" className="ui-control mt-1 w-full" />
-          </label>
+          {nothingDue ? (
+            <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Nothing is due. The booking will be marked paid.</p>
+          ) : (
+            <>
+              <label className="block text-xs font-medium" style={{ color: "var(--ck-text)" }}>
+                Amount received (R)
+                <input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} disabled={saving}
+                  aria-invalid={!!amountError} aria-describedby="mark-paid-amount-help" className="ui-control mt-1 w-full" />
+              </label>
+              <p id="mark-paid-amount-help" role={amountError ? "alert" : undefined} className="text-xs" style={{ color: amountError ? "var(--ck-danger)" : "var(--ck-text-muted)" }}>
+                {amountError || (part ? rand(due - value) + " will still be due. The booking stays confirmed." : "The booking will be marked paid.")}
+              </p>
+              <label className="block text-xs font-medium" style={{ color: "var(--ck-text)" }}>
+                Payment method
+                <select value={method} onChange={e => setMethod(e.target.value)} disabled={saving} className="ui-control mt-1 w-full">
+                  {METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+              </label>
+              <label className="block text-xs font-medium" style={{ color: "var(--ck-text)" }}>
+                Reference (optional)
+                <input value={reference} onChange={e => setReference(e.target.value)} maxLength={80} disabled={saving}
+                  placeholder="Bank reference or receipt number" className="ui-control mt-1 w-full" />
+              </label>
+            </>
+          )}
           <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{guestNotice}</p>
           {error && <p role="alert" className="text-xs font-medium" style={{ color: "var(--ck-danger)" }}>{error}</p>}
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" onClick={onClose} disabled={saving} className="ui-btn ui-btn-ghost disabled:opacity-50">Cancel</button>
           <button type="button" onClick={record} disabled={saving || !!amountError} className="ui-btn ui-btn-primary disabled:opacity-50">
-            {saving ? "Recording…" : amountError ? "Record payment" : "Record " + rand(value)}
+            {saving ? "Recording…" : nothingDue ? "Mark paid" : amountError ? "Record payment" : "Record " + rand(value)}
           </button>
         </div>
       </div>
