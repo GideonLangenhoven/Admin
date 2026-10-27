@@ -126,6 +126,7 @@ function Slots() {
 
   // Cancel Day State
   const [showCancelDay, setShowCancelDay] = useState(false);
+  const [cancelDayOfferChoice, setCancelDayOfferChoice] = useState(true);
   const [showReopenDay, setShowReopenDay] = useState(false);
   const [selectedCancelDates, setSelectedCancelDates] = useState<string[]>([]);
 
@@ -257,9 +258,16 @@ function Slots() {
   }
 
   async function handleCancelDay() {
-    if (selectedCancelDates.length === 0) return;
-    const handling = await confirmCancellation("Cancel selected days", `Cancel all slots for ${selectedCancelDates.length} selected day(s) due to weather? This closes the slots, cancels active bookings and notifies customers.`);
-    if (!handling) return;
+    if (cancellingWeather || selectedCancelDates.length === 0) return;
+    const offerChoice = cancelDayOfferChoice;
+    const confirmed = await confirmAction({
+      title: "Cancel selected days",
+      message: `Close departures and cancel bookings for ${selectedCancelDates.length} selected day(s)? ${offerChoice ? "Guests can choose a refund, voucher or new date in My Bookings." : "Guests must contact you for refunds, vouchers or rescheduling. These options will be unavailable in My Bookings."}`,
+      tone: "warning",
+      confirmLabel: "Cancel days",
+      cancelLabel: "Keep bookings",
+    });
+    if (!confirmed) return;
 
     setCancellingWeather(true);
     try {
@@ -291,7 +299,7 @@ function Slots() {
 
       // Delegate to weather-cancel edge function (atomic per-slot capacity, customer notifications)
       const { data, error } = await supabase.functions.invoke("weather-cancel", {
-        body: { slot_ids: allSlotIds, business_id: businessId, reason: "weather conditions", offer_choice: handling.offerChoice },
+        body: { slot_ids: allSlotIds, business_id: businessId, reason: "weather conditions", offer_choice: offerChoice },
       });
       if (error) throw error;
       const cancelled = (data as any)?.bookings_cancelled ?? 0;
@@ -785,7 +793,10 @@ function Slots() {
       notify({ title: "Select dates first", message: `Select calendar date headings to ${action} days.`, tone: "warning" });
       return;
     }
-    if (action === "cancel") setShowCancelDay(true);
+    if (action === "cancel") {
+      setCancelDayOfferChoice(true);
+      setShowCancelDay(true);
+    }
     else setShowReopenDay(true);
   }
 
@@ -1261,8 +1272,8 @@ function Slots() {
       {/* CANCEL DAY MODAL */}
       {showCancelDay && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(10,18,13,0.55)", backdropFilter: "blur(2px)" }}>
-          <div className="ui-card w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-6" role="dialog" aria-modal="true" aria-label="Cancel days">
-            <h3 className="mb-1 text-xl font-bold" style={{ color: "var(--ck-danger)" }}>Cancel ({selectedCancelDates.length}) Day(s)</h3>
+          <div role="dialog" aria-modal="true" aria-labelledby="cancel-day-title" className="ui-card max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto overscroll-contain p-5 sm:p-6">
+            <h3 id="cancel-day-title" className="mb-1 text-xl font-bold" style={{ color: "var(--ck-danger)" }}>Cancel days ({selectedCancelDates.length})</h3>
             <p className="mb-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Close departures and cancel active bookings for bad weather on:
             </p>
@@ -1274,6 +1285,18 @@ function Slots() {
                 ))}
               </ul>
             </div>
+
+            <fieldset disabled={cancellingWeather} className="space-y-2">
+              <legend className="mb-2 text-sm font-semibold">After cancellation</legend>
+              <label className="flex min-h-11 cursor-pointer items-start gap-3 py-2">
+                <input type="radio" name="cancel-day-handling" value="guests" checked={cancelDayOfferChoice} onChange={() => setCancelDayOfferChoice(true)} className="mt-1 h-4 w-4 shrink-0 accent-[var(--ck-accent)]" />
+                <span className="min-w-0 text-sm"><span className="block font-semibold">Guests choose</span><span style={{ color: "var(--ck-text-muted)" }}>Refund, voucher or reschedule in My Bookings.</span></span>
+              </label>
+              <label className="flex min-h-11 cursor-pointer items-start gap-3 py-2">
+                <input type="radio" name="cancel-day-handling" value="operator" checked={!cancelDayOfferChoice} onChange={() => setCancelDayOfferChoice(false)} className="mt-1 h-4 w-4 shrink-0 accent-[var(--ck-accent)]" />
+                <span className="min-w-0 text-sm"><span className="block font-semibold">Contact operator</span><span style={{ color: "var(--ck-text-muted)" }}>You handle refunds, vouchers and rescheduling. No guest choices in My Bookings.</span></span>
+              </label>
+            </fieldset>
 
             <div className="mt-6 grid grid-cols-1 gap-2 sm:flex sm:justify-end">
               <button
@@ -1288,7 +1311,7 @@ function Slots() {
                 className="ui-btn disabled:opacity-50"
                 style={{ background: "var(--ck-danger)", color: "#fff" }}
               >
-                {cancellingWeather ? "Cancelling..." : "Cancel Everything"}
+                {cancellingWeather ? "Cancelling…" : "Cancel days"}
               </button>
             </div>
           </div>
