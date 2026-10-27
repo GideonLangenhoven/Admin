@@ -1081,6 +1081,13 @@ function invoiceAmountPaid(d: Record<string, unknown>, total: number): number {
   return String(d.payment_method || "").trim().toLowerCase() === "pending" ? 0 : total;
 }
 
+// A document that still asks for money is a pro forma; the tax invoice is
+// issued once the booking is paid in full.
+function invoiceTitle(d: Record<string, unknown>): string {
+  const total = parseFloat(String(d.total_amount || "0").replace(/[^0-9.,]/g, "").replace(/,/g, "")) || 0;
+  return invoiceAmountPaid(d, total) >= total - 0.005 ? "Tax Invoice" : "Pro Forma Invoice";
+}
+
 function invoiceServiceDate(value: unknown, timezone: string) {
   const date = String(value || "-").trim();
   if (/^\d{4}-\d{2}-\d{2}T/.test(date) && !Number.isNaN(Date.parse(date))) {
@@ -1118,8 +1125,8 @@ function invoiceHtml(d: Record<string, unknown>, invCtx?: InvoiceContext) {
         <!-- Hero Banner -->
         <tr>
           <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
-            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">${invCtx?.companyName || "Tax Invoice"}</p>
-            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Tax Invoice ${d.invoice_number}</h1>
+            <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">${invCtx?.companyName || invoiceTitle(d)}</p>
+            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">${invoiceTitle(d)} ${d.invoice_number}</h1>
           </td>
         </tr>
         ${heroImg("IMG_INVOICE", "Cape Kayak")}
@@ -2267,8 +2274,9 @@ async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContex
   }
 
   // ── Header ──
-  page.drawText(invCtx.companyName || "Tax Invoice", { x: margin, y, font: fontBold, size: 18, color: black });
-  page.drawText("TAX INVOICE", { x: W - margin - fontBold.widthOfTextAtSize("TAX INVOICE", 22), y, font: fontBold, size: 22, color: grey });
+  const docTitle = invoiceTitle(d).toUpperCase();
+  page.drawText(invCtx.companyName || invoiceTitle(d), { x: margin, y, font: fontBold, size: 18, color: black });
+  page.drawText(docTitle, { x: W - margin - fontBold.widthOfTextAtSize(docTitle, 22), y, font: fontBold, size: 22, color: grey });
   y -= 16;
   const regLine = [invCtx.reg ? invCtx.reg : "", invCtx.vat ? "VAT: " + invCtx.vat : ""].filter(Boolean).join("  ");
   if (regLine) page.drawText(regLine, { x: margin, y, font, size: 8, color: grey });
@@ -2902,7 +2910,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         break;
       case "INVOICE": {
         const invCtxHtml = await getInvoiceContext(branding.businessId);
-        subject = (invCtxHtml.companyName || "Tax Invoice") + " - Tax Invoice " + d.invoice_number;
+        subject = (invCtxHtml.companyName || invoiceTitle(d)) + " - " + invoiceTitle(d) + " " + d.invoice_number;
         html = invoiceHtml(d, invCtxHtml);
         bcc = d.admin_email as string;
         break;
@@ -3064,7 +3072,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         return new Response(JSON.stringify({ error: "Unknown email type: " + type }), { status: 400, headers: getCors(req) });
     }
 
-    // Build tax invoice PDF attachment for INVOICE and BOOKING_CONFIRM emails
+    // Build the invoice PDF (pro forma until paid) for INVOICE and BOOKING_CONFIRM emails
     let attachments: Array<{ filename: string; content: string }> | undefined;
     if (giftImage) {
       const image = await fetch("https://admin.bookingtours.co.za/api/internal/voucher-image", {
@@ -3089,7 +3097,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
           let pdfB64 = "";
           for (let pi = 0; pi < pdfBytes.length; pi++) pdfB64 += String.fromCharCode(pdfBytes[pi]);
           pdfB64 = btoa(pdfB64);
-          attachments = [{ filename: "TaxInvoice-" + invNum + ".pdf", content: pdfB64 }];
+          attachments = [{ filename: invoiceTitle(d).replace(/ /g, "") + "-" + invNum + ".pdf", content: pdfB64 }];
         }
       } catch (pfErr) {
         console.error("PDF_INVOICE_ERR:", pfErr);

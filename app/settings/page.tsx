@@ -2902,7 +2902,7 @@ export default function SettingsPage() {
                     {([
                         { key: "payment", label: "Payment Link", desc: "Sent when admin creates a booking requiring payment" },
                         { key: "confirm", label: "Booking Confirmation", desc: "Sent after payment is completed" },
-                        { key: "invoice", label: "Invoice", desc: "Sent with the tax invoice attachment" },
+                        { key: "invoice", label: "Invoice", desc: "Sent with the invoice PDF: a pro forma until paid, then the tax invoice" },
                         { key: "gift", label: "Gift Voucher Default Photo", desc: "Fallback voucher background. Set a photo per experience in Tours above." },
                         { key: "cancel", label: "Cancellation – General", desc: "Sent when a booking is cancelled for any reason" },
                         { key: "cancel_weather", label: "Cancellation – Weather", desc: "Sent when a booking is cancelled due to weather" },

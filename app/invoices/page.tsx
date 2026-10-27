@@ -554,7 +554,7 @@ export default function Invoices() {
       if (problem) {
         notify({ title: "Invoice resend failed", message: problem, tone: "error", duration: 6000 });
       } else {
-        notify({ title: "Invoice resent", message: "Tax invoice " + invNo + " sent to " + email, tone: "success", duration: 5000 });
+        notify({ title: "Invoice resent", message: "Invoice " + invNo + " sent to " + email, tone: "success", duration: 5000 });
         setRecentlySentId(inv.id);
         setTimeout(() => setRecentlySentId((cur) => (cur === inv.id ? null : cur)), 3500);
       }

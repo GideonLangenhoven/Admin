@@ -239,7 +239,7 @@ async function createInvoice(booking: any, tourName: string, slotTime: string, p
   return inv.data;
 }
 
-async function sendBookingConfirmation(booking: any, yocoPaymentId: string, checkoutId: string, amount: number) {
+async function sendBookingConfirmation(booking: any, yocoPaymentId: string, checkoutId: string, amount: number, previousStatus = "") {
   // Idempotency: check logs table first (always exists)
   const existingLog = await supabase
     .from("logs")
@@ -362,13 +362,16 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
     }
   }
 
+  // A booking confirmed before this payment (money still due) was told so
+  // already; its one email now is the tax invoice, as manual-mark-paid sends.
+  const emailType = previousStatus === "CONFIRMED" ? "INVOICE" : "BOOKING_CONFIRM";
   if (booking.email) {
     try {
       const emailRes = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
         body: JSON.stringify({
-          type: "BOOKING_CONFIRM",
+          type: emailType,
           data: {
             email: booking.email,
             booking_id: booking.id,
@@ -386,6 +389,10 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
             tour_date: slotTime,
             start_time: slotTime,
             qty: booking.qty,
+            unit_price: booking.unit_price,
+            discount_type: booking.discount_type || null,
+            discount_percent: booking.discount_percent || 0,
+            discount_amount: invoice?.discount_amount || 0,
             total_amount: booking.total_amount,
             invoice_number: invoice?.invoice_number || "",
             invoice_date: tenant ? formatTenantDate(tenant.business, invoice?.created_at || new Date().toISOString()) : "",
@@ -414,6 +421,7 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
       yoco_payment_id: yocoPaymentId,
       checkout_id: checkoutId,
       amount,
+      email_type: emailType,
       wa_sent: waSent,
       email_sent: emailSent,
       email_queued: emailQueued,
@@ -1243,7 +1251,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
     // Send confirmation email + WhatsApp — wrapped in try-catch so a notification failure
     // does NOT prevent the webhook from returning 200 (booking is already marked PAID above)
     try {
-      await sendBookingConfirmation({ ...booking, status: "PAID", yoco_payment_id: yocoPaymentId }, yocoPaymentId, checkoutId, payload.amount);
+      await sendBookingConfirmation({ ...booking, status: "PAID", yoco_payment_id: yocoPaymentId }, yocoPaymentId, checkoutId, payload.amount, booking.status);
     } catch (confirmErr) {
       console.error("CONFIRM_SEND_ERR booking=" + booking.id + ":", confirmErr);
       // Log the failure so it can be retried manually from admin
