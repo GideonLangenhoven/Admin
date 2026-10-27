@@ -20,6 +20,11 @@ export default function PeakPricingPage() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState("");
+  const [resultIsError, setResultIsError] = useState(false);
+  // Peak-period prices are separate from each tour's standard peak price, so
+  // applying a period no longer rewrites the tour's own pricing.
+  const [periodPrices, setPeriodPrices] = useState<Record<string, string>>({});
+  const [editingPeriodId, setEditingPeriodId] = useState<string | null>(null);
   const [overlapWarning, setOverlapWarning] = useState("");
 
   useEffect(() => { load(); }, [businessId]);
@@ -30,6 +35,7 @@ export default function PeakPricingPage() {
     const s = new Date(startDate);
     const e = new Date(endDate);
     const overlaps = peakPeriods.filter((p: any) => {
+      if (p.id === editingPeriodId) return false;
       const ps = new Date(p.start_date);
       const pe = new Date(p.end_date);
       return s <= pe && e >= ps; // date ranges overlap
@@ -40,7 +46,7 @@ export default function PeakPricingPage() {
     } else {
       setOverlapWarning("");
     }
-  }, [startDate, endDate, peakPeriods]);
+  }, [startDate, endDate, peakPeriods, editingPeriodId]);
 
   async function load() {
     const { data: t } = await supabase.from("tours").select("id, name, base_price_per_person, peak_price_per_person").eq("business_id", businessId).eq("active", true).order("sort_order");
@@ -79,104 +85,73 @@ export default function PeakPricingPage() {
     setLoading(false);
   }
 
+  function showResult(text: string, isError = false) {
+    setResult(text);
+    setResultIsError(isError);
+  }
+
+  function resetPeakForm() {
+    setEditingPeriodId(null);
+    setStartDate("");
+    setEndDate("");
+    setPeriodLabel("");
+    setPriority("0");
+    setPeriodPrices({});
+  }
+
+  function startEditPeakPeriod(period: any) {
+    setEditingPeriodId(period.id);
+    setStartDate(period.start_date);
+    setEndDate(period.end_date);
+    setPeriodLabel(period.label || "");
+    setPriority(String(period.priority ?? 0));
+    setPeriodPrices(Object.fromEntries((period.peak_period_prices || []).map((pp: any) => [pp.tour_id, String(pp.price_per_person)])));
+    setResult("");
+    document.getElementById("set-peak-period")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // Period, per-tour prices and slot prices are saved in one transaction by
+  // save_peak_period, so a failure can no longer leave half-applied pricing.
   async function applyPeakPricing() {
     if (!startDate || !endDate) return;
-    if (new Date(startDate) > new Date(endDate)) { setResult("Start date must be before end date."); return; }
+    if (startDate > endDate) { showResult("Choose an end date on or after the start date.", true); return; }
     setSaving(true);
     setResult("");
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    end.setDate(end.getDate() + 1); // inclusive
-
     const priorityVal = Number(priority) || 0;
+    const prices = tours.map((tour) => ({
+      tour_id: tour.id,
+      price_per_person: Number(periodPrices[tour.id] || tour.peak_price_per_person || tour.base_price_per_person),
+    }));
+    const { data, error } = await supabase.rpc("save_peak_period", {
+      p_business_id: businessId,
+      p_period_id: editingPeriodId,
+      p_label: periodLabel.trim() || (startDate + " to " + endDate),
+      p_start: startDate,
+      p_end: endDate,
+      p_priority: priorityVal,
+      p_prices: prices,
+    });
+    setSaving(false);
 
-    // Save peak period record
-    const { data: period, error: periodErr } = await supabase.from("peak_periods").insert({
-      business_id: businessId,
-      label: periodLabel.trim() || (startDate + " to " + endDate),
-      start_date: startDate,
-      end_date: endDate,
-      priority: priorityVal,
-    }).select().single();
-
-    if (periodErr) {
-      setResult("Failed to save peak period: " + periodErr.message);
-      setSaving(false);
+    if (error || !data?.ok) {
+      console.error("save_peak_period failed", error || data);
+      const message = data?.error || "The peak period could not be saved. Please try again, or contact support if it keeps happening.";
+      notify({ title: "Peak period not saved", message, tone: "error", duration: 7000 });
+      showResult(message, true);
       return;
     }
 
-    // Save per-tour prices for this period
-    const periodPriceRows: any[] = [];
-    for (const tour of tours) {
-      const price = peakPrices[tour.id] ? Number(peakPrices[tour.id]) : (tour.peak_price_per_person || tour.base_price_per_person);
-      periodPriceRows.push({ peak_period_id: period.id, tour_id: tour.id, price_per_person: price });
-    }
-    if (periodPriceRows.length > 0) {
-      await supabase.from("peak_period_prices").insert(periodPriceRows);
-    }
-
-    // For each slot in range, determine the winning peak period (highest priority)
-    // and apply its price
-    let updated = 0;
-    for (const tour of tours) {
-      const price = peakPrices[tour.id] ? Number(peakPrices[tour.id]) : (tour.peak_price_per_person || tour.base_price_per_person);
-
-      // Also save peak price on tour
-      await supabase.from("tours").update({ peak_price_per_person: price }).eq("id", tour.id);
-
-      const { data: slots } = await supabase.from("slots").select("id, start_time, is_manually_overridden")
-        .eq("business_id", businessId)
-        .eq("tour_id", tour.id)
-        .gte("start_time", start.toISOString())
-        .lt("start_time", end.toISOString());
-
-      for (const s of (slots || [])) {
-        // Skip manually overridden slots
-        if (s.is_manually_overridden) continue;
-
-        // Skip slots that have CONFIRMED or PAID bookings (grandfathering)
-        const { count } = await supabase.from("bookings")
-          .select("id", { count: "exact", head: true })
-          .eq("slot_id", s.id)
-          .in("status", ["CONFIRMED", "PAID"]);
-        if ((count || 0) > 0) continue;
-
-        // Determine which peak period has the highest priority for this slot's date
-        const slotDate = new Date(s.start_time).toISOString().split("T")[0];
-        let winningPrice = price; // default to current period's price
-
-        // Check all peak periods that cover this date
-        const applicablePeriods = peakPeriods.filter((p: any) => slotDate >= p.start_date && slotDate <= p.end_date);
-        // Include the period we just created
-        applicablePeriods.push({ ...period, peak_period_prices: periodPriceRows.map(r => ({ tour_id: r.tour_id, price_per_person: r.price_per_person })) });
-
-        // Sort by priority descending — highest wins
-        applicablePeriods.sort((a: any, b: any) => (b.priority || 0) - (a.priority || 0));
-
-        if (applicablePeriods.length > 0) {
-          const winner = applicablePeriods[0];
-          const tourPrice = (winner.peak_period_prices || []).find((pp: any) => pp.tour_id === tour.id);
-          if (tourPrice) {
-            winningPrice = Number(tourPrice.price_per_person);
-          }
-        }
-
-        // Clearing last_minute_at keeps the flag honest: this override is now a
-        // peak price, not a last-minute deal price.
-        await supabase.from("slots").update({ is_peak: true, price_per_person_override: winningPrice, last_minute_at: null }).eq("id", s.id);
-        updated++;
-      }
-    }
-
+    const updated = Number(data.slots_updated) || 0;
+    const verb = editingPeriodId ? "updated" : "saved";
     if (updated === 0) {
       notify({
-        title: "Peak period saved, but 0 slots existed",
-        message: "No slots existed in " + startDate + " to " + endDate + " yet. The pricing rule is stored and will apply automatically when slots are created for these dates.",
+        title: "Peak period " + verb + ", no open slots changed",
+        message: "No unbooked slots exist in " + startDate + " to " + endDate + " yet. Slots created later for these dates get the peak price automatically.",
         tone: "warning",
         duration: 7000,
       });
-      setResult("Peak period saved. 0 existing slots updated (will apply on slot creation in " + startDate + " to " + endDate + ").");
+      showResult("Peak period " + verb + ". 0 existing slots updated (applies automatically to slots created in " + startDate + " to " + endDate + ").");
     } else {
       notify({
         title: "Peak pricing applied",
@@ -184,18 +159,9 @@ export default function PeakPricingPage() {
         tone: "success",
         duration: 5000,
       });
-      setResult("Applied peak pricing to " + updated + " slots (" + startDate + " to " + endDate + ", priority " + priorityVal + ")");
+      showResult("Applied peak pricing to " + updated + " slots (" + startDate + " to " + endDate + ", priority " + priorityVal + ")");
     }
-    setPeriodLabel("");
-    setPriority("0");
-    // T-4: Reset per-tour peak prices so the next submission starts from the
-    // configured tour defaults rather than the last-applied values.
-    const resetPeak: Record<string, string> = {};
-    for (const tour of tours) {
-      resetPeak[tour.id] = String(tour.peak_price_per_person ?? tour.base_price_per_person ?? "");
-    }
-    setPeakPrices(resetPeak);
-    setSaving(false);
+    resetPeakForm();
     load();
   }
 
@@ -210,7 +176,7 @@ export default function PeakPricingPage() {
         peak_price_per_person: nextPeak,
       }).eq("id", tour.id);
     }
-    setResult("Tour pricing updated.");
+    showResult("Tour pricing updated.");
     setSaving(false);
     load();
   }
@@ -218,29 +184,17 @@ export default function PeakPricingPage() {
   async function removePeakPeriod(periodId: string, startD: string, endD: string) {
     if (!await confirmAction({
       title: "Remove peak pricing",
-      message: "Remove peak pricing for " + startD + " to " + endD + "? This will revert affected slots to base pricing.",
+      message: "Remove peak pricing for " + startD + " to " + endD + "? Affected slots return to base pricing unless another peak period covers them.",
       tone: "warning",
       confirmLabel: "Remove range",
     })) return;
-    const start = new Date(startD);
-    const end = new Date(endD);
-    end.setDate(end.getDate() + 1);
-
-    const { data: slots } = await supabase.from("slots").select("id, is_manually_overridden")
-      .eq("business_id", businessId)
-      .eq("is_peak", true)
-      .gte("start_time", start.toISOString())
-      .lt("start_time", end.toISOString());
-
-    for (const s of (slots || [])) {
-      // Skip manually overridden slots
-      if (s.is_manually_overridden) continue;
-      await supabase.from("slots").update({ is_peak: false, price_per_person_override: null, last_minute_at: null }).eq("id", s.id);
+    const { data, error } = await supabase.rpc("delete_peak_period", { p_period_id: periodId });
+    if (error || !data?.ok) {
+      console.error("delete_peak_period failed", error || data);
+      notify({ title: "Peak pricing not removed", message: data?.error || "The peak period could not be removed. Please try again.", tone: "error" });
+      return;
     }
-
-    // Delete the peak period record
-    await supabase.from("peak_periods").delete().eq("id", periodId);
-
+    if (editingPeriodId === periodId) resetPeakForm();
     notify({ title: "Peak pricing removed", message: "The selected seasonal range has been cleared.", tone: "success" });
     load();
   }
@@ -326,8 +280,8 @@ export default function PeakPricingPage() {
       </div>
 
       {/* Set Peak Period */}
-      <div className="anim-fade-up anim-d2 ui-card p-5 mb-6">
-        <h2 className="text-[15px] font-semibold tracking-tight mb-4" style={{ color: "var(--ck-text-strong)" }}>Set Peak Period</h2>
+      <div id="set-peak-period" className="anim-fade-up anim-d2 ui-card p-5 mb-6">
+        <h2 className="text-[15px] font-semibold tracking-tight mb-4" style={{ color: "var(--ck-text-strong)" }}>{editingPeriodId ? "Edit Peak Period" : "Set Peak Period"}</h2>
         <div className="grid gap-4 md:grid-cols-2 mb-4">
           <div>
             <label className="text-xs font-medium block mb-1" style={{ color: "var(--ck-text-muted)" }}>Start Date</label>
@@ -374,8 +328,8 @@ export default function PeakPricingPage() {
               </div>
               <div className="w-full sm:w-32">
                 <label className="text-xs block mb-1 font-medium" style={{ color: "var(--ck-amber)" }}>Peak Price</label>
-                <input type="number" value={peakPrices[t.id] || t.peak_price_per_person || ""}
-                  onChange={e => setPeakPrices({ ...peakPrices, [t.id]: e.target.value })}
+                <input type="number" value={periodPrices[t.id] ?? String(t.peak_price_per_person ?? "")}
+                  onChange={e => setPeriodPrices({ ...periodPrices, [t.id]: e.target.value })}
                   placeholder={"R" + t.base_price_per_person}
                   className="ui-control w-full tabular-nums" />
               </div>
@@ -383,11 +337,16 @@ export default function PeakPricingPage() {
           ))}
         </div>
 
-        <button data-demo-action="pricing.apply" onClick={applyPeakPricing} disabled={saving || !startDate || !endDate}
-          className="ui-btn ui-btn-primary w-full disabled:opacity-50">
-          {saving ? "Applying..." : "Apply Peak Pricing"}
-        </button>
-        {result && <p className="mt-3 flex items-center gap-1.5 text-sm" style={{ color: "var(--ck-success)" }}>{result}</p>}
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button data-demo-action="pricing.apply" onClick={applyPeakPricing} disabled={saving || !startDate || !endDate}
+            className="ui-btn ui-btn-primary w-full disabled:opacity-50">
+            {saving ? "Applying..." : editingPeriodId ? "Update Peak Pricing" : "Apply Peak Pricing"}
+          </button>
+          {editingPeriodId && (
+            <button onClick={resetPeakForm} disabled={saving} className="ui-btn ui-btn-ghost sm:w-40">Cancel edit</button>
+          )}
+        </div>
+        {result && <p role={resultIsError ? "alert" : "status"} className="mt-3 flex items-center gap-1.5 text-sm" style={{ color: resultIsError ? "var(--ck-danger)" : "var(--ck-success)" }}>{result}</p>}
       </div>
 
       {/* Active Peak Periods (from peak_periods table) */}
@@ -414,10 +373,16 @@ export default function PeakPricingPage() {
                     </p>
                   )}
                 </div>
-                <button data-demo-action="pricing.remove" onClick={() => removePeakPeriod(p.id, p.start_date, p.end_date)}
-                  className="ui-btn ui-btn-danger !h-8 !px-3 text-xs gap-1.5">
-                  Remove
-                </button>
+                <div className="flex gap-2">
+                  <button data-demo-action="pricing.edit" onClick={() => startEditPeakPeriod(p)}
+                    className="ui-btn ui-btn-ghost !h-8 !px-3 text-xs">
+                    Edit
+                  </button>
+                  <button data-demo-action="pricing.remove" onClick={() => removePeakPeriod(p.id, p.start_date, p.end_date)}
+                    className="ui-btn ui-btn-danger !h-8 !px-3 text-xs gap-1.5">
+                    Remove
+                  </button>
+                </div>
               </div>
             ))}
           </div>
