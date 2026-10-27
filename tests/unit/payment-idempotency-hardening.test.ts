@@ -6,7 +6,7 @@ const serviceKey = "fixture-service-not-a-real-key";
 const env = { SUPABASE_URL: "https://fixture.invalid", SUPABASE_SERVICE_ROLE_KEY: serviceKey };
 
 // R11/R12/R14/R15: lease-gated, reconciled, reservation-settling confirmation.
-function webhookFixture(claim: string, confirm: any) {
+function webhookFixture(claim: string, confirm: any, refund?: any) {
   const booking: any = { id: "booking-a", business_id: "a", slot_id: "slot-a", qty: 2, status: "HELD", total_amount: 600, expected_amount_cents: 60000, expected_currency: "ZAR", yoco_payment_id: null, yoco_checkout_id: "checkout-a", email: "guest@fixture.invalid", phone: "27820000000" };
   const calls: any[] = [];
   const db = {
@@ -40,6 +40,7 @@ function webhookFixture(claim: string, confirm: any) {
         return { data: confirm, error: null };
       }
       if (name === "release_voucher_reservations") return { data: null, error: null };
+      if (name === "record_unfulfilled_payment" && refund) return { data: { ok: true }, error: null };
       if (name === "slot_has_capacity") return { data: true, error: null };
       return { data: null, error: null };
     },
@@ -57,13 +58,17 @@ function webhookFixture(claim: string, confirm: any) {
     "../_shared/sentry.ts": { withSentry: (_n: string, fn: any) => fn },
     "npm:standardwebhooks": { Webhook: class { async verify() {} } },
   };
-  const fetchImpl: typeof fetch = async () => Response.json({});
+  const refunds: any[] = [];
+  const fetchImpl: typeof fetch = async (url, init) => {
+    if (String(url).endsWith("/functions/v1/process-refund")) refunds.push(JSON.parse(String(init?.body)));
+    return Response.json(refund ?? {});
+  };
   const handler = sourceHandler("supabase/functions/yoco-webhook/index.ts", mocks, env, fetchImpl);
   const post = (amount: number) => handler(new Request("https://fixture.invalid/yoco", {
     method: "POST", headers: { "webhook-signature": "x" },
     body: JSON.stringify({ type: "payment.succeeded", payload: { id: "payment-a", amount, currency: "ZAR", metadata: { checkoutId: "checkout-a", type: "BOOKING", booking_id: "booking-a" } } }),
   }));
-  return { booking, calls, post };
+  return { booking, calls, post, refunds };
 }
 
 describe("R11 webhook processing lease", () => {
@@ -106,5 +111,19 @@ describe("R12 strict amount reconciliation", () => {
     const f = webhookFixture("claimed", { ok: false, error: "no_capacity" });
     expect((await f.post(60000)).status).toBe(503);
     expect(f.booking.status).toBe("HELD");
+  });
+});
+
+describe("Section 6: a payment link paid after its booking was cancelled", () => {
+  it("is refunded automatically and flagged, never marked PAID", async () => {
+    const f = webhookFixture("claimed", { ok: false, error: "bad_status" }, { ok: true });
+    f.booking.status = "CANCELLED";
+    const response = await f.post(60000);
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("Reservation unavailable; refund recorded");
+    expect(f.booking.status).toBe("CANCELLED");
+    // Records the money and marks the booking REFUND_PENDING / REQUESTED before refunding.
+    expect(f.calls).toContainEqual({ name: "record_unfulfilled_payment", args: { p_booking_id: "booking-a", p_payment_id: "payment-a", p_checkout_id: "checkout-a", p_amount_cents: 60000, p_hold_id: null } });
+    expect(f.refunds).toEqual([{ booking_id: "booking-a", amount: 600, keep_booking: false }]);
   });
 });
