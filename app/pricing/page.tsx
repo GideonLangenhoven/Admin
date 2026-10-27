@@ -169,16 +169,22 @@ export default function PeakPricingPage() {
   async function saveTourPricing() {
     setSaving(true);
     setResult("");
+    const failed: string[] = [];
     for (const tour of tours) {
       const nextBase = basePrices[tour.id] !== undefined ? Number(basePrices[tour.id] || 0) : Number(tour.base_price_per_person || 0);
       const nextPeak = peakPrices[tour.id] !== undefined ? Number(peakPrices[tour.id] || 0) : Number(tour.peak_price_per_person || tour.base_price_per_person || 0);
-      await supabase.from("tours").update({
+      const { error } = await supabase.from("tours").update({
         base_price_per_person: nextBase,
         peak_price_per_person: nextPeak,
-      }).eq("id", tour.id);
+      }).eq("id", tour.id).eq("business_id", businessId);
+      if (error) {
+        console.error("[pricing] tour price save failed", tour.id, error);
+        failed.push(tour.name);
+      }
     }
-    showResult("Tour pricing updated.");
     setSaving(false);
+    if (failed.length) notify({ title: "Prices not saved", message: "Could not save " + failed.join(", ") + ". Please try again.", tone: "error" });
+    else notify({ title: "Tour prices saved", message: "Standard and peak prices are updated.", tone: "success" });
     load();
   }
 
@@ -329,9 +335,10 @@ export default function PeakPricingPage() {
               </div>
               <div className="w-full sm:w-32">
                 <label className="text-xs block mb-1 font-medium" style={{ color: "var(--ck-amber)" }}>Peak Price</label>
-                <input type="number" value={periodPrices[t.id] ?? String(t.peak_price_per_person ?? "")}
+                {/* Blank means the tour's standard peak price, copied when the period is saved. */}
+                <input type="number" value={periodPrices[t.id] ?? ""}
                   onChange={e => setPeriodPrices({ ...periodPrices, [t.id]: e.target.value })}
-                  placeholder={"R" + t.base_price_per_person}
+                  placeholder={"R" + (t.peak_price_per_person ?? t.base_price_per_person)}
                   className="ui-control w-full tabular-nums" />
               </div>
             </div>
