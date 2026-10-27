@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { formatZar } from "../lib/money";
 import { notify, confirmAction } from "../lib/app-notify";
 import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
@@ -712,12 +713,12 @@ export default function SuperAdminPage() {
                     <div className="rounded-lg px-3 py-2 text-sm" style={{ background: "var(--ck-surface-sunken)" }}>
                       {bizDetail?.billing_plan ? <>
                         <span className="font-semibold text-[var(--ck-text-strong)]">
-                          Monthly cost: R{monthlyCostZar(b.max_admin_seats, bizDetail.billing_plan).toLocaleString("en-ZA")}/month
+                          Monthly cost: {formatZar(monthlyCostZar(b.max_admin_seats, bizDetail.billing_plan))}/month
                         </span>
                         <span className="ml-2 text-xs text-[var(--ck-text-muted)]">
-                          {bizDetail.billing_plan.name}: R{Number(bizDetail.billing_plan.monthly_price_zar).toLocaleString("en-ZA")} base ({Number(bizDetail.billing_plan.seat_limit)} seat{Number(bizDetail.billing_plan.seat_limit) === 1 ? "" : "s"} included)
+                          {bizDetail.billing_plan.name}: {formatZar(Number(bizDetail.billing_plan.monthly_price_zar))} base ({Number(bizDetail.billing_plan.seat_limit)} seat{Number(bizDetail.billing_plan.seat_limit) === 1 ? "" : "s"} included)
                           {b.max_admin_seats > Number(bizDetail.billing_plan.seat_limit)
-                            ? ` + ${b.max_admin_seats - Number(bizDetail.billing_plan.seat_limit)} extra seat${b.max_admin_seats - Number(bizDetail.billing_plan.seat_limit) === 1 ? "" : "s"} × R${Number(bizDetail.billing_plan.extra_seat_price_zar).toLocaleString("en-ZA")}`
+                            ? ` + ${b.max_admin_seats - Number(bizDetail.billing_plan.seat_limit)} extra seat${b.max_admin_seats - Number(bizDetail.billing_plan.seat_limit) === 1 ? "" : "s"} × ${formatZar(Number(bizDetail.billing_plan.extra_seat_price_zar))}`
                             : ""}
                         </span>
                       </> : <span className="text-xs text-[var(--ck-text-muted)]">{bizDetailLoading ? "Loading subscription pricing…" : "No subscription pricing is available."}</span>}
@@ -993,7 +994,7 @@ export default function SuperAdminPage() {
                                   <div className="min-w-0">
                                     <div className="text-xs font-semibold text-[var(--ck-text-strong)] truncate">{t.name}</div>
                                     <div className="text-[10px] text-[var(--ck-text-muted)]">
-                                      R{t.base_price_per_person} · {t.duration_minutes}min · Cap {t.default_capacity}
+                                      {formatZar(Number(t.base_price_per_person))} · {t.duration_minutes}min · Cap {t.default_capacity}
                                       {t.hidden && <span className="ml-1 text-[var(--ck-amber)]">(Hidden)</span>}
                                     </div>
                                   </div>
@@ -1840,7 +1841,7 @@ function EmailUsageBilling() {
     if (error) {
       notify({ title: "Failed", message: error.message, tone: "error" });
     } else {
-      notify({ title: "Rate updated", message: `Email rate set to R${newRate.toFixed(2)}/email`, tone: "success" });
+      notify({ title: "Rate updated", message: `Email rate set to ${formatZar(newRate)}/email`, tone: "success" });
       setRows((prev) => prev.map((r) =>
         r.business_id === businessId
           ? { ...r, rate_zar: newRate, overage_cost: Math.round(r.overage * newRate * 100) / 100 }
@@ -1892,7 +1893,7 @@ function EmailUsageBilling() {
         <div className="ui-card p-4">
           <div className="flex items-center gap-2">            <span className="ui-mono-label">Overage Owed</span>
           </div>
-          <div className="font-display text-[32px] font-semibold tabular-nums leading-none mt-2.5" style={{ color: totalOverageCost > 0 ? "var(--ck-amber)" : "var(--ck-text-strong)" }}>R{totalOverageCost.toFixed(2)}</div>
+          <div className="font-display text-[32px] font-semibold tabular-nums leading-none mt-2.5" style={{ color: totalOverageCost > 0 ? "var(--ck-amber)" : "var(--ck-text-strong)" }}>{formatZar(totalOverageCost)}</div>
           <div className="text-xs text-[var(--ck-text-muted)] mt-1.5">total for {periodLabel}</div>
         </div>
       </div>
@@ -1962,7 +1963,7 @@ function EmailUsageBilling() {
                       className="text-xs font-medium hover:underline"
                       title="Click to edit rate"
                     >
-                      R{r.rate_zar.toFixed(2)}
+                      {formatZar(r.rate_zar)}
                     </button>
                   )}
                 </div>
@@ -1970,7 +1971,7 @@ function EmailUsageBilling() {
                 {/* Owed */}
                 <div className="col-span-1 text-center">
                   {r.overage_cost > 0 ? (
-                    <span className="font-bold text-[var(--ck-amber)]">R{r.overage_cost.toFixed(2)}</span>
+                    <span className="font-bold text-[var(--ck-amber)]">{formatZar(r.overage_cost)}</span>
                   ) : (
                     <span className="text-[var(--ck-success)] text-xs">R0</span>
                   )}
@@ -2050,7 +2051,7 @@ function PlatformInvoicesBilling() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || "Failed to generate");
-      notify({ title: "Invoice generated", message: `${row.business_name}: R${Number(data.invoice.amount_zar).toFixed(2)}`, tone: "success" });
+      notify({ title: "Invoice generated", message: `${row.business_name}: ${formatZar(Number(data.invoice.amount_zar))}`, tone: "success" });
       loadInvoices();
     } catch (err: any) {
       notify({ title: "Generate failed", message: err.message, tone: "error" });
@@ -2101,7 +2102,7 @@ function PlatformInvoicesBilling() {
 
   async function sendEmail(row: PlatformInvoiceRow) {
     if (!row.existing_invoice) return;
-    if (!await confirmAction({ title: "Send invoice email", message: `Send ${row.business_name}'s invoice for R${Number(row.existing_invoice.amount_zar).toFixed(2)} to their billing contact?`, confirmLabel: "Send invoice" })) return;
+    if (!await confirmAction({ title: "Send invoice email", message: `Send ${row.business_name}'s invoice for ${formatZar(Number(row.existing_invoice.amount_zar))} to their billing contact?`, confirmLabel: "Send invoice" })) return;
     setBusyId(row.business_id);
     try {
       const res = await fetch("/api/platform-invoices/send", {
@@ -2172,12 +2173,12 @@ function PlatformInvoicesBilling() {
                     <div className="font-medium text-[var(--ck-text-strong)] truncate">{r.business_name}</div>
                     {r.pro_rated && r.pause_note && <div className="text-[10px] text-[var(--ck-amber)] mt-0.5">{r.pause_note}</div>}
                   </div>
-                  <div className="col-span-2 text-xs text-[var(--ck-text-muted)]">{r.plan_name} (R{r.monthly_price_zar})</div>
+                  <div className="col-span-2 text-xs text-[var(--ck-text-muted)]">{r.plan_name} ({formatZar(Number(r.monthly_price_zar))})</div>
                   <div className="col-span-2 text-center">
                     <span className={r.pro_rated ? "text-[var(--ck-amber)] font-semibold" : "text-[var(--ck-success)]"}>{r.active_days}</span>
                     <span className="text-[var(--ck-text-muted)]"> / {r.total_days}</span>
                   </div>
-                  <div className="col-span-1 text-center font-bold">R{Number(invoice?.amount_zar ?? r.amount_zar ?? 0).toFixed(2)}</div>
+                  <div className="col-span-1 text-center font-bold">{formatZar(Number(invoice?.amount_zar ?? r.amount_zar ?? 0))}</div>
                   <div className="col-span-1 text-center text-[10px] font-mono uppercase">{invoice?.status || "—"}</div>
                   <div className="col-span-3 flex items-center justify-center gap-1.5 flex-wrap">
                     {!invoice && (
@@ -2198,7 +2199,7 @@ function PlatformInvoicesBilling() {
                     {invoice && (invoice.status === "PAID" || invoice.status === "PAID_MANUALLY") && (
                       <span className="text-[10px] text-[var(--ck-success)] font-semibold">Paid{invoice.paid_method ? ` (${invoice.paid_method})` : ""}</span>
                     )}
-                    {!!r.voided_invoices?.length && <details className="w-full text-xs"><summary className="cursor-pointer">Voided history ({r.voided_invoices.length})</summary>{r.voided_invoices.map(old => <p key={old.id}>{old.invoice_number} · R{Number(old.amount_zar).toFixed(2)} · {old.void_reason}</p>)}</details>}
+                    {!!r.voided_invoices?.length && <details className="w-full text-xs"><summary className="cursor-pointer">Voided history ({r.voided_invoices.length})</summary>{r.voided_invoices.map(old => <p key={old.id}>{old.invoice_number} · {formatZar(Number(old.amount_zar))} · {old.void_reason}</p>)}</details>}
                   </div>
                 </div>
               );

@@ -1,5 +1,6 @@
 "use client";
 import { pluralize } from "../lib/automation-copy";
+import { formatZar } from "../lib/money";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { getAdminTimezone } from "../lib/admin-timezone";
@@ -423,7 +424,7 @@ export default function Vouchers() {
                     <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                       <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
                         <p className="ui-mono-label !text-[9.5px]">Value</p>
-                        <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{v.value !== null && v.value !== undefined ? "R" + Number(v.value).toFixed(2) : "-"}</p>
+                        <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{v.value !== null && v.value !== undefined ? formatZar(Number(v.value)) : "-"}</p>
                       </div>
                       <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
                         <p className="ui-mono-label !text-[9.5px]">Buyer</p>
@@ -460,7 +461,7 @@ export default function Vouchers() {
                         </td>
                         <td className="hidden p-3 text-xs md:table-cell" style={{ color: "var(--ck-text-muted)" }}>{v.type || "-"}</td>
                         <td className="hidden p-3 lg:table-cell" style={{ color: "var(--ck-text)" }}>{v.tour_name || "-"}</td>
-                        <td className="p-3 tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{v.value !== null && v.value !== undefined ? "R" + Number(v.value).toFixed(2) : "-"}</td>
+                        <td className="p-3 tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{v.value !== null && v.value !== undefined ? formatZar(Number(v.value)) : "-"}</td>
                         <td className="p-3" style={{ color: "var(--ck-text)" }}>{v.recipient_name || "-"}</td>
                         <td className="hidden p-3 text-xs md:table-cell" style={{ color: "var(--ck-text-muted)" }}>
                           {v.buyer_name || "-"}

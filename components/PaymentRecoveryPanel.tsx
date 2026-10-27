@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { formatZar } from "../app/lib/money";
 import Link from "next/link";
 import { EnvelopeSimple, WhatsappLogo } from "@phosphor-icons/react";
 import { useBusinessContext } from "./BusinessContext";
@@ -157,7 +158,7 @@ export default function PaymentRecoveryPanel({ contactButtonsOnly = false, dashb
               {partial && <p className="mt-1">Part-paid. Check the booking balance before sending a payment link.</p>}
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-3 sm:max-w-[50%] sm:justify-end">
-              <span className="text-sm font-semibold">{new Intl.NumberFormat("en-ZA", { style: "currency", currency: "ZAR" }).format(Number(awaiting ? booking.amount_due : booking.total_amount))}{review ? " · Payment needs review" : paid ? " · Paid" : awaiting ? "" : ` · ${booking.status.replaceAll("_", " ").toLowerCase()}`}</span>
+              <span className="text-sm font-semibold">{formatZar(Number(awaiting ? booking.amount_due : booking.total_amount))}{review ? " · Payment needs review" : paid ? " · Paid" : awaiting ? "" : ` · ${booking.status.replaceAll("_", " ").toLowerCase()}`}</span>
               {contactButtonsOnly ? <BookingContact booking={booking} /> : dashboard ? <DashboardContact booking={booking} /> : phoneNumber && <a href={`https://wa.me/${phoneNumber}`} target="_blank" rel="noopener noreferrer" className="ui-btn ui-btn-soft min-h-11 min-w-11 !px-3" aria-label={`WhatsApp ${booking.customer_name || "guest"}`} title={`WhatsApp ${booking.customer_name || "guest"}`}>
                 <WhatsappLogo size={18} aria-hidden="true" />
               </a>}

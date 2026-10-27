@@ -1,5 +1,6 @@
 "use client";
 import { renderGiftVoucherFace } from "../../supabase/functions/_shared/gift-voucher-face";
+import { formatZar } from "../lib/money";
 import GuideAccessSettings from "@/components/guide/GuideAccessSettings";
 import { useState, useEffect, ReactNode } from "react";
 import Link from "next/link";
@@ -1909,7 +1910,7 @@ export default function SettingsPage() {
                                                     </div>
                                                 </div>
                                                 <div className="text-xs text-[var(--ck-text-muted)]">
-                                                    R{t.base_price_per_person || 0}/person · <span className={tourSlotCounts[t.id] ? "text-emerald-600" : "text-orange-500"}>{tourSlotCounts[t.id] ?? "…"} upcoming slot{tourSlotCounts[t.id] !== 1 ? "s" : ""}</span>
+                                                    {formatZar(Number(t.base_price_per_person || 0))}/person · <span className={tourSlotCounts[t.id] ? "text-emerald-600" : "text-orange-500"}>{tourSlotCounts[t.id] ?? "…"} upcoming slot{tourSlotCounts[t.id] !== 1 ? "s" : ""}</span>
                                                 </div>
                                                 <p className="mt-2 text-sm font-semibold text-[var(--ck-text-strong)]">Duration: {t.duration_minutes ? formatDuration(t.duration_minutes) : "Not set"}</p>
                                             </div>
@@ -2350,7 +2351,7 @@ export default function SettingsPage() {
                                                     </span>
                                                 </div>
                                                 <div className="text-xs text-[var(--ck-text-muted)]">
-                                                    R{a.price}/item{a.description ? " \u00b7 " + a.description : ""}
+                                                    {formatZar(Number(a.price))}/item{a.description ? " \u00b7 " + a.description : ""}
                                                 </div>
                                             </div>
                                         </div>

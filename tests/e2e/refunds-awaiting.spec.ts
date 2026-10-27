@@ -96,7 +96,7 @@ test("Issue voucher and Resend options go through the server and confirm what ha
   await guest.getByRole("button", { name: "Issue voucher" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Issue voucher" }).click();
   await expect.poll(() => notices.find(n => n.title === "Voucher issued"))
-    .toEqual({ title: "Voucher issued", message: "Voucher WX7K2P (R1500.00) was emailed to the guest.", tone: "success" });
+    .toEqual({ title: "Voucher issued", message: "Voucher WX7K2P (R1\u00a0500,00) was emailed to the guest.", tone: "success" });
   expect(calls.map(c => [c.fn, c.body])).toEqual([
     ["auto-messages", { action: "refund_choice_reminder_one", booking_id: GUEST_CHOOSES }],
     ["rebook-booking", { booking_id: GUEST_CHOOSES, action: "CLAIM_CREDIT", credit_action: "VOUCHER" }],

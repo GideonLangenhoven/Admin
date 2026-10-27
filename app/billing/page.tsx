@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import { formatZar } from "../lib/money";
+import { pluralize } from "../lib/automation-copy";
 import { getAuthHeaders } from "../lib/admin-auth";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { confirmAction, notify } from "../lib/app-notify";
@@ -78,8 +80,8 @@ export default function BillingPage() {
     const confirmed = await confirmAction({
       title: `${delta > 0 ? "Add" : "Remove"} ${Math.abs(delta)} seat`,
       message: delta > 0
-        ? `Adding ${Math.abs(delta)} seat = R${seatPrice}/mo extra. Prorated charge for the rest of this billing period: ~R${estProration}.`
-        : `Removing ${Math.abs(delta)} seat. Prorated credit for the rest of this period: ~R${estProration}.`,
+        ? `Adding ${pluralize(Math.abs(delta), "seat")} = ${formatZar(seatPrice)}/mo extra. Prorated charge for the rest of this billing period: ~${formatZar(estProration)}.`
+        : `Removing ${pluralize(Math.abs(delta), "seat")}. Prorated credit for the rest of this period: ~${formatZar(estProration)}.`,
       tone: delta > 0 ? "info" : "warning",
       confirmLabel: delta > 0 ? "Add seat" : "Remove seat",
     });
@@ -95,7 +97,7 @@ export default function BillingPage() {
     setActionLoading(false);
 
     if (!r.ok) { setError(data.error); return; }
-    notify({ title: "Seats updated", message: `Now at ${data.new_seats} seat(s). Proration: R${data.proration_zar}`, tone: "success" });
+    notify({ title: "Seats updated", message: `Now at ${data.new_seats} seat(s). Proration: ${formatZar(Number(data.proration_zar))}`, tone: "success" });
     load();
   }
 
@@ -105,7 +107,7 @@ export default function BillingPage() {
     const upgrading = planPrice > (sub.plans?.monthly_price_zar ?? 0);
     const confirmed = await confirmAction({
       title: `Switch to ${planName}`,
-      message: `Change your plan to ${planName} (R${planPrice.toLocaleString()}/month base)? The ${upgrading ? "extra" : "difference"} is prorated for the rest of this billing period. Included seats adjust automatically.`,
+      message: `Change your plan to ${planName} (${formatZar(planPrice)}/month base)? The ${upgrading ? "extra" : "difference"} is prorated for the rest of this billing period. Included seats adjust automatically.`,
       tone: "info",
       confirmLabel: `Switch to ${planName}`,
     });
@@ -120,7 +122,7 @@ export default function BillingPage() {
     const data = await r.json();
     setActionLoading(false);
     if (!r.ok) { setError(data.error); return; }
-    notify({ title: "Plan changed", message: `You're now on ${planName}. Proration: R${data.proration_zar ?? 0}`, tone: "success" });
+    notify({ title: "Plan changed", message: `You're now on ${planName}. Proration: ${formatZar(Number(data.proration_zar ?? 0))}`, tone: "success" });
     load();
   }
 
@@ -212,7 +214,7 @@ export default function BillingPage() {
         </div>
         <p className="mt-2 font-display text-[32px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>{sub.plans?.name ?? "Custom"}</p>
         <p className="text-sm mt-1.5" style={{ color: "var(--ck-text-muted)" }}>
-          R{sub.plans?.monthly_price_zar ?? 2000}/month base · R{sub.plans?.extra_seat_price_zar ?? 500}/additional seat
+          {formatZar(sub.plans?.monthly_price_zar ?? 2000)}/month base · {formatZar(sub.plans?.extra_seat_price_zar ?? 500)}/additional seat
         </p>
 
         {(sub.status === "ACTIVE" || sub.status === "TRIAL") && alternativePlans.length > 0 && (
@@ -231,7 +233,7 @@ export default function BillingPage() {
                   }}
                 >
                   <div className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>{p.name}</div>
-                  <div className="text-xs mt-0.5 tabular-nums" style={{ color: "var(--ck-text-muted)" }}>R{p.monthly_price_zar.toLocaleString()}/mo · {p.included_seats} seat{p.included_seats !== 1 ? "s" : ""}</div>
+                  <div className="text-xs mt-0.5 tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{formatZar(p.monthly_price_zar)}/mo · {p.included_seats} seat{p.included_seats !== 1 ? "s" : ""}</div>
                   <div className="ui-mono-label !text-[9px] mt-1.5" style={{ color: "var(--ck-text-muted)" }}>Switch</div>
                 </button>
               ))}
@@ -247,7 +249,7 @@ export default function BillingPage() {
           </div>
           <div className="p-3 rounded-[10px] border" style={{ background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-subtle)" }}>
             <div className="ui-mono-label !text-[10px]">This month</div>
-            <div className="font-display text-[28px] font-semibold mt-1 leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{monthly.toLocaleString()}</div>
+            <div className="font-display text-[28px] font-semibold mt-1 leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{formatZar(monthly)}</div>
             <div className="text-xs mt-1.5 tabular-nums break-words" style={{ color: "var(--ck-text-muted)" }}>{sub.billing_cycle_start} → {sub.billing_cycle_end}</div>
           </div>
         </div>
@@ -259,7 +261,7 @@ export default function BillingPage() {
               disabled={actionLoading}
               className="ui-btn ui-btn-primary disabled:opacity-50"
             >
-              + Add seat (R{sub.plans?.extra_seat_price_zar ?? 500})
+              + Add seat ({formatZar(sub.plans?.extra_seat_price_zar ?? 500)})
             </button>
             <button data-demo-action="billing.remove"
               onClick={() => changeSeats(-1)}
@@ -309,12 +311,12 @@ export default function BillingPage() {
               <div className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Overage</div>
               <div className="text-2xl font-bold mt-0.5" style={{ color: emailUsage.overage_charge_zar > 0 ? "#b45309" : "var(--ck-text-strong)" }}>
                 {emailUsage.overage_emails > 0
-                  ? "R" + emailUsage.overage_charge_zar.toLocaleString()
+                  ? formatZar(emailUsage.overage_charge_zar)
                   : "R0"}
               </div>
               <div className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
                 {emailUsage.overage_emails > 0
-                  ? emailUsage.overage_emails.toLocaleString() + " over @ R" + emailUsage.overage_rate_zar.toFixed(2) + "/email"
+                  ? emailUsage.overage_emails.toLocaleString() + " over @ " + formatZar(emailUsage.overage_rate_zar) + "/email"
                   : "Under quota: no overage charge"}
               </div>
             </div>

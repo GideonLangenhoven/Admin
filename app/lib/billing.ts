@@ -34,7 +34,3 @@ export async function fetchUsageSnapshot(businessId: string): Promise<UsageSnaps
     remaining_admin_seats: Math.max(0, seatLimit - adminCount),
   };
 }
-
-export function formatZar(amount: number) {
-  return "R" + amount.toLocaleString("en-ZA");
-}

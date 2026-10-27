@@ -739,7 +739,7 @@ export default function NewBookingPage() {
                       "\u{1F6F6} " + (tourObj?.name || "Tour") + "\n" +
                       "\u{1F4C5} " + slotTimeLabel + "\n" +
                       "\u{1F465} " + qty + " people\n" +
-                      "\u{1F4B0} R" + totalAmount.toFixed(2) + "\n\n" +
+                      "\u{1F4B0} " + fmtCurrency(totalAmount) + "\n\n" +
                       "\u{1F517} Pay here: " + checkoutData.redirectUrl + "\n\n" +
                       "Payment due: " + new Intl.DateTimeFormat("en-ZA", {dateStyle:"full",timeStyle:"short",timeZone:timezone}).format(new Date(createdBooking.payment_deadline)) + " (" + timezone + ").",
                   },
@@ -845,7 +845,7 @@ export default function NewBookingPage() {
                   "\u{1F6F6} " + (tourObj?.name || "Tour") + "\n" +
                   "\u{1F4C5} " + slotTimeLabel + "\n" +
                   "\u{1F465} " + qty + " people\n" +
-                  "\u{1F4B0} R" + totalAmount.toFixed(2) + "\n\n" +
+                  "\u{1F4B0} " + fmtCurrency(totalAmount) + "\n\n" +
                   (meetingPoint
                     ? "\u{1F4CD} *Meeting Point:*\n" + meetingPoint + "\nArrive 15 min early\n\n" +
                       "\u{1F5FA} " + mapsUrl + "\n\n"
@@ -1214,7 +1214,7 @@ export default function NewBookingPage() {
         {discountType === "promo" && promoResult?.valid && (
           <div className="mb-4 flex items-center gap-3 rounded-lg px-4 py-3 text-sm" style={{ background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
             <span className="font-semibold">{promoResult.code}</span>
-            <span>{promoResult.discount_type === "PERCENT" ? promoResult.discount_value + "% off" : "R" + promoResult.discount_value + " off"}</span>
+            <span>{promoResult.discount_type === "PERCENT" ? promoResult.discount_value + "% off" : fmtCurrency(Number(promoResult.discount_value)) + " off"}</span>
             <button type="button" onClick={() => { setDiscountType("none"); setPromoCode(""); setPromoResult(null); }} className="ml-auto text-xs hover:underline" style={{ color: "var(--ck-danger)" }}>Remove</button>
           </div>
         )}

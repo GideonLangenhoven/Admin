@@ -52,7 +52,7 @@ describe("stepSentence", () => {
 
   it("describes a fixed-amount voucher step", () => {
     const step = { step_type: "generate_voucher", config: { voucher_type: "fixed_amount", amount: 100, code_prefix: "refer", valid_days: 90 } };
-    expect(stepSentence(step, 0, [step])).toBe("Create a unique R100 voucher (REFER-, valid 90 days)");
+    expect(stepSentence(step, 0, [step])).toBe("Create a unique R100,00 voucher (REFER-, valid 90 days)");
   });
 
   it("describes a promo code step with use limit", () => {

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { formatZar } from "../../lib/money";
 import { getAuthHeaders } from "../../lib/admin-auth";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { confirmAction, notify } from "../../lib/app-notify";
@@ -225,7 +226,7 @@ export default function DataRequestsPage() {
                     <div className="mt-1 flex items-center gap-3 text-xs flex-wrap" style={{ color: "var(--ck-text-muted)" }}>
                       <span>Requested {new Date(r.created_at).toLocaleDateString("en-ZA")}</span>
                       {r.customers && (
-                        <span>{r.customers.total_bookings} bookings · R{r.customers.total_spent}</span>
+                        <span>{r.customers.total_bookings} bookings · {formatZar(Number(r.customers.total_spent))}</span>
                       )}
                       {daysUntilDue !== null && r.status === "CONFIRMED" && (
                         <span className="font-medium" style={{ color: "var(--ck-amber)" }}>{daysUntilDue} days until due</span>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatZar } from "@/app/lib/money";
 import { useBusinessContext } from "@/components/BusinessContext";
 import { supabase } from "@/app/lib/supabase";
 import { MagnifyingGlass, Check } from "@phosphor-icons/react";
@@ -124,7 +125,7 @@ export default function CustomersPage() {
                     <td data-label="Email" className="px-4 py-3" style={{ color: "var(--ck-text)" }}>{r.email}</td>
                     <td data-label="Phone" className="px-4 py-3" style={{ color: "var(--ck-text)" }}>{r.phone || "\u2014"}</td>
                     <td data-label="Trips" className="px-4 py-3 text-right font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{r.total_bookings}</td>
-                    <td data-label="Spent" className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--ck-text)" }}>R{Number(r.total_spent).toFixed(0)}</td>
+                    <td data-label="Spent" className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--ck-text)" }}>{formatZar(Number(r.total_spent))}</td>
                     <td data-label="Last Trip" className="px-4 py-3" style={{ color: "var(--ck-text-muted)" }}>
                       {r.last_booking_at ? new Date(r.last_booking_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "\u2014"}
                     </td>

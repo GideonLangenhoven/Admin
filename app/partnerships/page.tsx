@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { formatZar } from "../lib/money";
 import { supabase } from "../lib/supabase";
 import { notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
@@ -250,7 +251,7 @@ export default function PartnershipsPage() {
         return;
       }
       if (splitType === "FIXED" && Math.abs(shareSum - price) > 0.01) {
-        notify({ title: "Invalid split", message: `Fixed shares must total the combo price of R${price} (currently R${shareSum}).`, tone: "error" });
+        notify({ title: "Invalid split", message: `Fixed shares must total the combo price of ${formatZar(price)} (currently ${formatZar(shareSum)}).`, tone: "error" });
         return;
       }
     }
@@ -355,8 +356,8 @@ export default function PartnershipsPage() {
       notify({
         title: data.reused ? "Payment link already active" : "Payment link created",
         message: data.email_sent
-          ? "R" + Number(data.amount).toFixed(2) + " payment link emailed to your partner. It will flip to Paid automatically once they pay."
-          : "Link created for R" + Number(data.amount).toFixed(2) + ". Your partner has no notification email on file — copy the link and send it to them.",
+          ? formatZar(Number(data.amount)) + " payment link emailed to your partner. It will flip to Paid automatically once they pay."
+          : "Link created for " + formatZar(Number(data.amount)) + ". Your partner has no notification email on file. Copy the link and send it to them.",
         tone: "success",
       });
       load();
@@ -380,9 +381,9 @@ export default function PartnershipsPage() {
   const allMine = offerRows.every((r, i) => i === 0 || r.partner_id === "__self" || !r.partner_id);
   const splitLabel = (o: any) => {
     if (o.items?.length) {
-      return o.items.map((i: any) => (i.businesses?.business_name || "?") + " " + (o.split_type === "PERCENT" ? Number(i.split_percent) + "%" : "R" + Number(i.split_fixed))).join(" · ");
+      return o.items.map((i: any) => (i.businesses?.business_name || "?") + " " + (o.split_type === "PERCENT" ? Number(i.split_percent) + "%" : formatZar(Number(i.split_fixed)))).join(" · ");
     }
-    return o.split_type === "PERCENT" ? `${Number(o.split_a_percent)}% / ${Number(o.split_b_percent)}%` : `R${Number(o.split_a_fixed)} / R${Number(o.split_b_fixed)}`;
+    return o.split_type === "PERCENT" ? `${Number(o.split_a_percent)}% / ${Number(o.split_b_percent)}%` : `${formatZar(Number(o.split_a_fixed))} / ${formatZar(Number(o.split_b_fixed))}`;
   };
 
   return (
@@ -560,14 +561,14 @@ export default function PartnershipsPage() {
 
             {comboPrice && (allMine ? (
               <p className="text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
-                A combo of your own tours — you keep the full R{comboPrice} per person, paid through your Yoco account. No partnership or settlement involved.
+                A combo of your own tours: you keep the full {formatZar(Number(comboPrice))} per person, paid through your Yoco account. No partnership or settlement involved.
               </p>
             ) : (
               <p className="text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
                 {splitType === "PERCENT"
                   ? `Shares total ${Math.round(offerRows.reduce((a, r) => a + (Number(r.share) || 0), 0) * 100) / 100}% (must be 100%)`
-                  : `Shares total R${Math.round(offerRows.reduce((a, r) => a + (Number(r.share) || 0), 0) * 100) / 100} of R${comboPrice} per person`}
-                {" — you collect the full payment and settle each partner's share (unless Paysafe auto-split is configured for a 2-tour combo)."}
+                  : `Shares total ${formatZar(Math.round(offerRows.reduce((a, r) => a + (Number(r.share) || 0), 0) * 100) / 100)} of ${formatZar(Number(comboPrice))} per person`}
+                {". You collect the full payment and settle each partner's share (unless Paysafe auto-split is configured for a 2-tour combo)."}
               </p>
             ))}
             <div className="rounded-xl border p-3" style={{ borderColor: "var(--ck-border)" }}>
@@ -590,7 +591,7 @@ export default function PartnershipsPage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{o.name}</p>
                     <p className="text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
-                      {(o.items || []).map((i: any) => i.tours?.name).filter(Boolean).join(" + ") || "Legacy offer"} · R{Number(o.combo_price)} pp · Split: {splitLabel(o)}
+                      {(o.items || []).map((i: any) => i.tours?.name).filter(Boolean).join(" + ") || "Legacy offer"} · {formatZar(Number(o.combo_price))} pp · Split: {splitLabel(o)}
                     </p>
                     <p className="text-[12px]" style={{ color: "var(--ck-text-muted)" }}>Rules: {rulesSummary(o)}</p>
                   </div>
@@ -640,15 +641,15 @@ export default function PartnershipsPage() {
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <p className="ui-mono-label !text-[10px]">Collected by me</p>
-                <p className="font-display text-[20px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{Number(s.total_collected_by_me).toLocaleString()}</p>
+                <p className="font-display text-[20px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{formatZar(Number(s.total_collected_by_me))}</p>
               </div>
               <div>
                 <p className="ui-mono-label !text-[10px]">I owe partner</p>
-                <p className="font-display text-[20px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{Number(s.total_owed_to_partner).toLocaleString()}</p>
+                <p className="font-display text-[20px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{formatZar(Number(s.total_owed_to_partner))}</p>
               </div>
               <div>
                 <p className="ui-mono-label !text-[10px]">Partner owes me</p>
-                <p className="font-display text-[20px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{Number(s.total_owed_to_me).toLocaleString()}</p>
+                <p className="font-display text-[20px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{formatZar(Number(s.total_owed_to_me))}</p>
               </div>
             </div>
             {(s.weekly || []).length > 0 && (
@@ -667,8 +668,8 @@ export default function PartnershipsPage() {
                     {s.weekly.map((w: any) => (
                       <tr key={w.week_start} style={{ color: "var(--ck-text)" }}>
                         <td data-label="Week starting" className="py-1.5 pr-3 whitespace-nowrap">{fmtDate(w.week_start)}</td>
-                        <td data-label="Partner owes me" className="py-1.5 pr-3 text-right tabular-nums">R{Number(w.owed_to_me).toLocaleString()}</td>
-                        <td data-label="I owe partner" className="py-1.5 pr-3 text-right tabular-nums">R{Number(w.owed_to_partner).toLocaleString()}</td>
+                        <td data-label="Partner owes me" className="py-1.5 pr-3 text-right tabular-nums">{formatZar(Number(w.owed_to_me))}</td>
+                        <td data-label="I owe partner" className="py-1.5 pr-3 text-right tabular-nums">{formatZar(Number(w.owed_to_partner))}</td>
                         <td data-label="Combos" className="py-1.5 text-right tabular-nums">{w.count}</td>
                       </tr>
                     ))}
@@ -694,9 +695,9 @@ export default function PartnershipsPage() {
                       <tr key={b.id} style={{ color: "var(--ck-text)" }}>
                         <td data-label="Date" className="py-1.5 pr-3 whitespace-nowrap">{fmtDate(b.date)}</td>
                         <td data-label="Combo" className="py-1.5 pr-3">{b.combo_name}</td>
-                        <td data-label="Total" className="py-1.5 pr-3 text-right tabular-nums">R{Number(b.total).toLocaleString()}</td>
-                        <td data-label="My share" className="py-1.5 pr-3 text-right tabular-nums">R{Number(b.my_share).toLocaleString()}</td>
-                        <td data-label="Partner share" className="py-1.5 pr-3 text-right tabular-nums">R{Number(b.partner_share).toLocaleString()}</td>
+                        <td data-label="Total" className="py-1.5 pr-3 text-right tabular-nums">{formatZar(Number(b.total))}</td>
+                        <td data-label="My share" className="py-1.5 pr-3 text-right tabular-nums">{formatZar(Number(b.my_share))}</td>
+                        <td data-label="Partner share" className="py-1.5 pr-3 text-right tabular-nums">{formatZar(Number(b.partner_share))}</td>
                         <td data-label="Status" className="py-1.5"><span className={"ui-status " + (b.settled ? "ui-pill-success" : "ui-pill-warning")}>{b.settled ? "Settled" : "Open"}</span></td>
                       </tr>
                     ))}
@@ -715,13 +716,13 @@ export default function PartnershipsPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   {pr?.status === "PAID" && (
                     <span className="ui-status ui-pill-success">
-                      Paid · R{Number(pr.amount_owed).toLocaleString()}{pr.paid_at ? " · " + fmtDate(pr.paid_at) : ""}
+                      Paid · {formatZar(Number(pr.amount_owed))}{pr.paid_at ? " · " + fmtDate(pr.paid_at) : ""}
                     </span>
                   )}
                   {pendingToMe && (
                     <>
                       <span className="ui-status ui-pill-warning">
-                        Payment link sent · R{Number(pr.amount_owed).toLocaleString()} · awaiting payment
+                        Payment link sent · {formatZar(Number(pr.amount_owed))} · awaiting payment
                       </span>
                       {pr.payment_url && (
                         <button
@@ -735,7 +736,7 @@ export default function PartnershipsPage() {
                   )}
                   {pendingIOwe && pr.payment_url && (
                     <a className="ui-btn ui-btn-primary !py-1.5 text-[12px]" href={pr.payment_url} target="_blank" rel="noreferrer">
-                      Pay R{Number(pr.amount_owed).toLocaleString()} now
+                      Pay {formatZar(Number(pr.amount_owed))} now
                     </a>
                   )}
                   {owedToMe > 0 && (!pendingToMe || amountChanged) && (
@@ -746,7 +747,7 @@ export default function PartnershipsPage() {
                     >
                       {linkBusy === s.partner_id
                         ? "Creating…"
-                        : (amountChanged ? "Regenerate link · R" : "Generate payment link · R") + owedToMe.toLocaleString()}
+                        : (amountChanged ? "Regenerate link · " : "Generate payment link · ") + formatZar(owedToMe)}
                     </button>
                   )}
                 </div>

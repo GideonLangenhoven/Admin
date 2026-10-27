@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { formatZar } from "../../lib/money";
 import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
@@ -383,7 +384,7 @@ export default function PromotionsPage() {
                       <td data-label="Description" className="px-4 py-3" style={{ color: "var(--ck-text)" }}>{p.description || "—"}</td>
                       <td data-label="Discount" className="px-4 py-3">
                         <span className={"ui-status " + (p.discount_type === "PERCENT" ? "ui-pill-ocean" : "ui-pill-success")}>
-                          {p.discount_type === "PERCENT" ? p.discount_value + "%" : "R" + p.discount_value}
+                          {p.discount_type === "PERCENT" ? p.discount_value + "%" : formatZar(Number(p.discount_value))}
                         </span>
                       </td>
                       <td data-label="Valid" className="px-4 py-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>

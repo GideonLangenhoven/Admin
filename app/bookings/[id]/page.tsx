@@ -558,14 +558,14 @@ export default function BookingDetailPage() {
           const problem = await functionError(paid, "Use Mark Paid to finish.");
           if (problem) {
             setBooking({ ...booking, total_amount: newTotal, discount_type: "VOUCHER" } as BookingDetail);
-            setCodeResult({ type: "error", message: `Voucher applied (R${deduction} off), but the booking could not be marked paid. ${problem}` });
+            setCodeResult({ type: "error", message: `Voucher applied (${fmtCurrency(deduction)} off), but the booking could not be marked paid. ${problem}` });
             setCodeApplying(false);
             return;
           }
         }
 
         setBooking({ ...booking, total_amount: newTotal, discount_type: "VOUCHER", status: newTotal <= 0 ? "PAID" : booking.status } as BookingDetail);
-        setCodeResult({ type: "success", message: `Voucher applied: R${deduction} off. ${newTotal <= 0 ? "Booking is now fully paid!" : `New total: R${newTotal}`}` });
+        setCodeResult({ type: "success", message: `Voucher applied: ${fmtCurrency(deduction)} off. ${newTotal <= 0 ? "Booking is now fully paid!" : `New total: ${fmtCurrency(newTotal)}`}` });
         setCodeInput("");
         setCodeApplying(false);
         return;
@@ -631,7 +631,7 @@ export default function BookingDetailPage() {
         });
         const discountLabel = promoResult.discount_type === "PERCENT"
           ? `${promoResult.discount_value}% off`
-          : `R${promoResult.discount_value} off`;
+          : `${fmtCurrency(Number(promoResult.discount_value))} off`;
         setCodeResult({
           type: "success",
           message: `Promo applied: ${fmtCurrency(discountAmt)} off (${discountLabel}). New total: ${fmtCurrency(newTotal)}${newTotal <= 0 ? " \u2014 no payment needed!" : ""}`,

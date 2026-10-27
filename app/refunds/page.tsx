@@ -211,9 +211,9 @@ export default function Refunds() {
     if (booking?.refund_status === "REFUND_PENDING") { void executeAutoRefund(id); return; }
     const isPartial = booking && amount < Number(booking.total_amount || 0);
     setConfirmState({
-      title: `Refund R${amount.toFixed(2)}?`,
+      title: `Refund ${money(amount)}?`,
       message: isPartial
-        ? `Partial refund from R${Number(booking?.total_amount || 0).toFixed(2)} paid. Card refunds may stay pending; bank transfers need confirmation.`
+        ? `Partial refund from ${money(Number(booking?.total_amount || 0))} paid. Card refunds may stay pending; bank transfers need confirmation.`
         : "Card refunds may stay pending. Bank transfers need confirmation after payment.",
       confirmLabel: "Submit refund",
       tone: "danger",
@@ -231,8 +231,8 @@ export default function Refunds() {
     setConfirmState({
       title: "Confirm bank transfer",
       message: isPartial
-        ? `Confirm only after transferring R${amount.toFixed(2)} of R${Number(booking?.total_amount || 0).toFixed(2)} paid to the guest.`
-        : `Confirm only after transferring R${amount.toFixed(2)} to the guest.`,
+        ? `Confirm only after transferring ${money(amount)} of ${money(Number(booking?.total_amount || 0))} paid to the guest.`
+        : `Confirm only after transferring ${money(amount)} to the guest.`,
       confirmLabel: "Transfer completed",
       tone: "default",
       onConfirm: async () => {
@@ -296,7 +296,7 @@ export default function Refunds() {
         return;
       }
       const out = (res.data || {}) as { refund_status?: string | null; refund_amount?: number; voucher_code?: string; voucher_amount?: number };
-      if (out.voucher_code) notify({ title: "Voucher issued", message: `Voucher ${out.voucher_code} (R${Number(out.voucher_amount || 0).toFixed(2)}) was emailed to the guest.`, tone: "success" });
+      if (out.voucher_code) notify({ title: "Voucher issued", message: `Voucher ${out.voucher_code} (${money(Number(out.voucher_amount || 0))}) was emailed to the guest.`, tone: "success" });
       if (out.refund_status === "MANUAL_EFT_REQUIRED") {
         notify({ title: "Bank transfer needed", message: "The guest paid in cash or by EFT. Pay them by bank transfer, then confirm it in the queue.", tone: "warning" });
       } else if (out.refund_status === "REQUESTED" && Number(out.refund_amount) > 0) {
@@ -320,7 +320,7 @@ export default function Refunds() {
   }
 
   function claimCredit(id: string, creditAction: "REFUND" | "VOUCHER") {
-    const amount = "R" + Number(awaiting.find(b => b.id === id)?.refund_amount || 0).toFixed(2);
+    const amount = money(Number(awaiting.find(b => b.id === id)?.refund_amount || 0));
     setConfirmState(creditAction === "REFUND" ? {
       title: `Refund ${amount}?`,
       message: "The guest is emailed. Card payments go back to the card; cash or EFT payments need a bank transfer from you. Any part paid by voucher comes back as a new voucher.",

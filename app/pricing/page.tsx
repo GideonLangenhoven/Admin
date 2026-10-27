@@ -1,5 +1,6 @@
 "use client";
 import { pluralize } from "../lib/automation-copy";
+import { formatZar } from "../lib/money";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { confirmAction, notify } from "../lib/app-notify";
@@ -276,7 +277,7 @@ export default function PeakPricingPage() {
                       <input type="number" value={peak} onChange={(e) => setPeakPrices({ ...peakPrices, [tour.id]: e.target.value })} className="ui-control w-32 tabular-nums" />
                     </td>
                     <td data-label="Current spread" className="p-3" style={{ color: "var(--ck-text-muted)" }}>
-                      <span className="font-mono tabular-nums" style={{ color: "var(--ck-amber)" }}>R{Math.max(Number(peak || 0) - Number(base || 0), 0).toFixed(2)}</span> uplift during peak dates
+                      <span className="font-mono tabular-nums" style={{ color: "var(--ck-amber)" }}>{formatZar(Math.max(Number(peak || 0) - Number(base || 0), 0))}</span> uplift during peak dates
                     </td>
                   </tr>
                 );
@@ -331,7 +332,7 @@ export default function PeakPricingPage() {
             <div key={t.id} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center" style={{ background: "var(--ck-amber-soft)", borderColor: "color-mix(in srgb, var(--ck-amber) 20%, transparent)" }}>
               <div className="flex-1">
                 <p className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>{t.name}</p>
-                <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Normal: R{t.base_price_per_person}</p>
+                <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Normal: {formatZar(Number(t.base_price_per_person))}</p>
               </div>
               <div className="w-full sm:w-32">
                 <label className="text-xs block mb-1 font-medium" style={{ color: "var(--ck-amber)" }}>Peak Price</label>

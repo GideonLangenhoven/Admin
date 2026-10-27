@@ -1,14 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { formatZar } from "../lib/money";
 import { useBusinessContext } from "../../components/BusinessContext";
 
 // Single pricing model — mirrors the 'standard' row in the plans table.
 const plan = { name: "Standard", price: 2000, seats: 1, extraSeat: 500 };
-
-function zar(v: number) {
-  return "R" + v.toLocaleString("en-ZA");
-}
 
 function MarketingView() {
   return (
@@ -27,11 +24,11 @@ function MarketingView() {
         <section className="mx-auto max-w-md">
           <div className="ui-card p-6">
             <h2 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>{plan.name}</h2>
-            <p className="font-display mt-2 text-[30px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{zar(plan.price)}<span className="text-sm font-medium" style={{ color: "var(--ck-text-muted)" }}>/month</span></p>
+            <p className="font-display mt-2 text-[30px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{formatZar(plan.price)}<span className="text-sm font-medium" style={{ color: "var(--ck-text-muted)" }}>/month</span></p>
             <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>R0 setup fee · 1 admin seat included</p>
             <ul className="mt-4 space-y-2 text-sm" style={{ color: "var(--ck-text)" }}>
               <li>{plan.seats} admin seat included</li>
-              <li>{zar(plan.extraSeat)}/month per additional seat</li>
+              <li>{formatZar(plan.extraSeat)}/month per additional seat</li>
               <li>Unlimited bookings included</li>
               <li>All core features included</li>
             </ul>
@@ -41,15 +38,15 @@ function MarketingView() {
         <section className="ui-card p-6">
           <h3 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Add-ons</h3>
           <ul className="mt-3 space-y-2 text-sm" style={{ color: "var(--ck-text)" }}>
-            <li>Landing page build: {zar(3500)} for the first page</li>
-            <li>Additional landing pages: {zar(1500)} per page</li>
-            <li>Landing page hosting: {zar(500)}/month per business</li>
+            <li>Landing page build: {formatZar(3500)} for the first page</li>
+            <li>Additional landing pages: {formatZar(1500)} per page</li>
+            <li>Landing page hosting: {formatZar(500)}/month per business</li>
           </ul>
         </section>
 
         <section className="ui-card p-6">
           <h3 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Billing model</h3>
-          <p className="mt-2 text-sm" style={{ color: "var(--ck-text-muted)" }}>Each operator pays {zar(plan.price)}/month, which includes one admin seat. Every additional admin seat adds {zar(plan.extraSeat)}/month.</p>
+          <p className="mt-2 text-sm" style={{ color: "var(--ck-text-muted)" }}>Each operator pays {formatZar(plan.price)}/month, which includes one admin seat. Every additional admin seat adds {formatZar(plan.extraSeat)}/month.</p>
         </section>
       </div>
     </div>

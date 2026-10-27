@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { formatZar } from "../lib/money";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { AI_QUOTA_FNS, AI_HARD_CEILING_MULTIPLE, computeAiOverage } from "../lib/platform-billing";
@@ -134,7 +135,7 @@ export default function AiUsage() {
         <div className="ui-card anim-fade-up p-4">
           <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Past your included replies</p>
           <p className="mt-1 text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>
-            The assistant keeps answering. Replies beyond your allowance are billed at R{rate.toFixed(2)} each, and it pauses at {ceiling.toLocaleString()}.
+            The assistant keeps answering. Replies beyond your allowance are billed at {formatZar(rate)} each, and it pauses at {ceiling.toLocaleString()}.
           </p>
         </div>
       )}
@@ -163,7 +164,7 @@ export default function AiUsage() {
         </div>
         <div className="ui-card p-4">
           <div className="mb-2 flex items-center gap-2.5"><span className="ui-mono-label !text-[10px]">Overage</span></div>
-          <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{overageZar.toFixed(2)}</p>
+          <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{formatZar(overageZar)}</p>
           <p className="mt-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>{overageReplies.toLocaleString()} replies over</p>
         </div>
         <div className="ui-card p-4">

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { formatZar } from "../lib/money";
 import { supabase } from "../lib/supabase";
 import { confirmAction, notify } from "../lib/app-notify";
 import { useBusinessContext } from "../../components/BusinessContext";
@@ -218,12 +219,12 @@ export default function MarketingOverview() {
         </div>
         <div className="mt-2 flex items-center justify-between">
           <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{monthlyUsage.toLocaleString()} of {includedEmails.toLocaleString()} included</p>
-          <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>R{overageRate.toFixed(2)}/email over quota</p>
+          <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{formatZar(overageRate)}/email over quota</p>
         </div>
         <div className="mt-1 flex items-center justify-between">
           <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Emails sent all-time: {emailsSent.toLocaleString()}</p>
           <p className="text-xs font-medium" style={{ color: monthlyUsage > includedEmails ? "var(--ck-danger)" : "var(--ck-text-muted)" }}>
-            Cost this month: R{(Math.max(0, monthlyUsage - includedEmails) * overageRate).toFixed(2)}
+            Cost this month: {formatZar(Math.max(0, monthlyUsage - includedEmails) * overageRate)}
           </p>
         </div>
       </div>

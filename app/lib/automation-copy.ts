@@ -3,6 +3,8 @@
 // Pure functions only, no Supabase/DOM access, so they render identically on
 // the editor, the automations list, and the template gallery preview.
 
+import { formatZar } from "./money";
+
 export type AutomationStep = { step_type: string; config: any };
 export type AutomationLike = { trigger_type: string; trigger_config: any };
 export type TemplateRef = { name: string } | undefined;
@@ -68,7 +70,7 @@ export function stepSentence(
       const prefix = String(config.code_prefix || "AUTO").toUpperCase();
       const validDays = Number(config.valid_days) > 0 ? Number(config.valid_days) : 30;
       const amountLabel = config.voucher_type === "fixed_amount"
-        ? "R" + (Number(config.amount) || 0)
+        ? formatZar(Number(config.amount) || 0)
         : (Number(config.amount) || 0) + "%";
       return `Create a unique ${amountLabel} voucher (${prefix}-, valid ${validDays} days)`;
     }
@@ -77,7 +79,7 @@ export function stepSentence(
       const validDays = Number(config.valid_days) > 0 ? Number(config.valid_days) : 30;
       const maxUses = Number(config.max_uses) > 0 ? Number(config.max_uses) : 1;
       const amountLabel = config.discount_type === "FLAT"
-        ? "R" + (Number(config.discount_value) || 0)
+        ? formatZar(Number(config.discount_value) || 0)
         : (Number(config.discount_value) || 0) + "%";
       return `Create a unique ${amountLabel} promo code (${prefix}-, valid ${validDays} days, ${pluralize(maxUses, "use")})`;
     }

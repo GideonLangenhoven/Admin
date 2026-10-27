@@ -1,6 +1,7 @@
 "use client";
 
 import { pluralize } from "../../lib/automation-copy";
+import { formatZar } from "../../lib/money";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { arrivalReadiness } from "@/app/lib/operator-day";
@@ -36,6 +37,7 @@ function longDate(date: string) {
 }
 
 function money(value: number, currency: string) {
+  if (currency === "ZAR") return formatZar(value);
   try {
     return new Intl.NumberFormat("en-ZA", { style: "currency", currency, minimumFractionDigits: 2 }).format(value);
   } catch {

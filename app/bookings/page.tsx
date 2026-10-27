@@ -1196,7 +1196,7 @@ export default function Bookings() {
         if (data.ok) {
           notify({
             title: "Booking cancelled, voucher issued",
-            message: `Voucher ${data.voucher_code} for R${Number(data.voucher_amount).toFixed(2)} issued to customer.`,
+            message: `Voucher ${data.voucher_code} for ${fmtCurrency(Number(data.voucher_amount))} issued to customer.`,
             tone: "success",
           });
         } else {
@@ -1239,7 +1239,7 @@ export default function Bookings() {
       notify({
         title: "Booking cancelled",
         message: (data as any)?.refund_action_required
-          ? `Customer notified. Refund of R${Number((data as any).refund_amount || 0).toFixed(2)} pending their choice.`
+          ? `Customer notified. Refund of ${fmtCurrency(Number((data as any).refund_amount || 0))} pending their choice.`
           : (data as any)?.late_forfeit
           ? "Customer notified. Booking forfeited (cancelled within 24h of the trip)."
           : "Customer notified.",
@@ -1548,7 +1548,7 @@ export default function Bookings() {
         tone: "success",
       });
     } else if (data?.diff < 0) {
-      const refundOrVoucher = rebookExcessAction === "VOUCHER" ? `R${Math.abs(data.diff)} voucher issued (code: ${data.voucher_code || "see email"}).` : `R${Math.abs(data.diff)} refund initiated.`;
+      const refundOrVoucher = rebookExcessAction === "VOUCHER" ? `${fmtCurrency(Math.abs(data.diff))} voucher issued (code: ${data.voucher_code || "see email"}).` : `${fmtCurrency(Math.abs(data.diff))} refund initiated.`;
       notify({ title: "Booking changed", message: refundOrVoucher, tone: "success" });
     } else {
       notify({ title: "Booking changed", message: "The booking was successfully changed.", tone: "success" });
@@ -2477,7 +2477,7 @@ function SlotRows({
                     const exp = pr.expiresAt ? new Date(pr.expiresAt).getTime() : 0;
                     const minsLeft = exp ? Math.max(0, Math.round((exp - Date.now()) / 60000)) : null;
                     const newWhen = pr.newSlotStart ? new Date(pr.newSlotStart).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: getAdminTimezone() }) : "new slot";
-                    const label = `Pending reschedule → ${pr.newTourName || "Tour"} ${newWhen}${minsLeft !== null ? ` · hold ${minsLeft > 0 ? minsLeft + "m" : "expired"}` : ""} · +R${pr.diff.toFixed(0)}`;
+                    const label = `Pending reschedule → ${pr.newTourName || "Tour"} ${newWhen}${minsLeft !== null ? ` · hold ${minsLeft > 0 ? minsLeft + "m" : "expired"}` : ""} · +${fmtCurrency(pr.diff)}`;
                     return (
                       <span className="mt-1 flex max-w-full flex-wrap items-center gap-1.5 pl-[18px] lg:pl-0">
                         <span

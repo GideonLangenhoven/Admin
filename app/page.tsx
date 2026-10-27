@@ -1,5 +1,6 @@
 "use client";
 import { pluralize } from "./lib/automation-copy";
+import { formatZar } from "./lib/money";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { supabase } from "./lib/supabase";
 import { confirmAction, notify } from "./lib/app-notify";
@@ -874,7 +875,7 @@ export default function Dashboard() {
                         <Link href="/refunds" className={styles.attentionRow}>
                             <ArrowUDownLeft size={22} aria-hidden="true" />
                             <span className="min-w-0 flex-1">Refunds needing action <span className="block text-sm" style={{ color: "var(--ck-text-muted)" }}>Requested, pending, manual transfer or failed</span></span>
-                            <span className="text-right"><strong className="block tabular-nums">{refundCount}</strong><span className="text-sm tabular-nums">R{refundTotal.toLocaleString("en-ZA", { maximumFractionDigits: 2 })}</span></span>
+                            <span className="text-right"><strong className="block tabular-nums">{refundCount}</strong><span className="text-sm tabular-nums">{formatZar(refundTotal)}</span></span>
                         </Link>
                         <Link href="/inbox" className={styles.attentionRow}>
                             <ChatText size={22} aria-hidden="true" /><span className="min-w-0 flex-1">Inbox <span className="block text-sm" style={{ color: "var(--ck-text-muted)" }}>Conversations handled by a human</span></span><strong className="tabular-nums">{inboxCount}</strong>
