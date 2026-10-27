@@ -1,0 +1,28 @@
+H2b slot counter reconciliation: production dry run, 2026-10-27 (read-only).
+Query: DRIFT_SQL in scripts/reconcile-slot-counters.mjs, run read-only against
+project ukdsrndqhsatjkmxijuj. Nothing was changed.
+
+13 slot(s) drifted:
+  2026-09-28 12:30  Ocean Adventures / Sunset Paddle  cap 10  held 1 -> 0  [4409109e-b409-4dcc-8b0f-c26644a4ba59]
+  2026-09-29 12:30  Ocean Adventures / Sunset Paddle  cap 10  held 2 -> 0  [1669cb49-330f-43ce-85e0-6feb241c070c]
+  2026-10-16 18:00  Aonyx / Night Rock Pool  cap 10  held 1 -> 0  [b6ee8510-06c3-43ff-8ff9-9884bfd19aa3]
+  2026-10-16 18:00  Aonyx / Kayak & Rock Pool  cap 20  held 2 -> 0  [48de1450-d44d-4651-be6a-bc931790f583]
+  2026-10-19 08:30  Kayak / Morning Kayak  cap 20  held 1 -> 0  [ca7a0de0-0000-4000-8000-202610190101]
+  2026-10-21 09:30  Kayak / Midday Hike  cap 10  held 1 -> 0  [4145349d-f027-4653-b447-de82704c7d1c]
+  2026-10-26 09:00  Claire's Hiking / Kirstenbosch Morning Walk  cap 14  booked 8 -> 5  [c1a17e50-0000-4000-8000-000000000207]
+  2026-10-26 17:30  Claire's Hiking / Lion's Head Sunset Walk  cap 10  booked 6 -> 4  [c1a17e50-0000-4000-8000-000000000203]
+  2026-10-27 09:30  Claire's Hiking / Silvermine Fynbos Trail  cap 12  booked 7 -> 4  [c1a17e50-0000-4000-8000-000000000211]
+  2026-10-28 07:00  Claire's Hiking / Table Mountain Sunrise Hike  cap 8  booked 5 -> 2  [c1a17e50-0000-4000-8000-000000000214]
+  2026-10-31 10:00  Claire's Hiking / Cape Point Coastal Hike  cap 8  booked 5 -> 2  [c1a17e50-0000-4000-8000-000000000219]
+  2026-11-05 17:00  Claire's Hiking / Lion's Head Sunset Walk  cap 10  booked 3 -> 0  [c1a17e50-0000-4000-8000-000000000224]
+  2026-11-05 19:00  Kayak / Full Moon Paddle  cap 12  booked 3 -> 0  [99253045-32cc-446d-904f-7832fc1f369a]
+
+Every change lowers a counter: 7 slots release booked seats, 6 release held
+seats. No slot is raised and none ends above capacity. Future slots affected:
+28 Oct, 31 Oct and both 5 Nov departures, which are under-selling today.
+
+Apply only after approval, in this order:
+  1. Apply migration 20261027140000_slot_counters_derived.sql.
+  2. DATABASE_URL=... node scripts/reconcile-slot-counters.mjs          (dry run again)
+  3. DATABASE_URL=... node scripts/reconcile-slot-counters.mjs --apply  (expect "No drift")
+  4. Deploy cron-tasks with the drift monitor.

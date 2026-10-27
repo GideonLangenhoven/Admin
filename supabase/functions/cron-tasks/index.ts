@@ -746,6 +746,22 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     results.errors.push(error instanceof Error ? error.message : String(error));
   }
 
+  // H2b: triggers recount slots.booked/held from bookings and holds, so drift
+  // means a writer bypassed them. An error turns the cron check-in red.
+  // ponytail: a combo checkout between reserve_combo_capacity and its hold
+  // insert can show as drift for a moment; one red run that clears is that.
+  try {
+    const { data: drift, error: driftErr } = await supabase.rpc("slot_counter_drift", { p_from: new Date(Date.now() - 86_400_000).toISOString() });
+    if (driftErr) throw driftErr;
+    results.slot_counter_drift = (drift || []).length;
+    if (results.slot_counter_drift) {
+      throw new Error("Slot counter drift on " + results.slot_counter_drift + " slot(s): " + drift.slice(0, 10).map((s: any) => s.slot_id).join(", "));
+    }
+  } catch (error) {
+    console.error("SLOT_COUNTER_DRIFT_ERR", error);
+    results.errors.push(error instanceof Error ? error.message : String(error));
+  }
+
   await captureCheckIn("cron-tasks", results.errors.length ? "error" : "ok", checkInId);
   return new Response(JSON.stringify(results), { headers: headers(), status: results.errors.length ? 500 : 200 });
 }));
