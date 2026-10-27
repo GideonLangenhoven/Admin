@@ -12,6 +12,7 @@ import {
 } from "../_shared/tenant.ts";
 import { verifyCustomerSession } from "../_shared/customer-session.ts";
 import { getPaidPortions } from "../_shared/vouchers.ts";
+import { guestNeverContacted } from "../_shared/guest-contact.ts";
 import { getComboLegPolicy, validateComboDates } from "../_shared/combo.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -1009,6 +1010,7 @@ async function handleCancelVoucher(req: any, booking: any) {
 
 // ───── Notification helper ─────
 async function sendRebookNotification(booking: any, event: string, message: string) {
+  if (guestNeverContacted(booking)) return;
   try {
     const tenant = await getTenantByBusinessId(supabase, booking.business_id);
     const ref = booking.id.substring(0, 8).toUpperCase();

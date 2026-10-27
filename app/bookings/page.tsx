@@ -26,6 +26,7 @@ import MarkPaidDialog from "../../components/booking/MarkPaidDialog";
 import PaymentExpiryBadge from "../../components/booking/PaymentExpiryBadge";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { fetchAllRows } from "../../supabase/functions/_shared/pagination";
+import { guestNeverContacted } from "../../supabase/functions/_shared/guest-contact";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const BOOKING_COLUMNS = "id, created_at, confirmation_sent_at, slot_id, customer_name, phone, email, qty, total_amount, total_captured, voucher_amount_paid, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)";
@@ -1004,7 +1005,7 @@ export default function Bookings() {
       updateData.phone !== (editBooking.phone || "") ||
       updateData.email !== (editBooking.email || "").toLowerCase() ||
       guestsAdded;
-    if (detailsChanged && editForm.email.trim()) {
+    if (detailsChanged && editForm.email.trim() && !guestNeverContacted(editBooking)) {
       const changed: string[] = [];
       if (updateData.customer_name !== (editBooking.customer_name || "")) changed.push("name");
       if (updateData.email !== (editBooking.email || "").toLowerCase()) changed.push("email");

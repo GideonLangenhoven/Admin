@@ -18,6 +18,7 @@ import PaymentExpiryBadge from "../../../components/booking/PaymentExpiryBadge";
 import { guestActions, type GuestActionKey } from "../../lib/booking-action-registry";
 import { bookingDemoAction } from "../../lib/demo-guide";
 import { bookingCustomFieldEntries } from "../../../supabase/functions/_shared/booking-custom-fields";
+import { guestNeverContacted } from "../../../supabase/functions/_shared/guest-contact";
 
 /* ── helpers ── */
 function fmtDate(iso: string) {
@@ -485,7 +486,7 @@ export default function BookingDetailPage() {
       setEditingCustomer(false);
 
       // Spec: notify the customer when their details change (BOOKING_UPDATED).
-      if (changed.length && newEmail) {
+      if (changed.length && newEmail && !guestNeverContacted(booking)) {
         const startIso = booking.slots?.start_time;
         try {
           const updRes = await supabase.functions.invoke("send-email", {
