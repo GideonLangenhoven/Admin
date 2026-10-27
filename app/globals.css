@@ -68,19 +68,20 @@ html.light {
   --ck-chart-6: #6B7F3A;
   --ck-chart-grid: rgba(16, 44, 32, 0.07);
 
-  /* ── Sidebar: the deep-pine rail (dark in BOTH themes — the signature) ── */
-  --ck-sidebar: #0F2B1F;
-  --ck-sidebar-grad-top: #113022;
-  --ck-sidebar-grad-bottom: #0C2117;
-  --ck-sidebar-border: rgba(244, 241, 232, 0.08);
-  --ck-sidebar-text: #B7C9BD;
-  --ck-sidebar-muted: #85998C;
-  --ck-sidebar-hover: rgba(244, 241, 232, 0.055);
-  --ck-sidebar-active-bg: rgba(244, 241, 232, 0.09);
-  --ck-sidebar-active-border: rgba(244, 241, 232, 0.14);
-  --ck-sidebar-active-text: #F6F3EA;
-  --ck-sidebar-icon: #8FA79A;
-  --ck-sidebar-icon-active: #4FE0A6;
+  /* ── Sidebar: on the page ground, split by one hairline; the active item
+     is a neutral ink pill. (Dark theme keeps its own dark values below.) ── */
+  --ck-sidebar: #F7F5F0;
+  --ck-sidebar-grad-top: #F7F5F0;
+  --ck-sidebar-grad-bottom: #F7F5F0;
+  --ck-sidebar-border: rgba(16, 44, 32, 0.09);
+  --ck-sidebar-text: #46534B;
+  --ck-sidebar-muted: #66736B;
+  --ck-sidebar-hover: rgba(16, 44, 32, 0.04);
+  --ck-sidebar-active-bg: rgba(16, 44, 32, 0.07);
+  --ck-sidebar-active-border: rgba(16, 44, 32, 0.12);
+  --ck-sidebar-active-text: #17221C;
+  --ck-sidebar-icon: #66736B;
+  --ck-sidebar-icon-active: #125E40;
 
   --ck-radius-sm: 6px;
   --ck-radius-md: 10px;
@@ -552,8 +553,7 @@ body {
     color: var(--ck-text-muted);
   }
 
-  /* Signature active-nav treatment — cream pill + amber trail marker,
-     designed for the deep-pine rail. */
+  /* Active nav item — neutral pill + a small amber trail dot. */
   .ui-nav-active {
     position: relative;
     background: var(--ck-sidebar-active-bg);
@@ -562,13 +562,12 @@ body {
   .ui-nav-active::before {
     content: "";
     position: absolute;
-    left: 0;
-    top: 22%;
-    bottom: 22%;
-    width: 3px;
-    border-radius: 3px;
+    left: 3px;
+    top: calc(50% - 2.5px);
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
     background: var(--ck-amber-bright);
-    box-shadow: 0 0 10px rgba(217, 130, 47, 0.5);
   }
 
   .no-scrollbar::-webkit-scrollbar {
