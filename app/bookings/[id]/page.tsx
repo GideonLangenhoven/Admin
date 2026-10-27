@@ -506,7 +506,7 @@ export default function BookingDetailPage() {
       // Try voucher first
       const { data: voucher } = await supabase
         .from("vouchers")
-        .select("id, code, status, type, value, current_balance, purchase_amount, pax_limit, purchase_value")
+        .select("id, status")
         .eq("code", code)
         .eq("business_id", businessId)
         .maybeSingle();
@@ -517,51 +517,30 @@ export default function BookingDetailPage() {
           setCodeApplying(false);
           return;
         }
-        const balance = Number(voucher.current_balance || voucher.value || voucher.purchase_amount || 0);
-        const currentTotal = Number(booking.total_amount || 0);
-        let deduction = 0;
-
-        if (voucher.type === "FREE_TRIP") {
-          const coveredPax = Math.min(voucher.pax_limit || 1, booking.qty);
-          const slotCost = Number(booking.unit_price || 0) * coveredPax;
-          const purchaseVal = Number(voucher.purchase_value || voucher.purchase_amount || balance);
-          deduction = slotCost > purchaseVal ? Math.min(purchaseVal, currentTotal) : Math.min(balance, slotCost, currentTotal);
-        } else {
-          deduction = Math.min(balance, currentTotal);
-        }
-
-        const newTotal = Math.max(0, currentTotal - deduction);
-
-        // Deduct voucher balance atomically
-        const { data: rpcRes } = await supabase.rpc("deduct_voucher_balance", { p_voucher_id: voucher.id, p_amount: deduction });
-        if (!rpcRes?.success) {
-          // Redemption failed (expired / not active / no balance). Do NOT mark
-          // REDEEMED — that strands the remaining balance and hides the failure.
-          console.error("VOUCHER_DEDUCT_FAILED:", voucher.id, rpcRes?.error);
-        } else {
-          await supabase.from("vouchers").update({ redeemed_booking_id: booking.id }).eq("id", voucher.id);
-        }
-
-        // Update booking. Preserve any prior promo attribution and store the
-        // voucher deduction as a *separate* field (voucher_amount_paid) so the
-        // audit trail shows promo + voucher individually. discount_type kept
-        // as VOUCHER for backward-compatibility with downstream summarisation.
-        const updateFields: Record<string, unknown> = {
-          total_amount: newTotal,
-          voucher_code: code,
-          voucher_amount_paid: Math.round(deduction * 100) / 100,
-          discount_type: "VOUCHER",
-        };
-        if (newTotal <= 0) {
-          updateFields.status = "PAID";
-          updateFields.yoco_payment_id = "VOUCHER_ADMIN_" + code;
-        }
-        const { error: updateErr } = await supabase.from("bookings").update(updateFields).eq("id", booking.id);
-        if (updateErr) {
-          console.error("Booking voucher update failed:", updateErr);
-          setCodeResult({ type: "error", message: "Voucher deducted but booking update failed: " + updateErr.message });
+        // Server-side: the voucher balance, its settled credit and the booking
+        // total change together, so Mark Paid and payment links see the credit.
+        const { data: applied, error: applyErr } = await supabase.rpc("apply_booking_voucher", { p_booking_id: booking.id, p_voucher_id: voucher.id });
+        if (applyErr) console.error("APPLY_VOUCHER_ERR:", applyErr);
+        if (applyErr || !applied?.ok) {
+          setCodeResult({ type: "error", message: applied?.error || "The voucher could not be applied. Please try again." });
           setCodeApplying(false);
           return;
+        }
+        const deduction = Number(applied.deducted);
+        const newTotal = Number(applied.new_total);
+        // Fully covered: mark it paid server-side, which converts the hold to
+        // seats and sends the invoice and confirmation together.
+        if (newTotal <= 0) {
+          const paid = await supabase.functions.invoke("manual-mark-paid", {
+            body: { action: "mark_paid", booking_id: booking.id, payment_method: "Other", payment_note: "Voucher " + code },
+          });
+          const problem = await functionError(paid, "Use Mark Paid to finish.");
+          if (problem) {
+            setBooking({ ...booking, total_amount: newTotal, discount_type: "VOUCHER" } as BookingDetail);
+            setCodeResult({ type: "error", message: `Voucher applied (R${deduction} off), but the booking could not be marked paid. ${problem}` });
+            setCodeApplying(false);
+            return;
+          }
         }
 
         setBooking({ ...booking, total_amount: newTotal, discount_type: "VOUCHER", status: newTotal <= 0 ? "PAID" : booking.status } as BookingDetail);

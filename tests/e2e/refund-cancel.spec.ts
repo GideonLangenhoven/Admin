@@ -97,3 +97,30 @@ test("a refused refund shows the server's reason in red and changes nothing", as
     .toEqual({ title: "Refund failed", message: "Completed trips cannot be cancelled", tone: "error" });
   expect(directWrites(calls)).toEqual([]);
 });
+
+// H2: declining a queued refund goes through decline_refund_request (tenant
+// check, status guard, timeline entry), never a direct bookings write.
+for (const [label, email, notice] of [
+  ["and the guest is emailed", { status: 200, json: { ok: true } }, { message: "The guest has been emailed.", tone: "success" }],
+  ["but the email fails, so the operator is told", { status: 500, json: { error: "Resend unavailable" } }, { message: "The guest was not emailed. Let them know the refund was declined.", tone: "warning" }],
+] as const) {
+  test(`declining a refund goes through the server ${label}`, async ({ page }) => {
+    const queued = { id: BOOKING, customer_name: "Refund guest", email: "guest@example.invalid", qty: 3, total_amount: 300, total_captured: 300, refund_status: "REQUESTED", refund_amount: 300, slots: { start_time: "2026-10-16T07:00:00Z" }, tours: { name: "Harbour paddle" } };
+    const calls: Call[] = [];
+    await page.route(/127\.0\.0\.1:3191\/(functions\/v1\/|rest\/v1\/bookings|rest\/v1\/rpc\/decline_refund_request)/, route => {
+      const req = route.request();
+      calls.push({ url: req.url(), method: req.method(), body: req.postDataJSON?.() ?? null });
+      if (req.url().includes("decline_refund_request")) return route.fulfill({ json: { ok: true } });
+      if (req.url().includes("/functions/v1/send-email")) return route.fulfill(email);
+      if (req.method() === "PATCH") return route.fulfill({ status: 204 });
+      return route.fulfill({ json: req.url().includes("REQUESTED") ? [queued] : [] });
+    });
+    const seen = notices(page);
+    await page.goto("/refunds");
+    await page.getByRole("button", { name: "Decline", exact: true }).click();
+    await page.getByRole("button", { name: "Decline refund", exact: true }).click();
+    await expect.poll(() => seen.find(n => n.title === "Refund declined")).toEqual({ title: "Refund declined", ...notice });
+    expect(calls.filter(c => c.url.includes("decline_refund_request")).map(c => c.body)).toEqual([{ p_booking_id: BOOKING }]);
+    expect(directWrites(calls)).toEqual([]);
+  });
+}

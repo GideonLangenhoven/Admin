@@ -7,7 +7,9 @@ describe("decline refund action (K5)", () => {
   const page = readFileSync("app/refunds/page.tsx", "utf8");
 
   it("has a decline action that sets refund_status DECLINED", () => {
-    expect(page).toContain('refund_status: "DECLINED"');
+    // H2: declined server-side (tenant check, status guard, timeline entry).
+    expect(page).toContain('rpc("decline_refund_request"');
+    expect(readFileSync("supabase/migrations/20261027150000_booking_status_server_only.sql", "utf8")).toContain("refund_status = 'DECLINED'");
     expect(page).toContain("Decline");
   });
 

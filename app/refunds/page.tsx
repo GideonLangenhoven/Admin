@@ -240,13 +240,14 @@ export default function Refunds() {
 
   async function executeDeclineRefund(id: string) {
     const booking = refunds.find(b => b.id === id);
-    const declined = await supabase.from("bookings").update({
-      refund_status: "DECLINED", refund_notes: "Refund declined by admin",
-    }).eq("id", id).eq("business_id", businessId).in("refund_status", ["REQUESTED", "FAILED"]).select("id").maybeSingle();
-    if (declined.error || !declined.data) { notify({ title: "Refund could not be declined", message: "It may already be processing. Refresh the queue.", tone: "error" }); await load(); return; }
+    // Server-side: only REQUESTED or FAILED refunds of the caller's tenant, with a timeline entry.
+    const declined = await supabase.rpc("decline_refund_request", { p_booking_id: id });
+    if (declined.error) console.error("DECLINE_REFUND_ERR:", declined.error);
+    if (declined.error || !declined.data?.ok) { notify({ title: "Refund could not be declined", message: "It may already be processing. Refresh the queue.", tone: "error" }); await load(); return; }
+    let emailed = false;
     if (booking?.email) {
       try {
-        await supabase.functions.invoke("send-email", {
+        const sent = await supabase.functions.invoke("send-email", {
           body: {
             type: "BOOKING_UPDATED",
             data: {
@@ -262,10 +263,15 @@ export default function Refunds() {
             },
           },
         });
+        emailed = !sent.error;
+        if (sent.error) console.error("DECLINE_REFUND_EMAIL_ERR:", sent.error);
       } catch (e) {
         console.error("DECLINE_REFUND_EMAIL_ERR:", e);
       }
     }
+    notify(emailed
+      ? { title: "Refund declined", message: "The guest has been emailed.", tone: "success" }
+      : { title: "Refund declined", message: "The guest was not emailed. Let them know the refund was declined.", tone: "warning" });
     load();
   }
 
