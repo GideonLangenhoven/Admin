@@ -48,9 +48,11 @@ export default function RichTextEditor({ value, onChange, rows = 10, placeholder
   }, [value]);
 
   function handleInput() {
-    if (editorRef.current) {
+    const el = editorRef.current;
+    if (el) {
       internalUpdate.current = true;
-      onChange(editorRef.current.innerHTML);
+      // A cleared editor still holds "<br>" or "<p><br></p>"; save that as empty.
+      onChange(el.textContent?.trim() || el.querySelector("img") ? el.innerHTML : "");
     }
   }
 
