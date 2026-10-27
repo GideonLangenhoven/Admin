@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { confirmCancellation } from "../lib/cancellation-choice";
 import { confirmAction, notify } from "../lib/app-notify";
+import { functionError } from "../lib/function-error";
 import { bookingRealtimeFilter, shouldRefreshBookingsForPayload } from "../lib/bookings-realtime";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { bookingDateRange, type BookingDateView } from "../lib/booking-date-range";
@@ -901,20 +902,36 @@ export default function Bookings() {
     setActionBookingId(editBooking.id);
 
     const isChangingToPaid = editForm.status === "PAID" && editBooking.status !== "PAID";
-
-    // Detect if price or qty changed on a PENDING booking with an existing payment link
     const isPending = ["PENDING", "PENDING PAYMENT", "HELD"].includes(editBooking.status);
-    const priceOrQtyChanged = qty !== editBooking.qty || total !== Number(editBooking.total_amount || 0);
-    const shouldInvalidatePaymentLink = isPending && priceOrQtyChanged && editBooking.yoco_checkout_id;
+    const qtyChanged = qty !== editBooking.qty;
+
+    // The guest count moves held seats, so it changes server-side together with
+    // the hold, the slot counters and the total, after a capacity check.
+    if (qtyChanged) {
+      const res = await supabase.functions.invoke("rebook-booking", {
+        body: { booking_id: editBooking.id, action: qty > editBooking.qty ? "ADD_GUESTS" : "REMOVE_GUESTS", new_qty: qty },
+      });
+      const problem = await functionError(res, "The guest count could not be changed. Please try again.");
+      if (problem) {
+        setActionBookingId(null);
+        notify({ title: "Guest count not changed", message: problem, tone: "error" });
+        return;
+      }
+    }
+
+    // A price change on an unpaid booking makes its existing payment link stale.
+    // (A guest-count change is refused server-side while a link is outstanding.)
+    const priceChanged = !qtyChanged && total !== Number(editBooking.total_amount || 0);
+    const shouldInvalidatePaymentLink = isPending && priceChanged && editBooking.yoco_checkout_id;
 
     const updateData: Record<string, unknown> = {
       customer_name: editForm.customer_name.trim(),
       phone: normalizePhone(editForm.phone),
       email: editForm.email.trim().toLowerCase(),
-      qty,
-      total_amount: total,
       status: isChangingToPaid ? editBooking.status : editForm.status,
     };
+    // After a guest-count change the server has already set the new total.
+    if (!qtyChanged) updateData.total_amount = total;
 
     // Invalidate stale payment link if price/qty changed on a pending booking
     if (shouldInvalidatePaymentLink) {
@@ -927,24 +944,32 @@ export default function Bookings() {
       .eq("id", editBooking.id);
 
     if (error) {
+      console.error("[BOOKINGS] booking update failed", error);
       setActionBookingId(null);
-      notify({ title: "Booking update failed", message: error.message, tone: "error" });
+      notify({
+        title: "Booking update failed",
+        message: (qtyChanged ? "The guest count was saved, but the other changes were not. " : "Your changes were not saved. ") + "Refresh and try again.",
+        tone: "error",
+      });
+      if (qtyChanged) loadBookings();
       return;
     }
 
     // Notify the customer their details changed (spec: BOOKING_UPDATED email).
     // Skipped on a PAID transition — manual-mark-paid already sends a confirmation.
+    // Removing guests already emailed the customer from rebook-booking.
+    const guestsAdded = qty > editBooking.qty;
     const detailsChanged =
       updateData.customer_name !== (editBooking.customer_name || "") ||
       updateData.phone !== (editBooking.phone || "") ||
       updateData.email !== (editBooking.email || "").toLowerCase() ||
-      qty !== editBooking.qty;
+      guestsAdded;
     if (detailsChanged && !isChangingToPaid && editForm.email.trim()) {
       const changed: string[] = [];
       if (updateData.customer_name !== (editBooking.customer_name || "")) changed.push("name");
       if (updateData.email !== (editBooking.email || "").toLowerCase()) changed.push("email");
       if (updateData.phone !== (editBooking.phone || "")) changed.push("contact number");
-      if (qty !== editBooking.qty) changed.push("guest count");
+      if (guestsAdded) changed.push("guest count");
       const startIso = editBooking.slots?.start_time;
       try {
         const updRes = await supabase.functions.invoke("send-email", {
@@ -997,8 +1022,8 @@ export default function Bookings() {
           paymentLinkResent = true;
           notify({ title: "Payment link sent", message: "Payment link sent to " + editForm.email.trim().toLowerCase() + (editForm.phone.trim() ? " & WhatsApp" : ""), tone: "success" });
         } else {
-          const detail = linkRes.error?.message || linkRes.data?.error || "unknown";
-          notify({ title: "Payment link not re-sent", message: "Saved, but the payment link could not be re-sent to the new contact details: " + detail, tone: "warning", duration: 8000 });
+          const detail = (await functionError(linkRes)) ?? "Send it again with Payment Link.";
+          notify({ title: "Payment link not re-sent", message: "Saved, but the payment link could not be re-sent to the new contact details. " + detail, tone: "warning", duration: 8000 });
         }
       } catch (e) {
         console.error("Payment link resend failed:", e);
@@ -1357,8 +1382,9 @@ export default function Bookings() {
           qty: b.qty || 1,
         },
       });
-      if (res.error) {
-        notify({ title: "Payment link failed", message: res.error.message, tone: "error" });
+      const problem = await functionError(res, "The payment link could not be created. Please try again.");
+      if (problem) {
+        notify({ title: "Payment link failed", message: problem, tone: "error" });
         setPaymentLinkBookingId(null);
         return;
       }
@@ -1370,7 +1396,8 @@ export default function Bookings() {
         setPaymentLinkRef(ref);
         loadBookings();
       } else {
-        notify({ title: "Payment link failed", message: JSON.stringify(data), tone: "error" });
+        console.error("[BOOKINGS] create-checkout returned no link", data);
+        notify({ title: "Payment link failed", message: "The payment link could not be created. Please try again.", tone: "error" });
       }
     } catch (err: unknown) {
       notify({ title: "Payment link failed", message: err instanceof Error ? err.message : String(err), tone: "error" });
@@ -1398,8 +1425,9 @@ export default function Bookings() {
           pending_reschedule_id: pr.pendingId,
         },
       });
-      if (res.error) {
-        notify({ title: "Send failed", message: res.error.message, tone: "error" });
+      const problem = await functionError(res, "The payment link could not be created. Please try again.");
+      if (problem) {
+        notify({ title: "Send failed", message: problem, tone: "error" });
       } else if (res.data?.redirectUrl) {
         notify({ title: "Payment link sent", message: `Sent to ${b.email}${b.phone ? " & WhatsApp" : ""}`, tone: "success" });
         loadBookings();
@@ -1430,8 +1458,9 @@ export default function Bookings() {
           qty: b.qty || 1,
         },
       });
-      if (res.error) {
-        notify({ title: "Payment link failed", message: res.error.message, tone: "error" });
+      const problem = await functionError(res, "The payment link could not be created. Please try again.");
+      if (problem) {
+        notify({ title: "Payment link failed", message: problem, tone: "error" });
         setQuickResendingId(null);
         return;
       }
@@ -2034,8 +2063,13 @@ export default function Bookings() {
                   min={0}
                   value={editForm.total_amount}
                   onChange={(e) => setEditForm((p) => ({ ...p, total_amount: e.target.value }))}
-                  className="ui-control mt-1 w-full"
+                  disabled={(Math.max(1, Number(editForm.qty) || 1)) !== editBooking.qty}
+                  aria-describedby="edit-total-hint"
+                  className="ui-control mt-1 w-full disabled:opacity-60"
                 />
+                {(Math.max(1, Number(editForm.qty) || 1)) !== editBooking.qty && (
+                  <span id="edit-total-hint" className="mt-1 block text-xs">Recalculated for the new guest count when you save. Change the price separately.</span>
+                )}
               </label>
               <label className="text-sm text-gray-600 md:col-span-2">
                 Status

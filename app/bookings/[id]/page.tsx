@@ -11,6 +11,7 @@ import { getAdminTimezone } from "../../lib/admin-timezone";
 import { formatDuration } from "../../lib/duration";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { notify } from "../../lib/app-notify";
+import { functionError } from "../../lib/function-error";
 import { bookingCustomFieldEntries } from "../../../supabase/functions/_shared/booking-custom-fields";
 
 /* ── helpers ── */
@@ -735,10 +736,10 @@ export default function BookingDetailPage() {
           qty: booking.qty || 1,
         },
       });
-      if (res.error) {
-        const errMsg = "Payment link failed: " + res.error.message;
-        setCodeResult({ type: "error", message: errMsg });
-        notify({ title: "Payment link failed", message: res.error.message, tone: "error" });
+      const problem = await functionError(res, "The payment link could not be created. Please try again.");
+      if (problem) {
+        setCodeResult({ type: "error", message: "Payment link failed: " + problem });
+        notify({ title: "Payment link failed", message: problem, tone: "error" });
       } else if (res.data?.fully_covered) {
         setCodeResult({ type: "success", message: "Promo covers the full booking." });
         notify({ title: "Fully covered", message: "Promo applied. Nothing to pay.", tone: "success" });

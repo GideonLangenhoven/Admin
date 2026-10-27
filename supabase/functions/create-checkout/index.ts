@@ -106,7 +106,7 @@ Deno.serve(withSentry("create-checkout", async (req: any) => {
     const sendPaymentLink = body.send_payment_link === true;
     let checkoutBooking: any = null;
 
-    if (amount == null || !Number.isFinite(Number(amount)) || Number(amount) < 0) return new Response(JSON.stringify({ error: "Need amount" }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
+    if (amount == null || !Number.isFinite(Number(amount)) || Number(amount) < 0) return new Response(JSON.stringify({ error: "Need amount", reason: "Enter an amount of zero or more." }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
 
     // A public booking ID must not mint a private confirmation capability.
     // New storefront bookings already receive an independent waiver secret in
@@ -192,11 +192,11 @@ Deno.serve(withSentry("create-checkout", async (req: any) => {
     if (type === "GIFT_VOUCHER" && voucherId) {
       const gvRow = await supabase.from("vouchers").select("value, purchase_amount, status").eq("id", voucherId).maybeSingle();
       if (!gvRow.data) {
-        return new Response(JSON.stringify({ error: "VOUCHER_NOT_FOUND" }), { status: 404, headers: buildCors(req?.headers?.get("origin") || "*") });
+        return new Response(JSON.stringify({ error: "VOUCHER_NOT_FOUND", reason: "That voucher could not be found." }), { status: 404, headers: buildCors(req?.headers?.get("origin") || "*") });
       }
       const faceValue = Number(gvRow.data.value ?? gvRow.data.purchase_amount ?? 0);
       if (!(faceValue > 0)) {
-        return new Response(JSON.stringify({ error: "VOUCHER_VALUE_INVALID" }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
+        return new Response(JSON.stringify({ error: "VOUCHER_VALUE_INVALID", reason: "That voucher has no value to pay for." }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
       }
       if (Math.abs(Number(amount) - faceValue) > 0.01) {
         console.warn("VOUCHER_PRICE_MISMATCH: frontend=" + amount + " server=" + faceValue + " voucher=" + voucherId);
@@ -242,16 +242,16 @@ Deno.serve(withSentry("create-checkout", async (req: any) => {
       if (canonicalType === "RESCHEDULE") {
         const pending = await supabase.from("pending_reschedules").select("*")
           .eq("id", String(body.pending_reschedule_id || "")).eq("booking_id", bookingId).eq("business_id", resolved.businessId).maybeSingle();
-        if (pending.error || !pending.data || pending.data.status !== "PENDING") return new Response(JSON.stringify({ error: "RESCHEDULE_NOT_PENDING" }), { status: 409, headers: corsHeaders });
+        if (pending.error || !pending.data || pending.data.status !== "PENDING") return new Response(JSON.stringify({ error: "RESCHEDULE_NOT_PENDING", reason: "This reschedule is no longer waiting for payment." }), { status: 409, headers: corsHeaders });
         pendingReschedule = pending.data;
       }
       const held = await supabase.from("holds").select("*").eq("id", pendingReschedule?.hold_id || String(body.hold_id || "")).eq("booking_id", bookingId).maybeSingle();
       if (held.error || !held.data || held.data.status !== "ACTIVE" || new Date(held.data.expires_at).getTime() <= Date.now()
-          || held.data.hold_type !== canonicalType) return new Response(JSON.stringify({ error: "AMENDMENT_HOLD_EXPIRED" }), { status: 409, headers: corsHeaders });
+          || held.data.hold_type !== canonicalType) return new Response(JSON.stringify({ error: "AMENDMENT_HOLD_EXPIRED", reason: "The places for this change are no longer held. Start the change again." }), { status: 409, headers: corsHeaders });
       amendmentHold = held.data;
-      if (canonicalType === "ADD_GUESTS" && Number(amendmentHold.metadata?.new_qty) !== Number(body.new_qty)) return new Response(JSON.stringify({ error: "GUEST_COUNT_CHANGED" }), { status: 409, headers: corsHeaders });
+      if (canonicalType === "ADD_GUESTS" && Number(amendmentHold.metadata?.new_qty) !== Number(body.new_qty)) return new Response(JSON.stringify({ error: "GUEST_COUNT_CHANGED", reason: "The guest count changed since this change started. Start it again." }), { status: 409, headers: corsHeaders });
       amount = Number(pendingReschedule?.diff ?? amendmentHold.metadata?.diff);
-      if (!(amount > 0)) return new Response(JSON.stringify({ error: "AMENDMENT_AMOUNT_INVALID" }), { status: 409, headers: corsHeaders });
+      if (!(amount > 0)) return new Response(JSON.stringify({ error: "AMENDMENT_AMOUNT_INVALID", reason: "This change has nothing to pay." }), { status: 409, headers: corsHeaders });
       if (amendmentHold.metadata?.payment_url) return new Response(JSON.stringify({
         id: amendmentHold.metadata.yoco_checkout_id, redirectUrl: amendmentHold.metadata.payment_url, amount, expires_at: amendmentHold.expires_at,
       }), { headers: corsHeaders });
@@ -397,10 +397,10 @@ Deno.serve(withSentry("create-checkout", async (req: any) => {
         };
         const held = await supabase.from("holds").update({ metadata: { ...amendmentHold.metadata, ...stamp, payment_url: yocoData.redirectUrl } })
           .eq("id", amendmentHold.id).eq("booking_id", bookingId);
-        if (held.error) return new Response(JSON.stringify({ error: "AMENDMENT_CHECKOUT_SAVE_FAILED" }), { status: 503, headers: corsHeaders });
+        if (held.error) return new Response(JSON.stringify({ error: "AMENDMENT_CHECKOUT_SAVE_FAILED", reason: "Could not save the payment link. Please try again." }), { status: 503, headers: corsHeaders });
         if (pendingReschedule) {
           const pending = await supabase.from("pending_reschedules").update(stamp).eq("id", pendingReschedule.id).eq("business_id", resolved.businessId);
-          if (pending.error) return new Response(JSON.stringify({ error: "RESCHEDULE_CHECKOUT_SAVE_FAILED" }), { status: 503, headers: corsHeaders });
+          if (pending.error) return new Response(JSON.stringify({ error: "RESCHEDULE_CHECKOUT_SAVE_FAILED", reason: "Could not save the payment link. Please try again." }), { status: 503, headers: corsHeaders });
         }
       }
       if (voucherId) {
@@ -612,9 +612,10 @@ Deno.serve(withSentry("create-checkout", async (req: any) => {
       return new Response(JSON.stringify({ id: yocoData.id, redirectUrl: yocoData.redirectUrl, amount, expires_at: quote?.expires_at }), { status: 200, headers: corsHeaders });
     }
 
-    return new Response(JSON.stringify({ error: "Yoco error", details: yocoData }), { status: 500, headers: corsHeaders });
+    return new Response(JSON.stringify({ error: "Yoco error", reason: "The payment provider did not return a checkout. Please try again.", details: yocoData }), { status: 500, headers: corsHeaders });
   } catch (err: any) {
     console.error("CHECKOUT_ERR:", err?.message || err, JSON.stringify(_reqBody));
-    return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: buildCors(req?.headers?.get("origin") || "*") });
+    // The detail is logged above; never echo raw errors to the caller.
+    return new Response(JSON.stringify({ error: "CHECKOUT_FAILED", reason: "Could not create the payment link. Please try again." }), { status: 500, headers: buildCors(req?.headers?.get("origin") || "*") });
   }
 }));

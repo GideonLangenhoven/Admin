@@ -1356,6 +1356,7 @@ Deno.serve(async function (req: any) {
     return fail(req, "Unhandled action", 400);
   } catch (err: any) {
     console.error("REBOOK_BOOKING_ERR:", err);
-    return new Response(JSON.stringify({ error: err.message || "Internal error" }), { status: 500, headers: getCors(req) });
+    // The detail is logged above; never echo raw errors to the caller.
+    return new Response(JSON.stringify({ error: "This booking could not be changed. Please try again." }), { status: 500, headers: getCors(req) });
   }
 });
