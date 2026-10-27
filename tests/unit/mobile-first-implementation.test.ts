@@ -27,7 +27,8 @@ describe("mobile-first implementation contract", () => {
   });
 
   it("exposes the complete booking action set in the phone sheet", () => {
-    const bookings = source("app/bookings/page.tsx");
+    // The sheet lists the shared Guest action registry's actions (M3).
+    const bookings = source("app/bookings/page.tsx") + source("app/lib/booking-action-registry.ts");
     for (const label of [
       "Departure actions",
       "View booking",

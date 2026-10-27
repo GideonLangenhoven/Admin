@@ -8,7 +8,7 @@ import { functionError } from "../lib/function-error";
 import { bookingRealtimeFilter, shouldRefreshBookingsForPayload } from "../lib/bookings-realtime";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { bookingDateRange, type BookingDateView } from "../lib/booking-date-range";
-import { amountReceived } from "../lib/report-accounting";
+import { DIALOG_FIRST_ACTIONS, bookingPaidAmount, guestActions, isPaid, type GuestActionKey } from "../lib/booking-action-registry";
 import { addDaysToDateKey, businessDateKey, isDateKey } from "../lib/simple-view";
 import { customerNotesTooltip } from "../lib/customer-notes";
 import { contactPhoneNumber } from "../lib/contact-links";
@@ -96,20 +96,11 @@ function dayRange(dateInput: string) {
   return { startIso: day.toISOString(), endIso: next.toISOString() };
 }
 
-function isPaid(booking: Pick<Booking, "status" | "total_amount" | "total_captured">) {
-  return ["PAID", "CONFIRMED", "COMPLETED"].includes(booking.status)
-    && amountReceived(booking) + 0.005 >= Number(booking.total_amount || 0);
-}
-
 // A booking's value = cash portion (total_amount, i.e. what's due after any
 // voucher) + the voucher-funded portion. Reading total_amount alone shows
 // R0.00 for voucher-paid bookings.
 function bookingValue(b: { total_amount: number; voucher_amount_paid?: number | null }) {
   return Number(b.total_amount || 0) + Number(b.voucher_amount_paid || 0);
-}
-
-function bookingPaidAmount(b: Booking) {
-  return Math.min(Number(b.total_amount || 0), amountReceived(b)) + Number(b.voucher_amount_paid || 0);
 }
 
 type TourRel = { id?: string; name?: string } | null;
@@ -244,6 +235,7 @@ export default function Bookings() {
   const [rangeView, setRangeView] = useState<BookingDateView>("day");
   const [createdBooking, setCreatedBooking] = useState<{ id: string; date: string } | null>(null);
   const focusedBookingRef = useRef<string | null>(null);
+  const linkedActionRef = useRef<string | null>(null);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const date = params.get("date");
@@ -252,6 +244,14 @@ export default function Bookings() {
     const id = params.get("booking");
     if (id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
       setCreatedBooking({ id, date });
+      // An action chosen on the booking page. Dropped from the address so a
+      // reload or Back does not open it again.
+      const action = params.get("action");
+      if (action) {
+        linkedActionRef.current = action;
+        params.delete("action");
+        window.history.replaceState(null, "", window.location.pathname + "?" + params.toString());
+      }
     }
   }, []);
   const { rangeStart, rangeEnd, firstDate, lastDate } = useMemo(
@@ -717,10 +717,44 @@ export default function Bookings() {
         row.focus({ preventScroll: true });
         row.scrollIntoView({ block: "center" });
         focusedBookingRef.current = createdBooking.id;
+        const linked = day.slots[index].bookings.find(b => b.id === createdBooking.id);
+        if (linked && linkedActionRef.current) void openLinkedAction(linkedActionRef.current, linked);
+        linkedActionRef.current = null;
       }
       return;
     }
   }, [createdBooking, dayGroups, expandedSlots, loading]);
+
+  // Runs a Guest action chosen on the booking page. One that opens a dialog
+  // opens it; any other asks first, so following a link alone changes nothing.
+  async function openLinkedAction(key: string, b: Booking) {
+    const action = guestActions(b).find(a => a.key === key && a.key !== "view");
+    if (!action) return;
+    if (action.disabled) {
+      notify({ title: action.label + " is not available", message: action.title || "This action is not available for this booking right now.", tone: "warning" });
+      return;
+    }
+    if (!DIALOG_FIRST_ACTIONS.has(action.key) && !await confirmAction({ title: action.label, message: (b.customer_name || "This booking") + ": " + action.description, confirmLabel: action.label })) return;
+    runGuestAction(action.key, b);
+  }
+
+  function runGuestAction(key: GuestActionKey, b: Booking) {
+    switch (key) {
+      case "view": return router.push(`/bookings/${b.id}${window.location.pathname.startsWith("/simple") ? "?returnTo=%2Fsimple%2Fbookings" : ""}`);
+      case "edit": return openEditModal(b);
+      case "whatsapp": return openWhatsApp(b);
+      case "whatsapp-device": return void openDeviceWhatsApp(b.phone);
+      case "rebook": return openRebookModal(b);
+      case "mark-paid": return setMarkPaidBooking(b);
+      case "payment-link": return void sendPaymentLink(b);
+      case "payment-reminder": return void sendPaymentReminder(b);
+      case "allow-unpaid": return void toggleAllowUnpaid(b);
+      case "reschedule-link": return void sendRescheduleLink(b);
+      case "refund": return openRefundDialog(b);
+      case "resend-invoice": return void resendInvoiceForBooking(b.id);
+      case "cancel": return void cancelBooking(b);
+    }
+  }
 
   function toggleSlot(key: string) {
     setExpandedSlots((prev) => {
@@ -1856,23 +1890,12 @@ export default function Bookings() {
                             onToggle={() => toggleSlot(slotKey)}
                             actionBookingId={actionBookingId}
                             resendingInvoiceId={resendingInvoiceId}
-                            onEdit={openEditModal}
-                            onRebook={openRebookModal}
-                            onMarkPaid={setMarkPaidBooking}
-                            onRefund={openRefundDialog}
-                            onCancel={cancelBooking}
-                            onResendInvoice={resendInvoiceForBooking}
                             paymentLinkBookingId={paymentLinkBookingId}
-                            onSendPaymentLink={sendPaymentLink}
-                            onPaymentReminder={sendPaymentReminder}
-                            onToggleAllowUnpaid={toggleAllowUnpaid}
-                            onWhatsApp={openWhatsApp}
-                            onView={(b) => router.push(`/bookings/${b.id}${window.location.pathname.startsWith("/simple") ? "?returnTo=%2Fsimple%2Fbookings" : ""}`)}
+                            onAction={runGuestAction}
                             onCancelSlot={cancelSlotWeather}
                             cancellingWeatherId={cancellingWeatherId}
                             quickResendingId={quickResendingId}
                             onQuickResend={quickResendPaymentLink}
-                            onSendRescheduleLink={sendRescheduleLink}
                             selected={selected}
                             highlightedBookingId={createdBooking?.id || null}
                             onToggleSelect={toggleSelect}
@@ -2233,23 +2256,12 @@ function SlotRows({
   onToggle,
   actionBookingId,
   resendingInvoiceId,
-  onEdit,
-  onRebook,
-  onMarkPaid,
-  onRefund,
-  onCancel,
-  onResendInvoice,
   paymentLinkBookingId,
-  onSendPaymentLink,
-  onPaymentReminder,
-  onToggleAllowUnpaid,
-  onWhatsApp,
-  onView,
+  onAction,
   onCancelSlot,
   cancellingWeatherId,
   quickResendingId,
   onQuickResend,
-  onSendRescheduleLink,
   selected,
   highlightedBookingId,
   onToggleSelect,
@@ -2260,23 +2272,12 @@ function SlotRows({
   onToggle: () => void;
   actionBookingId: string | null;
   resendingInvoiceId: string | null;
-  onEdit: (b: Booking) => void;
-  onRebook: (b: Booking) => void;
-  onMarkPaid: (b: Booking) => void;
-  onRefund: (b: Booking) => void;
-  onCancel: (b: Booking) => void;
-  onResendInvoice: (bookingId: string) => void;
   paymentLinkBookingId: string | null;
-  onSendPaymentLink: (b: Booking) => void;
-  onPaymentReminder: (b: Booking) => void;
-  onToggleAllowUnpaid: (b: Booking) => void;
-  onWhatsApp: (b: Booking) => void;
-  onView: (b: Booking) => void;
+  onAction: (key: GuestActionKey, b: Booking) => void;
   onCancelSlot: (group: SlotGroup) => void;
   cancellingWeatherId: string | null;
   quickResendingId: string | null;
   onQuickResend: (b: Booking) => void;
-  onSendRescheduleLink: (b: Booking) => void;
   selected: Set<string>;
   highlightedBookingId: string | null;
   onToggleSelect: (id: string) => void;
@@ -2374,21 +2375,8 @@ function SlotRows({
           const isResending = resendingInvoiceId === b.id;
           const isGeneratingLink = paymentLinkBookingId === b.id;
           const actionsOpen = openActions === b.id;
-          const bookingActions: BookingRowAction[] = [
-            { label: "View", mobileLabel: "View booking", description: "Open the complete booking record.", run: () => onView(b), tone: "blue" },
-            { label: "Edit", mobileLabel: "Edit booking", description: "Correct guest and reservation details.", run: () => onEdit(b), disabled: isLoading },
-            { label: "WhatsApp", description: "Start a message in the guest conversation.", run: () => onWhatsApp(b), disabled: !b.phone, tone: "green" },
-            { label: "WhatsApp on device", description: "Open this number in WhatsApp.", run: () => { void openDeviceWhatsApp(b.phone); }, disabled: !contactPhoneNumber(b.phone), title: !contactPhoneNumber(b.phone) ? "Add a valid phone number first." : undefined, tone: "green" },
-            { label: "Rebook", description: "Move this party to another available departure.", run: () => onRebook(b), disabled: isLoading },
-            { label: "Mark Paid", description: "Record money received outside online checkout.", run: () => onMarkPaid(b), disabled: isLoading || isPaid(b), tone: "green" },
-            { label: isGeneratingLink ? "Generating…" : "Payment Link", demoAction: "booking.payment", description: "Send a link for the balance due.", run: () => onSendPaymentLink(b), disabled: isGeneratingLink || isPaid(b) || b.status === "CANCELLED", tone: "blue" },
-            { label: "Payment Reminder", description: "Resend the booking’s existing checkout link.", run: () => onPaymentReminder(b), disabled: isLoading || isPaid(b) || b.status === "CANCELLED" || !b.payment_url, title: !b.payment_url ? "Send a payment link first." : undefined, tone: "amber" },
-            { label: b.allow_unpaid ? "Require Payment" : "Allow Without Payment", description: b.allow_unpaid ? "Restore reminders and the payment deadline." : "Keep places for pay on arrival.", run: () => onToggleAllowUnpaid(b), disabled: isLoading || isPaid(b) || b.status === "CANCELLED" },
-            ...(b.pending_reschedule ? [{ label: "Reschedule Payment Link", demoAction: "booking.reschedule-link", description: "Request the reschedule balance.", run: () => onSendRescheduleLink(b), disabled: quickResendingId === b.id, tone: "blue" as const }] : []),
-            { label: "Refund", demoAction: "booking.refund", description: "Review the eligible refund before submitting it.", run: () => onRefund(b), disabled: isLoading || paid <= 0 || b.status === "CANCELLED", title: paid <= 0 ? "Nothing to refund: no payment received." : undefined, tone: "amber" },
-            { label: isResending ? "Resending…" : "Resend Invoice", demoAction: "booking.invoice", description: "Send the latest booking invoice again.", run: () => onResendInvoice(b.id), disabled: isResending || !["PAID", "CONFIRMED", "COMPLETED"].includes(b.status), title: !["PAID", "CONFIRMED", "COMPLETED"].includes(b.status) ? "Confirm the booking before resending its invoice." : undefined, tone: "blue" },
-            { label: "Cancel", description: "Cancel this booking and release places.", run: () => onCancel(b), disabled: isLoading || b.status === "CANCELLED", tone: "red" },
-          ];
+          const bookingActions: BookingRowAction[] = guestActions(b, { action: isLoading, link: isGeneratingLink, invoice: isResending, reschedule: quickResendingId === b.id })
+            .map(action => ({ ...action, run: () => onAction(action.key, b) }));
           return (
             <Fragment key={b.id}>
             <tr data-booking-id={b.id} tabIndex={-1} className={"border-t border-gray-100 text-gray-600 lg:hidden " + (selected.has(b.id) || highlightedBookingId === b.id ? "bg-[var(--ck-ocean-soft)]" : "bg-[var(--ck-surface-sunken)]")}>
@@ -2490,7 +2478,7 @@ function SlotRows({
                           type="button"
                           title="Resend the reschedule payment link by email and WhatsApp"
                           disabled={quickResendingId === b.id}
-                          onClick={(e) => { e.stopPropagation(); onSendRescheduleLink(b); }}
+                          onClick={(e) => { e.stopPropagation(); onAction("reschedule-link", b); }}
                           className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition-colors"
                         >
                           {quickResendingId === b.id && <SpinnerGap className="h-3 w-3 animate-spin" />}

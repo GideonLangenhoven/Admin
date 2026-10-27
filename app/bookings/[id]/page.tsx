@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { resolveWaiverLink } from "@/supabase/functions/_shared/waiver";
 import ArrivalApproval from "@/components/booking/ArrivalApproval";
 import CopyEmailButton from "@/components/booking/CopyEmailButton";
-import { safeSimpleReturn } from "@/app/lib/simple-view";
+import { businessDateKey, safeSimpleReturn } from "@/app/lib/simple-view";
 import { amountOutstanding, amountReceived } from "@/app/lib/report-accounting";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
@@ -13,6 +13,8 @@ import { useBusinessContext } from "../../../components/BusinessContext";
 import { notify } from "../../lib/app-notify";
 import { functionError } from "../../lib/function-error";
 import MarkPaidDialog from "../../../components/booking/MarkPaidDialog";
+import { guestActions, type GuestActionKey } from "../../lib/booking-action-registry";
+import { bookingDemoAction } from "../../lib/demo-guide";
 import { bookingCustomFieldEntries } from "../../../supabase/functions/_shared/booking-custom-fields";
 
 /* ── helpers ── */
@@ -64,6 +66,9 @@ interface BookingDetail {
   unit_price: number;
   total_amount: number;
   original_total: number | null;
+  total_captured?: number | null;
+  payment_url?: string | null;
+  allow_unpaid?: boolean | null;
   status: string;
   source: string;
   discount_type: string | null;
@@ -303,7 +308,7 @@ export default function BookingDetailPage() {
   const params = useParams();
   const router = useRouter();
   const bookingId = params.id as string;
-  const { businessId, readOnly } = useBusinessContext();
+  const { businessId, readOnly, timezone } = useBusinessContext();
 
   const [returnTo, setReturnTo] = useState("/bookings");
   useEffect(() => {
@@ -330,6 +335,7 @@ export default function BookingDetailPage() {
   const [codeResult, setCodeResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [resendingPayment, setResendingPayment] = useState(false);
   const [markPaidOpen, setMarkPaidOpen] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [reduceGuestsOpen, setReduceGuestsOpen] = useState(false);
   const [reduceGuestsTarget, setReduceGuestsTarget] = useState(1);
@@ -451,6 +457,19 @@ export default function BookingDetailPage() {
   const isCancelled = booking.status === "CANCELLED";
   const hasRefund = booking.refund_status && booking.refund_status !== "NONE";
   const deadlineExpired = booking.payment_deadline ? new Date(booking.payment_deadline) < new Date() : false;
+  const listDate = booking.slots?.start_time ? businessDateKey(timezone, new Date(booking.slots.start_time)) : null;
+
+  // Mark Paid and Payment Link run here; any other Guest action opens on the
+  // bookings list, focused on this booking, so each flow exists only once.
+  function runAction(key: GuestActionKey) {
+    if (!booking) return;
+    setActionsOpen(false);
+    if (key === "mark-paid") return setMarkPaidOpen(true);
+    if (key === "payment-link") return void resendPaymentLink();
+    if (!listDate) return;
+    const list = returnTo.startsWith("/simple") ? "/simple/bookings" : "/bookings";
+    router.push(list + "?" + new URLSearchParams({ date: listDate, booking: booking.id, action: key }));
+  }
 
   async function saveCustomerDetails() {
     if (!booking) return;
@@ -734,24 +753,34 @@ export default function BookingDetailPage() {
           <Badge className={STATUS_COLORS[booking.status] || "ui-pill-neutral"}>{booking.status}</Badge>
           <Badge className="ui-pill-neutral">{SOURCE_LABELS[booking.source] || booking.source}</Badge>
         </div>
-        {isPending && Number(booking.total_amount) > 0 && (
-          <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-2 flex-wrap">
-            <button data-demo-action="booking.paid"
-              onClick={() => setMarkPaidOpen(true)}
-              className="ui-btn ui-btn-soft !h-8 !px-3 !text-xs"
-            >
-              Mark as Paid
-            </button>
-            <button data-demo-action="booking.payment"
-              onClick={resendPaymentLink}
-              disabled={resendingPayment}
-              className="ui-btn ui-btn-primary !h-8 !px-3 !text-xs disabled:opacity-50"
-            >
-              {resendingPayment ? "Sending..." : "Resend Payment Link"}
-            </button>
-          </div>
-        )}
+        <div className="w-full sm:w-auto sm:ml-auto">
+          <button type="button" onClick={() => setActionsOpen(open => !open)} aria-expanded={actionsOpen} aria-controls="guest-actions"
+            className="ui-btn ui-btn-soft !h-8 !px-3 !text-xs"
+          >
+            Guest actions
+          </button>
+        </div>
       </div>
+
+      {/* The same Guest actions as the bookings list, from the shared registry.
+          Mark Paid and Payment Link run here; the others open on the list. */}
+      {actionsOpen && (
+        <div id="guest-actions" role="group" aria-label="Guest actions" className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {guestActions(booking, { link: resendingPayment }).filter(action => action.key !== "view").map(action => {
+            const noDate = !listDate && action.key !== "mark-paid" && action.key !== "payment-link";
+            return (
+              <button key={action.key} type="button" data-demo-action={action.demoAction || bookingDemoAction(action.label)}
+                onClick={() => runAction(action.key)} disabled={action.disabled || noDate}
+                title={noDate ? "This booking has no departure date, so it cannot be opened on the bookings list." : action.title}
+                className="ui-card flex min-h-12 flex-col items-start px-3 py-2 text-left text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span>{action.label}</span>
+                <span className="mt-0.5 text-xs font-normal leading-snug" style={{ color: "var(--ck-text-muted)" }}>{action.description}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Mark Paid: cash, EFT or card-machine payments, including deposits. */}
       {markPaidOpen && (

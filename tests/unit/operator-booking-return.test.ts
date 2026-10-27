@@ -134,8 +134,9 @@ describe("showing a newly created booking in the list", () => {
 });
 
 describe("payment amounts in the destination Bookings list", () => {
-  const isPaid = sourceFunction("app/bookings/page.tsx", "isPaid", { amountReceived });
-  const paidAmount = sourceFunction("app/bookings/page.tsx", "bookingPaidAmount", { amountReceived });
+  // The list's payment rules live in the shared Guest action registry (M3).
+  const isPaid = sourceFunction("app/lib/booking-action-registry.ts", "isPaid", { amountReceived });
+  const paidAmount = sourceFunction("app/lib/booking-action-registry.ts", "bookingPaidAmount", { amountReceived });
 
   it("keeps a confirmed unpaid booking due and its payment actions available", () => {
     const booking = { status: "CONFIRMED", total_amount: 750, total_captured: 0 };
