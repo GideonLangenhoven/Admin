@@ -13,6 +13,7 @@ import { useBusinessContext } from "../../../components/BusinessContext";
 import { notify } from "../../lib/app-notify";
 import { functionError } from "../../lib/function-error";
 import MarkPaidDialog from "../../../components/booking/MarkPaidDialog";
+import PaymentExpiryBadge from "../../../components/booking/PaymentExpiryBadge";
 import { guestActions, type GuestActionKey } from "../../lib/booking-action-registry";
 import { bookingDemoAction } from "../../lib/demo-guide";
 import { bookingCustomFieldEntries } from "../../../supabase/functions/_shared/booking-custom-fields";
@@ -41,16 +42,6 @@ function manualPaymentDetail(p: Record<string, unknown>) {
     p.payment_reference ? "ref " + String(p.payment_reference) : null,
     balance > 0 ? fmtCurrency(balance) + " still due" : null,
   ].filter(Boolean).join(" · ") || "Payment recorded manually by admin";
-}
-function timeAgo(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
 }
 
 /* ── types ── */
@@ -456,7 +447,6 @@ export default function BookingDetailPage() {
   const isPending = ["PENDING", "PENDING PAYMENT", "HELD"].includes(booking.status);
   const isCancelled = booking.status === "CANCELLED";
   const hasRefund = booking.refund_status && booking.refund_status !== "NONE";
-  const deadlineExpired = booking.payment_deadline ? new Date(booking.payment_deadline) < new Date() : false;
   const listDate = booking.slots?.start_time ? businessDateKey(timezone, new Date(booking.slots.start_time)) : null;
 
   // Mark Paid and Payment Link run here; any other Guest action opens on the
@@ -1218,13 +1208,7 @@ export default function BookingDetailPage() {
               label="Status"
               value={
                 isPending ? (
-                  deadlineExpired ? (
-                    <Badge className="ui-pill-danger">Expired</Badge>
-                  ) : (
-                    <Badge className="ui-pill-warning">
-                      Expires {timeAgo(booking.payment_deadline).replace(" ago", "")} remaining
-                    </Badge>
-                  )
+                  <PaymentExpiryBadge deadline={booking.payment_deadline} />
                 ) : (
                   <Badge className="ui-pill-success">Resolved</Badge>
                 )

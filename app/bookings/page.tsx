@@ -22,6 +22,7 @@ import { MonthPicker } from "../../components/MonthPicker";
 import BookingsMonthCalendar from "../../components/BookingsMonthCalendar";
 import CopyEmailButton from "../../components/booking/CopyEmailButton";
 import MarkPaidDialog from "../../components/booking/MarkPaidDialog";
+import PaymentExpiryBadge from "../../components/booking/PaymentExpiryBadge";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { fetchAllRows } from "../../supabase/functions/_shared/pagination";
 
@@ -2491,7 +2492,7 @@ function SlotRows({
                     {b.tours?.name || "—"} · {b.phone || "No mobile"}
                   </span>
                   {b.payment_deadline && !isPaid(b) && b.status !== "CANCELLED" && (
-                    <PaymentExpiryBadge deadline={b.payment_deadline} />
+                    <PaymentExpiryBadge deadline={b.payment_deadline} className="lg:ml-0 ml-[10px]" />
                   )}
                 </div>
               </td>
@@ -2692,44 +2693,5 @@ function ActionMenuItem({
     >
       {label}
     </button>
-  );
-}
-
-function PaymentExpiryBadge({ deadline }: { deadline: string }) {
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const iv = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(iv);
-  }, []);
-
-  const deadlineMs = new Date(deadline).getTime();
-  const diffMs = deadlineMs - now;
-
-  if (diffMs <= 0) {
-    return (
-      <span className="ui-status ui-pill-danger lg:ml-0 ml-[10px]">
-        Expired
-      </span>
-    );
-  }
-
-  const totalMin = Math.floor(diffMs / 60_000);
-  const hours = Math.floor(totalMin / 60);
-  const mins = totalMin % 60;
-  const label = hours > 0 ? `Expires in ${hours}h ${mins}m` : `Expires in ${mins}m`;
-
-  // Red if within 2 hours, amber if within 6 hours, otherwise gray
-  const urgency =
-    diffMs <= 2 * 60 * 60_000
-      ? "ui-pill-danger"
-      : diffMs <= 6 * 60 * 60_000
-        ? "ui-pill-warning"
-        : "ui-pill-neutral";
-
-  return (
-    <span className={`ui-status ${urgency} lg:ml-0 ml-[10px]`}>
-      {label}
-    </span>
   );
 }
