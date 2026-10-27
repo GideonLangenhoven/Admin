@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import { notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { processRefundAction, type ActionResult, type RefundOutcome } from "../lib/booking-actions";
+import { functionError } from "../lib/function-error";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { CaretDown, CaretRight } from "@phosphor-icons/react";
 
@@ -23,6 +24,7 @@ function fmtTime(iso: string) {
 export default function Refunds() {
   const { businessId } = useBusinessContext();
   const [refunds, setRefunds] = useState<any[]>([]);
+  const [awaiting, setAwaiting] = useState<any[]>([]);
   const [processed, setProcessed] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
@@ -46,12 +48,12 @@ export default function Refunds() {
     const requestId = ++loadRequestRef.current;
     try {
       const { data: pending, error: pendingError } = await supabase.from("bookings")
-        .select("id, customer_name, phone, email, qty, total_amount, total_captured, total_refunded, payment_method, refund_status, refund_amount, refund_notes, cancellation_reason, cancelled_at, yoco_checkout_id, slots(start_time), tours(name)")
+        .select("id, customer_name, phone, email, qty, total_amount, total_captured, total_refunded, payment_method, refund_status, refund_amount, refund_notes, cancellation_reason, cancellation_self_service, cancelled_at, yoco_checkout_id, slots(start_time), tours(name)")
         .eq("business_id", expectedBusinessId)
-        // ACTION_REQUIRED deliberately excluded: those bookings are waiting for
-        // the CUSTOMER to choose refund / voucher / reschedule on My Bookings.
-        // Money only enters this queue once they pick "refund" (→ REQUESTED).
-        .in("refund_status", ["REQUESTED", "REFUND_PENDING", "MANUAL_EFT_REQUIRED", "FAILED"])
+        // ACTION_REQUIRED: a weather/operator cancellation parked the money until
+        // the guest (or, if they were told so, the operator) picks refund,
+        // voucher or new date. Shown apart from the queue, never in Submit all.
+        .in("refund_status", ["REQUESTED", "REFUND_PENDING", "MANUAL_EFT_REQUIRED", "FAILED", "ACTION_REQUIRED"])
         .order("cancelled_at", { ascending: false });
       if (pendingError) throw pendingError;
       if (!mountedRef.current || businessIdRef.current !== expectedBusinessId || requestId !== loadRequestRef.current) return;
@@ -66,7 +68,8 @@ export default function Refunds() {
         .limit(20);
       if (doneError) throw doneError;
       if (!mountedRef.current || businessIdRef.current !== expectedBusinessId || requestId !== loadRequestRef.current) return;
-      setRefunds(pending || []);
+      setRefunds((pending || []).filter(b => b.refund_status !== "ACTION_REQUIRED"));
+      setAwaiting((pending || []).filter(b => b.refund_status === "ACTION_REQUIRED"));
       setProcessed(done || []);
     } catch (error: any) {
       if (mountedRef.current && businessIdRef.current === expectedBusinessId && requestId === loadRequestRef.current) {
@@ -94,6 +97,7 @@ export default function Refunds() {
     }
     setProcessing(null);
     setRefunds([]);
+    setAwaiting([]);
     setProcessed([]);
     setResults({});
     setEditedAmounts({});
@@ -275,6 +279,75 @@ export default function Refunds() {
     load();
   }
 
+  // Waiting bookings resolve through the same server path as the guest's own
+  // choice on My Bookings (rebook-booking CLAIM_CREDIT), which emails the guest.
+  async function executeClaim(id: string, creditAction: "REFUND" | "VOUCHER") {
+    if (refundRunRef.current) return;
+    const run = { businessId, cancelled: false };
+    refundRunRef.current = run;
+    const isCurrent = () => mountedRef.current && !run.cancelled && businessIdRef.current === run.businessId;
+    setProcessing(id);
+    try {
+      const res = await supabase.functions.invoke("rebook-booking", { body: { booking_id: id, action: "CLAIM_CREDIT", credit_action: creditAction } });
+      const problem = await functionError(res, "The booking could not be updated. Refresh and try again.");
+      if (!isCurrent()) return;
+      if (problem) {
+        notify({ title: creditAction === "REFUND" ? "Refund not started" : "Voucher not issued", message: problem, tone: "error" });
+        return;
+      }
+      const out = (res.data || {}) as { refund_status?: string | null; refund_amount?: number; voucher_code?: string; voucher_amount?: number };
+      if (out.voucher_code) notify({ title: "Voucher issued", message: `Voucher ${out.voucher_code} (R${Number(out.voucher_amount || 0).toFixed(2)}) was emailed to the guest.`, tone: "success" });
+      if (out.refund_status === "MANUAL_EFT_REQUIRED") {
+        notify({ title: "Bank transfer needed", message: "The guest paid in cash or by EFT. Pay them by bank transfer, then confirm it in the queue.", tone: "warning" });
+      } else if (out.refund_status === "REQUESTED" && Number(out.refund_amount) > 0) {
+        const result = await processRefundAction({ bookingId: id, amount: Number(out.refund_amount), canSubmit: isCurrent });
+        if (!isCurrent()) return;
+        setResults(prev => ({ ...prev, [id]: result as RefundUiResult }));
+        notify(result.outcome === "completed" ? { title: "Refund processed", message: "The guest has been emailed.", tone: "success" }
+          : result.outcome === "failed" ? { title: "Refund failed", message: result.error || result.message || "See the queue below.", tone: "error" }
+          : { title: "Refund pending", message: result.message || "It is in the queue below.", tone: "warning" });
+      }
+    } catch {
+      if (isCurrent()) notify({ title: "Status unknown", message: "Refresh the page before trying again.", tone: "error" });
+    } finally {
+      const current = isCurrent();
+      if (refundRunRef.current === run) refundRunRef.current = null;
+      if (current) {
+        setProcessing(null);
+        await load(run.businessId);
+      }
+    }
+  }
+
+  function claimCredit(id: string, creditAction: "REFUND" | "VOUCHER") {
+    const amount = "R" + Number(awaiting.find(b => b.id === id)?.refund_amount || 0).toFixed(2);
+    setConfirmState(creditAction === "REFUND" ? {
+      title: `Refund ${amount}?`,
+      message: "The guest is emailed. Card payments go back to the card; cash or EFT payments need a bank transfer from you. Any part paid by voucher comes back as a new voucher.",
+      confirmLabel: "Refund now",
+      tone: "danger",
+      onConfirm: async () => { setConfirmState(null); await executeClaim(id, "REFUND"); },
+    } : {
+      title: `Issue a ${amount} voucher?`,
+      message: "The guest is emailed the voucher code instead of a refund.",
+      confirmLabel: "Issue voucher",
+      tone: "default",
+      onConfirm: async () => { setConfirmState(null); await executeClaim(id, "VOUCHER"); },
+    });
+  }
+
+  async function resendOptions(id: string) {
+    setProcessing(id);
+    try {
+      const res = await supabase.functions.invoke("auto-messages", { body: { action: "refund_choice_reminder_one", booking_id: id } });
+      const problem = await functionError(res, "The email could not be sent. Please try again.");
+      notify(problem ? { title: "Options not sent", message: problem, tone: "error" }
+        : { title: "Options resent", message: "The guest has been emailed their refund, voucher and new date options.", tone: "success" });
+    } finally {
+      setProcessing(null);
+    }
+  }
+
   function declineRefund(id: string) {
     setConfirmState({
       title: "Decline this refund?",
@@ -304,13 +377,56 @@ export default function Refunds() {
   if (loading) return <div className="space-y-4 py-2"><div className="ui-skeleton h-8 w-36" /><div className="ui-skeleton h-[320px] !rounded-xl" /></div>;
 
   const totalRefund = refunds.reduce((sum, b) => sum + Number(b.refund_amount || 0), 0);
+  const totalAwaiting = awaiting.reduce((sum, b) => sum + Number(b.refund_amount || 0), 0);
   const money = (amount: number) => `R${amount.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="max-w-5xl space-y-5">
       <h2 className="text-2xl font-semibold" style={{ color: "var(--ck-text-strong)" }}>Refunds</h2>
 
-      {refunds.length === 0 ? (
+      {awaiting.length > 0 && (
+        <section aria-label="Waiting for a decision" className="overflow-hidden rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" }}>
+          <div className="border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
+            <p className="text-sm" style={{ color: "var(--ck-text)" }}>
+              <span className="font-semibold" style={{ color: "var(--ck-text-strong)" }}>{awaiting.length} waiting for a decision</span>
+              <span className="ml-3 tabular-nums">{money(totalAwaiting)} held</span>
+            </p>
+          </div>
+          <div className="divide-y divide-[var(--ck-border-subtle)]">
+            {awaiting.map((b: any) => {
+              const days = b.cancelled_at ? Math.max(0, Math.floor((Date.now() - new Date(b.cancelled_at).getTime()) / 86_400_000)) : 0;
+              const guestChooses = b.cancellation_self_service !== false;
+              return (
+                <article key={b.id} data-awaiting-id={b.id} className="p-4 sm:p-5">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 md:grid-cols-[minmax(0,1fr)_10rem_11rem] md:items-start md:gap-x-6">
+                    <div className="min-w-0">
+                      <h3 className="break-words text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "Guest"}</h3>
+                      <p className="mt-1 text-sm" style={{ color: "var(--ck-text)" }}>{b.tours?.name || "Booking"}</p>
+                      <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.slots?.start_time ? fmtTime(b.slots.start_time) : "No departure date"} · {b.qty} {b.qty === 1 ? "guest" : "guests"}</p>
+                      <p className="mt-2 text-xs" style={{ color: "var(--ck-text-muted)" }}>Booking {b.id.substring(0, 8).toUpperCase()}</p>
+                      <p className="mt-2 text-xs font-medium" style={{ color: "var(--ck-text)" }}>{guestChooses
+                        ? "Waiting for the guest to choose: refund, voucher or new date."
+                        : "The guest was told you will be in touch. Choose a refund or voucher for them."}</p>
+                      <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>Cancelled {days === 0 ? "today" : days === 1 ? "1 day ago" : `${days} days ago`}.{guestChooses ? " Guests get one automatic reminder after 3 days." : ""}</p>
+                    </div>
+                    <div className="w-32 text-right md:w-auto">
+                      <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Owed</p>
+                      <p className="mt-1 text-base font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{money(Number(b.refund_amount || 0))}</p>
+                    </div>
+                    <div className="col-span-2 flex flex-wrap items-center gap-2 border-t pt-3 md:col-span-1 md:flex-col md:items-stretch md:border-0 md:pt-0" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                      <button data-demo-action="refund.claim" onClick={() => claimCredit(b.id, "REFUND")} disabled={!!processing} className="ui-btn ui-btn-primary min-h-11 flex-1 whitespace-nowrap disabled:opacity-40">{processing === b.id ? "Working…" : "Refund now"}</button>
+                      <button data-demo-action="refund.voucher" onClick={() => claimCredit(b.id, "VOUCHER")} disabled={!!processing} className="ui-btn ui-btn-ghost min-h-11 whitespace-nowrap disabled:opacity-40">Issue voucher</button>
+                      {guestChooses && <button data-demo-action="refund.resend-options" onClick={() => void resendOptions(b.id)} disabled={!!processing || !b.email} title={b.email ? undefined : "No email on file"} className="ui-btn ui-btn-ghost min-h-11 whitespace-nowrap disabled:opacity-40">Resend options</button>}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {refunds.length === 0 ? (awaiting.length === 0 &&
         <div className="rounded-xl border px-4 py-8 text-sm" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-muted)" }}>No refunds waiting.</div>
       ) : (
         <section aria-label="Refund queue" className="overflow-hidden rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" }}>

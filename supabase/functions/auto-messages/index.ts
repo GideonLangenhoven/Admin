@@ -711,6 +711,53 @@ async function sendOnePaymentReminder(bookingId: string, businessId: string | nu
   return { ok: true };
 }
 
+// H7: a weather or operator cancellation parks the paid amount until the guest
+// picks a refund, voucher or new date on My Bookings. Resend the options email
+// the cancellation sent: by the operator from Refunds, and once automatically
+// after REFUND_CHOICE_REMINDER_DAYS.
+const REFUND_CHOICE_REMINDER_DAYS = 3;
+const REFUND_CHOICE_FIELDS = "id, business_id, status, refund_status, refund_amount, converted_to_voucher_id, cancellation_self_service, cancellation_reason, customer_name, email, phone, tours(name), slots(start_time)";
+
+async function sendRefundChoiceReminder(bk: any, source: "operator" | "automatic"): Promise<{ ok: boolean; error?: string }> {
+  if (bk.status !== "CANCELLED" || bk.refund_status !== "ACTION_REQUIRED" || !(Number(bk.refund_amount) > 0) || bk.converted_to_voucher_id) {
+    return { ok: false, error: "This booking is no longer waiting for the guest to choose." };
+  }
+  if (bk.cancellation_self_service === false) return { ok: false, error: "The guest was told you will handle this one, so there are no options to resend." };
+  if (!bk.email) return { ok: false, error: "No email on file for this guest." };
+  const tenant = await getTenantContext(db, bk.business_id);
+  // weather-cancel stores "Weather cancellation: <reason>" or "Cancelled by operator: <reason>".
+  const reason = String(bk.cancellation_reason || "");
+  const res = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_SERVICE_ROLE_KEY },
+    body: JSON.stringify({ type: "CANCELLATION", data: {
+      business_id: bk.business_id, email: bk.email, customer_name: bk.customer_name || "Guest",
+      ref: String(bk.id).substring(0, 8).toUpperCase(), tour_name: bk.tours?.name || "Tour",
+      start_time: bk.slots?.start_time ? formatTenantDateTime(tenant.business, bk.slots.start_time, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "",
+      reason: reason.replace(/^(weather cancellation|cancelled by operator):\s*/i, ""),
+      total_amount: Number(bk.refund_amount), is_weather: /^weather cancellation/i.test(reason), offer_choice: true,
+    } }),
+  }).catch((e) => { console.error("REFUND_CHOICE_REMINDER_ERR", bk.id, e); return null; });
+  if (!res?.ok) return { ok: false, error: "The email could not be sent. Please try again." };
+  await db.from("logs").insert({ business_id: bk.business_id, booking_id: bk.id, event: "refund_choice_reminder_sent", payload: { source } });
+  return { ok: true };
+}
+
+async function sendRefundChoiceRemindersForBusiness(businessId: string): Promise<number> {
+  const due = new Date(Date.now() - REFUND_CHOICE_REMINDER_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const bookings = await fetchAllRows<any>((from, to) => db.from("bookings").select(REFUND_CHOICE_FIELDS)
+    .eq("business_id", businessId).eq("status", "CANCELLED").eq("refund_status", "ACTION_REQUIRED")
+    .eq("cancellation_self_service", true).is("converted_to_voucher_id", null).not("email", "is", null)
+    .lt("cancelled_at", due).order("id").range(from, to));
+  let sent = 0;
+  for (const bk of bookings) {
+    // Claimed before sending: one automatic reminder per booking, even if the send fails.
+    if (!(await logSent(businessId, bk.id, bk.phone || "", "REFUND_CHOICE_REMINDER"))) continue;
+    if ((await sendRefundChoiceReminder(bk, "automatic")).ok) sent++;
+  }
+  return sent;
+}
+
 // Only the stored booking address/link may be used for operator recovery emails.
 async function sendPaymentRecoveryEmail(bookingId: string, requestedBusinessId: string, auth: Awaited<ReturnType<typeof requireAuth>>) {
   if (!canAccessBusiness(auth, requestedBusinessId)) return { ok: false, error: "Booking not accessible" };
@@ -771,6 +818,17 @@ Deno.serve(withSentry("auto-messages", async (req) => {
       return new Response(JSON.stringify(r), { status: r.ok ? 200 : 400, headers: getHeaders(req.headers.get("origin")) });
     }
 
+    // Refunds page "Resend options" for one booking waiting on the guest's choice.
+    if (action === "refund_choice_reminder_one") {
+      const bookingId = String(body.booking_id || "");
+      if (!bookingId) return new Response(JSON.stringify({ ok: false, error: "booking_id required" }), { status: 400, headers: getHeaders(req.headers.get("origin")) });
+      let query = db.from("bookings").select(REFUND_CHOICE_FIELDS).eq("id", bookingId);
+      if (businessId) query = query.eq("business_id", businessId);
+      const { data: bk } = await query.maybeSingle();
+      const r = bk ? await sendRefundChoiceReminder(bk, "operator") : { ok: false, error: "Booking not found" };
+      return new Response(JSON.stringify(r), { status: r.ok ? 200 : 400, headers: getHeaders(req.headers.get("origin")) });
+    }
+
     const businesses = await getBusinesses(businessId);
     const results: Record<string, number> = {
       first_booking_whatsapp: 0,
@@ -782,6 +840,7 @@ Deno.serve(withSentry("auto-messages", async (req) => {
       auto_expire: 0,
       human_timeout: 0,
       payment_reminders: 0,
+      refund_choice_reminders: 0,
     };
 
     await mapWithConcurrency(businesses, 8, async (biz) => {
@@ -799,6 +858,11 @@ Deno.serve(withSentry("auto-messages", async (req) => {
         if (action === "all" || action === "auto_expire") results.auto_expire += await autoExpireBookingsForBusiness(businessId);
         if (action === "all" || action === "human_timeout") results.human_timeout += await autoTimeoutHumanChatsForBusiness(businessId);
         if (action === "all" || action === "payment_reminders") results.payment_reminders += await sendPaymentRemindersForBusiness(businessId);
+        if (action === "all" || action === "refund_choice_reminders") {
+          // Await first: `x += await` reads x before the await and loses concurrent tenants' counts.
+          const reminded = await sendRefundChoiceRemindersForBusiness(businessId);
+          results.refund_choice_reminders += reminded;
+        }
       } catch (err) {
         // Per-tenant failure must not abort the whole sweep.
         console.error("AUTO_MESSAGES_TENANT_ERR", businessId, err instanceof Error ? err.message : String(err));

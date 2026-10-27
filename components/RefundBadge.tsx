@@ -43,14 +43,14 @@ export default function RefundBadge() {
 
     async function fetchCount() {
         if (!businessId) return;
-        // ACTION_REQUIRED excluded: those await the CUSTOMER's choice
-        // (refund/voucher/reschedule) and are not operator work yet —
-        // mirrors the refunds-page queue filter.
+        // Every refund that isn't final, including ACTION_REQUIRED (money parked
+        // by a weather/operator cancellation until someone chooses) — mirrors
+        // the Refunds page and the dashboard count.
         const { count } = await supabase
             .from("bookings")
             .select("*", { count: "exact", head: true })
             .eq("business_id", businessId)
-            .in("refund_status", ["REQUESTED", "REFUND_PENDING", "MANUAL_EFT_REQUIRED", "FAILED"]);
+            .in("refund_status", ["REQUESTED", "REFUND_PENDING", "MANUAL_EFT_REQUIRED", "FAILED", "ACTION_REQUIRED"]);
 
         setCount(count || 0);
     }
