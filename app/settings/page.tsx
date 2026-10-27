@@ -244,6 +244,8 @@ export default function SettingsPage() {
         Object.entries(colors).every(([key, value]) => siteSettings[key as keyof typeof colors].toLowerCase() === value.toLowerCase())
     )?.[0] || "";
     const [subdomain, setSubdomain] = useState<string | null>(null);
+    // The tenant's booking site, for deep links to a single tour.
+    const bookingSiteBase = (siteSettings.booking_site_url || (subdomain ? "https://" + subdomain + ".booking.bookingtours.co.za" : "")).replace(/\/+$/, "");
     // Custom booking questions — edited as a plain form; serialised to the
     // businesses.booking_custom_fields JSON array on save (same structure the
     // admin new-booking form and the chat bots already consume).
@@ -821,13 +823,32 @@ export default function SettingsPage() {
     }
 
     async function handleToggleTour(t: Tour) {
-        await supabase.from("tours").update({ active: !t.active }).eq("id", t.id);
+        if (t.active && !await confirmAction({
+            title: "Deactivate tour",
+            message: "Deactivate \"" + t.name + "\"? Guests can't book it until you activate it again.",
+            tone: "warning",
+            confirmLabel: "Deactivate",
+        })) return;
+        const { error } = await supabase.from("tours").update({ active: !t.active }).eq("id", t.id).eq("business_id", businessId);
+        if (error) tourUpdateFailed(error);
         fetchTours();
     }
 
     async function handleToggleHidden(t: Tour) {
-        await supabase.from("tours").update({ hidden: !t.hidden }).eq("id", t.id);
+        if (!t.hidden && !await confirmAction({
+            title: "Hide tour",
+            message: "Hide \"" + t.name + "\" from your booking site? It stays bookable through a direct link.",
+            tone: "warning",
+            confirmLabel: "Hide",
+        })) return;
+        const { error } = await supabase.from("tours").update({ hidden: !t.hidden }).eq("id", t.id).eq("business_id", businessId);
+        if (error) tourUpdateFailed(error);
         fetchTours();
+    }
+
+    function tourUpdateFailed(error: unknown) {
+        console.error("[settings] tour update failed", error);
+        notify({ title: "Tour not updated", message: "The tour could not be updated. Please try again.", tone: "error" });
     }
 
     async function handleDrop(targetIdx: number) {
@@ -1904,9 +1925,9 @@ export default function SettingsPage() {
                                             </button>
                                             <button data-demo-action="tour.delete" onClick={(e) => { e.stopPropagation(); handleDeleteTour(t.id, t.name); }}
                                                 className="text-xs font-medium text-[var(--ck-danger)] hover:underline">Delete</button>
-                                            <a href={siteSettings.booking_site_url || DEFAULT_BOOKING_URL} target="_blank" rel="noopener noreferrer"
+                                            {bookingSiteBase && <a href={bookingSiteBase + "/book?tour=" + t.id} target="_blank" rel="noopener noreferrer"
                                                 onClick={(e) => e.stopPropagation()}
-                                                className="text-xs font-medium text-[var(--ck-accent)] hover:underline ml-auto">Book Page &rarr;</a>
+                                                className="text-xs font-medium text-[var(--ck-accent)] hover:underline ml-auto">Book Page &rarr;</a>}
                                         </div>
                                     </div>
                                 ))}
