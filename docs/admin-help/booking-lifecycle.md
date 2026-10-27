@@ -9,7 +9,7 @@ A quick reference for the booking lifecycle across the whole dashboard.
 ## Booking statuses
 
 - **Held / Pending** — seats reserved, payment not yet received. Online checkouts hold seats for about 15 minutes; manual bookings hold for the duration you set (default 7 days). Unpaid holds release automatically.
-- **Paid** — payment confirmed (card payment webhook, or marked paid manually for EFT/cash).
+- **Paid** — payment confirmed (card payment webhook, or recorded with Guest actions → Mark Paid for EFT or cash).
 - **Confirmed** — confirmed to run.
 - **Completed** — the trip happened.
 - **Cancelled** — cancelled by you or the customer; seats returned to the slot.

@@ -42,7 +42,7 @@ Optional extras customers can add at checkout (photo packages, equipment hire). 
 
 ## Booking Site Configuration
 
-Your customer-facing booking site's policies, directions, branding, background and hero text, navigation, button and footer copy, theme colours, contact links, timezone, chatbot avatar and cancellation policy tiers. The booking-site preview shows the effect of the settings, including theme text contrast. Custom checkout questions are maintained under Tours & Activities.
+Your customer-facing booking site's policies, directions, branding, background and hero text, navigation, button and footer copy, theme colours, contact links, timezone, chatbot avatar and cancellation policy tiers. Refund percentages are set in **Settings → Booking Site Configuration → Cancellation Policy**: each tier is the hours of notice before the trip and the percentage refunded, plus the policy summary guests and the chat assistants see. The booking-site preview shows the effect of the settings, including theme text contrast. Custom checkout questions are maintained under Tours & Activities.
 
 ## Embed Widget
 

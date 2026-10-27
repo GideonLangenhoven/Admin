@@ -32,6 +32,8 @@ export type TenantBusiness = {
   activity_verb_past?: string | null;
   location_phrase?: string | null;
   public_email?: string | null;
+  refund_policy_tiers?: unknown;
+  refund_policy_text?: string | null;
   public_phone?: string | null;
   public_whatsapp?: string | null;
 };
@@ -174,6 +176,8 @@ export async function getBusinessConfig(supabase: any, businessId: string): Prom
       "activity_verb_past",
       "location_phrase",
       "public_email",
+      "refund_policy_tiers",
+      "refund_policy_text",
       "public_phone",
       "public_whatsapp",
     ].join(","))

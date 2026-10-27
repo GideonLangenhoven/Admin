@@ -135,6 +135,8 @@ export type BlockBInput = {
   terminology?: unknown;          // businesses.terminology (object)
   faqJson?: unknown;              // businesses.faq_json (object)
   bookingUrl?: string | null;
+  refundPolicyTiers?: unknown;    // businesses.refund_policy_tiers
+  refundPolicyText?: string | null;
   tours: Array<{ name: string; price: number; durationMinutes: number; description?: string | null; meetingPoint?: string | null }>;
 };
 
@@ -188,6 +190,9 @@ export function buildBlockB(input: BlockBInput): string {
     }).join("\n"));
   }
 
+  const policy = cancellationPolicyPrompt({ refund_policy_tiers: input.refundPolicyTiers, refund_policy_text: input.refundPolicyText });
+  if (policy) parts.push("### " + policy);
+
   const faq = serializeFaq(input.faqJson);
   if (faq) parts.push("### FAQ\n" + faq);
 
@@ -195,6 +200,30 @@ export function buildBlockB(input: BlockBInput): string {
     (Deno.env.get("WA_REOPEN_TEMPLATE") || "hello_world") + ": generic re-engagement nudge, no parameters");
 
   return parts.join("\n\n");
+}
+
+// The tenant's refund tiers as calculate_refund_percent applies them (the
+// first tier, highest hours_before first, whose notice the cancellation
+// meets), plus the operator's summary. Weather cancellations by the
+// operator skip the tiers (p_weather in cancel_booking_transaction).
+export function cancellationPolicyPrompt(business: { refund_policy_tiers?: unknown; refund_policy_text?: string | null }): string {
+  const tiers = (Array.isArray(business.refund_policy_tiers) ? business.refund_policy_tiers : [])
+    .map((t) => ({ hours: Number(t?.hours_before), percent: Number(t?.refund_percent) }))
+    .filter((t) => Number.isFinite(t.hours) && Number.isFinite(t.percent))
+    .sort((a, b) => b.hours - a.hours);
+  const lines = tiers.map((t, i) =>
+    (i === 0 ? (t.hours > 0 ? t.hours + " hours or more" : "Any time") : t.hours > 0 ? t.hours + " to " + tiers[i - 1].hours + " hours" : "Less than " + tiers[i - 1].hours + " hours")
+    + " before the start: " + t.percent + "% refund");
+  const last = tiers[tiers.length - 1];
+  if (last && last.hours > 0) lines.push("Less than " + last.hours + " hours before the start: no refund");
+  const summary = String(business.refund_policy_text || "").trim();
+  if (lines.length === 0 && !summary) return "";
+  return [
+    "Cancellation policy (refund of the amount paid, by notice given before the trip starts):",
+    ...lines.map((line) => "• " + line),
+    summary ? "Operator's summary: " + summary : "",
+    "Weather: if we cancel a trip because of the weather, these tiers don't apply; guests who paid choose a new date, a voucher or a full refund.",
+  ].filter(Boolean).join("\n");
 }
 
 // Per-request runtime context. Empty sections are OMITTED, not rendered as

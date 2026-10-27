@@ -76,6 +76,7 @@ function fixture({ modelAvailable = true, modelReply = "Use the harbour meeting 
     },
     "../_shared/subscription.ts": { getSubscriptionState: async () => ({ trading: true }) },
     "../_shared/chat-booking-pricing.ts": pricing, "../_shared/platform-invariants.ts": {},
+    "../_shared/bot-prompt.ts": sourceExports("supabase/functions/_shared/bot-prompt.ts", { "./platform-invariants.ts": {}, "./duration.ts": duration }),
     "../_shared/chat-contact.ts": contact,
     "../_shared/booking-custom-fields.ts": questions,
     "../_shared/llm.ts": { llmAvailable: () => modelAvailable, llmText: async (options: any) => {

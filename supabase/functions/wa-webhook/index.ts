@@ -19,7 +19,7 @@ import { shouldBotReply } from "../_shared/bot-gate.ts";
 import { getSubscriptionState } from "../_shared/subscription.ts";
 import { llmText, withinAiQuota } from "../_shared/llm.ts";
 import { retrieveKb, retrieveKbContext } from "../_shared/kb.ts";
-import { assembleBotSystem, buildBlockB, buildBlockC } from "../_shared/bot-prompt.ts";
+import { assembleBotSystem, buildBlockB, buildBlockC, cancellationPolicyPrompt } from "../_shared/bot-prompt.ts";
 import { hashedUserKey } from "../_shared/openrouter-provider.ts";
 import { botReply, type BotOut, type BotUsage } from "../_shared/bot-llm.ts";
 import { calculateChatBookingPricing, verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
@@ -273,6 +273,7 @@ async function getFaqAnswer(tenant: TenantContext, key: string, query = "") {
   if (faqJson && typeof faqJson === "object" && !Array.isArray(faqJson) && typeof faqJson[key] === "string") {
     return faqJson[key];
   }
+  if (key === "cancellation" && String(tenant.business.refund_policy_text || "").trim()) return String(tenant.business.refund_policy_text).trim();
   if (key === "meeting_point") {
     const address = String(tenant.business.meeting_point_address || tenant.business.directions || "").trim();
     const arrival = String(tenant.business.arrival_instructions || "").trim();
@@ -294,6 +295,9 @@ function buildGeminiInstruction(tenant: TenantContext, extraContext?: string) {
 
   const terminologyText = serializeTerminology(tenant.business.terminology);
   if (terminologyText) sections.push("Terminology: " + terminologyText);
+
+  const policy = cancellationPolicyPrompt(tenant.business);
+  if (policy) sections.push(policy);
 
   const faqText = serializeFaqForPrompt(tenant.business.faq_json);
   if (faqText) sections.push("FAQ:\n" + faqText);
@@ -878,6 +882,8 @@ async function buildBotSystemForTurn(tenant: TenantContext, phone: string, userT
     aiPrompt: tenant.business.ai_system_prompt,
     terminology: tenant.business.terminology,
     faqJson: tenant.business.faq_json,
+    refundPolicyTiers: tenant.business.refund_policy_tiers,
+    refundPolicyText: tenant.business.refund_policy_text,
     bookingUrl: siteUrls.bookingSiteUrl || null,
     tours: (tours || []).map((t: any) => ({
       name: t.name,

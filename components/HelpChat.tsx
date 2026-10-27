@@ -92,7 +92,7 @@ function setField(el: HTMLElement, value: string): void {
 
 // Renders assistant text, turning internal markdown links [Label](/route)
 // into client-side <Link>s. Everything else is plain text — no HTML injection.
-function AnswerText({ text, onNavigate, readOnly }: { text: string; onNavigate: () => void; readOnly?: boolean }) {
+function AnswerText({ text, readOnly }: { text: string; readOnly?: boolean }) {
   const parts = text.split(LINK_SPLIT_RE);
   return (
     <span className="whitespace-pre-wrap">
@@ -106,7 +106,6 @@ function AnswerText({ text, onNavigate, readOnly }: { text: string; onNavigate: 
                 event.preventDefault();
                 window.location.hash = m[2].split("#")[1];
               }
-              onNavigate();
             }} className="font-semibold underline underline-offset-2" style={{ color: "var(--ck-accent)" }}>
               {m[1]}
             </Link>
@@ -197,19 +196,10 @@ export default function HelpChat({ inline = false }: { inline?: boolean }) {
   const isPrivileged = role === "MAIN_ADMIN" || role === "SUPER_ADMIN";
   const suggestions = readOnly ? DEMO_SUGGESTED : SUGGESTED.filter((s) => !s.privilegedOnly || isPrivileged);
 
-  // Following a link out of the assistant used to close it unconditionally,
-  // which reads as the bot quitting on you mid-conversation. It only needs to
-  // move on mobile, where the panel is a bottom sheet over 75dvh and would
-  // hide the page you just asked to see; on desktop it's a 380px corner card
-  // that obscures nothing. The thread itself always survives either way —
-  // HelpChat is mounted in the root layout, so client-side navigation never
-  // unmounts it.
-  function handleNavigate() {
-    if (typeof window !== "undefined" && !window.matchMedia("(min-width: 1024px)").matches) {
-      setOpen(false);
-    }
-  }
-
+  // Opening a page, by a directive or one of the answer's links, keeps the
+  // panel open at every width so the answer stays beside the page; only the
+  // X or Escape closes it (M12). HelpChat lives in the root layout, so
+  // client-side navigation never unmounts the thread.
   // Execute the reply's directives: navigate, fill visible inputs the way a
   // user would, and only press a button when the assistant was told to. All of
   // it happens in the admin's own session on the app's own pages, so every
@@ -218,7 +208,6 @@ export default function HelpChat({ inline = false }: { inline?: boolean }) {
     if (openPath && openPath.startsWith("/") && (!readOnly || isDemoPathVisible(openPath))) {
       if (readOnly && openPath.split("#")[0] === pathname && openPath.includes("#")) window.location.hash = openPath.split("#")[1];
       else router.push(openPath);
-      handleNavigate();
     }
     if (fills.length === 0 && !submit) return;
     if (readOnly) {
@@ -365,14 +354,13 @@ export default function HelpChat({ inline = false }: { inline?: boolean }) {
                     ? { background: "var(--ck-accent)", color: "#fff", borderBottomRightRadius: 6 }
                     : { background: "var(--ck-surface-warm)", color: "var(--ck-text-strong)", border: "1px solid var(--ck-border-subtle)", borderBottomLeftRadius: 6 }}
                 >
-                  {m.role === "assistant" ? <AnswerText text={m.content} onNavigate={handleNavigate} readOnly={readOnly} /> : m.content}
+                  {m.role === "assistant" ? <AnswerText text={m.content} readOnly={readOnly} /> : m.content}
                   {m.role === "assistant" && (m.sources?.length || 0) > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {m.sources!.filter(s => !readOnly || isDemoPathVisible(s.route)).map((s) => (
                         <Link
                           key={s.route}
                           href={s.route}
-                          onClick={handleNavigate}
                           className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold"
                           style={{ background: "var(--ck-success-soft, rgba(18,94,64,0.1))", color: "var(--ck-accent)" }}
                         >

@@ -9,6 +9,7 @@ const pricing = sourceExports("supabase/functions/_shared/chat-booking-pricing.t
 const contact = sourceExports("supabase/functions/_shared/chat-contact.ts", {}) as any;
 const questions = sourceExports("supabase/functions/_shared/booking-custom-fields.ts", {}) as any;
 const duration = sourceExports("supabase/functions/_shared/duration.ts", {}) as any;
+const botPrompt = sourceExports("supabase/functions/_shared/bot-prompt.ts", { "./platform-invariants.ts": { PLATFORM_INVARIANTS: "" }, "./duration.ts": duration }) as any;
 
 export function webChatFixture(source = "supabase/functions/web-chat/index.ts") {
   const business = { id: "a", business_name: "Fixture Kayak", timezone: "Africa/Johannesburg", booking_site_url: "https://a.booking.fixture.invalid", faq_json: {}, what_to_bring: "Bring a towel and water.", meeting_point_address: "Harbour kiosk" };
@@ -120,6 +121,7 @@ export function webChatFixture(source = "supabase/functions/web-chat/index.ts") 
     "../_shared/chat-contact.ts": contact,
     "../_shared/booking-custom-fields.ts": questions,
     "../_shared/platform-invariants.ts": { PLATFORM_INVARIANTS: "Never invent operator facts or grant free trips." },
+    "../_shared/bot-prompt.ts": botPrompt,
     "../_shared/llm.ts": { llmAvailable: () => settings.llmAvailable, llmText: async (data: any) => {
       calls.push({ kind: "llm", name: data.label, data });
       if (failures["llm"]) throw new Error("Model unavailable");

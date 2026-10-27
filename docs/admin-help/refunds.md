@@ -10,6 +10,10 @@ The Refund Queue lists customer refund requests waiting for your decision, with 
 
 The queue includes requested refunds, failed attempts, pending provider refunds and refunds requiring a bank transfer. A cancellation awaiting the customer's choice of refund, voucher or reschedule is not yet a refund request. That booking remains action required until they choose.
 
+## Refund percentages
+
+The refund for a guest's cancellation depends on how long before the trip they cancel. The tiers are set in **Settings → Booking Site Configuration → Cancellation Policy**: each tier is a number of hours before the trip and the percentage refunded, and the highest tier the guest still qualifies for applies. When you cancel for weather, the tiers don't apply: guests can choose a new date, a voucher or a full refund.
+
 ## Processing a refund
 
 For each request you can:

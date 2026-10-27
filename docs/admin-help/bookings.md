@@ -16,7 +16,8 @@ Use the status filter across the top: **Pending, Paid, Confirmed, Completed, Can
 
 Open a booking's action menu to:
 
-- **Edit Booking** — change status or details. Marking a booking PAID by hand is treated as a manual payment (for example EFT or cash).
+- **Edit**: correct guest and reservation details. Edit has no status or payment fields; those change through the other guest actions.
+- **Mark Paid**: record money received outside online checkout, such as cash, EFT or a card machine.
 - **Rebook** — move the booking to another slot or tour. Equal-price moves can complete immediately. A more expensive slot requires payment of the difference before the move; a cheaper slot uses the available credit-voucher or refund options.
 - **Refund** — start a refund for a paid booking.
 - **WhatsApp** — compose a message through the business messaging service.
@@ -25,7 +26,11 @@ Open a booking's action menu to:
 - **Payment Reminder** — sends the existing checkout link again; send a payment link first if none exists.
 - **Allow Without Payment** — keeps an unpaid reservation valid for pay on arrival and exempts it from reminders and automatic expiry. **Require Payment** restores the normal payment rules.
 
-Choose **View** (or **View booking** on mobile) to review the booking source, payment, waiver and customer notes. Reference numbers and booking sources are hidden from the Bookings list. Marking a booking paid records money you have already received; select the actual cash, EFT, card-terminal or other payment method and add the reference where available.
+Choose **View** (or **View booking** on mobile) to review the booking source, payment, waiver and customer notes. Reference numbers and booking sources are hidden from the Bookings list. To record money you have already received, use **Guest actions → Mark Paid**, described below.
+
+## Recording a cash, EFT or card-machine payment
+
+Open the booking's **Guest actions → Mark Paid**. Enter the amount received, choose the method (Cash, EFT (bank transfer), Card machine or Other), add the receipt or bank reference, and save. Record only money you have actually received. An amount below the balance is saved as a part-payment and leaves the rest due.
 
 ## Bulk actions
 

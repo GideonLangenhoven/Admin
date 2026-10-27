@@ -6,39 +6,27 @@ import ts from "typescript";
 // source chip, route /marketing) closed the assistant mid-conversation — it
 // read as the bot quitting on you. Both the inline answer links and the source
 // chips called setOpen(false) unconditionally.
-//
-// The panel only needs to move on mobile, where it is a bottom sheet over
-// 75dvh covering the page you just asked to see. On desktop it is a 380px
-// corner card that obscures nothing.
 const SRC = readFileSync("components/HelpChat.tsx", "utf8");
 
+// M12: it still closed below 1024px, so on a laptop window or tablet the
+// answer vanished whenever the assistant opened a page. Navigation now never
+// closes it; the browser check is tests/e2e/help-panel-stays-open.spec.ts.
 describe("help assistant survives following its own links", () => {
-  it("routes every navigation through the shared handler", () => {
-    expect(SRC).toContain("function handleNavigate()");
-    expect(SRC).toContain("onNavigate={handleNavigate}");
-    expect(SRC).toContain("onClick={handleNavigate}");
-    // The unconditional close is what caused the report. Scoped to the links:
-    // the header's X button uses the same inline form and SHOULD always close.
-    expect(SRC).not.toContain("onNavigate={() => setOpen(false)}");
+  it("never closes when a link, source chip or directive navigates", () => {
+    expect(SRC).not.toContain("handleNavigate");
+    expect(SRC).not.toContain("onNavigate");
+    const runActions = SRC.slice(SRC.indexOf("async function runActions"), SRC.indexOf("async function ask"));
+    expect(runActions).toContain("router.push(openPath)");
+    expect(runActions).not.toContain("setOpen(false)");
     const ast = ts.createSourceFile("HelpChat.tsx", SRC, ts.ScriptTarget.Latest, true);
-    const chips: string[] = [];
+    const links: string[] = [];
     function visit(node: ts.Node) {
-      if (ts.isJsxOpeningElement(node) && node.tagName.getText(ast) === "Link"
-        && node.attributes.properties.some(attr => attr.getText(ast) === "href={s.route}"))
-        chips.push(node.attributes.getText(ast));
+      if (ts.isJsxOpeningElement(node) && node.tagName.getText(ast) === "Link") links.push(node.attributes.getText(ast));
       ts.forEachChild(node, visit);
     }
     visit(ast);
-    expect(chips).toHaveLength(1);
-    expect(chips[0]).toContain("onClick={handleNavigate}");
-    expect(chips[0]).not.toContain("setOpen(false)");
-  });
-
-  it("only closes below the desktop panel breakpoint", () => {
-    const fn = SRC.slice(SRC.indexOf("function handleNavigate()"), SRC.indexOf("async function ask"));
-    expect(fn).toContain('matchMedia("(min-width: 1024px)")');
-    expect(SRC).toContain("lg:inset-x-auto");
-    expect(fn).toContain("setOpen(false)");
+    expect(links.length).toBeGreaterThanOrEqual(2);
+    for (const link of links) expect(link).not.toContain("setOpen(false)");
   });
 
   it("the explicit close button still closes unconditionally", () => {
