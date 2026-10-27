@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-16T07:04:23.935Z",
+  "results": [
+    {
+      "question": "Do Super Admins or operators need MFA, an authenticator QR code or a six digit authenticator code to save Yoco test credentials or banking settings?",
+      "page": "/settings",
+      "answer": "No. MFA has been removed for all accounts, including Super Admins. No authenticator QR code or six-digit code is needed.\n\nYoco credentials and banking settings use normal sign-in and existing permissions:\n\n- **Super Admins** can manage them.\n- **Main admins** can manage them.\n- **Operations staff** need their main admin to perform the change. Your Settings access has not been granted, and integration credentials and banking details remain main-admin-only.",
+      "pass": true
+    },
+    {
+      "question": "Do I need an authenticator to link Yoco credentials while creating a new client or to save platform banking settings?",
+      "page": "/super-admin",
+      "answer": "No. An authenticator is not required. MFA has been removed for all accounts, including SUPER_ADMIN.\n\nHowever, your service role cannot perform these actions:\n\n- Linking Yoco credentials requires your main admin.\n- Saving banking settings requires your main admin.\n- Platform administration requires SUPER_ADMIN access.\n\nAsk your main admin to complete them using normal sign-in.",
+      "pass": true
+    }
+  ],
+  "internal_questions_only": true,
+  "no_customer_actions": true
+}

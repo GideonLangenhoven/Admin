@@ -12,7 +12,7 @@ Invoices are grouped by day; filter by date to find a specific one. Each invoice
 
 ## Company details on invoices
 
-The company information and banking details shown on invoices come from Settings → Invoice & Banking Details. If your invoices show missing or outdated details, update them there (a MAIN_ADMIN, or an admin granted the invoice settings permission, can edit that section).
+Company and EFT banking details come from [Invoice & Banking Details](/settings#invoice). A MAIN_ADMIN can manage both. Staff granted **Invoice Details** can edit the permitted company fields; banking details still require MAIN_ADMIN or SUPER_ADMIN.
 
 ## Resending an invoice
 

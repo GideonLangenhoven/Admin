@@ -60,6 +60,10 @@ verify_jwt = false
 [functions.marketing-dispatch]
 verify_jwt = false
 
+# Read-only diagnostics; accepts only internal service credentials.
+[functions.marketing-setup-status]
+verify_jwt = false
+
 [functions.marketing-automation-dispatch]
 verify_jwt = false
 
@@ -143,6 +147,11 @@ verify_jwt = false
 [functions.admin-help-chat]
 verify_jwt = false
 
+# Google Drive validates the session with auth.getUser and checks the caller's
+# business and role inside the function. The legacy gateway rejects ES256 JWTs.
+[functions.google-drive]
+verify_jwt = false
+
 # onboarding-wizard is driven by a client filling in the setup wizard on their
 # own machine during a CS call — an anonymous caller with no Supabase session.
 # The gateway JWT check would only prove the caller has the public anon key, so
@@ -151,4 +160,12 @@ verify_jwt = false
 # no request may supply a business_id, and the tenant stays outside the TRADING
 # set until go-live. Per-IP rate limits back it up.
 [functions.onboarding-wizard]
+verify_jwt = false
+
+# Signature verified over the raw body inside the handler.
+[functions.resend-webhook]
+verify_jwt = false
+
+# Verifies its own booking/business/deadline-specific payment capability.
+[functions.booking-payment]
 verify_jwt = false

@@ -1,0 +1,163 @@
+{
+  "files": [
+    {
+      "name": "20261015120000_payment_recovery.sql",
+      "version": "20261015120000",
+      "sha256": "9c735d875fa5a1f06f081e4b1a5c0bd7a7f1175f4df4d2974dfb7cf59809bb2a"
+    },
+    {
+      "name": "20261015140000_customer_return_history.sql",
+      "version": "20261015140000",
+      "sha256": "9233c83f2a64bf2ad271c42d21000a0baab06870bdc1179d7bc953a631768641"
+    },
+    {
+      "name": "20261015150000_welcome_back_email_sequences.sql",
+      "version": "20261015150000",
+      "sha256": "e2856f1d3691435007b21e4b5c8dd62c20f054858ef349b5f2e54625f01074ca"
+    },
+    {
+      "name": "20261015160000_marketing_permission_safety.sql",
+      "version": "20261015160000",
+      "sha256": "07001f1a11618a0661582057c935633a95491d3004bea54c63d79f72c7ca8bd5"
+    },
+    {
+      "name": "20261015161000_marketing_draft_revisions.sql",
+      "version": "20261015161000",
+      "sha256": "a48a1bf349e646c27aa7cbf78fa74f42877f9c6919088cf92ec4de0f5bdc78d6"
+    },
+    {
+      "name": "20261015170000_operator_daily_consistency.sql",
+      "version": "20261015170000",
+      "sha256": "8555ef18bc5c3601a9740bd8cb33ea614c7330589ae099cca47f627c12312559"
+    },
+    {
+      "name": "20261015171000_operator_booking_transaction.sql",
+      "version": "20261015171000",
+      "sha256": "96bdde584a2be69f336793035732946ad1431096251d5855e676af7fcfcde5c3"
+    },
+    {
+      "name": "20261015172000_operator_cancellation_money.sql",
+      "version": "20261015172000",
+      "sha256": "bb98c97ebbc0084c6bc918b0a62cac290d8c78a522ca501bfdc0034b747374b5"
+    },
+    {
+      "name": "20261015180000_marketing_closeout_hold.sql",
+      "version": "20261015180000",
+      "sha256": "a9e2a8fe73a6d0b2b635feecc469a74f7a23b54c68639339bdfe9802a9fef3f1"
+    }
+  ],
+  "tables": [
+    {
+      "relname": "booking_arrival_approvals",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "marketing_automation_revisions",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "marketing_deliveries",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "marketing_delivery_policy",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "marketing_journey_status_events",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "marketing_offer_limits",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "marketing_permission_events",
+      "relrowsecurity": true
+    },
+    {
+      "relname": "operator_booking_requests",
+      "relrowsecurity": true
+    }
+  ],
+  "grants": [
+    {
+      "proname": "approve_account_arrival",
+      "anon": false,
+      "authenticated": true,
+      "service": false
+    },
+    {
+      "proname": "confirm_marketing_delivery",
+      "anon": false,
+      "authenticated": false,
+      "service": true
+    },
+    {
+      "proname": "create_operator_booking",
+      "anon": false,
+      "authenticated": true,
+      "service": false
+    },
+    {
+      "proname": "customer_booking_history",
+      "anon": false,
+      "authenticated": false,
+      "service": true
+    },
+    {
+      "proname": "enroll_welcome_back_sequences",
+      "anon": false,
+      "authenticated": false,
+      "service": true
+    },
+    {
+      "proname": "marketing_policy_reason",
+      "anon": false,
+      "authenticated": false,
+      "service": true
+    },
+    {
+      "proname": "operator_booking_history",
+      "anon": false,
+      "authenticated": true,
+      "service": true
+    },
+    {
+      "proname": "operator_departure_manifest",
+      "anon": false,
+      "authenticated": true,
+      "service": true
+    },
+    {
+      "proname": "prepare_payment_recovery",
+      "anon": false,
+      "authenticated": false,
+      "service": true
+    },
+    {
+      "proname": "record_booking_payment_failure",
+      "anon": false,
+      "authenticated": false,
+      "service": true
+    },
+    {
+      "proname": "reserve_marketing_delivery",
+      "anon": false,
+      "authenticated": false,
+      "service": true
+    },
+    {
+      "proname": "resolve_booking_discount",
+      "anon": false,
+      "authenticated": false,
+      "service": true
+    }
+  ],
+  "held": [
+    {
+      "policies": 0,
+      "enabled": 0
+    }
+  ]
+}

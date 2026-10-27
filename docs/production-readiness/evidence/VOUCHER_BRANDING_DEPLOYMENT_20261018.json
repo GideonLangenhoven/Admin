@@ -1,0 +1,181 @@
+{
+  "status": "DEPLOYED_AND_VERIFIED",
+  "at": "2026-10-18T12:40:58.292Z",
+  "scope": [
+    "Solid white gift voucher purchase panel, matching the selected departure panel",
+    "Operator logo beside the operator name at the top of voucher previews and downloadable PNG attachments",
+    "Powered by BookingTours and BookingTours logo at bottom right of the voucher"
+  ],
+  "admin": {
+    "id": "dpl_7GNhMQDSVynU6q23pgm7LGVmUjX8",
+    "url": "caepweb-admin-cy2uncu5v-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 494,
+    "changed": [
+      "app/lib/gift-voucher-image.ts",
+      "app/api/internal/voucher-image/route.ts",
+      "next.config.ts",
+      "supabase/functions/_shared/gift-voucher-face.ts",
+      "app/vouchers/page.tsx",
+      "app/settings/page.tsx"
+    ]
+  },
+  "booking": {
+    "id": "dpl_4ZG83iJzZQk5UcJJjawuJCuW5EdD",
+    "url": "booking-82x4m2qy2-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 170,
+    "changed": [
+      "lib/gift-voucher-face.ts",
+      "app/voucher/page.tsx",
+      "app/voucher-confirmed/page.tsx"
+    ]
+  },
+  "email": {
+    "at": "2026-10-18T12:40:42.513Z",
+    "project": "ukdsrndqhsatjkmxijuj",
+    "functions": [
+      {
+        "slug": "send-email",
+        "version": 192,
+        "status": "ACTIVE",
+        "verify_jwt": false
+      }
+    ],
+    "source_files": [
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/send-email/index.ts",
+        "sha256": "34f5d61e539842aafd24cbde2c099f11babfe37ee2740f4159f29cc6a26f3075"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/gift-voucher-face.ts",
+        "sha256": "5bc5fce2f3c9733bce8da7cd47b87a396f37916c867b81d60b2adcb3eed4f734"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/sentry.ts",
+        "sha256": "cf5cad26d7ddb3a103a60d658dab85fa647d98e574d5ddb44ab83700c915bafb"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/waiver.ts",
+        "sha256": "8a81bc17ec5a1106629301c77e2d479b7b7ba6fc66a8927534fb70b7311829d7"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/tenant.ts",
+        "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/pagination.ts",
+        "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/duration.ts",
+        "sha256": "4f6eb2b814536b6066378deb29002e829e4784ff09e26245009ea76aee22626c"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/marketing-tokens.ts",
+        "sha256": "ac28048ac64a3e0bca6d84db933d91aa2f33479804e457e2922f595b3934ab12"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/marketing-email-html.ts",
+        "sha256": "fa51d920412113136b15c3bf90b694cf5bfc33caec1588357bb64b5bc9c29b42"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/auth.ts",
+        "sha256": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/payment-deadline.ts",
+        "sha256": "afb8e3a68337c44ddd81d5f2c90a5f1504f89530ee2077b109ce9e57388bb3a7"
+      }
+    ],
+    "probes": [
+      {
+        "slug": "send-email",
+        "status": 401
+      }
+    ],
+    "worker": [
+      {
+        "status": "succeeded",
+        "start_time": "2026-10-18 12:40:00.204893+00",
+        "end_time": "2026-10-18 12:40:00.239914+00"
+      },
+      {
+        "status": "succeeded",
+        "start_time": "2026-10-18 12:39:00.062524+00",
+        "end_time": "2026-10-18 12:39:00.066666+00"
+      },
+      {
+        "status": "succeeded",
+        "start_time": "2026-10-18 12:38:00.663057+00",
+        "end_time": "2026-10-18 12:38:00.700724+00"
+      }
+    ],
+    "unrelated_functions_unchanged": true,
+    "customer_messages_sent": 0
+  },
+  "live_image": {
+    "at": "2026-10-18T12:40:11.500Z",
+    "deployment": "dpl_7GNhMQDSVynU6q23pgm7LGVmUjX8",
+    "width": 1200,
+    "height": 958,
+    "bytes": 1074229,
+    "operator_logo": true,
+    "bookingtours_logo": true,
+    "customer_messages_sent": 0
+  },
+  "browser": [
+    {
+      "width": 375,
+      "background": "rgb(255, 255, 255)",
+      "color": "rgb(11, 18, 32)",
+      "blur": "none",
+      "details_step_white": true,
+      "operator_logo_beside_name": true,
+      "bookingtours_bottom_right": true,
+      "overflow": false,
+      "page_errors": 0,
+      "writes": 0
+    },
+    {
+      "width": 1440,
+      "background": "rgb(255, 255, 255)",
+      "color": "rgb(11, 18, 32)",
+      "blur": "none",
+      "details_step_white": true,
+      "operator_logo_beside_name": true,
+      "bookingtours_bottom_right": true,
+      "overflow": false,
+      "page_errors": 0,
+      "writes": 0
+    }
+  ],
+  "validation": {
+    "targeted_unit_tests_passed": 128,
+    "production_builds_passed": 2,
+    "deno_typecheck": "passed",
+    "eslint_errors": 0,
+    "existing_eslint_warnings": 12,
+    "design_scan": "Existing Arial email font retained; no new design violations",
+    "customer_emails_sent": 0,
+    "purchases_created": 0
+  },
+  "white_panel_release": {
+    "id": "dpl_AgsjNTTEHvzC9Koh62YJQLkAGpDx",
+    "url": "booking-6aeh9mypt-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 170,
+    "changed": "app/voucher/layout.tsx"
+  },
+  "limits": [
+    "Native email clients were not tested; no customer messages were sent."
+  ]
+}

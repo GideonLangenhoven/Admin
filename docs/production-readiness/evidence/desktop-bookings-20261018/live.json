@@ -1,0 +1,22 @@
+{
+  "at": "2026-10-18T10:05:24.008Z",
+  "deployment": "dpl_ATUtJHejxdaatHqiCFbGEgggeTaQ",
+  "checks": [
+    {
+      "path": "/bookings",
+      "status": 200
+    },
+    {
+      "path": "/simple/bookings",
+      "status": 200
+    },
+    {
+      "path": "/settings",
+      "status": 200
+    },
+    {
+      "path": "/simpleguide",
+      "status": 200
+    }
+  ]
+}

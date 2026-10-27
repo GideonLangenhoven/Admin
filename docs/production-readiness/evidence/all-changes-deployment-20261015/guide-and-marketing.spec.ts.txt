@@ -1,0 +1,125 @@
+import {test,expect,type Page} from "@playwright/test";
+const origin='https://admin.bookingtours.co.za';
+const biz="10000000-0000-4000-8000-000000000001",user="10000000-0000-4000-8000-000000000010",slot="10000000-0000-4000-8000-000000000040";
+const email="guide+cape-kayak@guides.bookingtours.co.za";
+function session(){const encode=(v:unknown)=>Buffer.from(JSON.stringify(v)).toString('base64url');const expires=Math.floor(Date.now()/1000)+3600;return {access_token:`${encode({alg:'HS256',typ:'JWT'})}.${encode({sub:user,role:'authenticated',aud:'authenticated',exp:expires})}.fixture`,refresh_token:'synthetic-refresh',expires_in:3600,expires_at:expires,token_type:'bearer',user:{id:user,email,aud:'authenticated',role:'authenticated',app_metadata:{provider:'email',providers:['email']},user_metadata:{},created_at:new Date().toISOString()}};}
+async function fixture(page:Page,signedIn=false,owner=false){
+ const auth=session(),calls:{path:string;body:any}[]=[];
+ await page.routeWebSocket(/realtime/,()=>{});
+ await page.addInitScript(({auth,signedIn,email,biz})=>{localStorage.setItem('ck_welcome_done','1');if(signedIn){localStorage.setItem('sb-ukdsrndqhsatjkmxijuj-auth-token',JSON.stringify(auth));localStorage.setItem('ck_admin_email',email);localStorage.setItem('ck_admin_time',String(Date.now()));localStorage.setItem('ck_admin_business_id',biz);}}, {auth,signedIn,email,biz});
+ await page.route('**/*',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  const json=(body:unknown,status=200)=>route.fulfill({status,contentType:'application/json',headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'GET,POST,OPTIONS'},body:JSON.stringify(body)});
+  if(request.method()==='OPTIONS')return json(null,204);
+  if(url.pathname==='/api/admin/login'){
+   calls.push({path:url.pathname,body:request.postDataJSON()});
+   return request.headers().authorization?json({auth_ready:true,admin:{id:'guide-a',email,role:'GUIDE',business_id:biz,name:'Guides',read_only:false}}):json({code:'AUTH_REQUIRED'},401);
+  }
+  if(url.pathname==='/api/guide/access'){
+   if(request.method()==='GET') return json({guide:null});
+   const body=request.postDataJSON();calls.push({path:url.pathname,body});
+   return body.action==='validate'?json({login:'guide@cape-kayak'}):body.action==='complete'?json({ok:true,email,login:'guide@cape-kayak'}):body.action==='issue'&&owner?json({guide:{login_name:'guide@cape-kayak',must_set_password:true,suspended:false},setup_url:origin+'/guide-setup?login=guide%40cape-kayak&token=synthetic'}):json({error:'Synthetic preview refuses management writes'},403);
+  }
+  if(url.pathname==='/api/guide/check-ins'){const body=request.postDataJSON();calls.push({path:url.pathname,body});return json({ok:true,arrived_count:body.arrived_count});}
+  if(url.pathname==='/api/guide/photo-upload'){calls.push({path:url.pathname,body:request.postData()});return json({ok:true});}
+  if(url.pathname.startsWith('/api/'))return json({error:'Synthetic preview refuses other APIs'},403);
+  if(url.hostname===new URL(origin).hostname)return route.continue();
+  if(url.hostname!=='ukdsrndqhsatjkmxijuj.supabase.co')return route.abort();
+  if(url.pathname.includes('/auth/v1/user'))return json(auth.user);
+  if(url.pathname.includes('/auth/v1/token'))return json(auth);
+  if(url.pathname.includes('/auth/v1/logout'))return json({});
+  if(url.pathname.endsWith('/rpc/marketing_audience_summary'))return json({eligible:0,permission_unknown:1,suppressed:0});
+  if(url.pathname.endsWith('/rpc/marketing_goal_audiences'))return json({reviews:{included:0,excluded:1},welcome:{included:0,excluded:1},winback:{included:0,excluded:1},vouchers:{included:null,excluded:null}});
+  if(url.pathname.endsWith('/admin_users'))return json(owner?[{id:'owner-a',user_id:user,email,business_id:biz,role:'MAIN_ADMIN',name:'Owner',suspended:false,read_only:false,created_at:new Date().toISOString()}]:[]);
+  if(url.pathname.endsWith('/businesses'))return json([{id:biz,name:'Example Tours',business_name:'Example Tours',timezone:'Africa/Johannesburg',subscription_status:'ACTIVE',subdomain:'cape-kayak',currency:'ZAR'}]);
+  if(url.pathname.endsWith('/guide_accounts'))return json([{id:'guide-a',business_id:biz,login_name:'guide@cape-kayak'}]);
+  if(url.pathname.endsWith('/rpc/guide_context'))return json({id:biz,name:'Example Tours',business_name:'Example Tours',timezone:'Africa/Johannesburg',subscription_status:'ACTIVE',subdomain:'cape-kayak'});
+  if(url.pathname.endsWith('/rpc/guide_simple_day'))return json({date:'2026-10-15',currency:'ZAR',unbooked_departures:[],departures:[{id:slot,tour_id:'tour-a',tour_name:'Morning paddle',start_time:'2026-10-15T08:00Z',status:'OPEN',capacity_total:20,available_capacity:null,can_book:false,booked_guests:7,arrived_guests:0,settled_guests:7,bookings:[{id:'10000000-0000-4000-8000-000000000050',slot_id:slot,customer_name:'Alex Guest',phone:'27825550100',email:'alex@example.invalid',qty:7,status:'PAID',waiver_status:'SIGNED',arrived_count:0,checked_in:false,total_amount:700,total_captured:700}]}]});
+  if(url.pathname.endsWith('/rpc/guide_day'))return json([{id:slot,tour_name:'Morning paddle',start_time:'2026-10-15T08:00Z',pax_expected:7,booking_count:3,photo_count:1},{id:'10000000-0000-4000-8000-000000000041',tour_name:'Coastal walk',start_time:'2026-10-15T09:00Z',pax_expected:4,booking_count:2,photo_count:0}]);
+  if(url.pathname.endsWith('/rpc/guide_photos'))return json({slot:{tour_name:'Morning paddle',start_time:'2026-10-15T08:00Z'},photos:[{id:'photo-a',photo_url:'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22%3E%3Crect width=%2232%22 height=%2232%22 fill=%22%23d6e9bc%22/%3E%3C/svg%3E',gdrive_view_url:'https://drive.google.com/file/d/synthetic/view',uploaded_at:'2026-10-15T08:00Z'}]});
+  return json([]);
+ });
+ return calls;
+}
+
+test('shared guide sign-in opens Simple View, shows pax and blocks office pages',async({page})=>{
+ const calls=await fixture(page);await page.setViewportSize({width:390,height:844});await page.goto('/');
+ await page.getByRole('textbox',{name:'Email address or guide login'}).fill('guide@cape-kayak');
+ await page.getByLabel('Password',{exact:true}).fill('chosen-password');await page.getByRole('button',{name:'Sign In',exact:true}).click();
+ await expect(page).toHaveURL(/\/simpleguide$/);await expect(page.getByRole('heading',{name:'Roll call',exact:true,level:1})).toBeVisible();
+ await expect(page.getByText('Alex Guest',{exact:true})).toBeVisible();
+ await expect(page.getByText('27825550100',{exact:true})).toBeVisible();
+ await expect(page.getByRole('link',{name:'Call Alex Guest'})).toHaveAttribute('href','tel:+27825550100');
+ await expect(page.getByRole('link',{name:'WhatsApp Alex Guest'})).toHaveAttribute('href','https://wa.me/27825550100');
+ await expect(page.getByRole('link',{name:'Full dashboard'})).toHaveCount(0);await expect(page.getByRole('link',{name:'Add walk-in'})).toHaveCount(0);
+ await expect(page.getByRole('region',{name:'Payment recovery'})).toHaveCount(0);
+ expect(calls[0].body.email).toBe(email);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:'.vercel/guide-access/simple-phone.png',fullPage:true});
+ for(const path of ['/simple','/bookings','/settings','/simple/new-booking','/inbox']){await page.goto(path);await expect(page).toHaveURL(/\/simpleguide$/);await expect(page.getByRole('heading',{name:'Roll call',exact:true,level:1})).toBeVisible();}
+ // A forged advisory cookie cannot turn the verified guide session into an admin.
+ await page.context().addCookies([{name:'ck_admin_role',value:'ADMIN',url:origin}]);await page.goto('/settings');await expect(page).toHaveURL(/\/simpleguide$/);
+ expect(calls.every(c=>c.path==='/api/admin/login')).toBe(true);
+});
+
+test('guide can open and upload trip photos without email or payment controls',async({page})=>{
+ const calls=await fixture(page,true);await page.setViewportSize({width:390,height:844});await page.goto('/simpleguide');
+ await page.getByRole('link',{name:'Trip photos',exact:true}).click();
+ await expect(page).toHaveURL(new RegExp('/guide/photos/'+slot));
+ await expect(page.getByRole('heading',{name:'Trip photos',exact:true})).toBeVisible();
+ await expect(page.locator('.simple-view')).toBeVisible();
+ await expect(page.getByText('Field Console',{exact:true})).toHaveCount(0);
+ await expect(page.getByRole('heading',{name:'Trip photos',level:1,exact:true})).toBeVisible();
+ await expect(page.locator('a[href="https://drive.google.com/file/d/synthetic/view"]')).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:'.vercel/guide-access/photos-phone.png',fullPage:true});
+ await expect(page.getByRole('button',{name:'Send thank-you email with photos'})).toHaveCount(0);
+ await page.locator('input[type=file]').setInputFiles({name:'synthetic.jpg',mimeType:'image/jpeg',buffer:Buffer.from('synthetic')});
+ await expect(page.getByRole('status')).toContainText('1 of 1 photos uploaded');expect(calls.filter(c=>c.path==='/api/guide/photo-upload')).toHaveLength(1);
+ await page.getByRole('link',{name:'Back to roll call',exact:true}).click();await expect(page.getByRole('heading',{name:'Roll call',exact:true,level:1})).toBeVisible();
+});
+
+test('one-time password setup signs the guide straight into Simple View',async({page})=>{
+ const calls=await fixture(page);await page.goto('/guide-setup?login=guide%40cape-kayak&token='+ 'a'.repeat(48));
+ await page.getByLabel('Password',{exact:true}).fill('chosen-password');await page.getByLabel('Confirm password',{exact:true}).fill('chosen-password');
+ await page.getByRole('button',{name:'Set password and open Simple View',exact:true}).click();
+ await expect(page).toHaveURL(/\/simpleguide$/);await expect(page.getByRole('heading',{name:'Roll call',exact:true,level:1})).toBeVisible();
+ expect(calls.filter(c=>c.body?.action==='complete')).toHaveLength(1);
+});
+
+ test('operator creates one shared guide login and shares a private password link',async({page})=>{
+ const calls=await fixture(page,true,true);await page.goto('/settings');
+ await page.getByRole('button',{name:'Admin Users',exact:true}).click();
+ const panel=page.getByRole('region',{name:'Guide login',exact:true});
+ await panel.getByRole('button',{name:'Create guide login',exact:true}).click();
+ await expect(panel.getByText('guide@cape-kayak',{exact:true})).toBeVisible();
+ await expect(panel.getByLabel('Private password setup link')).toHaveValue(/guide-setup\?login=guide%40cape-kayak/);
+ await expect(panel.locator('input[type=password]')).toHaveCount(0);
+ expect(calls.filter(c=>c.body?.action==='issue')).toHaveLength(1);
+ });
+
+ test('guides share roll-call and partial-arrival controls without desk payments',async({page})=>{
+ const calls=await fixture(page,true);await page.goto('/simpleguide');
+ await page.getByRole('checkbox',{name:"Mark all of Alex Guest's group as present"}).click();
+ await expect.poll(()=>calls.filter(c=>c.path==='/api/guide/check-ins').length).toBe(1);
+ expect(calls.find(c=>c.path==='/api/guide/check-ins')?.body.arrived_count).toBe(7);
+ await page.getByRole('article').getByRole('link',{name:'Check-ins',exact:true}).click();
+ await expect(page).toHaveURL(/\/simpleguide\/check-ins/);
+ await page.getByRole('button',{name:'Increase arrived guests'}).click();
+ await page.getByRole('button',{name:'Save arrivals',exact:true}).click();
+ await expect.poll(()=>calls.filter(c=>c.path==='/api/guide/check-ins').length).toBe(2);
+ expect(calls.filter(c=>c.path==='/api/guide/check-ins')[1].body.arrived_count).toBe(1);
+ await expect(page.getByRole('button',{name:/Confirm .* received/})).toHaveCount(0);
+ await expect(page.getByRole('link',{name:'Add walk-in'})).toHaveCount(0);
+ });
+
+ test('marketing offers plain-English actions on the deployed dashboard',async({page})=>{
+ await fixture(page,true,true);await page.setViewportSize({width:390,height:844});await page.goto('/marketing');
+ await expect(page.getByRole('heading',{name:'Email your customers'})).toBeVisible();
+ await expect(page.getByText('1 contact needs permission checked.',{exact:false})).toBeVisible();
+ await expect(page.getByRole('link',{name:'Request email setup'})).toHaveAttribute('href',/^mailto:support@bookingtours\.co\.za/);
+ await expect(page.getByRole('link',{name:'Choose email:',exact:false})).toHaveCount(3);
+ await expect(page.getByText('Unknown evidence:',{exact:false})).toHaveCount(0);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:'.vercel/release-all-20261015/marketing-live-phone.png',fullPage:true});
+ });

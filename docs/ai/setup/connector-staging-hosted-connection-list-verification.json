@@ -1,0 +1,22 @@
+{
+  "verified_on": "2026-10-08",
+  "target_project": "gwwnkihblioayklptdab",
+  "https_origin": "https://bookingtours-connector-test-gwwn.vercel.app",
+  "result": "PASS",
+  "owner_report": {
+    "connection_list_fixed": true,
+    "function_owner_preserved": true,
+    "enabled_connectors": 0
+  },
+  "independent_authenticated_api_check": {
+    "connections_http_status": 200,
+    "safe_error_code": null,
+    "grant_count": 0,
+    "chatgpt_enabled": false,
+    "muse_enabled": false,
+    "temporary_native_session_cleanup": "local_sign_out_attempted"
+  },
+  "hosted_browser_evidence": "connector-staging-https-native-signin-verification.json",
+  "credentials_printed": false,
+  "boundary": "The SQL Editor owner-preservation result is user supplied. Independent HTTPS API and browser checks prove native sign-in and restricted connection listing for the synthetic test business. No provider activation, consent, grant issuance or ChatGPT/Muse platform journey was performed."
+}

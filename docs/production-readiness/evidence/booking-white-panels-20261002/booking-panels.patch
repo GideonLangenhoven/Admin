@@ -1,0 +1,121 @@
+--- /dev/null
++++ b/app/book/booking-panels.css
+@@ -0,0 +1,99 @@
++/* Booking content stays opaque white; action colours inherit the operator theme. */
++.booking-workflow :is(.guest-calendar, .glass, .glass-sheet, [data-mobile-booking-bar]) {
++  --booking-surface: #ffffff;
++  --booking-ink: #0b1220;
++  --booking-muted: #515762;
++  --booking-border: #dde1e6;
++  --booking-control-border: #858d99;
++  --booking-accent-text: var(--booking-ink);
++  --text: var(--booking-ink);
++  --textMuted: var(--booking-muted);
++  --ink: var(--booking-ink);
++  --ink-sheet: var(--booking-ink);
++  --ink-muted: var(--booking-muted);
++  --ink-faint: #5c6675;
++  --accent-text: var(--booking-ink);
++  --glass-tint-card: var(--booking-surface);
++  --glass-tint-sheet: var(--booking-surface);
++  --glass-solid-card: var(--booking-surface);
++  --glass-solid-sheet: var(--booking-surface);
++  --glass-border: var(--booking-border);
++  --hover-overlay: rgb(11 18 32 / 0.04);
++  --danger: #b42318;
++  --warning: #855415;
++  --success: #146c43;
++  color-scheme: light;
++  color: var(--booking-ink);
++  background: var(--booking-surface);
++  border: 1px solid var(--booking-border);
++  border-radius: var(--radius-lg);
++  -webkit-backdrop-filter: none;
++  backdrop-filter: none;
++  box-shadow: 0 2px 8px rgb(11 18 32 / 0.06);
++}
++
++.booking-workflow [data-mobile-booking-bar] { background: var(--booking-surface) !important; }
++
++.booking-workflow :is(.guest-calendar, .glass, .glass-sheet) :is(h2, h3) {
++  font-family: inherit;
++  font-weight: 600;
++}
++
++.booking-workflow .guest-calendar h3 { font-size: 1.125rem; }
++
++.booking-workflow :is(.field, .glass-input) {
++  color-scheme: light;
++  background: var(--booking-surface);
++  color: var(--booking-ink);
++  border-color: var(--booking-control-border);
++  min-height: 2.75rem;
++  font-size: 1rem;
++}
++
++.booking-workflow :is(.field, .glass-input)::placeholder {
++  color: var(--booking-muted);
++  opacity: 1;
++}
++
++.booking-workflow :is(.guest-calendar, .glass, .glass-sheet, [data-mobile-booking-bar]) :focus-visible {
++  outline: 2px solid var(--booking-ink);
++  outline-offset: 3px;
++  box-shadow: none;
++}
++
++.booking-workflow .guest-calendar button:focus-visible { outline-offset: -3px; }
++.booking-workflow .guest-calendar-day[aria-pressed="true"]:focus-visible { outline-color: var(--ink-on-main); }
++
++.booking-workflow :is(.guest-calendar-nav, .guest-departure-choice, .surface-muted, .btn-secondary) {
++  background: var(--booking-surface);
++  border-color: var(--booking-control-border);
++  color: var(--booking-ink);
++}
++
++.booking-workflow .guest-departure-choice[aria-pressed="true"] {
++  background: var(--booking-surface);
++  border: 1px solid var(--booking-ink);
++  box-shadow: inset 0 0 0 1px var(--booking-ink);
++}
++
++.booking-workflow .guest-departure-choice:hover { background: var(--booking-surface); border-color: var(--booking-ink); }
++
++.booking-workflow .guest-calendar-nav:disabled {
++  color: var(--booking-muted);
++  opacity: 1;
++}
++
++.booking-workflow input:is([type="checkbox"], [type="radio"]) { accent-color: var(--booking-ink); }
++
++.booking-workflow .btn-primary {
++  min-height: 3rem;
++  border-radius: var(--radius-md);
++  font-size: 1rem;
++  font-weight: 600;
++  box-shadow: 0 2px 6px rgb(11 18 32 / 0.08);
++}
++
++.booking-workflow .btn-primary:hover { filter: none; box-shadow: 0 3px 10px rgb(11 18 32 / 0.14); }
++
++.booking-workflow .glass-sheet .flex.justify-between { flex-wrap: wrap; gap: 0.5rem 1rem; }
++.booking-workflow .glass-sheet .flex.justify-between > * { min-width: 0; }
+--- a/app/book/layout.tsx
++++ b/app/book/layout.tsx
+@@ -1,4 +1,5 @@
+ import type { Metadata } from "next";
++import "./booking-panels.css";
+ 
+ export const metadata: Metadata = {
+   title: "Book a Tour | Book Your Tour",
+--- a/app/book/page.tsx
++++ b/app/book/page.tsx
+@@ -575,7 +575,7 @@
+   if (!trading) return <TenantClosedNotice />;
+ 
+   return (
+-    <div className={`mx-auto max-w-4xl px-4 py-6 md:py-12 ${step === "payment" || embed ? "" : "pb-36 md:pb-12"}`}>
++    <div className={`booking-workflow mx-auto max-w-4xl px-4 py-6 md:py-12 ${step === "payment" || embed ? "" : "pb-36 md:pb-12"}`}>
+       {/* Progress */}
+       <div className="flex items-center justify-between mb-10 glass !rounded-full p-2 sm:p-2.5 max-w-lg mx-auto">
+         {[{ l: "Date", s: "calendar" }, { l: "Details", s: "details" }, { l: "Pay", s: "payment" }].map((x, i) => {

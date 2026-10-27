@@ -1,3 +1,5 @@
+import { guideSession, guideWorkerScope, guideQueueAuthorityKey, sessionKey } from "./browser-session";
+
 export type GuideQueueAuthContext = {
   userId: string;
   businessId: string;
@@ -96,13 +98,13 @@ type SyncRegistration = ServiceWorkerRegistration & {
   sync?: { register(tag: string): Promise<void> };
 };
 
-const DB_NAME = "guide-queue-v2";
+const DB_NAME = guideSession ? "shared-guide-queue-v2" : "guide-queue-v2";
 const DB_VERSION = 1;
 const QUEUE_STORE = "check-ins";
 const AUTH_STORE = "auth-context";
 const SYNC_TAG = "sync-check-ins-v2";
-const AUTHORITY_STORAGE_KEY = "guide-queue-authority-v2";
-const AUTH_TRANSITION_LOCK = "bookingtours-guide-auth-transition-v1";
+const AUTHORITY_STORAGE_KEY = guideQueueAuthorityKey;
+const AUTH_TRANSITION_LOCK = sessionKey("bookingtours-guide-auth-transition-v1");
 const BASE_RETRY_DELAY_MS = 5_000;
 const MAX_RETRY_DELAY_MS = 15 * 60_000;
 export const GUIDE_QUEUE_UPDATE_EVENT = "guide-queue-update";
@@ -337,8 +339,9 @@ export async function queueGuideCheckIn(item: GuideQueueItem): Promise<void> {
 
 export async function registerGuideCheckInSync(): Promise<void> {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
-  const registration = await navigator.serviceWorker.getRegistration("/guide/") as SyncRegistration | undefined;
-  if (registration?.sync) {
+  const registration = await navigator.serviceWorker.getRegistration(guideWorkerScope) as SyncRegistration | undefined;
+  if (!registration || new URL(registration.scope).pathname !== guideWorkerScope) return;
+  if (registration.sync) {
     try {
       await registration.sync.register(SYNC_TAG);
       return;
@@ -481,7 +484,8 @@ export async function rejectGuideQueueCredential(
 async function postGuideWorkerMessage(message: Record<string, unknown>, canPost = () => true): Promise<boolean> {
   if (!canPost()) return false;
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return false;
-  const registration = await navigator.serviceWorker.getRegistration("/guide/");
+  const registration = await navigator.serviceWorker.getRegistration(guideWorkerScope);
+  if (!registration || new URL(registration.scope).pathname !== guideWorkerScope) return false;
   if (!canPost()) return false;
   const workers = new Set<ServiceWorker>();
   if (registration?.active) workers.add(registration.active);

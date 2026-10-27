@@ -1,0 +1,16 @@
+[
+  {
+    "path": "/",
+    "method": "HEAD",
+    "status": 200,
+    "cache_control": "public, max-age=0, must-revalidate",
+    "deployment_protection_bypass": false
+  },
+  {
+    "path": "/api/agent/read",
+    "method": "HEAD",
+    "status": 503,
+    "cache_control": "no-store",
+    "deployment_protection_bypass": false
+  }
+]

@@ -1,0 +1,266 @@
+{
+  "reviewed_at": "2026-10-19T09:32:38.442Z",
+  "verdict": "NOT READY: fix the four confirmed findings before relying on partnerships for commercial combo sales.",
+  "scope": "Existing partnership lifecycle and connected combo offer behavior; ordinary concurrent operator usage, not a load test.",
+  "application_code_changed": false,
+  "application_deployed": false,
+  "operators": [
+    {
+      "name": "Kayak",
+      "id": "44ff11ab-c697-47de-9227-0ffa51db127c"
+    },
+    {
+      "name": "Claire's Hiking",
+      "id": "af17838c-fdd6-4b84-97c0-1cea39db7c0a"
+    }
+  ],
+  "final_partnership": {
+    "id": "ad9f7f4a-bbc3-4ade-aa04-4d746555eb43",
+    "business_a_id": "44ff11ab-c697-47de-9227-0ffa51db127c",
+    "business_b_id": "af17838c-fdd6-4b84-97c0-1cea39db7c0a",
+    "status": "ACTIVE",
+    "initiated_by": "44ff11ab-c697-47de-9227-0ffa51db127c",
+    "accepted_at": "2026-10-19T09:25:41.422+00:00",
+    "revoked_at": null,
+    "invite_token": null
+  },
+  "aonyx_partnerships_created": 0,
+  "invitation_emails_sent": 0,
+  "public_combo_offers_created": 0,
+  "customer_bookings_created": 0,
+  "method": "Invitation creation and re-invitation used the real repository handler with real authentication and the production database; the email transport alone was intercepted. Acceptance, revocation, partner-tour reads, tenant denial, read-only denial and email-link behavior used deployed HTTP endpoints. Claire’s account is read-only; its mutation was correctly denied, and platform Super Admin targeting Claire was used for recipient acceptance. Test sessions were signed out locally afterwards.",
+  "live_checks": [
+    {
+      "name": "Invitation created through repository handler; delivery intercepted",
+      "status": "PASS",
+      "partnership_id": "ad9f7f4a-bbc3-4ade-aa04-4d746555eb43"
+    },
+    {
+      "name": "Duplicate pending invitation rejected",
+      "status": "PASS",
+      "http": 409
+    },
+    {
+      "name": "Pending partnership visible to Kayak",
+      "status": "PASS",
+      "invite_token_exposed": true
+    },
+    {
+      "name": "Pending partnership visible to Claire's Hiking",
+      "status": "PASS",
+      "invite_token_exposed": true
+    },
+    {
+      "name": "Kayak cannot list another operator’s partnerships",
+      "status": "PASS",
+      "http": 403
+    },
+    {
+      "name": "Read-only Claire demo cannot mutate partnership",
+      "status": "PASS",
+      "http": 403
+    },
+    {
+      "name": "Receiving operator acceptance via platform target",
+      "status": "PASS"
+    },
+    {
+      "name": "Partner tours visible to Kayak",
+      "status": "PASS",
+      "tours": 5
+    },
+    {
+      "name": "Partner tours visible to Claire's Hiking",
+      "status": "PASS",
+      "tours": 3
+    },
+    {
+      "name": "Revocation recorded",
+      "status": "PASS"
+    },
+    {
+      "name": "Revocation removes partner-tour access",
+      "status": "PASS",
+      "http": 403
+    },
+    {
+      "name": "Reinvite revoked pair",
+      "status": "FAIL",
+      "http": 500,
+      "error": "duplicate key value violates unique constraint \"unique_partnership\""
+    },
+    {
+      "name": "Inviting operator cannot accept own invitation",
+      "status": "FAIL",
+      "http": 200,
+      "persisted_status": "ACTIVE"
+    },
+    {
+      "name": "Wrong invitation email rejected by token POST",
+      "status": "PASS"
+    },
+    {
+      "name": "Email-link GET activates partnership without confirmation",
+      "status": "FAIL",
+      "http": 200
+    },
+    {
+      "name": "Email-link token cannot be reused",
+      "status": "PASS",
+      "http": 404
+    },
+    {
+      "name": "Final state: one active fake partnership, Kayak ↔ Claire’s Hiking; Aonyx excluded",
+      "status": "PASS",
+      "partnership_id": "ad9f7f4a-bbc3-4ade-aa04-4d746555eb43",
+      "email_deliveries": 0
+    }
+  ],
+  "isolated_combo_checks": [
+    {
+      "name": "Revocation deactivates two-tour offer",
+      "status": "PASS"
+    },
+    {
+      "name": "Revocation deactivates three-tour offer between the same two operators",
+      "status": "FAIL",
+      "offer_active": true
+    },
+    {
+      "name": "Cannot reactivate partner offer after revocation",
+      "status": "FAIL",
+      "http": 200,
+      "partnership_status": "REVOKED",
+      "offer_active": true
+    }
+  ],
+  "browser_checks": [
+    {
+      "operator": "Kayak",
+      "width": 1440,
+      "active_partnership_visible": true,
+      "overflow": false,
+      "errors": []
+    },
+    {
+      "operator": "Kayak",
+      "width": 390,
+      "active_partnership_visible": true,
+      "overflow": false,
+      "errors": []
+    },
+    {
+      "operator": "Claire's Hiking",
+      "width": 1440,
+      "active_partnership_visible": true,
+      "overflow": false,
+      "errors": []
+    },
+    {
+      "operator": "Claire's Hiking",
+      "width": 390,
+      "active_partnership_visible": true,
+      "overflow": false,
+      "errors": []
+    }
+  ],
+  "unit_tests": {
+    "command": "node_modules/.bin/vitest run tests/unit/combo-settlements.test.ts tests/unit/combo-rules-parse.test.ts tests/unit/own-tour-combos.test.ts",
+    "files_passed": 3,
+    "tests_passed": 20
+  },
+  "findings": [
+    {
+      "id": 1,
+      "priority": "P1",
+      "title": "The inviting operator can accept without the partner’s consent",
+      "locations": [
+        {
+          "path": "app/api/partnerships/route.ts",
+          "line": 190
+        },
+        {
+          "path": "app/api/partnerships/route.ts",
+          "line": 41
+        }
+      ],
+      "what": "Accept should activate an invitation only when the receiving operator agrees.",
+      "problem": "A live Kayak request accepting its own outgoing invitation returned HTTP 200 and changed the database status to ACTIVE. Listing pending partnerships also returns invite_token and invite_email to the sender, allowing the unauthenticated token acceptance route to be used as a second bypass.",
+      "fix": "Restrict dashboard acceptance to the receiving operator; omit invitation tokens from dashboard and creation responses; clear the token on every successful acceptance.",
+      "impact": "An operator can establish a commercial partnership and build offers without the other operator agreeing.",
+      "proof": "Live HTTP API and persisted database row."
+    },
+    {
+      "id": 2,
+      "priority": "P1",
+      "title": "Revoking a partnership does not reliably stop its combo offers",
+      "locations": [
+        {
+          "path": "app/api/partnerships/route.ts",
+          "line": 288
+        },
+        {
+          "path": "app/api/combo-offers/route.ts",
+          "line": 130
+        },
+        {
+          "path": "app/api/combo-offers/route.ts",
+          "line": 288
+        }
+      ],
+      "what": "Revocation promises to deactivate all combo offers between the operators.",
+      "problem": "An offer containing three tours across two operators has no legacy partnership_id, so the revoke query misses it. Even a two-tour offer that is deactivated can immediately be activated again: activation checks offer participation but not an active partnership. Checkout checks active offers without checking the partnership.",
+      "fix": "Resolve affected offers through combo_offer_items as well as the legacy partnership_id; require active partnerships on activation and checkout; apply revocation and offer deactivation atomically.",
+      "impact": "Customers can continue buying joint offers after an operator has ended the partnership.",
+      "proof": "Isolated executions of the actual route handlers with synthetic offer rows; checkout code traced. No public test offers or customer purchases created."
+    },
+    {
+      "id": 3,
+      "priority": "P2",
+      "title": "A revoked pair cannot be invited again",
+      "locations": [
+        {
+          "path": "app/api/partnerships/route.ts",
+          "line": 102
+        },
+        {
+          "path": "app/api/partnerships/route.ts",
+          "line": 119
+        }
+      ],
+      "what": "An operator should be able to send a fresh invitation after a partnership has been revoked.",
+      "problem": "The existing-row check ignores REVOKED rows, then tries to insert the same operator pair again. The database rejects it with the unique_partnership constraint and the route returns HTTP 500.",
+      "fix": "Reuse the revoked pair with a conditional update to PENDING, a fresh invitation token, and cleared acceptance/revocation timestamps. Keep concurrent active or pending invitations protected.",
+      "impact": "Operators need manual database repair to partner again.",
+      "proof": "Repository invite handler, real authenticated Kayak session, real Supabase database; only email delivery intercepted."
+    },
+    {
+      "id": 4,
+      "priority": "P2",
+      "title": "Opening an email link accepts immediately",
+      "locations": [
+        {
+          "path": "app/api/partnerships/approve/route.ts",
+          "line": 57
+        }
+      ],
+      "what": "The emailed invitation URL is a GET endpoint that changes partnership status.",
+      "problem": "An unauthenticated GET changed a pending test invitation to ACTIVE without a confirmation step. Email security scanners and previews can request such URLs before the recipient chooses to accept; that unintended acceptance is a risk inferred from the confirmed GET mutation.",
+      "fix": "Make GET display an escaped confirmation page without writes; accept through an explicit POST with recipient verification, an atomic pending-state check, and token consumption.",
+      "impact": "A scanner or preview can accept on the recipient’s behalf. The current GET also bypasses the email proof required by accept_token POST.",
+      "proof": "Live unauthenticated GET and persisted database row; replay correctly returned HTTP 404."
+    }
+  ],
+  "not_checked": [
+    "Actual invitation email delivery (intercepted for fake invites).",
+    "Real payment capture, refunds, settlement transfers, and customer booking checkout.",
+    "Load and concurrency behavior."
+  ],
+  "source_sha256": {
+    "app/api/partnerships/route.ts": "5f9bca8041448e99b10cd8ecabdf7921b938226d4e04f1110749feefa91306a5",
+    "app/api/combo-offers/route.ts": "8e0b661f1ed08e2aac89d154cdcfa60dccc843cbf79afb6a93625fe80e4940da",
+    "app/api/partnerships/approve/route.ts": "01890eb48f5eb10b6a9b1d84cba6f61257681392f5018243436d51ca31294989",
+    "app/api/partner-tours/route.ts": "1e0449720a6aee98a7f6219b237864ddaa202b9c854f4125e2b3ba9304217446",
+    "supabase/functions/create-paysafe-checkout/index.ts": "f3f5539bb7e305cd412f6f693d3602107c1af4998836cb1682ba78c9a21631f9"
+  }
+}

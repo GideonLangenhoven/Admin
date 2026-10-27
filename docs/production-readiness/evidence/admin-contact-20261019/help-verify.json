@@ -1,0 +1,16 @@
+{
+  "at": "2026-10-19T09:30:10.363Z",
+  "changed": [
+    "help:settings:1",
+    "help:super-admin:1"
+  ],
+  "result": {
+    "ok": true,
+    "total": 178,
+    "embedded": 2,
+    "skipped": 176,
+    "removed": 0,
+    "failed": 0,
+    "errors": []
+  }
+}

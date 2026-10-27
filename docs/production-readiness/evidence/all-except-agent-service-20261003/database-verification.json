@@ -1,0 +1,35 @@
+{
+  "verified_at": "2026-10-03T17:37:45.529Z",
+  "project_ref": "ukdsrndqhsatjkmxijuj",
+  "mutation_performed": false,
+  "migration": {
+    "version": "20261003160000",
+    "name": "agent_read_foundation"
+  },
+  "grants": {
+    "total": 0,
+    "enabled": 0
+  },
+  "table": {
+    "rls": true,
+    "anon_select": false,
+    "authenticated_select": true,
+    "authenticated_write": false
+  },
+  "functions": [
+    {
+      "name": "agent_departure_waiver_counts",
+      "security_definer": false,
+      "volatility": "s",
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    {
+      "name": "agent_read_observed_at",
+      "security_definer": false,
+      "volatility": "s",
+      "anon_execute": false,
+      "authenticated_execute": true
+    }
+  ]
+}

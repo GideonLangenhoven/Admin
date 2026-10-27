@@ -1,0 +1,23 @@
+{
+  "at": "2026-10-18T11:41:44.270Z",
+  "checks": [
+    {
+      "subdomain": "kayak",
+      "width": 320,
+      "photoOptions": 3,
+      "preview": true,
+      "noHorizontalOverflow": true,
+      "pageErrors": 0,
+      "writes": 0
+    },
+    {
+      "subdomain": "claires-hiking",
+      "width": 1440,
+      "photoOptions": 5,
+      "preview": true,
+      "noHorizontalOverflow": true,
+      "pageErrors": 0,
+      "writes": 0
+    }
+  ]
+}

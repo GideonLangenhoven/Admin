@@ -1,0 +1,264 @@
+{
+  "at": "2026-10-20T04:41:25.609Z",
+  "secrets": [
+    "RESEND_API_KEY",
+    "RESEND_FROM_EMAIL",
+    "RESEND_WEBHOOK_SECRET"
+  ],
+  "functions": [
+    {
+      "slug": "send-email",
+      "version": 194,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    },
+    {
+      "slug": "marketing-dispatch",
+      "version": 65,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    },
+    {
+      "slug": "marketing-track",
+      "version": 41,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    },
+    {
+      "slug": "marketing-unsubscribe",
+      "version": 47,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    },
+    {
+      "slug": "marketing-automation-dispatch",
+      "version": 59,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    },
+    {
+      "slug": "resend-webhook",
+      "version": 2,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    },
+    {
+      "slug": "marketing-setup-status",
+      "version": 3,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    }
+  ],
+  "policies": [
+    {
+      "business_id": "a236bd31-5ab5-4c75-b9ee-b6fccc6be624",
+      "enabled": true,
+      "minimum_interval_seconds": 86400,
+      "window_start": "08:00:00",
+      "window_end": "20:00:00",
+      "approval_ref": "User requested marketing restoration for all operators, 2026-10-19",
+      "approved_at": "2026-10-20 04:39:57.819786+00",
+      "first_booking_rule_ref": "Existing rule: stop welcome emails on any non-cancelled reservation, including unpaid"
+    },
+    {
+      "business_id": "af17838c-fdd6-4b84-97c0-1cea39db7c0a",
+      "enabled": true,
+      "minimum_interval_seconds": 86400,
+      "window_start": "08:00:00",
+      "window_end": "20:00:00",
+      "approval_ref": "User requested marketing restoration for all operators, 2026-10-19",
+      "approved_at": "2026-10-20 04:39:57.825408+00",
+      "first_booking_rule_ref": "Existing rule: stop welcome emails on any non-cancelled reservation, including unpaid"
+    },
+    {
+      "business_id": "44ff11ab-c697-47de-9227-0ffa51db127c",
+      "enabled": true,
+      "minimum_interval_seconds": 86400,
+      "window_start": "08:00:00",
+      "window_end": "20:00:00",
+      "approval_ref": "User requested marketing restoration for all operators, 2026-10-19",
+      "approved_at": "2026-10-20 04:39:57.825457+00",
+      "first_booking_rule_ref": "Existing rule: stop welcome emails on any non-cancelled reservation, including unpaid"
+    },
+    {
+      "business_id": "280d9c97-c09d-4ca2-8ffc-37f0b6e31ba7",
+      "enabled": true,
+      "minimum_interval_seconds": 86400,
+      "window_start": "08:00:00",
+      "window_end": "20:00:00",
+      "approval_ref": "User requested marketing restoration for all operators, 2026-10-19",
+      "approved_at": "2026-10-20 04:39:57.825473+00",
+      "first_booking_rule_ref": "Existing rule: stop welcome emails on any non-cancelled reservation, including unpaid"
+    }
+  ],
+  "businesses": [
+    {
+      "id": "280d9c97-c09d-4ca2-8ffc-37f0b6e31ba7",
+      "business_name": "Aonyx",
+      "subdomain": "aonyx",
+      "timezone": "Africa/Johannesburg",
+      "subscription_status": "ACTIVE",
+      "contacts": 1,
+      "campaigns": 0,
+      "automations": 0
+    },
+    {
+      "id": "af17838c-fdd6-4b84-97c0-1cea39db7c0a",
+      "business_name": "Claire's Hiking",
+      "subdomain": "claires-hiking",
+      "timezone": "Africa/Johannesburg",
+      "subscription_status": "ACTIVE",
+      "contacts": 51,
+      "campaigns": 0,
+      "automations": 0
+    },
+    {
+      "id": "44ff11ab-c697-47de-9227-0ffa51db127c",
+      "business_name": "Kayak",
+      "subdomain": "kayak",
+      "timezone": "Africa/Johannesburg",
+      "subscription_status": "ACTIVE",
+      "contacts": 1,
+      "campaigns": 0,
+      "automations": 1
+    },
+    {
+      "id": "a236bd31-5ab5-4c75-b9ee-b6fccc6be624",
+      "business_name": "Ocean Adventures",
+      "subdomain": "ocean",
+      "timezone": "Africa/Johannesburg",
+      "subscription_status": "ACTIVE",
+      "contacts": 1,
+      "campaigns": 0,
+      "automations": 0
+    },
+    {
+      "id": "8d618852-b231-40a5-a65d-2bf46e0e5659",
+      "business_name": "Platform Administration",
+      "subdomain": null,
+      "timezone": "Africa/Johannesburg",
+      "subscription_status": "SUSPENDED",
+      "contacts": 0,
+      "campaigns": 0,
+      "automations": 0
+    }
+  ],
+  "campaigns": [],
+  "queue": [],
+  "automations": [
+    {
+      "business_id": "44ff11ab-c697-47de-9227-0ffa51db127c",
+      "trigger_type": "manual",
+      "status": "draft",
+      "count": 1
+    }
+  ],
+  "enrollments": [],
+  "permissions": [
+    {
+      "business_id": "44ff11ab-c697-47de-9227-0ffa51db127c",
+      "decision": "withdrawn",
+      "source": "contact_status",
+      "count": 7
+    },
+    {
+      "business_id": "44ff11ab-c697-47de-9227-0ffa51db127c",
+      "decision": "withdrawn",
+      "source": "customers_explicit_opt_out",
+      "count": 1
+    },
+    {
+      "business_id": "44ff11ab-c697-47de-9227-0ffa51db127c",
+      "decision": "withdrawn",
+      "source": "existing_booking_opt_out_observed",
+      "count": 12
+    },
+    {
+      "business_id": "af17838c-fdd6-4b84-97c0-1cea39db7c0a",
+      "decision": "withdrawn",
+      "source": "existing_booking_opt_out_observed",
+      "count": 50
+    }
+  ],
+  "deliveries": [],
+  "cron": [
+    {
+      "jobname": "marketing-automation-every-5-min",
+      "schedule": "*/5 * * * *",
+      "active": true
+    },
+    {
+      "jobname": "marketing-dispatch-every-minute",
+      "schedule": "* * * * *",
+      "active": true
+    }
+  ],
+  "definitions": [
+    {
+      "proname": "enroll_welcome_back_sequences",
+      "definition": "CREATE OR REPLACE FUNCTION public.enroll_welcome_back_sequences(p_business_id uuid DEFAULT NULL::uuid, p_limit integer DEFAULT 100)\n RETURNS integer\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nDECLARE item record; affected integer; enrolled integer := 0;\nBEGIN\n  FOR item IN SELECT a.id AS automation_id, a.business_id, c.id AS contact_id, (h->>'last_booking_at')::timestamptz AS anchor\n      FROM marketing_automations a JOIN businesses biz ON biz.id = a.business_id\n      JOIN marketing_contacts c ON c.business_id = a.business_id AND c.status = 'active'\n      CROSS JOIN LATERAL jsonb_build_object('last_booking_at',marketing_last_paid_booking(c.business_id,c.id)) h\n      WHERE a.status = 'active' AND a.trigger_type = 'booking_inactive'\n        AND (p_business_id IS NULL OR a.business_id = p_business_id)\n        AND upper(biz.subscription_status) IN ('ACTIVE','TRIAL','PAST_DUE')\n        AND marketing_eligibility(c.business_id,c.id)='eligible'\n        AND marketing_policy_reason(a.business_id) IN ('eligible','quiet_hours')\n        AND (a.trigger_config->>'days_since_last_booking')::integer BETWEEN 1 AND 3650\n        AND (h->>'last_booking_at')::timestamptz <= now() - make_interval(days => (a.trigger_config->>'days_since_last_booking')::integer)\n        AND welcome_back_contact_eligible(c.business_id,c.id,(h->>'last_booking_at')::timestamptz)\n        AND NOT EXISTS(SELECT 1 FROM marketing_automation_enrollments e WHERE e.automation_id = a.id AND e.contact_id = c.id\n          AND (e.status = 'active' OR (e.metadata->>'last_booking_at')::timestamptz = (h->>'last_booking_at')::timestamptz))\n      ORDER BY (h->>'last_booking_at')::timestamptz, a.id, c.id\n      LIMIT GREATEST(1,LEAST(COALESCE(p_limit,100),500)) LOOP\n    INSERT INTO marketing_automation_enrollments AS e(automation_id,business_id,contact_id,status,current_step,next_action_at,metadata)\n      VALUES(item.automation_id,item.business_id,item.contact_id,'active',0,now(),jsonb_build_object('last_booking_at',item.anchor))\n      ON CONFLICT (automation_id,contact_id) DO UPDATE SET status='active',current_step=0,next_action_at=now(),\n        metadata=EXCLUDED.metadata,created_at=now(),updated_at=now()\n      WHERE e.status <> 'active' AND (e.metadata->>'last_booking_at')::timestamptz IS DISTINCT FROM item.anchor;\n    GET DIAGNOSTICS affected = ROW_COUNT;\n    IF affected > 0 THEN\n      UPDATE marketing_automations SET enrolled_count = enrolled_count + 1 WHERE id = item.automation_id AND business_id = item.business_id;\n      enrolled := enrolled + 1;\n    END IF;\n  END LOOP;\n  RETURN enrolled;\nEND $function$\n"
+    },
+    {
+      "proname": "marketing_guard_active_revision",
+      "definition": "CREATE OR REPLACE FUNCTION public.marketing_guard_active_revision()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nDECLARE aid uuid; a marketing_automations%ROWTYPE;\nBEGIN\n IF TG_TABLE_NAME='marketing_automation_steps' THEN\n   aid:=CASE WHEN TG_OP='DELETE' THEN OLD.automation_id ELSE NEW.automation_id END;\n   SELECT * INTO a FROM marketing_automations WHERE id=aid FOR UPDATE;\n   IF TG_OP='UPDATE' AND NEW.automation_id IS DISTINCT FROM OLD.automation_id AND EXISTS(\n     SELECT 1 FROM marketing_automations prior WHERE prior.id=OLD.automation_id AND (prior.status='active' OR EXISTS(\n       SELECT 1 FROM marketing_automation_enrollments WHERE automation_id=prior.id AND status='active'))) THEN\n     RAISE EXCEPTION 'Active enrollment steps cannot be moved'; END IF;\n   IF a.status='active' OR EXISTS(SELECT 1 FROM marketing_automation_enrollments WHERE automation_id=aid AND status='active') THEN\n     RAISE EXCEPTION 'Active enrollment revisions cannot be edited'; END IF;\n ELSE\n   IF TG_OP='INSERT' THEN\n     IF NEW.status='active' THEN RAISE EXCEPTION 'Create a draft before activation'; END IF;\n     RETURN NEW;\n   END IF;\n   a:=OLD;\n   IF TG_OP='UPDATE' AND NEW.business_id IS DISTINCT FROM OLD.business_id THEN RAISE EXCEPTION 'Journey tenant cannot change'; END IF;\n   IF TG_OP='DELETE' AND a.id='5bb1d74b-8634-4fec-9c42-f6f13cc1c33f' THEN RAISE EXCEPTION 'Review draft deletion is not approved'; END IF;\n   IF TG_OP='UPDATE' THEN\n     IF (a.status='active' OR EXISTS(SELECT 1 FROM marketing_automation_enrollments WHERE automation_id=a.id AND status='active')) AND\n       (NEW.name,NEW.description,NEW.trigger_type,NEW.trigger_config) IS DISTINCT FROM (OLD.name,OLD.description,OLD.trigger_type,OLD.trigger_config) THEN\n       RAISE EXCEPTION 'Active enrollment revisions cannot be edited'; END IF;\n     IF NEW.status='active' AND OLD.status IS DISTINCT FROM 'active' THEN\n       PERFORM marketing_assert_editor(NEW.business_id);\n       IF NOT EXISTS(SELECT 1 FROM marketing_automation_revisions r WHERE r.automation_id=NEW.id AND r.revision=NEW.revision\n         AND (r.snapshot->'automation'->>'name',r.snapshot->'automation'->>'description',r.snapshot->'automation'->>'trigger_type',r.snapshot->'automation'->'trigger_config') IS NOT DISTINCT FROM\n             (NEW.name,NEW.description,NEW.trigger_type,NEW.trigger_config)\n         AND r.snapshot->'steps'=(SELECT coalesce(jsonb_agg(jsonb_build_object('step_type',step_type,'config',config) ORDER BY position),'[]') FROM marketing_automation_steps WHERE automation_id=NEW.id AND business_id=NEW.business_id)\n         AND r.snapshot->'templates'=marketing_revision_templates(NEW.business_id,r.snapshot->'steps')) THEN\n         RAISE EXCEPTION 'Save and review the current content before activation';\n       END IF;\n       IF NEW.revision<1 OR NOT EXISTS(SELECT 1 FROM marketing_automation_revisions WHERE automation_id=NEW.id AND revision=NEW.revision) OR NOT EXISTS(SELECT 1 FROM marketing_automation_steps WHERE automation_id=NEW.id AND step_type='send_email') THEN\n         RAISE EXCEPTION 'Save and review a valid revision before activation'; END IF;\n       IF EXISTS(SELECT 1 FROM marketing_automation_steps WHERE automation_id=NEW.id AND\n         ((step_type IN ('generate_voucher','generate_promo') AND NOT marketing_offer_allowed(NEW.business_id,NEW.id,step_type,config)) OR\n          (step_type='send_email' AND NOT EXISTS(SELECT 1 FROM marketing_templates t WHERE t.id=template_id AND t.business_id=NEW.business_id AND length(btrim(t.html_content))>0)) OR\n          (step_type='delay' AND (CASE WHEN coalesce(config->>'duration','') ~ '^[0-9]+([.][0-9]+)?$' THEN (config->>'duration')::numeric<=0 ELSE true END OR coalesce(config->>'unit','') NOT IN ('minutes','hours','days'))) OR\n          (step_type='condition' AND coalesce(config->>'condition_type','') NOT IN ('has_tag','opened_email','clicked_link')))) THEN\n          RAISE EXCEPTION 'Missing content or unsupported step. Voucher/promo issuance requires separately approved limits.'; END IF;\n       IF NEW.trigger_type='tag_added' AND NEW.trigger_config->>'tag'='completed-tour' AND EXISTS(\n          SELECT 1 FROM marketing_automation_steps WHERE automation_id=NEW.id AND step_type='condition' AND config->>'condition_type'='opened_email') THEN\n          RAISE EXCEPTION 'Review invitations cannot depend on email opens. Review completion is unavailable.'; END IF;\n       IF NOT EXISTS(SELECT 1 FROM marketing_contacts c WHERE c.business_id=NEW.business_id AND marketing_eligibility(NEW.business_id,c.id)='eligible') THEN\n          RAISE EXCEPTION 'No contacts have verified email-marketing permission. Approve the collection notice and evidence first.'; END IF;\n     END IF;\n   END IF;\n END IF;\n IF TG_OP='DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;\nEND $function$\n"
+    },
+    {
+      "proname": "marketing_policy_reason",
+      "definition": "CREATE OR REPLACE FUNCTION public.marketing_policy_reason(p_business_id uuid)\n RETURNS text\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nDECLARE p marketing_delivery_policy%ROWTYPE; zone text; local_time time;\nBEGIN\n SELECT * INTO p FROM marketing_delivery_policy WHERE business_id=p_business_id;\n IF NOT FOUND OR NOT p.enabled OR p.approved_at>clock_timestamp() THEN RETURN 'policy_approval_pending'; END IF;\n SELECT timezone INTO zone FROM businesses WHERE id=p_business_id;\n -- Named zones only: do not guess the operator's location or use the worker's clock zone.\n IF zone IS NULL OR zone NOT LIKE '%/%' OR NOT EXISTS(SELECT 1 FROM pg_timezone_names WHERE name=zone) THEN\n   RETURN 'timezone_unavailable'; END IF;\n local_time:=(clock_timestamp() AT TIME ZONE zone)::time;\n IF local_time<p.window_start OR local_time>=p.window_end THEN RETURN 'quiet_hours'; END IF;\n RETURN 'eligible';\nEND $function$\n"
+    },
+    {
+      "proname": "marketing_step_eligibility",
+      "definition": "CREATE OR REPLACE FUNCTION public.marketing_step_eligibility(p_business_id uuid, p_contact_id uuid, p_enrollment_id uuid DEFAULT NULL::uuid)\n RETURNS text\n LANGUAGE plpgsql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nDECLARE reason text; a marketing_automations%ROWTYPE; e marketing_automation_enrollments%ROWTYPE;\nBEGIN\n reason:=marketing_eligibility(p_business_id,p_contact_id);\n IF reason<>'eligible' THEN RETURN reason; END IF;\n IF p_enrollment_id IS NOT NULL THEN\n   SELECT * INTO e FROM marketing_automation_enrollments WHERE id=p_enrollment_id AND business_id=p_business_id AND contact_id=p_contact_id;\n   IF NOT FOUND OR e.status<>'active' THEN RETURN 'enrollment_inactive'; END IF;\n   SELECT * INTO a FROM marketing_automations WHERE id=e.automation_id AND business_id=p_business_id;\n   IF NOT FOUND OR a.status<>'active' THEN RETURN 'journey_paused'; END IF;\n   IF a.trigger_type='contact_added' AND NOT EXISTS(SELECT 1 FROM marketing_delivery_policy\n      WHERE business_id=p_business_id AND nullif(btrim(first_booking_rule_ref),'') IS NOT NULL) THEN RETURN 'first_booking_policy_pending'; END IF;\n   IF EXISTS(SELECT 1 FROM marketing_automation_steps WHERE automation_id=a.id AND business_id=p_business_id\n      AND step_type IN ('generate_voucher','generate_promo')) THEN RETURN 'offer_issuance_unavailable'; END IF;\n   IF a.trigger_type IN ('date_field','post_booking') THEN RETURN 'domain_event_binding_unavailable'; END IF;\n   -- These tags are not bound to verified domain events in the current engine.\n   IF a.trigger_type='tag_added' AND a.trigger_config->>'tag' IN ('completed-tour','left-review','photos-ready','anniversary-1yr','vip') THEN\n      RETURN 'domain_event_binding_unavailable'; END IF;\n   IF a.trigger_type='tag_added' AND a.trigger_config->>'tag'='voucher-expiring-30d' THEN RETURN 'voucher_expiry_schedule_unavailable'; END IF;\n   IF nullif(e.metadata->>'voucher_code','') IS NOT NULL AND NOT EXISTS(\n     SELECT 1 FROM vouchers v JOIN marketing_contacts c ON c.id=p_contact_id AND c.business_id=v.business_id\n     WHERE v.business_id=p_business_id AND v.code=e.metadata->>'voucher_code' AND v.status='ACTIVE' AND v.current_balance>0\n       AND (v.expires_at IS NULL OR v.expires_at>now()) AND lower(btrim(v.recipient_email))=lower(btrim(c.email))) THEN RETURN 'voucher_ineligible'; END IF;\n   IF nullif(e.metadata->>'promo_code','') IS NOT NULL AND NOT EXISTS(\n     SELECT 1 FROM promotions p WHERE p.business_id=p_business_id AND p.code=e.metadata->>'promo_code' AND p.active\n       AND (p.valid_from IS NULL OR p.valid_from<=now()) AND (p.valid_until IS NULL OR p.valid_until>now())\n       AND (p.max_uses IS NULL OR coalesce(p.used_count,0)<p.max_uses)) THEN RETURN 'promo_ineligible'; END IF;\n   IF a.trigger_type='contact_added' AND marketing_has_reservation(p_business_id,p_contact_id) THEN RETURN 'already_booked'; END IF;\n   IF a.trigger_type='booking_inactive' AND (marketing_has_reservation(p_business_id,p_contact_id,(e.metadata->>'last_booking_at')::timestamptz)\n      OR NOT welcome_back_contact_eligible(p_business_id,p_contact_id,(e.metadata->>'last_booking_at')::timestamptz)) THEN RETURN 'rebooked_or_upcoming'; END IF;\n END IF;\n RETURN 'eligible';\nEND $function$\n"
+    },
+    {
+      "proname": "validate_welcome_back_enrollment",
+      "definition": "CREATE OR REPLACE FUNCTION public.validate_welcome_back_enrollment(p_enrollment_id uuid, p_business_id uuid)\n RETURNS boolean\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nDECLARE e marketing_automation_enrollments%ROWTYPE; a marketing_automations%ROWTYPE;\nBEGIN\n  SELECT * INTO e FROM marketing_automation_enrollments WHERE id=p_enrollment_id AND business_id=p_business_id FOR UPDATE;\n  IF NOT FOUND OR e.status <> 'active' THEN RETURN false; END IF;\n  SELECT * INTO a FROM marketing_automations WHERE id=e.automation_id AND business_id=e.business_id;\n  IF NOT FOUND OR a.status <> 'active' THEN RETURN false; END IF;\n  IF a.trigger_type <> 'booking_inactive' THEN RETURN true; END IF;\n  IF NOT COALESCE(welcome_back_contact_eligible(e.business_id,e.contact_id,(e.metadata->>'last_booking_at')::timestamptz),false) THEN\n    UPDATE marketing_automation_enrollments SET status='exited',updated_at=now() WHERE id=e.id;\n    RETURN false;\n  END IF;\n  RETURN true;\nEND $function$\n"
+    },
+    {
+      "proname": "welcome_back_contact_eligible",
+      "definition": "CREATE OR REPLACE FUNCTION public.welcome_back_contact_eligible(p_business_id uuid, p_contact_id uuid, p_anchor timestamp with time zone)\n RETURNS boolean\n LANGUAGE sql\n STABLE SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\n  SELECT EXISTS(SELECT 1 FROM marketing_contacts c\n    WHERE c.id = p_contact_id AND c.business_id = p_business_id AND c.status = 'active'\n      AND marketing_last_paid_booking(c.business_id,c.id) = p_anchor\n      AND NOT EXISTS(SELECT 1 FROM bookings b LEFT JOIN slots s ON s.id = b.slot_id AND s.business_id = b.business_id\n        WHERE b.business_id = c.business_id AND b.status IS DISTINCT FROM 'CANCELLED'\n          AND (lower(trim(b.email)) = lower(trim(c.email)) OR\n            (NULLIF(booking_contact_phone(c.phone),'') IS NOT NULL AND booking_contact_phone(b.phone) = booking_contact_phone(c.phone)))\n          AND (b.created_at > p_anchor OR s.start_time > now())));\n$function$\n"
+    }
+  ],
+  "status": [
+    {
+      "business_id": "280d9c97-c09d-4ca2-8ffc-37f0b6e31ba7",
+      "business_name": "Aonyx",
+      "email_service_configured": true,
+      "email_feedback_configured": true,
+      "operator_status": "quiet_hours",
+      "welcome_back_available": true
+    },
+    {
+      "business_id": "af17838c-fdd6-4b84-97c0-1cea39db7c0a",
+      "business_name": "Claire's Hiking",
+      "email_service_configured": true,
+      "email_feedback_configured": true,
+      "operator_status": "quiet_hours",
+      "welcome_back_available": true
+    },
+    {
+      "business_id": "44ff11ab-c697-47de-9227-0ffa51db127c",
+      "business_name": "Kayak",
+      "email_service_configured": true,
+      "email_feedback_configured": true,
+      "operator_status": "quiet_hours",
+      "welcome_back_available": true
+    },
+    {
+      "business_id": "a236bd31-5ab5-4c75-b9ee-b6fccc6be624",
+      "business_name": "Ocean Adventures",
+      "email_service_configured": true,
+      "email_feedback_configured": true,
+      "operator_status": "quiet_hours",
+      "welcome_back_available": true
+    },
+    {
+      "business_id": "8d618852-b231-40a5-a65d-2bf46e0e5659",
+      "business_name": "Platform Administration",
+      "email_service_configured": true,
+      "email_feedback_configured": true,
+      "operator_status": "policy_approval_pending",
+      "welcome_back_available": true
+    }
+  ]
+}

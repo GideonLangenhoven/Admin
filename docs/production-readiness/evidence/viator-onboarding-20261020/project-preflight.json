@@ -1,0 +1,53 @@
+{
+  "at": "2026-10-20T11:55:33.236Z",
+  "project_ref": "ukdsrndqhsatjkmxijuj",
+  "operation": "read-only",
+  "inventory": {
+    "tours": 12,
+    "bookings": 254,
+    "customers": 64,
+    "businesses": 5,
+    "ota_boundary": "BLOCKED",
+    "viator_enabled": 0,
+    "viator_mappings": 0,
+    "booking_triggers": [
+      "advance_arrival_approval_version",
+      "block_read_only_admin_write",
+      "cancel_booking_notification_jobs",
+      "ck_booking_after_paid_status",
+      "ck_booking_before_paid_status",
+      "ck_booking_sync_marketing_contact",
+      "enforce_chat_booking_pricing",
+      "enqueue_replacement_booking_notification_job",
+      "mark_first_operator_booking",
+      "marketing_booking_withdrawal",
+      "protect_checkout_request",
+      "protect_payment_recovery_fields",
+      "strip_anon_booking_money",
+      "trg_audit_direct_booking_arrival",
+      "trg_set_waiver_token_expiry",
+      "trg_sync_booking_arrival_state",
+      "zero_anon_booking_money"
+    ],
+    "future_departures": 200,
+    "public_ota_routines": [
+      {
+        "name": "ota_apply_operation",
+        "anon_execute": false,
+        "service_execute": true
+      },
+      {
+        "name": "ota_assert_sandbox",
+        "anon_execute": false,
+        "service_execute": true
+      },
+      {
+        "name": "ota_expire_reservations",
+        "anon_execute": false,
+        "service_execute": true
+      }
+    ],
+    "viator_integrations": 0,
+    "businesses_with_future_departures": 3
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "at": "2026-10-19T09:28:04.866Z",
+  "origin": "https://admin.bookingtours.co.za",
+  "checks": [
+    {
+      "path": "/settings",
+      "role": "MAIN_ADMIN",
+      "width": 390,
+      "passed": true,
+      "synthetic_writes": 3,
+      "page_errors": 0
+    },
+    {
+      "path": "/settings",
+      "role": "MAIN_ADMIN",
+      "width": 1280,
+      "passed": true,
+      "synthetic_writes": 3,
+      "page_errors": 0
+    },
+    {
+      "path": "/super-admin",
+      "role": "SUPER_ADMIN",
+      "width": 390,
+      "passed": true,
+      "synthetic_writes": 3,
+      "page_errors": 0
+    },
+    {
+      "path": "/super-admin",
+      "role": "SUPER_ADMIN",
+      "width": 1280,
+      "passed": true,
+      "synthetic_writes": 3,
+      "page_errors": 0
+    }
+  ],
+  "live_account_writes": 0
+}

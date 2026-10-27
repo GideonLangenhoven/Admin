@@ -23,7 +23,7 @@ function statusForCode(code: string | undefined) {
   return 400;
 }
 
-export async function handleBookingArrivalRequest(req: Request, source: "simple-view" | "guide-pwa" | "dashboard" | "bookings") {
+export async function handleBookingArrivalRequest(req: Request, source: "simple-view" | "guide-pwa" | "dashboard" | "bookings", guide = false) {
   const authorization = req.headers.get("authorization") || req.headers.get("Authorization") || "";
   if (!/^Bearer\s+\S+$/i.test(authorization)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -63,7 +63,7 @@ export async function handleBookingArrivalRequest(req: Request, source: "simple-
     return NextResponse.json({ error: "client_event_id is required and must be 160 characters or fewer" }, { status: 400 });
   }
 
-  const { data, error } = await authenticatedClient(authorization).rpc("record_authenticated_booking_arrival", {
+  const { data, error } = await authenticatedClient(authorization).rpc(guide ? "record_guide_booking_arrival" : "record_authenticated_booking_arrival", {
     p_booking_id: bookingId,
     p_business_id: businessId,
     p_arrived_count: arrivedCount,

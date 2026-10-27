@@ -1,0 +1,303 @@
+{
+  "date": "2026-10-15",
+  "status": "DEPLOYED",
+  "snapshot_time": "2026-10-15 16:33 Africa/Johannesburg",
+  "admin": {
+    "previous": "dpl_DGqDLHzsfR5kDUAcCXiHM6gX57VR",
+    "deployment": "dpl_6dmkz7W8U4wj9MQLNSgcGj8dhwMB",
+    "url": "https://admin.bookingtours.co.za",
+    "state": "READY",
+    "source_files_verified": 463
+  },
+  "scope": [
+    "failed Yoco payment recovery and operator email",
+    "direct WhatsApp client contact",
+    "previous paid booking history and returning confirmation greeting",
+    "operator automatic WhatsApp discount rules",
+    "welcome-back email draft configuration",
+    "marketing permission, suppression, delivery and revision controls",
+    "operator day consistency, arrivals and account/reseller approvals",
+    "atomic walk-in booking with adult/child and configured participant questions",
+    "confirmed-unpaid accounting and cancellation correction"
+  ],
+  "database": {
+    "files": [
+      {
+        "name": "20261015120000_payment_recovery.sql",
+        "version": "20261015120000",
+        "sha256": "9c735d875fa5a1f06f081e4b1a5c0bd7a7f1175f4df4d2974dfb7cf59809bb2a"
+      },
+      {
+        "name": "20261015140000_customer_return_history.sql",
+        "version": "20261015140000",
+        "sha256": "9233c83f2a64bf2ad271c42d21000a0baab06870bdc1179d7bc953a631768641"
+      },
+      {
+        "name": "20261015150000_welcome_back_email_sequences.sql",
+        "version": "20261015150000",
+        "sha256": "e2856f1d3691435007b21e4b5c8dd62c20f054858ef349b5f2e54625f01074ca"
+      },
+      {
+        "name": "20261015160000_marketing_permission_safety.sql",
+        "version": "20261015160000",
+        "sha256": "07001f1a11618a0661582057c935633a95491d3004bea54c63d79f72c7ca8bd5"
+      },
+      {
+        "name": "20261015161000_marketing_draft_revisions.sql",
+        "version": "20261015161000",
+        "sha256": "a48a1bf349e646c27aa7cbf78fa74f42877f9c6919088cf92ec4de0f5bdc78d6"
+      },
+      {
+        "name": "20261015170000_operator_daily_consistency.sql",
+        "version": "20261015170000",
+        "sha256": "8555ef18bc5c3601a9740bd8cb33ea614c7330589ae099cca47f627c12312559"
+      },
+      {
+        "name": "20261015171000_operator_booking_transaction.sql",
+        "version": "20261015171000",
+        "sha256": "96bdde584a2be69f336793035732946ad1431096251d5855e676af7fcfcde5c3"
+      },
+      {
+        "name": "20261015172000_operator_cancellation_money.sql",
+        "version": "20261015172000",
+        "sha256": "bb98c97ebbc0084c6bc918b0a62cac290d8c78a522ca501bfdc0034b747374b5"
+      },
+      {
+        "name": "20261015180000_marketing_closeout_hold.sql",
+        "version": "20261015180000",
+        "sha256": "a9e2a8fe73a6d0b2b635feecc469a74f7a23b54c68639339bdfe9802a9fef3f1"
+      }
+    ],
+    "tables": [
+      {
+        "relname": "booking_arrival_approvals",
+        "relrowsecurity": true
+      },
+      {
+        "relname": "marketing_automation_revisions",
+        "relrowsecurity": true
+      },
+      {
+        "relname": "marketing_deliveries",
+        "relrowsecurity": true
+      },
+      {
+        "relname": "marketing_delivery_policy",
+        "relrowsecurity": true
+      },
+      {
+        "relname": "marketing_journey_status_events",
+        "relrowsecurity": true
+      },
+      {
+        "relname": "marketing_offer_limits",
+        "relrowsecurity": true
+      },
+      {
+        "relname": "marketing_permission_events",
+        "relrowsecurity": true
+      },
+      {
+        "relname": "operator_booking_requests",
+        "relrowsecurity": true
+      }
+    ],
+    "grants": [
+      {
+        "proname": "approve_account_arrival",
+        "anon": false,
+        "authenticated": true,
+        "service": false
+      },
+      {
+        "proname": "confirm_marketing_delivery",
+        "anon": false,
+        "authenticated": false,
+        "service": true
+      },
+      {
+        "proname": "create_operator_booking",
+        "anon": false,
+        "authenticated": true,
+        "service": false
+      },
+      {
+        "proname": "customer_booking_history",
+        "anon": false,
+        "authenticated": false,
+        "service": true
+      },
+      {
+        "proname": "enroll_welcome_back_sequences",
+        "anon": false,
+        "authenticated": false,
+        "service": true
+      },
+      {
+        "proname": "marketing_policy_reason",
+        "anon": false,
+        "authenticated": false,
+        "service": true
+      },
+      {
+        "proname": "operator_booking_history",
+        "anon": false,
+        "authenticated": true,
+        "service": true
+      },
+      {
+        "proname": "operator_departure_manifest",
+        "anon": false,
+        "authenticated": true,
+        "service": true
+      },
+      {
+        "proname": "prepare_payment_recovery",
+        "anon": false,
+        "authenticated": false,
+        "service": true
+      },
+      {
+        "proname": "record_booking_payment_failure",
+        "anon": false,
+        "authenticated": false,
+        "service": true
+      },
+      {
+        "proname": "reserve_marketing_delivery",
+        "anon": false,
+        "authenticated": false,
+        "service": true
+      },
+      {
+        "proname": "resolve_booking_discount",
+        "anon": false,
+        "authenticated": false,
+        "service": true
+      }
+    ],
+    "held": [
+      {
+        "policies": 0,
+        "enabled": 0
+      }
+    ]
+  },
+  "functions": {
+    "checked_at": "2026-10-15T14:38:29.831Z",
+    "functions": [
+      {
+        "slug": "wa-webhook",
+        "version": 239,
+        "verify_jwt": false,
+        "sha256": "7a3e133126c01a41707f30c516ef8c82c3ce8f90f06d4a5ab4031b573c3609da"
+      },
+      {
+        "slug": "yoco-webhook",
+        "version": 133,
+        "verify_jwt": false,
+        "sha256": "51a7bf1f5ccb9f72ba8c5c165b94082cf472fd8ccbb2f44e85de23578432c16a"
+      },
+      {
+        "slug": "auto-messages",
+        "version": 98,
+        "verify_jwt": false,
+        "sha256": "bfef475d020ec7bf72f83592bbf1f3290c0c0263e4ee1c74cdb33f72bddb2db8"
+      },
+      {
+        "slug": "broadcast",
+        "version": 84,
+        "verify_jwt": true,
+        "sha256": "c6f4cc8dbb6a08935c33cd600367a93df3ce988299e1f167f17deeeb42033dc3"
+      },
+      {
+        "slug": "send-email",
+        "version": 188,
+        "verify_jwt": false,
+        "sha256": "2086046af5bc4ee47331f04f1ccf4db082bf275ace87e5effafd0f8296553249"
+      },
+      {
+        "slug": "marketing-dispatch",
+        "version": 64,
+        "verify_jwt": false,
+        "sha256": "7f5ff5bf77871dedb3a88f30c77c86da842e768ce8b0738e52a7001f8a87bc5f"
+      },
+      {
+        "slug": "marketing-track",
+        "version": 40,
+        "verify_jwt": false,
+        "sha256": "59dde630b8b52a5caa41af4c6ea0070f6717e0c36add3b9e9cc397d21993f5e4"
+      },
+      {
+        "slug": "marketing-unsubscribe",
+        "version": 45,
+        "verify_jwt": false,
+        "sha256": "d71e619069c12d2516541908fa0ab4edb83c2f13d25df13f6286a16a6cb7ab0a"
+      },
+      {
+        "slug": "marketing-automation-dispatch",
+        "version": 58,
+        "verify_jwt": false,
+        "sha256": "d9d793394f3c48c2db0e82753c0688acda8f7140e35effa2fdf4bf43617d54c2"
+      },
+      {
+        "slug": "resend-webhook",
+        "version": 1,
+        "verify_jwt": false,
+        "sha256": "af20ef10b72ad43e32f7724102c0234db67dcc6f61ad75d17c9555e1c1fe3f2f"
+      }
+    ],
+    "unrelatedFunctionsUnchanged": true
+  },
+  "help": {
+    "status": 200,
+    "result": {
+      "ok": true,
+      "total": 169,
+      "embedded": 9,
+      "skipped": 160,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    },
+    "articles": [
+      "bookings",
+      "marketing",
+      "payment-reminders",
+      "simple-view"
+    ]
+  },
+  "validation": {
+    "final_targeted_unit_tests": 427,
+    "deployed_mocked_browser_tests": 5,
+    "operator_synthetic_browser_tests": 7,
+    "operator_postgres_acceptance_groups": 16,
+    "typescript": "PASS",
+    "deno_ten_entrypoints": "PASS",
+    "production_migration_rehearsal": "PASS rollback then exact-source commit",
+    "uploaded_source": "PASS all 463 files match tested candidate",
+    "live_access_checks": {
+      "passed": 19,
+      "evidence": "todays-changes-deployment-20261015/smoke-results.json"
+    }
+  },
+  "limitations": [
+    "Automated welcome-back and affected promotional delivery are held; no commercial policy, consent or offer approval is invented.",
+    "Resend callback is deployed but has no signing-secret/provider configuration; it safely returns 503 until configured.",
+    "No real customer payment, booking or message was submitted by release verification.",
+    "Pre-existing PAUSED_BY_USER / FAILED_GATE qualification status and dormant agent/OTA boundaries are unchanged.",
+    "Release uses the verified snapshot; concurrent later working-tree edits and unintegrated marketing review patches are preserved. Exact deployed differences and migration sources are stored alongside this record."
+  ],
+  "rollback": "Keep suppression/delivery evidence and the new promotional gates. Do not restore an ungated marketing dispatcher or old reservation RPC. UI can be rolled back independently.",
+  "follow_up_release": {
+    "record": "GUIDE_ACCESS_DEPLOYMENT_20261015.json",
+    "deployment": "dpl_4v2DFh5cJqNDVfFZWgAeK7qXc9EZ",
+    "status": "DEPLOYED_AND_VERIFIED"
+  },
+  "latest_follow_up": {
+    "record": "ALL_CHANGES_DEPLOYMENT_20261015.json",
+    "deployment": "dpl_749ZGg63mBwEQ4zfdG8bdWUPEuCZ",
+    "guest_deployment": "dpl_DEtYg9jBcEThHpReFGiaJE6dX4qZ",
+    "status": "DEPLOYED_AND_VERIFIED"
+  }
+}

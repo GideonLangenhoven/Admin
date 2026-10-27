@@ -1,0 +1,12 @@
+{
+  "verified_at": "2026-10-08T19:34:19.339Z",
+  "target_project": "gwwnkihblioayklptdab",
+  "sql_sha256": "bfcc485d1ca2d12d59f99332089fbbe66dcc97306d902fde9ee280a3d6d6f9a1",
+  "checks": 8,
+  "report": {
+    "connection_list_fixed": true,
+    "function_owner_preserved": true,
+    "enabled_connectors": "0"
+  },
+  "boundary": "Local PostgreSQL 17 synthetic identities: reproduces 42702, proves empty/populated projections, owner/ACL preservation, tenant/direct-access denial and safe repeat application. No hosted mutation or provider activation."
+}

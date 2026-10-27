@@ -1,0 +1,55 @@
+{
+  "at": "2026-10-21T13:56:25.803Z",
+  "origin": "https://admin.bookingtours.co.za",
+  "checks": [
+    {
+      "path": "/new-booking",
+      "status": 200,
+      "scripts_checked": 18,
+      "stylesheets_checked": 3,
+      "copy_verified": true
+    },
+    {
+      "path": "/bookings",
+      "status": 200,
+      "scripts_checked": 21,
+      "stylesheets_checked": 3,
+      "copy_verified": true
+    },
+    {
+      "path": "/simple/bookings",
+      "status": 200,
+      "scripts_checked": 21,
+      "stylesheets_checked": 3,
+      "copy_verified": true
+    },
+    {
+      "path": "/inbox",
+      "status": 200,
+      "scripts_checked": 17,
+      "stylesheets_checked": 2,
+      "copy_verified": true
+    },
+    {
+      "path": "/reports",
+      "status": 200,
+      "scripts_checked": 18,
+      "stylesheets_checked": 3,
+      "copy_verified": true
+    },
+    {
+      "path": "/billing",
+      "status": 200,
+      "scripts_checked": 16,
+      "stylesheets_checked": 2,
+      "copy_verified": true
+    },
+    {
+      "path": "/broadcasts",
+      "status": 200,
+      "scripts_checked": 17,
+      "stylesheets_checked": 2,
+      "copy_verified": true
+    }
+  ]
+}

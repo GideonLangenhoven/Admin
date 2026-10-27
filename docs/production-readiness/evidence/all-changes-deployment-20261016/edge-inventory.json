@@ -1,0 +1,76 @@
+[
+  {
+    "slug": "admin-help-chat",
+    "version": 26,
+    "verify_jwt": false,
+    "status": "ACTIVE",
+    "files": [
+      "supabase/functions/admin-help-chat/index.ts",
+      "supabase/functions/_shared/tenant.ts",
+      "supabase/functions/_shared/pagination.ts",
+      "supabase/functions/_shared/auth.ts",
+      "supabase/functions/_shared/llm.ts",
+      "supabase/functions/_shared/openrouter-provider.ts",
+      "supabase/functions/_shared/kb.ts",
+      "supabase/functions/_shared/demo-guide.ts"
+    ],
+    "changes": [
+      "supabase/functions/admin-help-chat/index.ts"
+    ]
+  },
+  {
+    "slug": "bank-details",
+    "version": 28,
+    "verify_jwt": true,
+    "status": "ACTIVE",
+    "files": [
+      "supabase/functions/bank-details/index.ts"
+    ],
+    "changes": [
+      "supabase/functions/bank-details/index.ts"
+    ]
+  },
+  {
+    "slug": "onboarding-wizard",
+    "version": 11,
+    "verify_jwt": false,
+    "status": "ACTIVE",
+    "files": [
+      "supabase/functions/onboarding-wizard/index.ts",
+      "supabase/functions/_shared/otp-attempts.ts",
+      "supabase/functions/_shared/slot-generation.ts",
+      "supabase/functions/_shared/onboarding-guards.ts"
+    ],
+    "changes": [
+      "supabase/functions/onboarding-wizard/index.ts"
+    ]
+  },
+  {
+    "slug": "web-chat",
+    "version": 151,
+    "verify_jwt": false,
+    "status": "ACTIVE",
+    "files": [
+      "supabase/functions/web-chat/index.ts",
+      "supabase/functions/_shared/sentry.ts",
+      "supabase/functions/_shared/duration.ts",
+      "supabase/functions/_shared/tenant.ts",
+      "supabase/functions/_shared/pagination.ts",
+      "supabase/functions/_shared/bot-guards.ts",
+      "supabase/functions/_shared/intent.ts",
+      "supabase/functions/_shared/subscription.ts",
+      "supabase/functions/_shared/booking-custom-fields.ts",
+      "supabase/functions/_shared/chat-booking-pricing.ts",
+      "supabase/functions/_shared/chat-contact.ts",
+      "supabase/functions/_shared/platform-invariants.ts",
+      "supabase/functions/_shared/llm.ts",
+      "supabase/functions/_shared/openrouter-provider.ts",
+      "supabase/functions/_shared/kb.ts",
+      "supabase/functions/_shared/customer-session.ts",
+      "supabase/functions/_shared/web-chat-session.ts"
+    ],
+    "changes": [
+      "supabase/functions/web-chat/index.ts"
+    ]
+  }
+]

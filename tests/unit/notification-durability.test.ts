@@ -16,6 +16,7 @@ function workerFixture(response: Response | Error | "hang", finishFails = false,
   const supabase = {
     rpc: vi.fn(async (name: string, args: Record<string, unknown>) => {
       calls.push({ name, args });
+      if (name === "enqueue_manual_payment_reminders") return { data: 0, error: null };
       if (name === "claim_notification_jobs") return { data: [job], error: null };
       if (name === "validate_notification_job") return { data: eligibility, error: null };
       if (name === "finish_notification_job") {

@@ -1,0 +1,56 @@
+[
+  {
+    "case": "get",
+    "status": 503,
+    "cache_control": "no-store",
+    "body": {
+      "ok": false,
+      "code": "INTEGRATION_DISABLED"
+    }
+  },
+  {
+    "case": "post",
+    "status": 503,
+    "cache_control": "no-store",
+    "body": {
+      "ok": false,
+      "code": "INTEGRATION_DISABLED"
+    }
+  },
+  {
+    "case": "forged",
+    "status": 503,
+    "cache_control": "no-store",
+    "body": {
+      "ok": false,
+      "code": "INTEGRATION_DISABLED"
+    }
+  },
+  {
+    "case": "unsupported",
+    "status": 503,
+    "cache_control": "no-store",
+    "body": {
+      "ok": false,
+      "code": "INTEGRATION_DISABLED"
+    }
+  },
+  {
+    "case": "head",
+    "status": 503,
+    "cache_control": "no-store"
+  },
+  {
+    "case": "home",
+    "status": 200,
+    "cache_control": "public, max-age=0, must-revalidate"
+  },
+  {
+    "case": "auth",
+    "status": 401,
+    "cache_control": "public, max-age=0, must-revalidate",
+    "body": {
+      "error": "Unauthorized"
+    }
+  }
+]

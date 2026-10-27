@@ -1,0 +1,138 @@
+{
+  "authorization": "please deploy all changes made today",
+  "status": "deployed and verified",
+  "verified_at": "2026-10-08T08:49:42.160546+00:00",
+  "admin": {
+    "deployment": "dpl_9sDQ5vztJayELXWVJ64SP5eP4ZcP",
+    "deployment_url": "https://caepweb-admin-8tz85hupx-jerrys-projects-f4e4eaf9.vercel.app",
+    "production_url": "https://admin.bookingtours.co.za/",
+    "state": "READY",
+    "previous_deployment": "dpl_F3pqbpucFqNR4sypXrGbgaRJsXvT"
+  },
+  "scope": {
+    "date": "2026-10-08",
+    "features": [
+      "Reviews integrated into Reports",
+      "Tour date-range and specific-date scheduling",
+      "Calendar positioning",
+      "Responsive help-chat panel"
+    ],
+    "runtime_files": [
+      "app/reports/page.tsx",
+      "app/reviews/page.tsx",
+      "app/settings/page.tsx",
+      "app/lib/tour-slot-generation.ts",
+      "components/DatePicker.tsx",
+      "components/HelpChat.tsx",
+      "components/SectionTabs.tsx",
+      "components/ReportsLayout.tsx"
+    ],
+    "help_articles": [
+      "docs/admin-help/reports.md",
+      "docs/admin-help/settings.md"
+    ],
+    "source_baseline": "dpl_F3pqbpucFqNR4sypXrGbgaRJsXvT",
+    "source_snapshot": "/private/tmp/bookingtours-today-deploy-20261008-J0wQ1X/admin"
+  },
+  "checks": {
+    "unit_tests": {
+      "passed": 2097,
+      "skipped": 56,
+      "failed": 0
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 18
+    },
+    "production_build": "passed, including TypeScript and all 95 static pages",
+    "email_service_authorization": "passed; no email sent",
+    "uploaded_source": {
+      "deploymentId": "dpl_9sDQ5vztJayELXWVJ64SP5eP4ZcP",
+      "verifiedAt": "2026-10-08T08:40:48.257Z",
+      "files": 439,
+      "allMatch": true
+    },
+    "public_http": {
+      "checkedAt": "2026-10-08T08:47:01.083Z",
+      "passed": true,
+      "rows": [
+        {
+          "url": "https://admin.bookingtours.co.za/",
+          "expected": 200,
+          "status": 200,
+          "cacheControl": "public, max-age=0, must-revalidate"
+        },
+        {
+          "url": "https://admin.bookingtours.co.za/reports",
+          "expected": 200,
+          "status": 200,
+          "cacheControl": "public, max-age=0, must-revalidate"
+        },
+        {
+          "url": "https://admin.bookingtours.co.za/reviews",
+          "expected": 200,
+          "status": 200,
+          "cacheControl": "public, max-age=0, must-revalidate"
+        },
+        {
+          "url": "https://admin.bookingtours.co.za/settings",
+          "expected": 200,
+          "status": 200,
+          "cacheControl": "public, max-age=0, must-revalidate"
+        },
+        {
+          "url": "https://kayak.admin.bookingtours.co.za/",
+          "expected": 200,
+          "status": 200,
+          "cacheControl": "public, max-age=0, must-revalidate"
+        },
+        {
+          "url": "https://claires-hiking.admin.bookingtours.co.za/",
+          "expected": 200,
+          "status": 200,
+          "cacheControl": "public, max-age=0, must-revalidate"
+        },
+        {
+          "url": "https://admin.bookingtours.co.za/api/admin/chat-faq",
+          "expected": 401,
+          "status": 401,
+          "cacheControl": "public, max-age=0, must-revalidate"
+        },
+        {
+          "url": "https://admin.bookingtours.co.za/api/agent/read",
+          "expected": 503,
+          "status": 503,
+          "cacheControl": "no-store"
+        }
+      ]
+    },
+    "deployed_browser": {
+      "passed": true,
+      "origin": "https://admin.bookingtours.co.za",
+      "results": [
+        "Shared Reports heading, width, all six tabs, direct Financials reload, and review moderation passed.",
+        "Help panel and calendar picker fit phone and landscape viewports.",
+        "Specific-date and range scheduling controls switch, add, and remove dates correctly.",
+        "Responsive checks at 320, 390, 768, and 1024 pixels and existing permission/demo/suspension rules passed."
+      ]
+    },
+    "browser_data": "isolated fixtures; API writes intercepted"
+  },
+  "help_sync": {
+    "status": 200,
+    "ok": true,
+    "total": 165,
+    "embedded": 5,
+    "skipped": 160,
+    "removed": 0,
+    "failed": 0
+  },
+  "boundaries": {
+    "git_commit_or_push": false,
+    "database_migration": false,
+    "edge_function_change": false,
+    "customer_booking_payment_or_message_submitted_by_checks": false,
+    "wider_rollout": "PAUSED_BY_USER / FAILED_GATE, not resumed"
+  },
+  "evidence_directory": "/private/tmp/bookingtours-today-deploy-20261008-J0wQ1X"
+}

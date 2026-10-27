@@ -1,0 +1,46 @@
+{
+  "at": "2026-10-15T16:32:50.464Z",
+  "deployment": "dpl_9jATfEpt4yWvmhF1SUh4MAahrLox",
+  "results": [
+    {
+      "path": "/",
+      "status": 200
+    },
+    {
+      "path": "/simple",
+      "status": 200
+    },
+    {
+      "path": "/marketing",
+      "status": 200
+    },
+    {
+      "path": "/marketing/contacts",
+      "status": 200
+    },
+    {
+      "path": "/marketing/promotions",
+      "status": 200
+    },
+    {
+      "path": "/marketing/automations",
+      "status": 200
+    },
+    {
+      "path": "/marketing/automations/new",
+      "status": 200
+    },
+    {
+      "path": "/settings",
+      "status": 200
+    },
+    {
+      "path": "/guide-setup",
+      "status": 200
+    },
+    {
+      "path": "/new-booking",
+      "status": 200
+    }
+  ]
+}

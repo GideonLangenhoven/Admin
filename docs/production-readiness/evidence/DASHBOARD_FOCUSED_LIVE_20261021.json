@@ -1,0 +1,116 @@
+{
+  "at": "2026-10-21T14:42:32.785489+00:00",
+  "authorization": "User explicitly requested: please make it live",
+  "branch": "feature/dashboard-focused-20261021",
+  "dashboard_commit": "b31c5de",
+  "release_refinement_commit": "bce05f9",
+  "deployment": {
+    "id": "dpl_3EKQx428LDraotpRs5ctHrvgrhMg",
+    "url": "caepweb-admin-ezxefxvdb-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 515,
+    "changed": [
+      "app/dashboard.module.css",
+      "app/lib/payment-recovery.ts",
+      "app/page.tsx",
+      "components/DashboardComposition.tsx",
+      "components/DashboardContact.tsx",
+      "components/PaymentRecoveryPanel.tsx",
+      "components/WindguruWidget.tsx",
+      "public/fonts/lato/Lato-Bold.woff2",
+      "public/fonts/lato/Lato-Regular.woff2",
+      "public/fonts/lato/OFL.txt",
+      "components/AppShell.tsx"
+    ],
+    "build": "READY",
+    "production_target_verified": true
+  },
+  "preserved_production_baseline": {
+    "id": "dpl_GUYkbCn7rkk6pgqPuBAPzMSF2oY2",
+    "url": "caepweb-admin-oxviqhpaj-jerrys-projects-f4e4eaf9.vercel.app",
+    "files": 509,
+    "unchanged_files": 504
+  },
+  "live_pages": {
+    "at": "2026-10-21T14:41:18.738Z",
+    "origin": "https://admin.bookingtours.co.za",
+    "checks": [
+      {
+        "path": "/",
+        "status": 200,
+        "assets_checked": 20,
+        "copy_verified": true
+      },
+      {
+        "path": "/slots",
+        "status": 200,
+        "assets_checked": 18,
+        "copy_verified": true
+      },
+      {
+        "path": "/refunds",
+        "status": 200,
+        "assets_checked": 16,
+        "copy_verified": true
+      },
+      {
+        "path": "/invoices",
+        "status": 200,
+        "assets_checked": 17,
+        "copy_verified": true
+      },
+      {
+        "path": "/marketing/contacts",
+        "status": 200,
+        "assets_checked": 19,
+        "copy_verified": true
+      }
+    ]
+  },
+  "font_delivery": {
+    "at": "2026-10-21T14:41:14.228Z",
+    "origin": "https://admin.bookingtours.co.za",
+    "fonts": [
+      {
+        "path": "/fonts/lato/Lato-Regular.woff2",
+        "status": 200,
+        "bytes": 211928,
+        "sha256": "92151a5256255fff1e99abaada09fe5be6002e68078e74e12ec39e6354aedd59"
+      },
+      {
+        "path": "/fonts/lato/Lato-Bold.woff2",
+        "status": 200,
+        "bytes": 211516,
+        "sha256": "b19158d418134fec815b33339c35f6a7f89dc69ecdcc3ed095f95c56faf96983"
+      }
+    ],
+    "stylesheets_checked": 4,
+    "font_declarations_served": true,
+    "browser_rendered_font_check": "Not performed, per user restriction"
+  },
+  "validation": {
+    "focused_unit_tests": {
+      "passed": 93,
+      "files": 8
+    },
+    "lint_errors": 0,
+    "lint_existing_warnings": 8,
+    "uploaded_source_files_verified": 515,
+    "browser_or_Playwright_automation": "Not used, per user request",
+    "visual_and_actual_browser_font_checks": "Not performed; left for manual review",
+    "full_functional_parity": "Not newly certified; previous handoff limits remain",
+    "existing_full_suite_failures": [
+      "demo-action-guide.test.ts: slot.close-weekdays catalogue explanation",
+      "goal-items-26-30.test.ts: voucher cancellation email source assertion"
+    ]
+  },
+  "data_scope": {
+    "migrations": false,
+    "edge_deployments": false,
+    "live_business_data_or_settings_writes": false
+  },
+  "rollback": {
+    "action": "Promote the previous deployment",
+    "id": "dpl_GUYkbCn7rkk6pgqPuBAPzMSF2oY2",
+    "url": "caepweb-admin-oxviqhpaj-jerrys-projects-f4e4eaf9.vercel.app"
+  }
+}

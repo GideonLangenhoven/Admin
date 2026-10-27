@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-18T11:40:26.745Z",
+  "checks": [
+    {
+      "subdomain": "kayak",
+      "theme_access": true,
+      "tour_photo_access": true,
+      "tours": 3,
+      "voucher_columns_access": true
+    },
+    {
+      "subdomain": "claires-hiking",
+      "theme_access": true,
+      "tour_photo_access": true,
+      "tours": 5,
+      "voucher_columns_access": true
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "articles": 30,
+  "chunks": 176,
+  "changed": [
+    {
+      "chunk_key": "help:settings:14",
+      "title": "Settings — Saving banking and integration settings",
+      "route": "/settings",
+      "required_role": "MAIN_ADMIN",
+      "content": "Settings — Saving banking and integration settings\n## Saving banking and integration settings\n\nOperator accounts use their normal sign-in to save banking details, WhatsApp credentials, Yoco credentials and Yoco test mode. No authenticator setup or code is required. Existing role permissions still apply: these settings are managed by the account owner (MAIN_ADMIN). Platform Super Admins still verify their own authenticator when changing these settings."
+    },
+    {
+      "chunk_key": "help:settings:16",
+      "title": "Settings — Data Requests and unavailable connections",
+      "route": "/settings",
+      "required_role": "MAIN_ADMIN",
+      "content": "Settings — Data Requests and unavailable connections\n## Data Requests and unavailable connections\n\nMain admins reach [Data Requests](/privacy/data-requests) from the link at the bottom of Settings. OTA Channels currently says direct Viator and GetYourGuide connections are not available yet. Do not try to configure them as live integrations. Operator ChatGPT/MCP and Meta Muse connections are also not customer-available; they are separate from the built-in dashboard and guest assistants."
+    },
+    {
+      "chunk_key": "help:super-admin:3",
+      "title": "Super Admin — MFA support and sensitive settings",
+      "route": "/super-admin",
+      "required_role": "SUPER_ADMIN",
+      "content": "Super Admin — MFA support and sensitive settings\n## MFA support and sensitive settings\n\nOpen **MFA support and sensitive settings** at /super-admin/sensitive-actions. Select the operator first; changing its banking, WhatsApp or Yoco settings requires the signed-in Super Admin's authenticator verification. Credential status does not expose saved secret values.\n\nFor verified account recovery, select the target admin, record the identity-verification reference and acknowledge the verification before submitting. Recovery can require follow-up if it is pending or partial. This removes legacy MFA factors from the operator account. Operators use normal sign-in and do not need to enrol another authenticator. Do not choose passwords or bypass verification on the client's behalf."
+    }
+  ]
+}

@@ -26,7 +26,8 @@ export function parseResendBatchResponse(body: unknown, batchSize: number): {
     data?: Array<{ id?: unknown }>;
     errors?: Array<{ index?: unknown; message?: unknown }>;
   };
-  if (!Array.isArray(response.data)) return null;
+  if (!Array.isArray(response.data) || response.data.some(item => typeof item?.id !== "string" || !item.id.trim()) ||
+    new Set(response.data.map(item => item.id)).size !== response.data.length) return null;
 
   // Strict-mode success has no errors array and one ID per input. Permissive
   // mode compacts successful IDs and identifies failures by original index.

@@ -1,0 +1,37 @@
+{
+  "verified_at_utc": "2026-10-02 06:32:38 UTC",
+  "task": "Secure ChatGPT / Meta application integration",
+  "scope": "Independent recovery check and correction of the local acquisition attribution helper",
+  "result": "Attribution correction implemented and verified locally",
+  "change": {
+    "files": [
+      "scripts/operator-acquisition-report.mjs",
+      "tests/unit/operator-acquisition.test.ts"
+    ],
+    "behavior": "Recognise the exact consented utm_source=chatgpt.com tag as chatgpt with campaign_tag evidence.",
+    "regression": "Reproduced unknown attribution before the fix; now verifies the corrected tag, lack of consent, and a lookalike domain."
+  },
+  "checks": [
+    {
+      "command": "node_modules/.bin/vitest run tests/unit/agent-read-service.test.ts tests/unit/operator-acquisition.test.ts",
+      "exit_code": 0,
+      "passed": 94
+    },
+    {
+      "command": "node_modules/.bin/tsc --noEmit --incremental false",
+      "exit_code": 0
+    },
+    {
+      "command": "node_modules/.bin/eslint scripts/operator-acquisition-report.mjs tests/unit/operator-acquisition.test.ts",
+      "exit_code": 0
+    }
+  ],
+  "boundaries": {
+    "external_agent_access": "Disabled in both route and shared service",
+    "provider_connection_tested": false,
+    "deployed": false,
+    "production_migrations_applied": false,
+    "attribution_join_to_real_conversions": "Not implemented; outcome sources remain unknown"
+  },
+  "continuation": "The original resumed integration session is completing the database rehearsal, build/regression close-out and product-facts handoff."
+}

@@ -1,0 +1,20 @@
+{
+  "at": "2026-10-16T16:20:45.769Z",
+  "results": [
+    {
+      "initial_origin": false,
+      "network_error": "TypeError: Failed to fetch",
+      "temporary_files_removed": 1
+    },
+    {
+      "initial_origin": true,
+      "status": 200,
+      "ok": true,
+      "file_id_present": true,
+      "error": null,
+      "temporary_files_removed": 1
+    }
+  ],
+  "customer_files_used": false,
+  "customer_messages_sent": false
+}

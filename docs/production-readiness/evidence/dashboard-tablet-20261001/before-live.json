@@ -1,0 +1,1203 @@
+{
+  "responseStatus": 200,
+  "vercelId": "cpt1::wmjl8-1790869848923-262f973b4a67",
+  "records": [
+    {
+      "url": "https://kayak.admin.bookingtours.co.za/",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      },
+      "orientation": "portrait",
+      "breakpoint": "md",
+      "role": "MAIN_ADMIN",
+      "touchPoints": 0,
+      "rootScrollWidth": 768,
+      "main": {
+        "x": 0,
+        "y": 93,
+        "width": 768,
+        "height": 870,
+        "scrollWidth": 768,
+        "clientWidth": 768
+      },
+      "font": "\"Plus Jakarta Sans\", \"Plus Jakarta Sans Fallback\"",
+      "cards": [
+        {
+          "x": 40,
+          "y": 348.25,
+          "width": 688,
+          "height": 432,
+          "scrollWidth": 686,
+          "clientWidth": 686,
+          "heading": "Manifest",
+          "tables": [
+            {
+              "x": 41,
+              "y": 453.25,
+              "width": 686,
+              "height": 326,
+              "scrollWidth": 686,
+              "clientWidth": 686
+            }
+          ],
+          "clipped": []
+        },
+        {
+          "x": 40,
+          "y": 796.25,
+          "width": 688,
+          "height": 227,
+          "scrollWidth": 686,
+          "clientWidth": 686,
+          "heading": "Roll Call",
+          "tables": [
+            {
+              "x": 41,
+              "y": 872.75,
+              "width": 686,
+              "height": 101,
+              "scrollWidth": 686,
+              "clientWidth": 686
+            }
+          ],
+          "clipped": []
+        }
+      ],
+      "simpleControls": [],
+      "scripts": [
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/5d015edf-faf44353f12cca48.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/4bd1b696-bcfb689fcd79d3ec.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/6970-d2a5a7c9a786f3dc.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/main-app-969a52c636582261.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/44530001-a15af602c05e7426.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8199-c2168b5d1fc79516.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8500-de7ca64f447c675f.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/1607-31e74bb57b28f085.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8948-5e520e848ffd0152.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/layout-2e2eb4c85c70fb59.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/not-found-4204588444707930.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8461-bc3a08fceca5cbb2.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/page-16dcc475012af7fb.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/global-error-2459c73a94b9e424.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/polyfills-42372ed130431b0a.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/9890-a34953aa99ca68f1.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/reports/page-9eaedfed476acb5e.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/webpack-03f75118e12369e4.js",
+        "https://www.windguru.cz/js/widget.php?s=137629&uid=wg_fwdg_137629_100&wj=knots&tj=c&p=WINDSPD,GUST,SMER,WAVES,WVPER,WVDIR,TMPE,CDC,APCP1s,RATING&b=1&hc=#333&dc=gray&tc=#333&stl=&lng=en&wl=3"
+      ],
+      "nextBuildId": null
+    },
+    {
+      "url": "https://kayak.admin.bookingtours.co.za/",
+      "viewport": {
+        "width": 820,
+        "height": 1180
+      },
+      "orientation": "portrait",
+      "breakpoint": "md",
+      "role": "MAIN_ADMIN",
+      "touchPoints": 0,
+      "rootScrollWidth": 820,
+      "main": {
+        "x": 0,
+        "y": 93,
+        "width": 820,
+        "height": 1026,
+        "scrollWidth": 820,
+        "clientWidth": 820
+      },
+      "font": "\"Plus Jakarta Sans\", \"Plus Jakarta Sans Fallback\"",
+      "cards": [
+        {
+          "x": 40,
+          "y": 289.25,
+          "width": 740,
+          "height": 432,
+          "scrollWidth": 738,
+          "clientWidth": 738,
+          "heading": "Manifest",
+          "tables": [
+            {
+              "x": 41,
+              "y": 394.25,
+              "width": 738,
+              "height": 326,
+              "scrollWidth": 738,
+              "clientWidth": 738
+            }
+          ],
+          "clipped": []
+        },
+        {
+          "x": 40,
+          "y": 737.25,
+          "width": 740,
+          "height": 227,
+          "scrollWidth": 738,
+          "clientWidth": 738,
+          "heading": "Roll Call",
+          "tables": [
+            {
+              "x": 41,
+              "y": 813.75,
+              "width": 738,
+              "height": 101,
+              "scrollWidth": 738,
+              "clientWidth": 738
+            }
+          ],
+          "clipped": []
+        }
+      ],
+      "simpleControls": [],
+      "scripts": [
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/5d015edf-faf44353f12cca48.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/4bd1b696-bcfb689fcd79d3ec.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/6970-d2a5a7c9a786f3dc.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/main-app-969a52c636582261.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/44530001-a15af602c05e7426.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8199-c2168b5d1fc79516.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8500-de7ca64f447c675f.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/1607-31e74bb57b28f085.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8948-5e520e848ffd0152.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/layout-2e2eb4c85c70fb59.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/not-found-4204588444707930.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8461-bc3a08fceca5cbb2.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/page-16dcc475012af7fb.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/global-error-2459c73a94b9e424.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/polyfills-42372ed130431b0a.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/webpack-03f75118e12369e4.js",
+        "https://www.windguru.cz/js/widget.php?s=137629&uid=wg_fwdg_137629_100&wj=knots&tj=c&p=WINDSPD,GUST,SMER,WAVES,WVPER,WVDIR,TMPE,CDC,APCP1s,RATING&b=1&hc=#333&dc=gray&tc=#333&stl=&lng=en&wl=3"
+      ],
+      "nextBuildId": null
+    },
+    {
+      "url": "https://kayak.admin.bookingtours.co.za/",
+      "viewport": {
+        "width": 1024,
+        "height": 768
+      },
+      "orientation": "landscape",
+      "breakpoint": "lg",
+      "role": "MAIN_ADMIN",
+      "touchPoints": 0,
+      "rootScrollWidth": 1024,
+      "main": {
+        "x": 256,
+        "y": 93,
+        "width": 768,
+        "height": 675,
+        "scrollWidth": 768,
+        "clientWidth": 768
+      },
+      "font": "\"Plus Jakarta Sans\", \"Plus Jakarta Sans Fallback\"",
+      "cards": [
+        {
+          "x": 296,
+          "y": 678.5,
+          "width": 332,
+          "height": 454,
+          "scrollWidth": 330,
+          "clientWidth": 330,
+          "heading": "Manifest",
+          "tables": [
+            {
+              "x": 297,
+              "y": 805.5,
+              "width": 512.5,
+              "height": 326,
+              "scrollWidth": 513,
+              "clientWidth": 513
+            }
+          ],
+          "clipped": [
+            {
+              "text": "Pax",
+              "x": 605,
+              "y": 805.5,
+              "width": 62.0625,
+              "height": 48.5,
+              "scrollWidth": 62,
+              "clientWidth": 62
+            },
+            {
+              "text": "Checked In",
+              "x": 667.0625,
+              "y": 805.5,
+              "width": 142.4375,
+              "height": 48.5,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "4",
+              "x": 605,
+              "y": 854,
+              "width": 62.0625,
+              "height": 57,
+              "scrollWidth": 62,
+              "clientWidth": 62
+            },
+            {
+              "text": "4/4",
+              "x": 667.0625,
+              "y": 854,
+              "width": 142.4375,
+              "height": 57,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "4/4",
+              "x": 753.0625,
+              "y": 870.5,
+              "width": 36.4375,
+              "height": 24,
+              "scrollWidth": 36,
+              "clientWidth": 36
+            },
+            {
+              "text": "2",
+              "x": 605,
+              "y": 911,
+              "width": 62.0625,
+              "height": 57,
+              "scrollWidth": 62,
+              "clientWidth": 62
+            },
+            {
+              "text": "0/2",
+              "x": 667.0625,
+              "y": 911,
+              "width": 142.4375,
+              "height": 57,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "0/2",
+              "x": 753.0625,
+              "y": 927.5,
+              "width": 36.4375,
+              "height": 24,
+              "scrollWidth": 36,
+              "clientWidth": 36
+            },
+            {
+              "text": "2",
+              "x": 605,
+              "y": 968,
+              "width": 62.0625,
+              "height": 57,
+              "scrollWidth": 62,
+              "clientWidth": 62
+            },
+            {
+              "text": "2/2",
+              "x": 667.0625,
+              "y": 968,
+              "width": 142.4375,
+              "height": 57,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "2/2",
+              "x": 753.0625,
+              "y": 984.5,
+              "width": 36.4375,
+              "height": 24,
+              "scrollWidth": 36,
+              "clientWidth": 36
+            },
+            {
+              "text": "1",
+              "x": 605,
+              "y": 1025,
+              "width": 62.0625,
+              "height": 57.5,
+              "scrollWidth": 62,
+              "clientWidth": 62
+            },
+            {
+              "text": "0/1",
+              "x": 667.0625,
+              "y": 1025,
+              "width": 142.4375,
+              "height": 57.5,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "0/1",
+              "x": 753.0625,
+              "y": 1041.5,
+              "width": 36.4375,
+              "height": 24,
+              "scrollWidth": 36,
+              "clientWidth": 36
+            },
+            {
+              "text": "9",
+              "x": 605,
+              "y": 1082.5,
+              "width": 62.0625,
+              "height": 49,
+              "scrollWidth": 62,
+              "clientWidth": 62
+            },
+            {
+              "text": "6/9",
+              "x": 667.0625,
+              "y": 1082.5,
+              "width": 142.4375,
+              "height": 49,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "6/9",
+              "x": 753.0625,
+              "y": 1095.5,
+              "width": 36.4375,
+              "height": 24,
+              "scrollWidth": 36,
+              "clientWidth": 36
+            }
+          ]
+        },
+        {
+          "x": 652,
+          "y": 678.5,
+          "width": 332,
+          "height": 454,
+          "scrollWidth": 330,
+          "clientWidth": 330,
+          "heading": "Roll Call",
+          "tables": [
+            {
+              "x": 653,
+              "y": 755,
+              "width": 368.828125,
+              "height": 137,
+              "scrollWidth": 369,
+              "clientWidth": 369
+            }
+          ],
+          "clipped": [
+            {
+              "text": "Status",
+              "x": 912.625,
+              "y": 755,
+              "width": 109.203125,
+              "height": 48.5,
+              "scrollWidth": 109,
+              "clientWidth": 109
+            },
+            {
+              "text": "CONFIRMED",
+              "x": 912.625,
+              "y": 803.5,
+              "width": 109.203125,
+              "height": 88.5,
+              "scrollWidth": 109,
+              "clientWidth": 109
+            },
+            {
+              "text": "CONFIRMED",
+              "x": 928.625,
+              "y": 836.5,
+              "width": 77.203125,
+              "height": 24,
+              "scrollWidth": 77,
+              "clientWidth": 77
+            }
+          ]
+        }
+      ],
+      "simpleControls": [
+        "Simple view"
+      ],
+      "scripts": [
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/5d015edf-faf44353f12cca48.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/4bd1b696-bcfb689fcd79d3ec.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/6970-d2a5a7c9a786f3dc.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/main-app-969a52c636582261.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/44530001-a15af602c05e7426.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8199-c2168b5d1fc79516.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8500-de7ca64f447c675f.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/1607-31e74bb57b28f085.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8948-5e520e848ffd0152.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/layout-2e2eb4c85c70fb59.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/not-found-4204588444707930.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8461-bc3a08fceca5cbb2.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/page-16dcc475012af7fb.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/global-error-2459c73a94b9e424.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/polyfills-42372ed130431b0a.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/webpack-03f75118e12369e4.js",
+        "https://www.windguru.cz/js/widget.php?s=137629&uid=wg_fwdg_137629_100&wj=knots&tj=c&p=WINDSPD,GUST,SMER,WAVES,WVPER,WVDIR,TMPE,CDC,APCP1s,RATING&b=1&hc=#333&dc=gray&tc=#333&stl=&lng=en&wl=3"
+      ],
+      "nextBuildId": null
+    },
+    {
+      "url": "https://kayak.admin.bookingtours.co.za/",
+      "viewport": {
+        "width": 1180,
+        "height": 820
+      },
+      "orientation": "landscape",
+      "breakpoint": "lg",
+      "role": "MAIN_ADMIN",
+      "touchPoints": 0,
+      "rootScrollWidth": 1180,
+      "main": {
+        "x": 256,
+        "y": 93,
+        "width": 924,
+        "height": 727,
+        "scrollWidth": 924,
+        "clientWidth": 924
+      },
+      "font": "\"Plus Jakarta Sans\", \"Plus Jakarta Sans Fallback\"",
+      "cards": [
+        {
+          "x": 296,
+          "y": 298,
+          "width": 410,
+          "height": 414,
+          "scrollWidth": 408,
+          "clientWidth": 408,
+          "heading": "Manifest",
+          "tables": [
+            {
+              "x": 297,
+              "y": 385,
+              "width": 512.5,
+              "height": 326,
+              "scrollWidth": 513,
+              "clientWidth": 513
+            }
+          ],
+          "clipped": [
+            {
+              "text": "Checked In",
+              "x": 667.0625,
+              "y": 385,
+              "width": 142.4375,
+              "height": 48.5,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "4/4",
+              "x": 667.0625,
+              "y": 433.5,
+              "width": 142.4375,
+              "height": 57,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "4/4",
+              "x": 753.0625,
+              "y": 450,
+              "width": 36.4375,
+              "height": 24,
+              "scrollWidth": 36,
+              "clientWidth": 36
+            },
+            {
+              "text": "0/2",
+              "x": 667.0625,
+              "y": 490.5,
+              "width": 142.4375,
+              "height": 57,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "0/2",
+              "x": 753.0625,
+              "y": 507,
+              "width": 36.4375,
+              "height": 24,
+              "scrollWidth": 36,
+              "clientWidth": 36
+            },
+            {
+              "text": "2/2",
+              "x": 667.0625,
+              "y": 547.5,
+              "width": 142.4375,
+              "height": 57,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "2/2",
+              "x": 753.0625,
+              "y": 564,
+              "width": 36.4375,
+              "height": 24,
+              "scrollWidth": 36,
+              "clientWidth": 36
+            },
+            {
+              "text": "0/1",
+              "x": 667.0625,
+              "y": 604.5,
+              "width": 142.4375,
+              "height": 57.5,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "0/1",
+              "x": 753.0625,
+              "y": 621,
+              "width": 36.4375,
+              "height": 24,
+              "scrollWidth": 36,
+              "clientWidth": 36
+            },
+            {
+              "text": "6/9",
+              "x": 667.0625,
+              "y": 662,
+              "width": 142.4375,
+              "height": 49,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "6/9",
+              "x": 753.0625,
+              "y": 675,
+              "width": 36.4375,
+              "height": 24,
+              "scrollWidth": 36,
+              "clientWidth": 36
+            }
+          ]
+        },
+        {
+          "x": 730,
+          "y": 298,
+          "width": 410,
+          "height": 414,
+          "scrollWidth": 408,
+          "clientWidth": 408,
+          "heading": "Roll Call",
+          "tables": [
+            {
+              "x": 731,
+              "y": 374.5,
+              "width": 408,
+              "height": 117,
+              "scrollWidth": 408,
+              "clientWidth": 408
+            }
+          ],
+          "clipped": []
+        }
+      ],
+      "simpleControls": [],
+      "scripts": [
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/5d015edf-faf44353f12cca48.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/4bd1b696-bcfb689fcd79d3ec.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/6970-d2a5a7c9a786f3dc.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/main-app-969a52c636582261.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/44530001-a15af602c05e7426.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8199-c2168b5d1fc79516.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8500-de7ca64f447c675f.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/1607-31e74bb57b28f085.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8948-5e520e848ffd0152.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/layout-2e2eb4c85c70fb59.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/not-found-4204588444707930.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8461-bc3a08fceca5cbb2.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/page-16dcc475012af7fb.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/global-error-2459c73a94b9e424.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/polyfills-42372ed130431b0a.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/webpack-03f75118e12369e4.js",
+        "https://www.windguru.cz/js/widget.php?s=137629&uid=wg_fwdg_137629_100&wj=knots&tj=c&p=WINDSPD,GUST,SMER,WAVES,WVPER,WVDIR,TMPE,CDC,APCP1s,RATING&b=1&hc=#333&dc=gray&tc=#333&stl=&lng=en&wl=3"
+      ],
+      "nextBuildId": null
+    },
+    {
+      "url": "https://kayak.admin.bookingtours.co.za/",
+      "viewport": {
+        "width": 1023,
+        "height": 800
+      },
+      "orientation": "landscape",
+      "breakpoint": "md",
+      "role": "MAIN_ADMIN",
+      "touchPoints": 0,
+      "rootScrollWidth": 1023,
+      "main": {
+        "x": 0,
+        "y": 93,
+        "width": 1023,
+        "height": 646,
+        "scrollWidth": 1023,
+        "clientWidth": 1023
+      },
+      "font": "\"Plus Jakarta Sans\", \"Plus Jakarta Sans Fallback\"",
+      "cards": [
+        {
+          "x": 40,
+          "y": 93.25,
+          "width": 943,
+          "height": 432,
+          "scrollWidth": 941,
+          "clientWidth": 941,
+          "heading": "Manifest",
+          "tables": [
+            {
+              "x": 41,
+              "y": 198.25,
+              "width": 941,
+              "height": 326,
+              "scrollWidth": 941,
+              "clientWidth": 941
+            }
+          ],
+          "clipped": []
+        },
+        {
+          "x": 40,
+          "y": 541.25,
+          "width": 943,
+          "height": 227,
+          "scrollWidth": 941,
+          "clientWidth": 941,
+          "heading": "Roll Call",
+          "tables": [
+            {
+              "x": 41,
+              "y": 617.75,
+              "width": 941,
+              "height": 101,
+              "scrollWidth": 941,
+              "clientWidth": 941
+            }
+          ],
+          "clipped": []
+        }
+      ],
+      "simpleControls": [],
+      "scripts": [
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/5d015edf-faf44353f12cca48.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/4bd1b696-bcfb689fcd79d3ec.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/6970-d2a5a7c9a786f3dc.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/main-app-969a52c636582261.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/44530001-a15af602c05e7426.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8199-c2168b5d1fc79516.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8500-de7ca64f447c675f.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/1607-31e74bb57b28f085.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8948-5e520e848ffd0152.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/layout-2e2eb4c85c70fb59.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/not-found-4204588444707930.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8461-bc3a08fceca5cbb2.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/page-16dcc475012af7fb.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/global-error-2459c73a94b9e424.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/polyfills-42372ed130431b0a.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/ai-usage/page-381088c24f3155f4.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/partnerships/page-861f30e20a8dca2d.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/webpack-03f75118e12369e4.js",
+        "https://www.windguru.cz/js/widget.php?s=137629&uid=wg_fwdg_137629_100&wj=knots&tj=c&p=WINDSPD,GUST,SMER,WAVES,WVPER,WVDIR,TMPE,CDC,APCP1s,RATING&b=1&hc=#333&dc=gray&tc=#333&stl=&lng=en&wl=3"
+      ],
+      "nextBuildId": null
+    },
+    {
+      "url": "https://kayak.admin.bookingtours.co.za/",
+      "viewport": {
+        "width": 1025,
+        "height": 800
+      },
+      "orientation": "landscape",
+      "breakpoint": "lg",
+      "role": "MAIN_ADMIN",
+      "touchPoints": 0,
+      "rootScrollWidth": 1025,
+      "main": {
+        "x": 256,
+        "y": 93,
+        "width": 769,
+        "height": 707,
+        "scrollWidth": 769,
+        "clientWidth": 769
+      },
+      "font": "\"Plus Jakarta Sans\", \"Plus Jakarta Sans Fallback\"",
+      "cards": [
+        {
+          "x": 296,
+          "y": 184.5,
+          "width": 332.5,
+          "height": 454,
+          "scrollWidth": 331,
+          "clientWidth": 331,
+          "heading": "Manifest",
+          "tables": [
+            {
+              "x": 297,
+              "y": 311.5,
+              "width": 512.5,
+              "height": 326,
+              "scrollWidth": 513,
+              "clientWidth": 513
+            }
+          ],
+          "clipped": [
+            {
+              "text": "Pax",
+              "x": 605,
+              "y": 311.5,
+              "width": 62.0625,
+              "height": 48.5,
+              "scrollWidth": 62,
+              "clientWidth": 62
+            },
+            {
+              "text": "Checked In",
+              "x": 667.0625,
+              "y": 311.5,
+              "width": 142.4375,
+              "height": 48.5,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "4",
+              "x": 605,
+              "y": 360,
+              "width": 62.0625,
+              "height": 57,
+              "scrollWidth": 62,
+              "clientWidth": 62
+            },
+            {
+              "text": "4/4",
+              "x": 667.0625,
+              "y": 360,
+              "width": 142.4375,
+              "height": 57,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "4/4",
+              "x": 753.0625,
+              "y": 376.5,
+              "width": 36.4375,
+              "height": 24,
+              "scrollWidth": 36,
+              "clientWidth": 36
+            },
+            {
+              "text": "2",
+              "x": 605,
+              "y": 417,
+              "width": 62.0625,
+              "height": 57,
+              "scrollWidth": 62,
+              "clientWidth": 62
+            },
+            {
+              "text": "0/2",
+              "x": 667.0625,
+              "y": 417,
+              "width": 142.4375,
+              "height": 57,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "0/2",
+              "x": 753.0625,
+              "y": 433.5,
+              "width": 36.4375,
+              "height": 24,
+              "scrollWidth": 36,
+              "clientWidth": 36
+            },
+            {
+              "text": "2",
+              "x": 605,
+              "y": 474,
+              "width": 62.0625,
+              "height": 57,
+              "scrollWidth": 62,
+              "clientWidth": 62
+            },
+            {
+              "text": "2/2",
+              "x": 667.0625,
+              "y": 474,
+              "width": 142.4375,
+              "height": 57,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "2/2",
+              "x": 753.0625,
+              "y": 490.5,
+              "width": 36.4375,
+              "height": 24,
+              "scrollWidth": 36,
+              "clientWidth": 36
+            },
+            {
+              "text": "1",
+              "x": 605,
+              "y": 531,
+              "width": 62.0625,
+              "height": 57.5,
+              "scrollWidth": 62,
+              "clientWidth": 62
+            },
+            {
+              "text": "0/1",
+              "x": 667.0625,
+              "y": 531,
+              "width": 142.4375,
+              "height": 57.5,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "0/1",
+              "x": 753.0625,
+              "y": 547.5,
+              "width": 36.4375,
+              "height": 24,
+              "scrollWidth": 36,
+              "clientWidth": 36
+            },
+            {
+              "text": "9",
+              "x": 605,
+              "y": 588.5,
+              "width": 62.0625,
+              "height": 49,
+              "scrollWidth": 62,
+              "clientWidth": 62
+            },
+            {
+              "text": "6/9",
+              "x": 667.0625,
+              "y": 588.5,
+              "width": 142.4375,
+              "height": 49,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "6/9",
+              "x": 753.0625,
+              "y": 601.5,
+              "width": 36.4375,
+              "height": 24,
+              "scrollWidth": 36,
+              "clientWidth": 36
+            }
+          ]
+        },
+        {
+          "x": 652.5,
+          "y": 184.5,
+          "width": 332.5,
+          "height": 454,
+          "scrollWidth": 331,
+          "clientWidth": 331,
+          "heading": "Roll Call",
+          "tables": [
+            {
+              "x": 653.5,
+              "y": 261,
+              "width": 368.828125,
+              "height": 137,
+              "scrollWidth": 369,
+              "clientWidth": 369
+            }
+          ],
+          "clipped": [
+            {
+              "text": "Status",
+              "x": 913.125,
+              "y": 261,
+              "width": 109.203125,
+              "height": 48.5,
+              "scrollWidth": 109,
+              "clientWidth": 109
+            },
+            {
+              "text": "CONFIRMED",
+              "x": 913.125,
+              "y": 309.5,
+              "width": 109.203125,
+              "height": 88.5,
+              "scrollWidth": 109,
+              "clientWidth": 109
+            },
+            {
+              "text": "CONFIRMED",
+              "x": 929.125,
+              "y": 342.5,
+              "width": 77.203125,
+              "height": 24,
+              "scrollWidth": 77,
+              "clientWidth": 77
+            }
+          ]
+        }
+      ],
+      "simpleControls": [],
+      "scripts": [
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/5d015edf-faf44353f12cca48.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/4bd1b696-bcfb689fcd79d3ec.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/6970-d2a5a7c9a786f3dc.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/main-app-969a52c636582261.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/44530001-a15af602c05e7426.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8199-c2168b5d1fc79516.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8500-de7ca64f447c675f.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/1607-31e74bb57b28f085.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8948-5e520e848ffd0152.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/layout-2e2eb4c85c70fb59.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/not-found-4204588444707930.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8461-bc3a08fceca5cbb2.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/page-16dcc475012af7fb.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/global-error-2459c73a94b9e424.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/polyfills-42372ed130431b0a.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/webpack-03f75118e12369e4.js",
+        "https://www.windguru.cz/js/widget.php?s=137629&uid=wg_fwdg_137629_100&wj=knots&tj=c&p=WINDSPD,GUST,SMER,WAVES,WVPER,WVDIR,TMPE,CDC,APCP1s,RATING&b=1&hc=#333&dc=gray&tc=#333&stl=&lng=en&wl=3"
+      ],
+      "nextBuildId": null
+    },
+    {
+      "url": "https://kayak.admin.bookingtours.co.za/",
+      "viewport": {
+        "width": 1366,
+        "height": 1024
+      },
+      "orientation": "landscape",
+      "breakpoint": "xl",
+      "role": "MAIN_ADMIN",
+      "touchPoints": 0,
+      "rootScrollWidth": 1366,
+      "main": {
+        "x": 256,
+        "y": 93,
+        "width": 1110,
+        "height": 931,
+        "scrollWidth": 1110,
+        "clientWidth": 1110
+      },
+      "font": "\"Plus Jakarta Sans\", \"Plus Jakarta Sans Fallback\"",
+      "cards": [
+        {
+          "x": 296,
+          "y": 330,
+          "width": 503,
+          "height": 414,
+          "scrollWidth": 501,
+          "clientWidth": 501,
+          "heading": "Manifest",
+          "tables": [
+            {
+              "x": 297,
+              "y": 417,
+              "width": 512.5,
+              "height": 326,
+              "scrollWidth": 513,
+              "clientWidth": 513
+            }
+          ],
+          "clipped": [
+            {
+              "text": "Checked In",
+              "x": 667.0625,
+              "y": 417,
+              "width": 142.4375,
+              "height": 48.5,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "4/4",
+              "x": 667.0625,
+              "y": 465.5,
+              "width": 142.4375,
+              "height": 57,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "0/2",
+              "x": 667.0625,
+              "y": 522.5,
+              "width": 142.4375,
+              "height": 57,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "2/2",
+              "x": 667.0625,
+              "y": 579.5,
+              "width": 142.4375,
+              "height": 57,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "0/1",
+              "x": 667.0625,
+              "y": 636.5,
+              "width": 142.4375,
+              "height": 57.5,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            },
+            {
+              "text": "6/9",
+              "x": 667.0625,
+              "y": 694,
+              "width": 142.4375,
+              "height": 49,
+              "scrollWidth": 142,
+              "clientWidth": 142
+            }
+          ]
+        },
+        {
+          "x": 823,
+          "y": 330,
+          "width": 503,
+          "height": 414,
+          "scrollWidth": 501,
+          "clientWidth": 501,
+          "heading": "Roll Call",
+          "tables": [
+            {
+              "x": 824,
+              "y": 406.5,
+              "width": 501,
+              "height": 102,
+              "scrollWidth": 501,
+              "clientWidth": 501
+            }
+          ],
+          "clipped": []
+        }
+      ],
+      "simpleControls": [],
+      "scripts": [
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/5d015edf-faf44353f12cca48.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/4bd1b696-bcfb689fcd79d3ec.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/6970-d2a5a7c9a786f3dc.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/main-app-969a52c636582261.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/44530001-a15af602c05e7426.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8199-c2168b5d1fc79516.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8500-de7ca64f447c675f.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/1607-31e74bb57b28f085.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8948-5e520e848ffd0152.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/layout-2e2eb4c85c70fb59.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/not-found-4204588444707930.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8461-bc3a08fceca5cbb2.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/page-16dcc475012af7fb.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/global-error-2459c73a94b9e424.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/polyfills-42372ed130431b0a.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/webpack-03f75118e12369e4.js",
+        "https://www.windguru.cz/js/widget.php?s=137629&uid=wg_fwdg_137629_100&wj=knots&tj=c&p=WINDSPD,GUST,SMER,WAVES,WVPER,WVDIR,TMPE,CDC,APCP1s,RATING&b=1&hc=#333&dc=gray&tc=#333&stl=&lng=en&wl=3"
+      ],
+      "nextBuildId": null
+    },
+    {
+      "url": "https://kayak.admin.bookingtours.co.za/",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "orientation": "landscape",
+      "breakpoint": "xl",
+      "role": "MAIN_ADMIN",
+      "touchPoints": 0,
+      "rootScrollWidth": 1440,
+      "main": {
+        "x": 256,
+        "y": 93,
+        "width": 1184,
+        "height": 907,
+        "scrollWidth": 1184,
+        "clientWidth": 1184
+      },
+      "font": "\"Plus Jakarta Sans\", \"Plus Jakarta Sans Fallback\"",
+      "cards": [
+        {
+          "x": 296,
+          "y": 611,
+          "width": 540,
+          "height": 414,
+          "scrollWidth": 538,
+          "clientWidth": 538,
+          "heading": "Manifest",
+          "tables": [
+            {
+              "x": 297,
+              "y": 698,
+              "width": 538,
+              "height": 326,
+              "scrollWidth": 538,
+              "clientWidth": 538
+            }
+          ],
+          "clipped": []
+        },
+        {
+          "x": 860,
+          "y": 611,
+          "width": 540,
+          "height": 414,
+          "scrollWidth": 538,
+          "clientWidth": 538,
+          "heading": "Roll Call",
+          "tables": [
+            {
+              "x": 861,
+              "y": 687.5,
+              "width": 538,
+              "height": 102,
+              "scrollWidth": 538,
+              "clientWidth": 538
+            }
+          ],
+          "clipped": []
+        }
+      ],
+      "simpleControls": [],
+      "scripts": [
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/5d015edf-faf44353f12cca48.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/4bd1b696-bcfb689fcd79d3ec.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/6970-d2a5a7c9a786f3dc.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/main-app-969a52c636582261.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/44530001-a15af602c05e7426.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8199-c2168b5d1fc79516.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8500-de7ca64f447c675f.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/1607-31e74bb57b28f085.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8948-5e520e848ffd0152.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/layout-2e2eb4c85c70fb59.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/not-found-4204588444707930.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/8461-bc3a08fceca5cbb2.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/page-16dcc475012af7fb.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/app/global-error-2459c73a94b9e424.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/polyfills-42372ed130431b0a.js",
+        "https://kayak.admin.bookingtours.co.za/_next/static/chunks/webpack-03f75118e12369e4.js",
+        "https://www.windguru.cz/js/widget.php?s=137629&uid=wg_fwdg_137629_100&wj=knots&tj=c&p=WINDSPD,GUST,SMER,WAVES,WVPER,WVDIR,TMPE,CDC,APCP1s,RATING&b=1&hc=#333&dc=gray&tc=#333&stl=&lng=en&wl=3"
+      ],
+      "nextBuildId": null
+    }
+  ]
+}

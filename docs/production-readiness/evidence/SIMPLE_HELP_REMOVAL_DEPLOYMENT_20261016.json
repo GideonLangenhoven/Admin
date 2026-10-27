@@ -1,0 +1,41 @@
+{
+  "at": "2026-10-16T16:04:55.242Z",
+  "deployment": {
+    "id": "dpl_HWyBwRqyZyRdz9DWw2fCk4sCBeEn",
+    "url": "caepweb-admin-nvty81ub2-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 486
+  },
+  "scope": {
+    "baseline": "dpl_7of8iQxrzBkWfvFKR6hiG9jyFm5S",
+    "changed": [
+      "components/SimpleViewShell.tsx"
+    ],
+    "preserved": 485,
+    "database_changes": [],
+    "functions": [],
+    "marketing_activation": false
+  },
+  "checks": {
+    "eslint": "passed",
+    "production_build": "passed",
+    "typescript": "passed",
+    "live_synthetic_browser_cases": 1,
+    "viewport_widths": [
+      390,
+      1024,
+      1280
+    ],
+    "live_http_access_checks": 11,
+    "uploaded_sources_verified": 486
+  },
+  "changes": [
+    "Removed Help from the shared Simple View destinations, covering phone bottom navigation and desktop top navigation",
+    "Removed the unused Question icon import"
+  ],
+  "limits": [
+    "Browser verification used a simulated account. No customer booking, payment or message was submitted."
+  ],
+  "database_changes": [],
+  "edge_function_deployments": []
+}

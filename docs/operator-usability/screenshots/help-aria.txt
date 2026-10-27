@@ -1,0 +1,29 @@
+- main:
+  - heading "Daily work help" [level=1]
+  - paragraph: Choose the task you need. Advanced controls remain in the full dashboard.
+  - list:
+    - listitem:
+      - link "Find departures and record arrivals":
+        - /url: /simple
+    - listitem:
+      - link "Find a booking by reference or guest details":
+        - /url: /simple/bookings
+    - listitem:
+      - link "Configure a future departure in Slots":
+        - /url: /slots
+    - listitem:
+      - link "Open guest conversations in Inbox":
+        - /url: /inbox
+  - group:
+    - text: Booking and payment glossary
+    - term: Confirmed
+    - definition: A reservation has been confirmed. Money may still be due.
+    - term: Paid / received
+    - definition: Money recorded as received. Record payment does not charge a card.
+    - term: Held
+    - definition: Places temporarily reserved until the payment deadline. Availability can change when a hold expires.
+    - term: Arrived
+    - definition: The recorded number of guests present, separate from payment and waiver status.
+    - term: Signed waiver
+    - definition: The current product records a booking-level signature. Check its signer and participant details against your requirements.
+  - paragraph: For an exception, open the booking and ask your main admin for help. Include the booking reference and the task you were completing.

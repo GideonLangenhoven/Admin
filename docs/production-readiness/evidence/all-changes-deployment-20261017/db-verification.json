@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-17T08:54:59.423Z",
+  "function": {
+    "proname": "clear_sensitive_credentials_audited",
+    "prosecdef": true,
+    "proconfig": [
+      "search_path=public"
+    ],
+    "anon_execute": false,
+    "authenticated_execute": false,
+    "service_execute": true
+  },
+  "ledger": [
+    {
+      "version": "20261017120000",
+      "name": "clear_integration_credentials"
+    }
+  ]
+}

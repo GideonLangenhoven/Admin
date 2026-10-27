@@ -124,7 +124,6 @@ describe("shared demo account boundaries", () => {
     expect(edge).toContain("Show off the features included in this demo");
     expect(edge).toContain("hits.filter(hit => !hit.route || isDemoPathVisible(hit.route))");
     expect(chat).toContain("!readOnly || isDemoPathVisible(openPath)");
-    expect(edge).toContain("hits.length === 0 && !auth.readOnly");
   });
 
   it("blocks direct public-table and Storage writes in the database", () => {

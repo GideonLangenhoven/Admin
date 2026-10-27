@@ -1,0 +1,160 @@
+{
+  "at": "2026-10-21T17:52:12.456Z",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "authorization": "User explicitly requested deploy all changes",
+  "admin": {
+    "id": "dpl_5ujG6ZE9Pko6dCJAANGn8kKPiN7K",
+    "url": "caepweb-admin-gplqmzxv9-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 518,
+    "changed": [
+      "components/PaymentRecoveryPanel.tsx",
+      "components/DashboardContact.tsx",
+      "components/simple/BookingContact.tsx",
+      "components/simple/DepartureCard.tsx",
+      "supabase/functions/_shared/chat-contact.ts",
+      "supabase/functions/cancel-booking/index.ts",
+      "supabase/functions/my-bookings-lookup/index.ts",
+      "supabase/functions/rebook-booking/index.ts",
+      "supabase/functions/send-email/index.ts",
+      "supabase/functions/weather-cancel/index.ts",
+      "supabase/functions/wa-webhook/index.ts",
+      "supabase/functions/web-chat/index.ts",
+      "app/dashboard.module.css",
+      "app/page.tsx",
+      "app/bookings/page.tsx",
+      "app/bookings/[id]/page.tsx",
+      "app/simple/page.tsx",
+      "components/booking/BookingWaiverEmail.tsx"
+    ]
+  },
+  "customer": {
+    "id": "dpl_HDMfskyZvotbmrDW26zPB2GrhncX",
+    "url": "booking-4m7u32t39-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 171,
+    "already_current": true
+  },
+  "backend": {
+    "at": "2026-10-21T17:47:57.527Z",
+    "checks": [
+      {
+        "slug": "cancel-booking",
+        "version": 44,
+        "verify_jwt": false,
+        "files_verified": 3
+      },
+      {
+        "slug": "send-email",
+        "version": 199,
+        "verify_jwt": false,
+        "files_verified": 11
+      },
+      {
+        "slug": "weather-cancel",
+        "version": 94,
+        "verify_jwt": false,
+        "files_verified": 4
+      }
+    ],
+    "untouched": 55
+  },
+  "candidate_browser": {
+    "startTime": "2026-10-21T17:47:49.939Z",
+    "duration": 47120.636000000006,
+    "expected": 7,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "live_browser": {
+    "startTime": "2026-10-21T17:50:36.442Z",
+    "duration": 45907.842000000004,
+    "expected": 7,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "live": {
+    "at": "2026-10-21T17:50:43.824Z",
+    "id": "dpl_5ujG6ZE9Pko6dCJAANGn8kKPiN7K",
+    "url": "https://admin.bookingtours.co.za",
+    "checks": [
+      {
+        "url": "https://admin.bookingtours.co.za/",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/bookings",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/simple",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/simpleguide",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/simple/bookings",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/slots",
+        "status": 200
+      },
+      {
+        "url": "https://kayak.booking.bookingtours.co.za/",
+        "status": 200
+      },
+      {
+        "url": "https://claires-hiking.booking.bookingtours.co.za/",
+        "status": 200
+      }
+    ]
+  },
+  "help": {
+    "at": "2026-10-21T17:50:37.662Z",
+    "changed": [
+      "help:bookings:2",
+      "help:dashboard:4",
+      "help:simple-view:1"
+    ],
+    "chunks_verified": 177,
+    "result": {
+      "ok": true,
+      "total": 177,
+      "embedded": 3,
+      "skipped": 174,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    }
+  },
+  "validation": {
+    "unit_passed": 2651,
+    "unit_skipped": 58,
+    "unit_existing_failures": [
+      "tests/unit/db-column-refs.test.ts > database column references in code exist in the schema > the fixture covers every table the code queries",
+      "tests/unit/demo-action-guide.test.ts > feature-specific demo catalogue > has a real explanation for every annotated action, including conditional buttons",
+      "tests/unit/goal-items-26-30.test.ts > item 30 — operator-cancellation remediation > voucher cancellation emails show the code, not the three options again",
+      "tests/unit/mobile-first-implementation.test.ts > mobile-first implementation contract > keeps exactly four primary admin routes plus the More trigger"
+    ],
+    "failures_reproduced_on_live_baseline": true,
+    "production_build": "READY",
+    "edge_typecheck": "PASS"
+  },
+  "preserved": {
+    "cancellation_admin": "app/slots/page.tsx",
+    "cancellation_customer": "app/my-bookings/BookingCard.tsx",
+    "production_fonts": true
+  },
+  "database_migrations": false,
+  "new_migrations_pending": false,
+  "customer_messages_sent_by_checks": false,
+  "live_customer_records_modified_by_checks": false,
+  "rollback": {
+    "admin": "dpl_cxr4bmRxRttV68z5SNCDqJBG7SVk",
+    "customer": "dpl_HDMfskyZvotbmrDW26zPB2GrhncX",
+    "backend_sources": "/Users/gideonlangenhoven/dev/capekayak/.vercel/all-final-20261021/edge-before"
+  }
+}

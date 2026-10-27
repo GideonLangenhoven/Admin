@@ -1,24 +1,37 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { arrivalReadiness } from "@/app/lib/operator-day";
+import { bookingResolutionUrl, rememberReturnPosition } from "@/app/lib/simple-view";
 import { useRouter } from "next/navigation";
 import { CaretLeft, CaretRight, CheckCircle, Minus, Plus, WarningCircle } from "@phosphor-icons/react";
 import { useBusinessContext } from "@/components/BusinessContext";
+import BookingContact from "@/components/simple/BookingContact";
 import { addDaysToDateKey, businessDateKey, isDateKey } from "@/app/lib/simple-view";
-import { amountOutstanding, derivePaymentMethod } from "@/app/lib/report-accounting";
+import { derivePaymentMethod } from "@/app/lib/report-accounting";
 import { markPaidAction, setArrivedCountAction, type ManualPaymentMethod } from "@/app/lib/booking-actions";
 import type { SimpleBooking, SimpleDeparture } from "../simple-data";
 import { useSimpleDay } from "../use-simple-day";
 
 const PAYMENT_METHODS: ManualPaymentMethod[] = ["Cash", "EFT", "Card (terminal)", "Other"];
-const ARRIVAL_STATUSES = new Set(["PAID", "CONFIRMED", "COMPLETED"]);
+
+function focusArrivalInput(id: string) {
+  if (!/^arrived-[0-9a-f-]{36}$/i.test(id)) return false;
+  const input = document.getElementById(id);
+  if (!(input instanceof HTMLInputElement)) return false;
+  input.focus({ preventScroll: true });
+  input.scrollIntoView({ block: "center" });
+  input.select();
+  return true;
+}
 
 function timeLabel(iso: string, timeZone: string) {
   return new Intl.DateTimeFormat("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone }).format(new Date(iso));
 }
 
 function longDate(date: string) {
-  return new Intl.DateTimeFormat("en-ZA", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date(date + "T12:00:00Z"));
+  return new Intl.DateTimeFormat("en-ZA", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date(date + "T12:00:00Z"));
 }
 
 function money(value: number, currency: string) {
@@ -34,24 +47,26 @@ function BookingCheckIn({
   departure,
   businessId,
   currency,
-  reload,
+  reload, returnTo, refreshing,
 }: {
   booking: SimpleBooking;
   departure: SimpleDeparture;
   businessId: string;
   currency: string;
+  returnTo: string;
+  refreshing: boolean;
   reload: (quiet?: boolean) => Promise<void>;
 }) {
+  const { role } = useBusinessContext();
+  const guide = role === "GUIDE";
   const [draft, setDraft] = useState(booking.arrived_count);
   const [method, setMethod] = useState<ManualPaymentMethod>("Cash");
   const [paymentNote, setPaymentNote] = useState("");
   const [busy, setBusy] = useState<"payment" | "arrival" | null>(null);
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
-  const due = amountOutstanding(booking);
-  const settledStatus = ARRIVAL_STATUSES.has(booking.status);
-  const paymentNeeded = due > 0.005 || !settledStatus;
-  const waiverReady = booking.waiver_status === "SIGNED";
-  const canSave = draft !== booking.arrived_count && draft >= 0 && draft <= booking.qty && (draft === 0 || (!paymentNeeded && waiverReady));
+  const { due, paymentReady, waiverReady, canIncrease } = arrivalReadiness(booking, { requirePaid: true });
+  const paymentNeeded = !paymentReady;
+  const canSave = !refreshing && draft !== booking.arrived_count && draft >= 0 && draft <= booking.qty && (draft <= booking.arrived_count || canIncrease);
 
   useEffect(() => setDraft(booking.arrived_count), [booking.arrived_count]);
 
@@ -71,6 +86,7 @@ function BookingCheckIn({
       expectedArrivedCount: booking.arrived_count,
       slotId: departure.id,
       source: "simple-view",
+      guide,
       notes: draft < booking.arrived_count ? "Arrival count corrected by operator" : undefined,
     });
     if (result.ok) {
@@ -83,15 +99,15 @@ function BookingCheckIn({
   }
 
   async function recordPayment() {
-    if (busy) return;
+    if (guide || busy || refreshing || due <= 0.005) return;
     setBusy("payment");
     setMessage(null);
     const result = await markPaidAction(booking.id, { paymentMethod: method, paymentNote });
     if (result.ok) {
-      setMessage({ tone: "success", text: "Payment recorded. You can check in the guests once the refreshed booking is eligible." });
+      setMessage({ tone: "success", text: "Payment recorded. Check in once the refreshed booking is eligible." });
       setPaymentNote("");
     } else {
-      setMessage({ tone: "error", text: result.error || "Payment could not be confirmed. The booking has been refreshed; check its status before retrying." });
+      setMessage({ tone: "error", text: result.error || "Payment unconfirmed. Check the refreshed status before retrying." });
     }
     await reload(true);
     setBusy(null);
@@ -101,12 +117,9 @@ function BookingCheckIn({
     <li className="sv-check-in">
       <div className="sv-check-in-body">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <h3 className="sv-customer-name">{booking.customer_name || "Guest"}</h3>
-            <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>
-              {booking.qty} guest{booking.qty === 1 ? "" : "s"}
-              {booking.phone ? ` · ${booking.phone}` : ""}
-            </p>
+          <div className="sv-booking-name-row min-w-0 flex-1">
+            <h3 className="sv-customer-name">{guide ? booking.customer_name || "Guest" : <Link onClick={() => rememberReturnPosition(businessId, returnTo)} href={bookingResolutionUrl(booking.id, returnTo)} className="no-underline">{booking.customer_name || "Guest"}</Link>}</h3>
+            <BookingContact booking={booking} />
           </div>
           <span className={`ui-status shrink-0 self-start sv-arrival-pill ${booking.checked_in ? "sv-arrival-pill--full" : booking.arrived_count === 0 ? "sv-arrival-pill--empty" : ""}`}>
             {booking.arrived_count} of {booking.qty} arrived
@@ -117,24 +130,24 @@ function BookingCheckIn({
           <div>
             <p className="sv-field-label">Payment</p>
             <p className="mt-1 text-sm font-semibold" style={{ color: paymentNeeded ? "var(--ck-warning)" : "var(--ck-success)" }}>
-              {paymentNeeded ? `${money(due, currency)} due` : `Paid${derivePaymentMethod(booking) ? ` · ${derivePaymentMethod(booking)}` : ""}`}
+              {due > 0.005 ? `${money(due, currency)} due` : `Paid${derivePaymentMethod(booking) ? ` · ${derivePaymentMethod(booking)}` : ""}`}
             </p>
           </div>
           <div>
             <p className="sv-field-label">Waiver</p>
             <p className="mt-1 text-sm font-semibold" style={{ color: waiverReady ? "var(--ck-success)" : "var(--ck-danger)" }}>
-              {waiverReady ? "Signed" : "Signature required"}
+              {waiverReady ? "Signed" : "Signature required (booking waiver)"}
             </p>
           </div>
         </div>
 
-        {paymentNeeded && (
+        {!guide && paymentNeeded && (
           <div className="sv-payment-panel">
             <div className="flex items-start gap-2">
               <WarningCircle size={19} className="mt-0.5 shrink-0" />
               <div>
                 <p className="text-sm font-semibold">Confirm payment received</p>
-                <p className="mt-1 text-xs leading-relaxed">Record the full balance of {money(due, currency)}. Card (terminal) records a payment already taken on your terminal.</p>
+                <p className="mt-1 text-xs leading-relaxed">Record the full balance of {money(due, currency)} already received. This does not charge a card. Saving may send a booking confirmation to the booking contact.</p>
               </div>
             </div>
             <div className="sv-payment-fields">
@@ -148,16 +161,16 @@ function BookingCheckIn({
                 Note <span className="font-normal">(optional)</span>
                 <input value={paymentNote} onChange={event => setPaymentNote(event.target.value)} maxLength={240} className="ui-control mt-1 h-11 w-full rounded-xl px-3 text-sm" placeholder="Receipt or reference" disabled={busy !== null} />
               </label>
-              <button type="button" onClick={recordPayment} disabled={busy !== null} className="ui-btn ui-btn-primary disabled:opacity-50">
+              <button type="button" onClick={recordPayment} disabled={busy !== null || refreshing || due <= 0.005} className="ui-btn ui-btn-primary disabled:opacity-50">
                 {busy === "payment" ? "Confirming…" : `Confirm ${money(due, currency)} received`}
               </button>
             </div>
           </div>
         )}
 
-        {!paymentNeeded && !waiverReady && (
+        {!waiverReady && (
           <p className="mt-4 rounded-xl border px-3 py-2.5 text-sm font-medium" style={{ borderColor: "color-mix(in srgb, var(--ck-danger) 28%, transparent)", background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }}>
-            A signed waiver is required before recording arrivals. The full dashboard has the waiver actions.
+            {guide ? "Resolve waiver" : <Link className="no-underline" aria-label="Resolve this booking’s waiver" onClick={() => rememberReturnPosition(businessId, returnTo)} href={bookingResolutionUrl(booking.id, returnTo, "waiver")}>Resolve waiver</Link>}
           </p>
         )}
 
@@ -183,12 +196,14 @@ function BookingCheckIn({
 }
 
 export default function SimpleCheckInsPage() {
-  const { businessId, timezone } = useBusinessContext();
+  const { businessId, timezone, role } = useBusinessContext();
+  const guide = role === "GUIDE";
+  const base = guide ? "/simpleguide" : "/simple";
   const router = useRouter();
   const today = businessDateKey(timezone);
   const [date, setDate] = useState(today);
   const [slotFilter, setSlotFilter] = useState("");
-  const { data, loading, error, reload } = useSimpleDay(businessId, date, timezone);
+  const { data, loading, error, reload, refreshing } = useSimpleDay(businessId, date, timezone, guide);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -204,11 +219,22 @@ export default function SimpleCheckInsPage() {
     return validSlotFilter ? data.departures.filter(departure => departure.id === validSlotFilter) : data.departures;
   }, [data, validSlotFilter]);
   const bookingCount = departures.reduce((sum, departure) => sum + departure.bookings.length, 0);
+  const focusedArrival = useRef("");
+  useEffect(() => {
+    if (loading || !data) return;
+    const focusRequestedGuest = () => {
+      const id = window.location.hash.slice(1);
+      if (id !== focusedArrival.current && focusArrivalInput(id)) focusedArrival.current = id;
+    };
+    focusRequestedGuest();
+    window.addEventListener("hashchange", focusRequestedGuest);
+    return () => window.removeEventListener("hashchange", focusRequestedGuest);
+  }, [data, loading, validSlotFilter]);
 
   function updateUrl(nextDate: string, nextSlot: string) {
     const params = new URLSearchParams({ date: nextDate });
     if (nextSlot) params.set("slot", nextSlot);
-    router.replace("/simple/check-ins?" + params.toString(), { scroll: false });
+    router.replace(base + "/check-ins?" + params.toString(), { scroll: false });
   }
 
   function selectDate(next: string) {
@@ -226,9 +252,8 @@ export default function SimpleCheckInsPage() {
   return (
     <div className="sv-page">
       <header className="sv-intro sv-intro--arrivals">
-        <p className="sv-eyebrow"><CheckCircle size={16} /> Arrivals and desk payments</p>
+        <p className="sv-eyebrow"><CheckCircle size={16} /> {guide ? "Guest arrivals" : "Arrivals and desk payments"}</p>
         <h1 className="sv-title">Check-ins</h1>
-        <p className="sv-intro-copy">Welcome your guests. Confirm payment and waivers, then record arrivals.</p>
       </header>
 
       <section className="ui-card sv-filters grid gap-4 md:grid-cols-[minmax(0,340px)_minmax(0,1fr)] md:items-end" aria-label="Check-in filters">
@@ -267,13 +292,13 @@ export default function SimpleCheckInsPage() {
         <div className="ui-card px-5 py-10 text-center">
           <CheckCircle size={32} className="mx-auto" style={{ color: "var(--ck-text-muted)" }} />
           <h2 className="mt-3 font-semibold" style={{ color: "var(--ck-text-strong)" }}>No bookings to check in</h2>
-          <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>{departures.length ? "These departures do not have active bookings yet." : "There are no departures on this day."}</p>
+          <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>No booked sessions today.</p>
         </div>
       )}
 
       {!loading && !error && bookingCount > 0 && (
         <div className="space-y-6">
-          {departures.filter(departure => departure.bookings.length > 0).map(departure => (
+          {departures.map(departure => (
             <section key={departure.id} aria-labelledby={`departure-${departure.id}`}>
               <div className="sv-group-heading">
                 <h2 id={`departure-${departure.id}`}>
@@ -283,7 +308,7 @@ export default function SimpleCheckInsPage() {
               </div>
               <ul className="space-y-3">
                 {departure.bookings.map(booking => (
-                  <BookingCheckIn key={booking.id} booking={booking} departure={departure} businessId={businessId} currency={data?.currency || "ZAR"} reload={reload} />
+                  <BookingCheckIn key={booking.id} booking={booking} departure={departure} businessId={businessId} currency={data?.currency || "ZAR"} reload={reload} returnTo={base + "/check-ins?" + new URLSearchParams({date, ...(validSlotFilter ? {slot: validSlotFilter} : {})})} refreshing={refreshing} />
                 ))}
               </ul>
             </section>

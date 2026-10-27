@@ -1,5 +1,7 @@
 "use client";
 
+import { authStorage } from "./browser-session";
+
 import { TZDateMini } from "@date-fns/tz/date/mini";
 
 const TZ_FMT_OPTS: Intl.DateTimeFormatOptions = {
@@ -13,12 +15,12 @@ export function getAdminTimezone() {
   // Fall back to the browser's timezone, not UTC — a UTC default made every
   // admin-triggered email/display show shifted times until the operator
   // explicitly saved a timezone in Settings.
-  return localStorage.getItem("ck_admin_timezone") || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  return authStorage.getItem("ck_admin_timezone") || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }
 
 export function setAdminTimezone(tz: string) {
   if (typeof window === "undefined") return;
-  localStorage.setItem("ck_admin_timezone", tz);
+  authStorage.setItem("ck_admin_timezone", tz);
 }
 
 export function tzParts(d: Date, tz: string) {

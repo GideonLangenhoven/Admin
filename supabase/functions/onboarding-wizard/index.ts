@@ -434,8 +434,8 @@ Deno.serve(async (req) => {
     if (action === "save-credentials") {
       return respond(403, {
         success: false,
-        code: "MFA_REQUIRED",
-        error: "Finish onboarding without payment credentials. Then sign in to the admin dashboard and connect Yoco under Settings after authenticator verification.",
+        code: "ADMIN_SIGN_IN_REQUIRED",
+        error: "Finish onboarding, then sign in to the admin dashboard and connect Yoco under Settings.",
       });
     }
 

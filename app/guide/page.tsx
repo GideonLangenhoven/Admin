@@ -150,7 +150,7 @@ export default function GuideHomePage() {
       </ul>
 
       {!loading && slots.length > 0 && (
-        <p className="text-center text-[12px] ui-text-muted mt-6">Tap a tour to see passengers and check them in.</p>
+        <p className="text-center text-[12px] ui-text-muted mt-6">Choose a tour to check in guests.</p>
       )}
     </div>
   );

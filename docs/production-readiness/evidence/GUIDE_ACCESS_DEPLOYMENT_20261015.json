@@ -1,0 +1,63 @@
+{
+  "date": "2026-10-15",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "verified_at": "2026-10-15T15:54:19.237039+00:00",
+  "admin": {
+    "previous": "dpl_6dmkz7W8U4wj9MQLNSgcGj8dhwMB",
+    "deployment": "dpl_4v2DFh5cJqNDVfFZWgAeK7qXc9EZ",
+    "url": "https://admin.bookingtours.co.za",
+    "state": "READY",
+    "uploaded_source_files_verified": 475
+  },
+  "preserves_earlier_release": "TODAYS_CHANGES_DEPLOYMENT_20261015.json",
+  "scope": [
+    "One shared guide login per operator, guide@<operator-subdomain>",
+    "Owner creates private one-use 48-hour password setup link in Settings > Admin Users > Guide login",
+    "Guide chooses shared password and opens Simple View directly",
+    "Tenant-bound expected passenger counts and trip photo viewing/upload",
+    "Guide suspension and password reset links",
+    "Booking creation rejects missing, negative or non-finite configured pricing",
+    "Simple View daily-help layout and copy"
+  ],
+  "database": {
+    "migration": "20261015190000_shared_guide_access.sql",
+    "sha256": "5918f903b64885615c67491147506a10e644e47303a87bd86b9edf758be54c5c",
+    "rehearsal": "PASS rollback",
+    "applied": "PASS committed exact source",
+    "verified": "RLS, safe column SELECT grants, service-only setup RPCs, tenant-only read RPCs, office/guide identity separation and restrictive storage write policies"
+  },
+  "validation": {
+    "production_build": "PASS including TypeScript and 100 static pages",
+    "candidate_typescript": "PASS",
+    "candidate_focused_unit_tests": 175,
+    "deployed_browser_tests": 4,
+    "live_access_and_route_checks": 21,
+    "earlier_migrations_exact_sources_verified": 9,
+    "edge_functions": "Versions, JWT settings and state unchanged",
+    "help_sync": {
+      "status": 200,
+      "result": {
+        "ok": true,
+        "total": 171,
+        "embedded": 2,
+        "skipped": 169,
+        "removed": 0,
+        "failed": 0,
+        "errors": []
+      },
+      "articles": [
+        "guide",
+        "simple-view"
+      ]
+    },
+    "full_suite_attempt": "The isolated admin snapshot contains pre-existing tests for excluded booking, OTA and chat sources; 13 suites cannot load those files, and two dormant agent CA assertions differ from the older deployed agent source. 129 files passed. This is not reported as a full-suite pass. A separate pre-deploy working-tree run passed 2338 tests; focused candidate guide/auth/booking checks and deployed browser checks passed."
+  },
+  "limitations": [
+    "Deployed browser flows use synthetic data and intercept provider/API writes; no real guide account or password was created for verification.",
+    "Real Google Drive uploads, customer payments and message delivery were not exercised.",
+    "Existing automated promotional sending restrictions remain in force; Resend callback configuration remains pending as recorded in the earlier release.",
+    "Older unrelated working-tree agent, OTA and chat changes were not included in this follow-up. Earlier reviewed marketing fixes were preserved verbatim."
+  ],
+  "evidence_directory": "guide-access-deployment-20261015/",
+  "rollback": "Dashboard can be promoted back to dpl_6dmkz7W8U4wj9MQLNSgcGj8dhwMB. Retain the additive guide schema and existing marketing restrictions; do not delete guide identities or uploaded photos."
+}

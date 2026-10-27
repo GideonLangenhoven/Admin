@@ -1,7 +1,9 @@
+import { guideAuthEmail } from "../../app/lib/guide-access";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ts from "typescript";
+import { arrivalReadiness } from "../../app/lib/operator-day";
 import * as guideOffline from "../../app/lib/guide-offline";
 import {
   activateGuideQueueAuthContext,
@@ -164,6 +166,7 @@ function guideStatusHandlerFixture(authority: {
       },
     },
     require: (name: string) => {
+      if (name.endsWith("/browser-session")) return { guideWorkerScope: "/guide/", guideWorkerScript: "/guide/sw.js", guideQueueAuthorityKey: "guide-queue-authority-v2" };
       if (name === "react") return {
         useEffect: (effect: () => void | (() => void)) => effects.push(effect),
         useRef: () => retries,
@@ -208,6 +211,8 @@ function loginCleanupFixture(cleanupClearResult: number | null, signInError: { s
   let queueAuthorityLive = false;
   const noop = vi.fn();
   const login = sourceFunction("components/AuthGate.tsx", "login", {
+    guideSession: false, sessionCookie: (key: string) => key,
+    guideAuthEmail,
     email: "a@example.invalid",
     pass: "test",
     pathname: "/",
@@ -228,7 +233,7 @@ function loginCleanupFixture(cleanupClearResult: number | null, signInError: { s
     setYocoTestMode: noop,
     setHostMismatch: noop,
     setAuthed: noop,
-    localStorage: {
+    authStorage: {
       getItem: () => null,
       setItem,
       removeItem: () => {
@@ -406,7 +411,7 @@ describe("offline guide check-in replay", () => {
       setItem: (key: string, value: string) => values.set(key, value),
     });
     vi.stubGlobal("navigator", {
-      serviceWorker: { getRegistration: async () => ({ active: { postMessage: vi.fn() } }) },
+      serviceWorker: { getRegistration: async () => ({ scope: "https://fixture.invalid/guide/", active: { postMessage: vi.fn() } }) },
     });
     const auth = { userId: "user-a", businessId: "business-a", accessToken: "stale-token" };
     const initialGeneration = currentGuideQueueAuthGeneration();
@@ -438,7 +443,7 @@ describe("offline guide check-in replay", () => {
         getRegistration: async () => {
           registrationStarted = true;
           await registrationGate;
-          return { active: { postMessage } };
+          return { scope: "https://fixture.invalid/guide/", active: { postMessage } };
         },
       },
     });
@@ -465,7 +470,7 @@ describe("offline guide check-in replay", () => {
       setItem: (key: string, value: string) => values.set(key, value),
     });
     vi.stubGlobal("navigator", {
-      serviceWorker: { getRegistration: async () => ({ active: { postMessage: vi.fn() } }) },
+      serviceWorker: { getRegistration: async () => ({ scope: "https://fixture.invalid/guide/", active: { postMessage: vi.fn() } }) },
     });
     const api = guideOffline as unknown as {
       establishGuideQueueAuthority(context: { userId: string; businessId: string; accessToken: string }, expected: number): number | null;
@@ -611,7 +616,7 @@ describe("offline guide check-in replay", () => {
       setItem: (key: string, value: string) => values.set(key, value),
     });
     vi.stubGlobal("navigator", {
-      serviceWorker: { getRegistration: async () => ({ active: { postMessage: vi.fn() } }) },
+      serviceWorker: { getRegistration: async () => ({ scope: "https://fixture.invalid/guide/", active: { postMessage: vi.fn() } }) },
     });
 
     const clearing = clearGuideQueueAuthContext(generation, authority);
@@ -650,7 +655,7 @@ describe("offline guide check-in replay", () => {
       setItem,
     });
     vi.stubGlobal("navigator", {
-      serviceWorker: { getRegistration: async () => ({ active: { postMessage: vi.fn() } }) },
+      serviceWorker: { getRegistration: async () => ({ scope: "https://fixture.invalid/guide/", active: { postMessage: vi.fn() } }) },
     });
 
     const clearing = clearGuideQueueAuthContext(generation, authority);
@@ -693,7 +698,7 @@ describe("offline guide check-in replay", () => {
       setItem: (key: string, value: string) => values.set(key, value),
     });
     vi.stubGlobal("navigator", {
-      serviceWorker: { getRegistration: async () => ({ active: { postMessage: vi.fn() } }) },
+      serviceWorker: { getRegistration: async () => ({ scope: "https://fixture.invalid/guide/", active: { postMessage: vi.fn() } }) },
     });
 
     await expect(clearGuideQueueAuthContext(generation, authority)).resolves.toBe(clearedGeneration);
@@ -726,7 +731,7 @@ describe("offline guide check-in replay", () => {
       setItem: (key: string, value: string) => values.set(key, value),
     });
     vi.stubGlobal("navigator", {
-      serviceWorker: { getRegistration: async () => ({ active: { postMessage: vi.fn() } }) },
+      serviceWorker: { getRegistration: async () => ({ scope: "https://fixture.invalid/guide/", active: { postMessage: vi.fn() } }) },
     });
 
     const [first, second] = await Promise.all([
@@ -760,7 +765,7 @@ describe("offline guide check-in replay", () => {
       setItem: (key: string, value: string) => values.set(key, value),
     });
     vi.stubGlobal("navigator", {
-      serviceWorker: { getRegistration: async () => ({ active: { postMessage } }) },
+      serviceWorker: { getRegistration: async () => ({ scope: "https://fixture.invalid/guide/", active: { postMessage } }) },
     });
     const accountB = { userId: "user-b", businessId: "business-b", accessToken: "token-b" };
 
@@ -781,16 +786,24 @@ describe("offline guide check-in replay", () => {
 
   it("uses the v2 sync tag when Background Sync is available", async () => {
     const register = vi.fn(async () => {});
-    vi.stubGlobal("navigator", { serviceWorker: { getRegistration: async () => ({ sync: { register } }) } });
+    vi.stubGlobal("navigator", { serviceWorker: { getRegistration: async () => ({ scope: "https://fixture.invalid/guide/", sync: { register } }) } });
 
     await registerGuideCheckInSync();
 
     expect(register).toHaveBeenCalledWith("sync-check-ins-v2");
   });
 
+  it("does not send check-ins to a parent service worker registration", async () => {
+    const postMessage = vi.fn(), register = vi.fn();
+    vi.stubGlobal("navigator", { serviceWorker: { getRegistration: async () => ({ scope: "https://fixture.invalid/", active: { postMessage }, sync: { register } }) } });
+    await registerGuideCheckInSync();
+    expect(register).not.toHaveBeenCalled();
+    expect(postMessage).not.toHaveBeenCalled();
+  });
+
   it("requests foreground replay when Background Sync is unavailable", async () => {
     const postMessage = vi.fn();
-    vi.stubGlobal("navigator", { serviceWorker: { getRegistration: async () => ({ active: { postMessage } }) } });
+    vi.stubGlobal("navigator", { serviceWorker: { getRegistration: async () => ({ scope: "https://fixture.invalid/guide/", active: { postMessage } }) } });
 
     await registerGuideCheckInSync();
 
@@ -801,7 +814,7 @@ describe("offline guide check-in replay", () => {
     const postMessage = vi.fn();
     vi.stubGlobal("navigator", {
       serviceWorker: {
-        getRegistration: async () => ({
+        getRegistration: async () => ({ scope: "https://fixture.invalid/guide/",
           sync: { register: vi.fn(async () => { throw new Error("registration denied"); }) },
           active: { postMessage },
         }),
@@ -817,6 +830,7 @@ describe("offline guide check-in replay", () => {
     const currentDb = { close: vi.fn() };
     const writes: Array<{ db: unknown; item: QueueItem }> = [];
     const migrate = sourceFunction("public/guide/sw.js", "migrateLegacyQueue", {
+      SHARED_GUIDE: false,
       openLegacyDb: async () => legacyDb,
       openDb: async () => currentDb,
       idbGetAll: async () => [boundItem({ userId: undefined, businessId: undefined, token: "legacy-token" })],
@@ -843,6 +857,7 @@ describe("offline guide check-in replay", () => {
     const current = new Map<string, QueueItem>([["event-a", boundItem({ payload: payload("event-a", "current-booking") })]]);
     const currentWrites: QueueItem[] = [];
     const migrate = sourceFunction("public/guide/sw.js", "migrateLegacyQueue", {
+      SHARED_GUIDE: false,
       openLegacyDb: async () => legacyDb,
       openDb: async () => currentDb,
       idbGetAll: async (db: unknown) => db === legacyDb ? [structuredClone(legacyItem)] : Array.from(current.values()),
@@ -1911,7 +1926,7 @@ describe("guide authority lifecycle", () => {
       guideQueueAuthContext,
       activateGuideQueueAuthContext,
       contextRequestRef: { current: 0 },
-      localStorage: { setItem: vi.fn() },
+      authStorage: { setItem: vi.fn() },
       setBusinessId: () => order.push("selection"),
       setBusinessName: vi.fn(), setLogoUrl: vi.fn(), setTimezone: vi.fn(),
       setSubscriptionStatus: vi.fn(), setYocoTestMode: vi.fn(),
@@ -1932,6 +1947,7 @@ describe("guide authority lifecycle", () => {
     const order: string[] = [];
     const clearGuideQueueAuthContext = vi.fn(async () => { order.push("guide-clear"); return 21; });
     const clearSession = sourceFunction("components/AuthGate.tsx", "clearSession", {
+        sessionCookie: (key: string) => key,
       contextRequestRef: { current: 0 },
       guideAuthorityEpochRef: { current: 10 },
       authSessionRef: { current: null },
@@ -1946,7 +1962,7 @@ describe("guide authority lifecycle", () => {
         getSession: async () => ({ data: { session: null } }),
         signOut: async () => { order.push("sign-out"); },
       } },
-      localStorage: { removeItem: vi.fn() },
+      authStorage: { removeItem: vi.fn() },
       document: { cookie: "" },
       setError: vi.fn(),
       setAuthed: vi.fn(), setBusinessId: vi.fn(), setBusinessName: vi.fn(), setLogoUrl: vi.fn(),
@@ -1967,6 +1983,7 @@ describe("guide authority lifecycle", () => {
     const removeItem = vi.fn();
     const isCurrentGuideQueueAuthClear = vi.fn(() => false);
     const clearSession = sourceFunction("components/AuthGate.tsx", "clearSession", {
+        sessionCookie: (key: string) => key,
       contextRequestRef: { current: 0 },
       guideAuthorityEpochRef: { current: 20 },
       authSessionRef: { current: null },
@@ -1981,7 +1998,7 @@ describe("guide authority lifecycle", () => {
         getSession: async () => ({ data: { session: { access_token: "token-a", user: { id: "user-a" } } } }),
         signOut,
       } },
-      localStorage: { removeItem },
+      authStorage: { removeItem },
       document: { cookie: "" },
       setError: vi.fn(),
       setAuthed: vi.fn(), setBusinessId: vi.fn(), setBusinessName: vi.fn(), setLogoUrl: vi.fn(),
@@ -2015,6 +2032,7 @@ describe("guide authority lifecycle", () => {
     });
     const removeItem = vi.fn();
     const clearSession = sourceFunction("components/AuthGate.tsx", "clearSession", {
+        sessionCookie: (key: string) => key,
       contextRequestRef: { current: 0 },
       guideAuthorityEpochRef: { current: 20 },
       authSessionRef: { current: accountA },
@@ -2034,7 +2052,7 @@ describe("guide authority lifecycle", () => {
           signOut,
         },
       },
-      localStorage: { removeItem },
+      authStorage: { removeItem },
       document: { cookie: "" },
       setError: vi.fn(),
       setAuthed: vi.fn(), setBusinessId: vi.fn(), setBusinessName: vi.fn(), setLogoUrl: vi.fn(),
@@ -2070,6 +2088,7 @@ describe("guide authority lifecycle", () => {
     const signOut = vi.fn(async () => { currentSession = null; });
     const clearGuideQueueAuthContext = vi.fn(async () => 22);
     const clearSession = sourceFunction("components/AuthGate.tsx", "clearSession", {
+        sessionCookie: (key: string) => key,
       contextRequestRef: { current: 0 },
       guideAuthorityEpochRef: { current: 20 },
       authSessionRef: { current: accountA },
@@ -2084,7 +2103,7 @@ describe("guide authority lifecycle", () => {
         getSession: async () => ({ data: { session: currentSession } }),
         signOut,
       } },
-      localStorage: { removeItem: vi.fn() },
+      authStorage: { removeItem: vi.fn() },
       document: { cookie: "" },
       setError: vi.fn(),
       setAuthed: vi.fn(), setBusinessId: vi.fn(), setBusinessName: vi.fn(), setLogoUrl: vi.fn(),
@@ -2143,6 +2162,7 @@ describe("guide authority lifecycle", () => {
     const signOut = vi.fn(async () => {});
     const removeItem = vi.fn();
     const clearSession = sourceFunction("components/AuthGate.tsx", "clearSession", {
+        sessionCookie: (key: string) => key,
       contextRequestRef: { current: 0 },
       guideAuthorityEpochRef: { current: 10 },
       authSessionRef: { current: null },
@@ -2157,7 +2177,7 @@ describe("guide authority lifecycle", () => {
         getSession: async () => ({ data: { session: { access_token: "token-a", user: { id: "user-a" } } } }),
         signOut,
       } },
-      localStorage: { removeItem },
+      authStorage: { removeItem },
       document: { cookie: "" },
       setError: vi.fn(),
       setAuthed: vi.fn(), setBusinessId: vi.fn(), setBusinessName: vi.fn(), setLogoUrl: vi.fn(),
@@ -2180,11 +2200,12 @@ describe("guide authority lifecycle", () => {
     expect(worker).toContain("MAX_AUTO_ATTEMPTS - (item.attempts || 0)");
   });
 
-  it("routes shared sign-out through AuthGate and waits for protected completion before reload", async () => {
+  it("routes shared sign-out through AuthGate and waits for protected completion before returning to sign-in", async () => {
     const order: string[] = [];
     const setError = vi.fn();
     const setSigningOut = vi.fn();
     const logout = sourceFunction("components/SignOutButton.tsx", "logout", {
+      guideSession: false,
       signingOut: false,
       setSigningOut,
       setError,
@@ -2204,13 +2225,13 @@ describe("guide authority lifecycle", () => {
           order.push("protected-clear-and-sdk-sign-out");
           event.detail.complete(true);
         },
-        location: { reload: () => order.push("reload") },
+        location: { replace: (url: string) => order.push("navigate:" + url) },
       },
     });
 
     await logout();
 
-    expect(order).toEqual(["protected-clear-and-sdk-sign-out", "reload"]);
+    expect(order).toEqual(["protected-clear-and-sdk-sign-out", "navigate:/"]);
     expect(setError).toHaveBeenCalledWith("");
     const gateSource = readFileSync("components/AuthGate.tsx", "utf8");
     expect(gateSource).toContain("window.addEventListener(PROTECTED_SIGN_OUT_EVENT, onSignOutRequest)");
@@ -2220,8 +2241,9 @@ describe("guide authority lifecycle", () => {
   it("keeps shared sign-out in place and reports a failed protected revocation", async () => {
     const setError = vi.fn();
     const setSigningOut = vi.fn();
-    const reload = vi.fn();
+    const replace = vi.fn();
     const logout = sourceFunction("components/SignOutButton.tsx", "logout", {
+      guideSession: false,
       signingOut: false,
       setSigningOut,
       setError,
@@ -2234,12 +2256,12 @@ describe("guide authority lifecycle", () => {
           this.detail = init.detail;
         }
       },
-      window: { dispatchEvent: () => true, location: { reload } },
+      window: { dispatchEvent: () => true, location: { replace } },
     });
 
     await logout();
 
-    expect(reload).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
     expect(setError).toHaveBeenLastCalledWith("Sign out could not be completed safely. Please try again.");
     expect(setSigningOut).toHaveBeenLastCalledWith(false);
   });
@@ -2265,6 +2287,7 @@ describe("guide authority lifecycle", () => {
       let signOutAttempt = 0;
       let reloads = 0;
       const clearSession = sourceFunction("components/AuthGate.tsx", "clearSession", {
+        sessionCookie: (key: string) => key,
         contextRequestRef: { current: 0 },
         guideAuthorityEpochRef,
         authSessionRef,
@@ -2296,7 +2319,7 @@ describe("guide authority lifecycle", () => {
             return { error: null };
           },
         } },
-        localStorage: { removeItem },
+        authStorage: { removeItem },
         document: { cookie: "" },
         setError: (value: string) => errors.push(value),
         setAuthed: vi.fn(), setBusinessId: vi.fn(), setBusinessName: vi.fn(), setStaffName: vi.fn(), setLogoUrl: vi.fn(),
@@ -2304,6 +2327,7 @@ describe("guide authority lifecycle", () => {
         setYocoTestMode: vi.fn(), setReadOnly: vi.fn(), setHostMismatch: vi.fn(),
       });
       const logout = sourceFunction("components/SignOutButton.tsx", "logout", {
+      guideSession: false,
         signingOut: false,
         setSigningOut: vi.fn(),
         setError: (value: string) => errors.push(value),
@@ -2321,7 +2345,7 @@ describe("guide authority lifecycle", () => {
             event.detail.handled = true;
             clearSession().then(event.detail.complete).catch(() => event.detail.complete(false));
           },
-          location: { reload: () => { reloads += 1; order.push("reload"); } },
+          location: { replace: (url: string) => { expect(url).toBe("/"); reloads += 1; order.push("reload"); } },
         },
       });
 
@@ -2377,7 +2401,7 @@ describe("guide authority lifecycle", () => {
       setItem: (key: string, value: string) => values.set(key, value),
     });
     vi.stubGlobal("navigator", {
-      serviceWorker: { getRegistration: async () => ({ active: { postMessage } }) },
+      serviceWorker: { getRegistration: async () => ({ scope: "https://fixture.invalid/guide/", active: { postMessage } }) },
     });
     const api = guideOffline as unknown as {
       acknowledgeGuideQueueIssue(authority: any, itemId: string): Promise<boolean>;
@@ -2458,7 +2482,7 @@ function pageFixture(options: {
   clearAdvancesAuthority?: boolean;
 } = {}) {
   let bookings = [{
-    id: "booking-a", customer_name: "Guest", phone: "", qty: 4, arrived_count: 2,
+    id: "booking-a", customer_name: "Guest", phone: "", qty: 4, arrived_count: 2, status: "PAID", total_amount: 400, total_captured: 400,
     checked_in: false, checked_in_at: null, waiver_status: "SIGNED", dietary: null, add_ons: [],
   }];
   const notify = vi.fn();
@@ -2506,6 +2530,7 @@ function pageFixture(options: {
   });
   const checkIn = sourceFunction("app/guide/slot/[slotId]/page.tsx", "checkIn", {
     bookings,
+    arrivalReadiness,
     readOnly: options.readOnly || false,
     businessId: "business-a",
     slotId: "slot-a",
@@ -2793,7 +2818,7 @@ describe("guide foreground check-in", () => {
     expect(f.clearGuideQueueAuthContext).not.toHaveBeenCalled();
     expect(f.registerGuideCheckInSync).not.toHaveBeenCalled();
     expect(f.requestGuideQueueStatus).toHaveBeenCalledOnce();
-    expect(f.notify).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining("sign in again") }));
+    expect(f.notify).toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringMatching(/sign in again/i) }));
   });
 
   it.each([403, 422])("retains direct %s rejection for deliberate owner acknowledgement", async response => {

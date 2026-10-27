@@ -1,0 +1,32 @@
+TASTESKILL · INSPECT   http://127.0.0.1:3000/simple/calendar
+
+MEASURED (first viewport listed)
+  hero headline   "Calendar"  1 words · 1 line(s) · 36px (3.5vw) · satoshi 600 · tracking -0.03em · leading 1.2
+  @768px          1 line(s) · 36px
+  @390px          1 line(s) · 28px
+  typefaces       Plus Jakarta Sans 99%
+  sizes in use    12 / 14 / 16 / 18 / 20 / 36 px
+  colour          page #f7f5f0 · sections #141815 #fbfbf8 · button #282d29
+  page            1 screens · 145 words · 1 images · hero media none
+  headings        1 · longest 1 line(s) · median - words
+
+WARN — fix, or be able to defend
+  [palette-cream] @1024px (+768, 390)  Yellow-cream background (page background #f7f5f0, section #fbfbf8, text #f6f5ef).
+      → Use the drawn palette. If you want warmth, take a low-chroma stone or bone, not a yellow cream.
+  [hero-void] @1024px  37% of the first screen is one empty block (469×614px at 384,154).
+      → Place the void on purpose or fill it: move the picture, the film or one fact into it, grow the headline to meet it, or shrink the screen to its content. A void reads as placed only when something closes it on the far side and it is the screen's one rest.
+  [no-data-hue] @1024px (+768)  The screen has a chart but no hue on any of its data (0.0% coloured pixels).
+      → Put the style's one chart hue (or the brand's) on the screen's main data element: today's line, the booked bars, the current period, the cover margin. Keep the chrome neutral; the hue still stays under the style's colour budget.
+  [app-title-size] @1024px (+768)  The h1 is 36px ("Calendar").
+      → An app screen is not a landing page: the title is 18-32px (20-24px on a phone).
+
+LOOK AT THE RENDER — open these with your image viewer / Read tool before saying anything about quality:
+  tablet 1024px   .taste-skill/audit/simple-calendar/tablet-1024-fold.jpg
+                  .taste-skill/audit/simple-calendar/tablet-1024-page-01.jpg
+  tablet 768px    .taste-skill/audit/simple-calendar/tablet-768-fold.jpg
+                  .taste-skill/audit/simple-calendar/tablet-768-page-01.jpg
+  mobile 390px    .taste-skill/audit/simple-calendar/mobile-fold.jpg
+                  .taste-skill/audit/simple-calendar/mobile-page-01.jpg
+
+report: .taste-skill/audit/simple-calendar/report.json
+RESULT: 0 FAIL, 4 WARN — measurements pass. Passing the meter is the floor, not the grade: score the screenshots with references/critique.md.

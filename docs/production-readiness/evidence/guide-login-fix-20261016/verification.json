@@ -1,0 +1,77 @@
+{
+  "at": "2026-10-16T05:20:43.525Z",
+  "deployment": {
+    "id": "dpl_3ELT2erzNJAya63VE6U35WhbH125",
+    "url": "caepweb-admin-9qdaceu6c-jerrys-projects-f4e4eaf9.vercel.app",
+    "readyState": "READY",
+    "current_live": "dpl_BUdA5CF8mUHjAtj1h4L7qHWwPZwT",
+    "expected_previous": "dpl_BUdA5CF8mUHjAtj1h4L7qHWwPZwT",
+    "source_files_verified": 482,
+    "changed": [
+      "components/AuthGate.tsx",
+      "components/SignOutButton.tsx"
+    ]
+  },
+  "live": {
+    "at": "2026-10-16T05:19:42.680Z",
+    "id": "dpl_3ELT2erzNJAya63VE6U35WhbH125",
+    "url": "caepweb-admin-9qdaceu6c-jerrys-projects-f4e4eaf9.vercel.app",
+    "checks": [
+      {
+        "path": "/",
+        "status": 200
+      },
+      {
+        "path": "/simpleguide",
+        "status": 200
+      },
+      {
+        "path": "/simpleguide/check-ins",
+        "status": 200
+      },
+      {
+        "path": "/guide-setup",
+        "status": 200
+      }
+    ]
+  },
+  "changes": [
+    "Redirect authenticated admins away from guide-only dashboard URLs.",
+    "Return admin sign-ins from guide links and successful sign-outs to the root dashboard/login.",
+    "Reload stale tabs when another tab completes sign-in or sign-out."
+  ],
+  "checks": {
+    "unit": {
+      "passed": 140,
+      "files": 4
+    },
+    "browser_local": {
+      "passed": 10
+    },
+    "browser_live": {
+      "passed": 10,
+      "seconds": 45.9,
+      "accounts": "synthetic; all authentication, API and database requests intercepted"
+    },
+    "typescript": "passed",
+    "lint": {
+      "errors": 0,
+      "pre_existing_warnings": 2
+    }
+  },
+  "source_sha256": {
+    "components/AuthGate.tsx": "2783a3fb2bc243b21cd7a1763d1ac73355500cad978c88ae1f20e895d9169645",
+    "components/SignOutButton.tsx": "212ac7c49abd943f26331ae7f086c30b305b96233df078039884361ac12707e0"
+  },
+  "preserved_newer_production_changes": [
+    "app/api/marketing/setup/route.ts",
+    "app/lib/marketing-setup.ts",
+    "app/marketing/automations/[id]/page.tsx",
+    "app/marketing/layout.tsx",
+    "components/marketing/MarketingSetupNotice.tsx",
+    "supabase/config.toml",
+    "supabase/functions/marketing-setup-status/index.ts"
+  ],
+  "customer_records_changed": false,
+  "database_or_edge_deployments": false
+}

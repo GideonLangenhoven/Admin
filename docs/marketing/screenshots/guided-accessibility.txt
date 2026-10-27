@@ -1,0 +1,26 @@
+- region "Plan a useful follow-up":
+  - paragraph: Synthetic demonstration
+  - heading "Plan a useful follow-up" [level=2]
+  - paragraph: This demonstration uses invented contacts. It cannot save, activate, issue offers or send messages.
+  - list "Planning steps":
+    - listitem:
+      - button "1. Goal"
+    - listitem:
+      - button "2. Audience"
+    - listitem:
+      - button "3. Content preview"
+    - listitem:
+      - button "4. Timing and safeguards"
+    - listitem:
+      - button "5. Review"
+  - status:
+    - 'heading "Review: Welcome enquiries" [level=3]'
+    - paragraph: 1 synthetic contacts · up to 3 emails before exits/frequency checks.
+    - paragraph: "Cost estimate unavailable: this demonstration has no verified billing rate or current quota. No booking or revenue result is measured."
+    - paragraph: Verified permission and no non-cancelled reservation. First-booking offers require approved issuance limits.
+    - paragraph: Activation is unavailable in this demonstration. In the real builder, Save creates a draft; owner activation separately validates prerequisites. Existing active enrollments cannot be silently moved to edited steps.
+    - link "Review existing recipes":
+      - /url: /marketing/automations
+  - button "Back"
+  - link "Advanced builder":
+    - /url: /marketing/automations/new

@@ -1,0 +1,1429 @@
+{
+ "url": "http://127.0.0.1:3000/simple",
+ "at": "2026-10-27T15:04:21.339Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 1024,
+   "height": 768,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    1
+   ],
+   "motion": {
+    "elements": 4,
+    "css": 4,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1024,
+     "h": 768
+    },
+    "page": {
+     "height": 768,
+     "screens": 1,
+     "words": 76,
+     "img": 1,
+     "video": 0,
+     "canvas": 0,
+     "svg": 21,
+     "sections": 2,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Roll call",
+     "words": 2,
+     "chars": 9,
+     "lines": 1,
+     "size": 28,
+     "vw": 2.7,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.03,
+     "leading": 1.2,
+     "top": 226,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "Roll call",
+     "words": 2,
+     "lines": 1,
+     "size": 28,
+     "font": "satoshi"
+    },
+    "headings": [
+     {
+      "text": "Roll call",
+      "words": 2,
+      "chars": 9,
+      "lines": 1,
+      "size": 28,
+      "vw": 2.7,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.2,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.91,
+      "top": 226,
+      "tag": "h1",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 0.98,
+       "mono": false
+      },
+      {
+       "family": "satoshi",
+       "share": 0.02,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      12,
+      14,
+      16,
+      18,
+      20,
+      28
+     ],
+     "sizeCount": 6,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 28,
+      "vw": 2.7,
+      "font": "satoshi",
+      "text": "Roll call"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0,
+     "centerShare": 0.06,
+     "smallText": 1
+    },
+    "eyebrows": [
+     {
+      "text": "Today · Tuesday, 27 October",
+      "above": "Roll call",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 14,
+      "top": 186
+     }
+    ],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#141815",
+       "top": 0,
+       "hsl": {
+        "h": 135,
+        "s": 0.09,
+        "l": 0.09
+       }
+      },
+      {
+       "color": "#fbfbf8",
+       "top": 750,
+       "hsl": {
+        "h": 60,
+        "s": 0.27,
+        "l": 0.98
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#19201a",
+       "share": 0.4
+      },
+      {
+       "color": "#545e55",
+       "share": 0.23
+      },
+      {
+       "color": "#1a261c",
+       "share": 0.18
+      },
+      {
+       "color": "#f6f5ef",
+       "share": 0.12
+      },
+      {
+       "color": "#b0b6af",
+       "share": 0.04
+      }
+     ],
+     "button": {
+      "bg": "#edede7",
+      "hsl": {
+       "h": 60,
+       "s": 0.14,
+       "l": 0.92
+      },
+      "fg": "#19201a"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 5,
+     "inHero": 5,
+     "radius": "pill",
+     "height": 44,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Full dashboard",
+      "Refresh",
+      "Today 2 bookings",
+      "Tomorrow 0 bookings",
+      "All departure days"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 5,
+     "hairlineSamples": [
+      "div.sv-intro-footer 928px",
+      "div.sv-roll-call-heading 976px",
+      "li.sv-booking-row 976px",
+      "li.sv-booking-row 976px",
+      "li.sv-booking-row 976px"
+     ],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 3,
+     "boxRadius": 24,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 3,
+     "fixed": false,
+     "height": 150,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 1024,
+     "h": 768
+    },
+    "pageH": 768,
+    "margins": {
+     "left": 44,
+     "right": 44
+    },
+    "sections": [
+     {
+      "sel": "header.sv-header",
+      "tag": "header",
+      "top": 0,
+      "height": 150,
+      "words": 7,
+      "media": 0,
+      "middle": 339,
+      "heading": null,
+      "left": 70,
+      "right": 67,
+      "textLeft": 70,
+      "textRight": 67,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "main.sv-main",
+      "tag": "main",
+      "top": 150,
+      "height": 618,
+      "words": 25,
+      "media": 0,
+      "middle": 12,
+      "heading": {
+       "text": "Roll call",
+       "size": 28,
+       "tag": "h1"
+      },
+      "left": 30,
+      "right": 44,
+      "textLeft": 30,
+      "textRight": 60,
+      "fullBleed": false,
+      "footer": true,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Roll call",
+      "size": 28,
+      "top": 226,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 44,
+      "n": 2
+     },
+     {
+      "x": 30,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 3,
+    "bodySize": 16,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0.21,
+    "voidBox": {
+     "x": 384,
+     "y": 512,
+     "w": 640,
+     "h": 256
+    }
+   },
+   "app": {
+    "viewport": {
+     "w": 1024,
+     "h": 768
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": null,
+    "topbar": null,
+    "canvas": {
+     "left": 30,
+     "right": 44
+    },
+    "hero": {
+     "text": "Roll call",
+     "words": 2,
+     "chars": 9,
+     "lines": 1,
+     "size": 28,
+     "vw": 2.7,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.03,
+     "leading": 1.2,
+     "top": 226,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 4,
+     "firstScreen": 3,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 9,
+     "radii": [
+      [
+       24,
+       3
+      ],
+      [
+       0,
+       3
+      ],
+      [
+       999,
+       2
+      ],
+      [
+       16,
+       1
+      ]
+     ],
+     "heavyBorders": 0,
+     "borderSamples": [],
+     "heavyShadows": 0,
+     "softShadows": 0,
+     "shadowSamples": [],
+     "glass": 0
+    },
+    "chips": {
+     "count": 2,
+     "hues": 1,
+     "samples": [
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      },
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      }
+     ]
+    },
+    "numbers": {
+     "cells": 0,
+     "leftAligned": 0,
+     "figures": 1,
+     "tabularShare": 0,
+     "kpiMax": 14
+    },
+    "rows": null,
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.08,
+     "tiny": 0,
+     "tinySamples": [],
+     "sizes": [
+      12,
+      14,
+      16,
+      18,
+      20,
+      28
+     ]
+    },
+    "title": {
+     "text": "Roll call",
+     "size": 28,
+     "top": 226
+    },
+    "colourShare": 0.208
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 768,
+   "height": 1024,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.94
+   ],
+   "motion": {
+    "elements": 17,
+    "css": 17,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "page": {
+     "height": 1024,
+     "screens": 1,
+     "words": 76,
+     "img": 1,
+     "video": 0,
+     "canvas": 0,
+     "svg": 21,
+     "sections": 2,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Roll call",
+     "words": 2,
+     "chars": 9,
+     "lines": 1,
+     "size": 28,
+     "vw": 3.6,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.03,
+     "leading": 1.2,
+     "top": 226,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "Roll call",
+     "words": 2,
+     "lines": 1,
+     "size": 28,
+     "font": "satoshi"
+    },
+    "headings": [
+     {
+      "text": "Roll call",
+      "words": 2,
+      "chars": 9,
+      "lines": 1,
+      "size": 28,
+      "vw": 3.6,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.2,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.88,
+      "top": 226,
+      "tag": "h1",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 0.98,
+       "mono": false
+      },
+      {
+       "family": "satoshi",
+       "share": 0.02,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      12,
+      14,
+      16,
+      18,
+      20,
+      28
+     ],
+     "sizeCount": 6,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 28,
+      "vw": 3.6,
+      "font": "satoshi",
+      "text": "Roll call"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0,
+     "centerShare": 0.06,
+     "smallText": 1
+    },
+    "eyebrows": [
+     {
+      "text": "Today · Tuesday, 27 October",
+      "above": "Roll call",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 14,
+      "top": 186
+     }
+    ],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#141815",
+       "top": 0,
+       "hsl": {
+        "h": 135,
+        "s": 0.09,
+        "l": 0.09
+       }
+      },
+      {
+       "color": "#fbfbf8",
+       "top": 750,
+       "hsl": {
+        "h": 60,
+        "s": 0.27,
+        "l": 0.98
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#19201a",
+       "share": 0.4
+      },
+      {
+       "color": "#545e55",
+       "share": 0.23
+      },
+      {
+       "color": "#1a261c",
+       "share": 0.18
+      },
+      {
+       "color": "#f6f5ef",
+       "share": 0.12
+      },
+      {
+       "color": "#b0b6af",
+       "share": 0.04
+      }
+     ],
+     "button": {
+      "bg": "#edede7",
+      "hsl": {
+       "h": 60,
+       "s": 0.14,
+       "l": 0.92
+      },
+      "fg": "#19201a"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 6,
+     "inHero": 6,
+     "radius": "pill",
+     "height": 44,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Today",
+      "Full dashboard",
+      "Refresh",
+      "Today 2 bookings",
+      "Tomorrow 0 bookings"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 5,
+     "hairlineSamples": [
+      "div.sv-intro-footer 672px",
+      "div.sv-roll-call-heading 720px",
+      "li.sv-booking-row 720px",
+      "li.sv-booking-row 720px",
+      "li.sv-booking-row 720px"
+     ],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 3,
+     "boxRadius": 24,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 3,
+     "fixed": false,
+     "height": 150,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "pageH": 1024,
+    "margins": {
+     "left": 44,
+     "right": 44
+    },
+    "sections": [
+     {
+      "sel": "header.sv-header",
+      "tag": "header",
+      "top": 0,
+      "height": 150,
+      "words": 7,
+      "media": 0,
+      "middle": 211,
+      "heading": null,
+      "left": 70,
+      "right": 67,
+      "textLeft": 70,
+      "textRight": 67,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "main.sv-main",
+      "tag": "main",
+      "top": 150,
+      "height": 874,
+      "words": 42,
+      "media": 0,
+      "middle": 6,
+      "heading": {
+       "text": "Roll call",
+       "size": 28,
+       "tag": "h1"
+      },
+      "left": 30,
+      "right": 44,
+      "textLeft": 30,
+      "textRight": 51,
+      "fullBleed": false,
+      "footer": true,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Roll call",
+      "size": 28,
+      "top": 226,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 44,
+      "n": 3
+     },
+     {
+      "x": 30,
+      "n": 1
+     },
+     {
+      "x": 114,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 5,
+    "bodySize": 16,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": null,
+    "topbar": null,
+    "canvas": {
+     "left": 30,
+     "right": 44
+    },
+    "hero": {
+     "text": "Roll call",
+     "words": 2,
+     "chars": 9,
+     "lines": 1,
+     "size": 28,
+     "vw": 3.6,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.03,
+     "leading": 1.2,
+     "top": 226,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 4,
+     "firstScreen": 4,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 9,
+     "radii": [
+      [
+       24,
+       3
+      ],
+      [
+       0,
+       3
+      ],
+      [
+       999,
+       2
+      ],
+      [
+       16,
+       1
+      ]
+     ],
+     "heavyBorders": 0,
+     "borderSamples": [],
+     "heavyShadows": 0,
+     "softShadows": 0,
+     "shadowSamples": [],
+     "glass": 0
+    },
+    "chips": {
+     "count": 2,
+     "hues": 1,
+     "samples": [
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      },
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      }
+     ]
+    },
+    "numbers": {
+     "cells": 0,
+     "leftAligned": 0,
+     "figures": 1,
+     "tabularShare": 0,
+     "kpiMax": 14
+    },
+    "rows": null,
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.08,
+     "tiny": 0,
+     "tinySamples": [],
+     "sizes": [
+      12,
+      14,
+      16,
+      18,
+      20,
+      28
+     ]
+    },
+    "title": {
+     "text": "Roll call",
+     "size": 28,
+     "top": 226
+    },
+    "colourShare": 0.154
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 390,
+   "height": 844,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    1
+   ],
+   "motion": {
+    "elements": 8,
+    "css": 8,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "page": {
+     "height": 844,
+     "screens": 1,
+     "words": 73,
+     "img": 1,
+     "video": 0,
+     "canvas": 0,
+     "svg": 21,
+     "sections": 2,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Roll call",
+     "words": 2,
+     "chars": 9,
+     "lines": 1,
+     "size": 28,
+     "vw": 7.2,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.03,
+     "leading": 1.2,
+     "top": 148,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "Roll call",
+     "words": 2,
+     "lines": 1,
+     "size": 28,
+     "font": "satoshi"
+    },
+    "headings": [
+     {
+      "text": "Roll call",
+      "words": 2,
+      "chars": 9,
+      "lines": 1,
+      "size": 28,
+      "vw": 7.2,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.2,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.86,
+      "top": 148,
+      "tag": "h1",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 0.98,
+       "mono": false
+      },
+      {
+       "family": "satoshi",
+       "share": 0.02,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      12,
+      14,
+      16,
+      18,
+      20,
+      28
+     ],
+     "sizeCount": 6,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 28,
+      "vw": 7.2,
+      "font": "satoshi",
+      "text": "Roll call"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0,
+     "centerShare": 0.06,
+     "smallText": 1
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#141815",
+       "top": 0,
+       "hsl": {
+        "h": 135,
+        "s": 0.09,
+        "l": 0.09
+       }
+      },
+      {
+       "color": "#fbfbf8",
+       "top": 683,
+       "hsl": {
+        "h": 60,
+        "s": 0.27,
+        "l": 0.98
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#19201a",
+       "share": 0.42
+      },
+      {
+       "color": "#545e55",
+       "share": 0.24
+      },
+      {
+       "color": "#1a261c",
+       "share": 0.17
+      },
+      {
+       "color": "#f6f5ef",
+       "share": 0.09
+      },
+      {
+       "color": "#b0b6af",
+       "share": 0.05
+      }
+     ],
+     "button": {
+      "bg": "#edede7",
+      "hsl": {
+       "h": 60,
+       "s": 0.14,
+       "l": 0.92
+      },
+      "fg": "#19201a"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 4,
+     "inHero": 4,
+     "radius": "pill",
+     "height": 44,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Refresh",
+      "Today 2 bookings",
+      "Tomorrow 0 bookings",
+      "All departure days"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 5,
+     "hairlineSamples": [
+      "div.sv-intro-footer 334px",
+      "div.sv-roll-call-heading 366px",
+      "li.sv-booking-row 366px",
+      "li.sv-booking-row 366px",
+      "li.sv-booking-row 366px"
+     ],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 3,
+     "boxRadius": 24,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 2,
+     "fixed": false,
+     "height": 80,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "pageH": 844,
+    "margins": {
+     "left": 28,
+     "right": 28
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Roll call",
+      "size": 28,
+      "top": 148,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 18,
+      "n": 3
+     },
+     {
+      "x": 32,
+      "n": 1
+     },
+     {
+      "x": 98,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 5,
+    "bodySize": 16,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": null,
+    "topbar": {
+     "h": 80
+    },
+    "canvas": {
+     "left": 20,
+     "right": 28
+    },
+    "hero": {
+     "text": "Roll call",
+     "words": 2,
+     "chars": 9,
+     "lines": 1,
+     "size": 28,
+     "vw": 7.2,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.03,
+     "leading": 1.2,
+     "top": 148,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 4,
+     "firstScreen": 4,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 10,
+     "radii": [
+      [
+       0,
+       4
+      ],
+      [
+       24,
+       3
+      ],
+      [
+       999,
+       2
+      ],
+      [
+       16,
+       1
+      ]
+     ],
+     "heavyBorders": 1,
+     "borderSamples": [
+      "#19251f on #d0e6af (11.78:1)"
+     ],
+     "heavyShadows": 0,
+     "softShadows": 0,
+     "shadowSamples": [],
+     "glass": 0
+    },
+    "chips": {
+     "count": 2,
+     "hues": 1,
+     "samples": [
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      },
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      }
+     ]
+    },
+    "numbers": {
+     "cells": 0,
+     "leftAligned": 0,
+     "figures": 1,
+     "tabularShare": 0,
+     "kpiMax": 14
+    },
+    "rows": null,
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.08,
+     "tiny": 0,
+     "tinySamples": [],
+     "sizes": [
+      12,
+      14,
+      16,
+      18,
+      20,
+      28
+     ]
+    },
+    "title": {
+     "text": "Roll call",
+     "size": 28,
+     "top": 148
+    },
+    "colourShare": 0.195
+   },
+   "consoleErrors": []
+  }
+ ],
+ "findings": [
+  {
+   "level": "WARN",
+   "id": "palette-cream",
+   "width": 1024,
+   "message": "Yellow-cream background (page background #f7f5f0, section #fbfbf8, text #f6f5ef).",
+   "fix": "Use the drawn palette. If you want warmth, take a low-chroma stone or bone, not a yellow cream.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "colour-sprawl",
+   "width": 1024,
+   "message": "21% of the first screen is strongly coloured.",
+   "fix": "Keep the screen neutral and spend colour on data and status: the studied screens sit near 3%, and only tinted styles reach 10–15%, as pale tints rather than saturated fills.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  }
+ ],
+ "images": [
+  {
+   "viewport": "tablet",
+   "width": 1024,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/simple/tablet-1024-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/simple/tablet-1024-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "tablet",
+   "width": 768,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/simple/tablet-768-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/simple/tablet-768-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "mobile",
+   "width": 390,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/simple/mobile-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/simple/mobile-page-01.jpg"
+   ],
+   "film": []
+  }
+ ]
+}

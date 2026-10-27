@@ -1,0 +1,35 @@
+{
+  "at": "2026-10-16T05:48:59.256Z",
+  "deployment": "dpl_HCaW5dys6U1GsJ9ueSpEZY6hQ3qQ",
+  "results": [
+    {
+      "path": "/photos",
+      "status": 200
+    },
+    {
+      "path": "/simpleguide",
+      "status": 200
+    },
+    {
+      "path": "/guide/photos/00000000-0000-4000-8000-000000000000",
+      "status": 200
+    },
+    {
+      "path": "/api/guide/photos?kind=slots",
+      "status": 401
+    },
+    {
+      "path": "/api/marketing/setup",
+      "status": 401
+    },
+    {
+      "path": "/api/guide/photo-session",
+      "status": 401
+    },
+    {
+      "path": "/api/guide/send-thank-you",
+      "status": 401
+    }
+  ],
+  "no_customer_actions": true
+}

@@ -1,0 +1,22 @@
+{
+  "verified_at": "2026-10-08T11:00:49.252Z",
+  "target_project": "gwwnkihblioayklptdab",
+  "sql_sha256": "d9bfe080ea47abd563a28da97268e41d82df1fb8b37f471fd3536686cfb70f78",
+  "result": {
+    "gateway_can_execute_rls_helper": false,
+    "rls_trigger_enabled": true,
+    "enabled_connectors": "0",
+    "gateway_privileges": "PASS"
+  },
+  "checks": [
+    "reported finding reproduced",
+    "targeted revoke under non-superuser installer",
+    "helper body/owner and event trigger unchanged",
+    "automatic RLS still fires for a creator without helper EXECUTE",
+    "existing native grants preserved",
+    "diagnostic clears",
+    "sample bookings and disabled providers preserved",
+    "correction can be repeated"
+  ],
+  "boundary": "Local PostgreSQL 17 event-trigger/permission test with synthetic schema. Hosted correction still requires the user to run the SQL in the named test project."
+}

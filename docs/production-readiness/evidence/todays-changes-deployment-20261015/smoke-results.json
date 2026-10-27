@@ -1,0 +1,82 @@
+{
+  "checked_at": "2026-10-15T14:41:14.635Z",
+  "results": [
+    {
+      "path": "/",
+      "status": 200
+    },
+    {
+      "path": "/simple",
+      "status": 200
+    },
+    {
+      "path": "/bookings",
+      "status": 200
+    },
+    {
+      "path": "/marketing/promotions",
+      "status": 200
+    },
+    {
+      "path": "/marketing/automations",
+      "status": 200
+    },
+    {
+      "path": "/new-booking",
+      "status": 200
+    },
+    {
+      "path": "/api/departures/00000000-0000-4000-8000-000000000000/preview",
+      "status": 401
+    },
+    {
+      "path": "/api/mcp/chatgpt",
+      "status": 503
+    },
+    {
+      "path": "/",
+      "status": 200
+    },
+    {
+      "path": "/functions/v1/send-email",
+      "status": 401
+    },
+    {
+      "path": "/functions/v1/auto-messages",
+      "status": 401
+    },
+    {
+      "path": "/functions/v1/marketing-dispatch",
+      "status": 401
+    },
+    {
+      "path": "/functions/v1/marketing-automation-dispatch",
+      "status": 401
+    },
+    {
+      "path": "/functions/v1/broadcast",
+      "status": 401
+    },
+    {
+      "path": "/functions/v1/yoco-webhook",
+      "status": 401
+    },
+    {
+      "path": "/functions/v1/wa-webhook",
+      "status": 403
+    },
+    {
+      "path": "/functions/v1/resend-webhook",
+      "status": 503
+    },
+    {
+      "path": "/rest/v1/rpc/operator_booking_history",
+      "status": 401
+    },
+    {
+      "path": "/rest/v1/rpc/prepare_payment_recovery",
+      "status": 401
+    }
+  ],
+  "noCustomerActions": true
+}

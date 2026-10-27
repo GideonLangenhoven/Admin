@@ -1,0 +1,7 @@
+{
+  "at": "2026-10-16T05:43:00.360Z",
+  "status": 200,
+  "action": "status",
+  "sentinel_operator": true,
+  "no_provider_upload_or_message": true
+}

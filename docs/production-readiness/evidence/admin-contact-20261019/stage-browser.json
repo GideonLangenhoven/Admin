@@ -1,0 +1,39 @@
+{
+  "at": "2026-10-19T09:19:43.034Z",
+  "origin": "https://caepweb-admin-g9lgyy914-jerrys-projects-f4e4eaf9.vercel.app",
+  "checks": [
+    {
+      "path": "/settings",
+      "role": "MAIN_ADMIN",
+      "width": 390,
+      "passed": true,
+      "synthetic_writes": 3,
+      "page_errors": 0
+    },
+    {
+      "path": "/settings",
+      "role": "MAIN_ADMIN",
+      "width": 1280,
+      "passed": true,
+      "synthetic_writes": 3,
+      "page_errors": 0
+    },
+    {
+      "path": "/super-admin",
+      "role": "SUPER_ADMIN",
+      "width": 390,
+      "passed": true,
+      "synthetic_writes": 3,
+      "page_errors": 0
+    },
+    {
+      "path": "/super-admin",
+      "role": "SUPER_ADMIN",
+      "width": 1280,
+      "passed": true,
+      "synthetic_writes": 3,
+      "page_errors": 0
+    }
+  ],
+  "live_account_writes": 0
+}

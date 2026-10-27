@@ -1,0 +1,35 @@
+{
+  "at": "2026-10-19T12:51:06.147Z",
+  "anonymous_status": 401,
+  "sender_domain": "bookingtours.co.za",
+  "domains": {
+    "status": 200,
+    "data": [
+      {
+        "id": "69d62498-ab9c-4780-a581-a2836368655c",
+        "name": "bookingtours.co.za",
+        "status": "verified",
+        "region": "eu-west-1",
+        "capabilities": {
+          "sending": "enabled",
+          "receiving": "disabled"
+        }
+      }
+    ]
+  },
+  "webhooks": {
+    "status": 200,
+    "data": [
+      {
+        "id": "0af4d3f6-1f9e-471b-9cf5-5747e0341eb4",
+        "endpoint": "https://ukdsrndqhsatjkmxijuj.supabase.co/functions/v1/resend-webhook",
+        "status": "enabled",
+        "events": [
+          "email.bounced",
+          "email.complained",
+          "email.suppressed"
+        ]
+      }
+    ]
+  }
+}

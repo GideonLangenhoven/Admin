@@ -1,0 +1,182 @@
+{
+  "at": "2026-10-18T10:32:31.010207+00:00",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "scope": "All changes made on 18 October 2026, including previously deployed desktop bookings and guest actions.",
+  "admin": {
+    "id": "dpl_BnQsYQsx6G8bi4p9wQPBCf1gDQHh",
+    "url": "caepweb-admin-e8rqekmsk-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 488,
+    "production_url": "https://admin.bookingtours.co.za"
+  },
+  "booking": {
+    "id": "dpl_6mkaQSQVq2XvqUAotEBgEkcfJ7uk",
+    "url": "booking-k9gull6vo-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 169,
+    "production_urls": [
+      "https://kayak.booking.bookingtours.co.za",
+      "https://claires-hiking.booking.bookingtours.co.za"
+    ]
+  },
+  "changes": {
+    "admin": {
+      "id": "dpl_ATUtJHejxdaatHqiCFbGEgggeTaQ",
+      "files": 488,
+      "changed": [
+        "app/dashboard.module.css",
+        "app/globals.css",
+        "app/new-booking/booking-form.module.css",
+        "app/new-booking/page.tsx",
+        "app/page.tsx",
+        "components/AppShell.tsx",
+        "components/AuthGate.tsx",
+        "components/MobileMenuDrawer.tsx",
+        "components/WelcomeChecklist.tsx",
+        "components/simple/DepartureCard.tsx",
+        "components/simple/simple-view.css",
+        "supabase/functions/marketing-unsubscribe/index.ts"
+      ],
+      "missing": []
+    },
+    "booking": {
+      "id": "dpl_DEtYg9jBcEThHpReFGiaJE6dX4qZ",
+      "files": 169,
+      "changed": [
+        "app/components/Header.tsx",
+        "app/globals.css",
+        "app/my-bookings/ActionBtn.tsx",
+        "app/my-bookings/Modal.tsx",
+        "app/review/[token]/page.tsx",
+        "app/voucher/page.tsx"
+      ],
+      "missing": []
+    },
+    "pendingMigrations": [
+      "20260711090000_tenant_health.sql",
+      "20260711160000_s1_chat_intent_daily_isolation.sql",
+      "20260711160100_s2_atomic_refund.sql",
+      "20260711160200_s3_reconcile_slot_held.sql",
+      "20260711170000_s8_combo_capacity_check.sql",
+      "20260711180000_payment_reminder.sql",
+      "20260711190000_hold_qty_insert_fix.sql",
+      "20260711200000_admin_help_kb_and_onboarding.sql",
+      "20260712090000_help_chat_hidden_pref.sql",
+      "20260713170000_security_audit_fixes.sql",
+      "20260714080000_fix_tour_delete_data_loss_risk.sql",
+      "20260714120000_voucher_payment_reminder.sql",
+      "20260714130000_tour_confirmation_tagline.sql",
+      "20260715090000_platform_invoices.sql",
+      "20260716090000_vouchers_operator_scoped.sql",
+      "20260716110000_platform_billing_contact.sql",
+      "20260716120000_single_plan_pricing.sql",
+      "20260718080000_popia_anonymize_multi_customer_and_dsr.sql",
+      "20260721090000_chat_conversation_rating.sql",
+      "20260724090000_combo_settlement_payment_links.sql",
+      "20260724120000_combo_items_settled_at.sql",
+      "20260724150000_operator_directory.sql",
+      "20260724170000_operator_directory_from_price.sql",
+      "20260725090000_last_minute_deals.sql",
+      "20260725130000_last_minute_deal_window.sql",
+      "20260803130000_llm_usage.sql",
+      "20260803160000_billing_enforcement_and_ai_cap.sql",
+      "20260804090000_rls_initplan_and_tenant_indexes.sql",
+      "20260804120000_rls_merge_permissive_and_holds_scope.sql",
+      "20260804140000_bookings_anon_write_tenant_scope.sql",
+      "20260804160000_last_minute_deals_follow_config.sql",
+      "20260805090000_ai_overage_invoice_and_5000_allowance.sql",
+      "20260815140000_onboarding_wizard.sql",
+      "20260817090000_combo_rules.sql"
+    ],
+    "functions": 57
+  },
+  "edge": {
+    "slug": "marketing-unsubscribe",
+    "before": 45,
+    "after": 46,
+    "verify_jwt": false,
+    "source_files_verified": 3,
+    "unrelated_functions_unchanged": true
+  },
+  "database_changes": false,
+  "checks": {
+    "unit_passed": 2434,
+    "unit_skipped": 58,
+    "admin_production_build": "passed",
+    "booking_production_build": "passed",
+    "typescript": "passed in both production builds",
+    "edge_typecheck": "passed",
+    "eslint_errors": 0,
+    "eslint_warnings": 27,
+    "uploaded_source_files_verified": 657,
+    "hosted_browser_cases_passed": 10,
+    "live_browser_checks": [
+      "admin login labels",
+      "guest menu Escape and focus"
+    ],
+    "live_http_checks": 14,
+    "browser_data": "synthetic identities and bookings; operational writes blocked"
+  },
+  "test_fixture_repairs": [
+    "Updated walk-in selectors to current Activity dropdown and Review booking control.",
+    "Added operator_departure_manifest to the mocked backend.",
+    "Scoped review error assertion to main to exclude the Next.js route announcer."
+  ],
+  "live": {
+    "at": "2026-10-18T10:30:57.155Z",
+    "projects": [
+      {
+        "name": "admin",
+        "id": "dpl_BnQsYQsx6G8bi4p9wQPBCf1gDQHh",
+        "state": "READY",
+        "files": 488,
+        "workspace_matches": true
+      },
+      {
+        "name": "booking",
+        "id": "dpl_6mkaQSQVq2XvqUAotEBgEkcfJ7uk",
+        "state": "READY",
+        "files": 169,
+        "workspace_matches": true
+      }
+    ],
+    "checks": [
+      {
+        "url": "https://admin.bookingtours.co.za/bookings",
+        "status": 200,
+        "expected_content": true
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/simple/bookings",
+        "status": 200,
+        "expected_content": true
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/new-booking",
+        "status": 200,
+        "expected_content": true
+      },
+      {
+        "url": "https://kayak.booking.bookingtours.co.za/voucher",
+        "status": 200,
+        "expected_content": true
+      },
+      {
+        "url": "https://claires-hiking.booking.bookingtours.co.za/my-bookings",
+        "status": 200,
+        "expected_content": true
+      },
+      {
+        "url": "https://ukdsrndqhsatjkmxijuj.supabase.co/functions/v1/marketing-unsubscribe",
+        "status": 400,
+        "expected_content": true
+      }
+    ]
+  },
+  "limits": [
+    "No real booking, payment, customer message, credential change or unsubscribe was performed by verification.",
+    "No physical-device checks were performed in this release.",
+    "Historical migration ledger gaps and the broader qualification pause remain unchanged."
+  ],
+  "evidence_directory": "docs/production-readiness/evidence/all-changes-deployment-20261018"
+}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import NotificationBadge from "./NotificationBadge";
 import RefundBadge from "./RefundBadge";
@@ -18,6 +18,7 @@ import HelpChat from "./HelpChat";
 import WelcomeChecklist from "./WelcomeChecklist";
 import DemoActionGuide from "./DemoActionGuide";
 import SimpleViewShell from "./SimpleViewShell";
+import dashboardStyles from "../app/dashboard.module.css";
 import { isSectionHidden } from "@/app/lib/operator-sections";
 import { DEMO_BOOKING_SITE_URL, isDemoPathVisible } from "@/app/lib/demo-guide";
 import {
@@ -96,43 +97,27 @@ const SIDEBAR_BG = [
 
 export default function AppShell({ children, nav }: { children: React.ReactNode; nav: NavItem[] }) {
   const pathname = usePathname() || "";
-  const router = useRouter();
-  const isSimplePath = pathname === "/simple" || pathname.startsWith("/simple/");
-  const { businessId, businessName, logoUrl, role, subscriptionStatus, yocoTestMode, readOnly, operators, switchOperator } = useBusinessContext();
+  const isSimplePath = pathname === "/simple" || pathname.startsWith("/simple/") || pathname === "/simpleguide" || pathname.startsWith("/simpleguide/");
+  const { businessId, businessName, logoUrl, role, timezone, subscriptionStatus, yocoTestMode, readOnly, operators, switchOperator } = useBusinessContext();
   const displayName = businessName || "Admin";
   const [collapsed, setCollapsed] = useState(false);
-  const [simpleAvailable, setSimpleAvailable] = useState<boolean | null>(null);
   const [clock, setClock] = useState("");
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set(NAV_GROUPS.flatMap(group => group.label && group.label !== "Operations" ? [group.label] : [])));
   const isSuspended = subscriptionStatus === "SUSPENDED" && !/super/i.test(role);
   const routeBlocked = isSuspended && !isSuspendedAllowed(pathname);
-
-  useEffect(() => {
-    const update = () => {
-      const width = window.innerWidth;
-      setSimpleAvailable(width <= 1024 || (navigator.maxTouchPoints > 0 && width <= 1366));
-    };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
-  useEffect(() => {
-    if (isSimplePath && simpleAvailable === false) router.replace("/");
-  }, [isSimplePath, simpleAvailable, router]);
 
   useEffect(() => {
     const tick = () =>
       setClock(
         new Date().toLocaleString("en-ZA", {
           weekday: "short", day: "2-digit", month: "short",
-          hour: "2-digit", minute: "2-digit", hour12: false,
+          hour: "2-digit", minute: "2-digit", hour12: false, timeZone: timezone, timeZoneName: "short",
         }).replace(",", " ·"),
       );
     tick();
     const iv = setInterval(tick, 30_000);
     return () => clearInterval(iv);
-  }, []);
+  }, [timezone]);
 
   useEffect(() => {
     if (displayName && displayName !== "Admin") {
@@ -151,7 +136,6 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
   } catch { /* SSR / malformed — treat as nothing hidden */ }
 
   const visibleNav = nav.filter((n) => {
-    if (n.href === "/simple" && simpleAvailable !== true) return false;
     if (readOnly) return n.external === true || isDemoPathVisible(n.href);
     // The external Claire storefront link belongs only to the guided demo.
     // Internal destinations tagged in layout remain available to entitled
@@ -184,34 +168,19 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
     });
   }
 
-  // Nav-group accordion state — remembered per admin account (namespaced by
-  // ck_admin_email) so different admins sharing a browser keep separate prefs.
-  useEffect(() => {
-    const email = localStorage.getItem("ck_admin_email") || "shared";
-    try {
-      const saved = JSON.parse(localStorage.getItem(`ck_nav_groups_collapsed_${email}`) || "[]");
-      if (Array.isArray(saved)) setCollapsedGroups(new Set(saved));
-    } catch { /* ignore malformed local state */ }
-  }, []);
-
   function toggleGroup(label: string) {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(label)) next.delete(label); else next.add(label);
-      const email = localStorage.getItem("ck_admin_email") || "shared";
-      localStorage.setItem(`ck_nav_groups_collapsed_${email}`, JSON.stringify(Array.from(next)));
       return next;
     });
   }
 
-  if (pathname === "/google-callback" || (isMarketingPath(pathname) && !(pathname === "/operators" && businessId))) {
+  if (pathname === "/guide-setup" || pathname === "/google-callback" || (isMarketingPath(pathname) && !(pathname === "/operators" && businessId))) {
     return <main className="min-h-screen">{children}</main>;
   }
 
-  if (isSimplePath) {
-    if (simpleAvailable !== true) {
-      return <main role="status" className="flex min-h-screen items-center justify-center text-sm text-[var(--ck-text-muted)]">Opening full dashboard...</main>;
-    }
+  if (isSimplePath || (role === "GUIDE" && /^\/guide\/photos\//.test(pathname))) {
     return <SimpleViewShell>{readOnly ? <DemoActionGuide>{children}</DemoActionGuide> : children}</SimpleViewShell>;
   }
 
@@ -233,22 +202,17 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
     .find((n) => isNavItemActive(pathname, n.href, visibleHrefs))?.label
     || (pathname.split("/")[1] ? pathname.split("/")[1].replace(/-/g, " ") : "Dashboard");
 
-  const desktopNav = visibleNav;
+  const menuNav = visibleNav.filter((item) => item.href !== "/simple");
   const mobilePrimaryHrefs = ["/", "/bookings", "/new-booking", "/inbox"];
   const mobilePrimaryNav = mobilePrimaryHrefs
     .map((href) => visibleNav.find((item) => item.href === href))
     .filter(Boolean) as NavItem[];
   const mobileMoreActive = !mobilePrimaryNav.some((item) => isNavItemActive(pathname, item.href, visibleHrefs));
-  function isNavActive(href: string) {
-    return isNavItemActive(pathname, href, visibleHrefs);
-  }
-
   return (
-    <div className="flex h-dvh min-h-0 overflow-hidden">
+    <div className="flex h-dvh min-h-0 min-w-0">
       {/* Surfaces failed WhatsApp sends as in-the-moment toasts. Renders nothing. */}
       <WaFailureWatcher />
       {/* Floating help assistant + one-time first-login welcome. */}
-      <HelpChat />
       {!readOnly && <WelcomeChecklist />}
       {/* Sidebar starts at lg, not md: at 768px it would eat 256px of an
           already-768px tablet, leaving 512px for the md: row/grid layouts that
@@ -259,13 +223,16 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
       >
         <div className="p-6 pb-2">
           <div className={`mb-8 flex items-center ${collapsed ? "justify-center" : "justify-between gap-2"}`}>
-            <Link href="/" className={`flex items-center hover:opacity-80 transition-opacity ${collapsed ? "justify-center" : "gap-2.5"}`}>
+            <Link href="/" className={`flex min-w-0 items-center hover:opacity-80 transition-opacity ${collapsed ? "justify-center" : "gap-2.5"}`}>
             {logoUrl ? (
               <Image src={logoUrl} alt={displayName} width={28} height={28} className="h-7 w-7 rounded-md object-contain p-[1px]" style={{ background: "rgba(244, 241, 232, 0.10)" }} unoptimized />
             ) : (
               <BrandMark size={26} variant="ivory" className="shrink-0" />
             )}
-            {!collapsed && <h1 className="text-[16px] font-semibold tracking-tight truncate" style={{ color: "var(--ck-sidebar-active-text)" }}>{displayName}</h1>}
+            {!collapsed && <div className="min-w-0" style={{ color: "var(--ck-sidebar-active-text)" }}>
+              <BrandWordmark className="block text-[15px]" />
+              <h1 className="mt-1 whitespace-normal break-words text-xs font-normal leading-relaxed [overflow-wrap:anywhere]">{displayName}</h1>
+            </div>}
             </Link>
             <button
               type="button"
@@ -312,10 +279,9 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
         )}
 
         <div className="flex-1 overflow-auto px-3.5 pb-4">
-          {groupNav(desktopNav).map((group, gi) => {
+          {groupNav(menuNav).map((group, gi) => {
             const isCollapsedGroup = group.label ? collapsedGroups.has(group.label) : false;
-            const hasActiveItem = group.items.some((n) => isNavActive(n.href));
-            const showItems = collapsed || !isCollapsedGroup || hasActiveItem || !group.label;
+            const showItems = collapsed || !isCollapsedGroup || !group.label;
             return (
             <div key={group.label ?? `g${gi}`}>
               {group.label && !collapsed && (
@@ -334,7 +300,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
                 <div className="mx-auto my-3 w-5 border-t" style={{ borderColor: "var(--ck-sidebar-border)" }} aria-hidden="true" />
               )}
               {showItems && (
-              <nav className="space-y-0.5">
+              <nav className="space-y-0.5" aria-label={group.label || "Dashboard"}>
                 {group.items.map((n) => {
                   const Icon = iconMap[n.icon] || Circle;
                   const isActive = isNavItemActive(pathname, n.href, visibleHrefs);
@@ -348,6 +314,8 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
                           : "font-medium text-[var(--ck-sidebar-text)] hover:bg-[var(--ck-sidebar-hover)] hover:text-[var(--ck-sidebar-active-text)]"
                         } ${navBlocked ? "opacity-40 pointer-events-none" : ""}`}
                       aria-disabled={navBlocked}
+                      aria-current={isActive ? "page" : undefined}
+                      aria-label={collapsed ? n.label : undefined}
                       tabIndex={navBlocked ? -1 : undefined}
                       title={collapsed ? `${n.label}${n.external ? " (opens in a new tab)" : ""}` : undefined}
                     >
@@ -386,38 +354,41 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
           )}
         </a>
       </aside>
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* Desktop topbar — glass chrome: breadcrumb, live clock, session controls */}
         <header
-          className="ui-glass hidden lg:flex h-14 shrink-0 items-center justify-between border-b px-6"
+          className="ui-glass flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2 lg:px-6"
           style={{ borderColor: "var(--ck-border-subtle)" }}
         >
-          <div className="flex items-baseline gap-2 min-w-0">
+          <div className="hidden min-w-0 items-baseline gap-2 lg:flex">
             <span className="ui-mono-label truncate max-w-[220px]">{displayName}</span>
             <span className="text-[11px]" style={{ color: "var(--ck-border-strong)" }}>/</span>
             <span className="ui-mono-label truncate" style={{ color: "var(--ck-text-strong)" }}>{sectionLabel}</span>
           </div>
-          <div className="flex items-center gap-4">
+          <Link href="/" className="flex min-w-0 items-center gap-2 transition-opacity hover:opacity-80 lg:hidden">
+            {logoUrl ? (
+              <Image src={logoUrl} alt={displayName} width={24} height={24} className="h-6 w-6 rounded object-contain" unoptimized />
+            ) : (
+              <BrandMark size={22} className="shrink-0" />
+            )}
+            <h1 className="max-w-[30vw] truncate text-base font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>{displayName}</h1>
+          </Link>
+          <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 lg:gap-4">
+            {visibleNav.some((item) => item.href === "/simple") && !isSuspended && (
+              <Link href="/simple" className="ui-btn ui-btn-soft min-h-11 !px-3 !text-[13px]">Simple View</Link>
+            )}
             {clock && (
               <span className="ui-mono-label hidden lg:flex items-center gap-2 !normal-case !tracking-[0.04em]">
                 <span className="h-[5px] w-[5px] rounded-full motion-safe:animate-pulse" style={{ background: "var(--ck-accent)" }} aria-hidden="true" />
                 {clock}
               </span>
             )}
-            <ThemeToggle size="sm" />
-            <SignOutButton variant="header" />
+            <div className="hidden items-center gap-4 lg:flex">
+              <ThemeToggle size="sm" />
+              <SignOutButton variant="header" />
+            </div>
+            <HelpChat inline />
           </div>
-        </header>
-        <header className="ui-glass lg:hidden flex min-h-14 items-center justify-between gap-3 border-b px-4 py-2" style={{ borderColor: "var(--ck-border-subtle)" }}>
-          <Link href="/" className="flex min-w-0 items-center gap-2 hover:opacity-80 transition-opacity">
-            {logoUrl ? (
-              <Image src={logoUrl} alt={displayName} width={24} height={24} className="h-6 w-6 rounded object-contain" unoptimized />
-            ) : (
-              <BrandMark size={22} className="shrink-0" />
-            )}
-            <h1 className="truncate text-base font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>{displayName}</h1>
-          </Link>
-          <span className="ui-mono-label max-w-[42%] truncate text-right !text-[11px]" style={{ color: "var(--ck-text-muted)" }}>{sectionLabel}</span>
         </header>
         {isSuspended && (
           <div className="shrink-0 border-b px-4 py-2.5 md:px-10 flex items-center gap-2" style={{ background: "var(--ck-danger-soft)", borderColor: "color-mix(in srgb, var(--ck-danger) 25%, transparent)" }}>
@@ -443,7 +414,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
               <ShieldCheck size={16} weight="fill" className="shrink-0" style={{ color: "var(--ck-accent)" }} aria-hidden="true" />
               <p className="text-xs font-medium" style={{ color: "var(--ck-accent)" }}>
                 <span className="lg:hidden">Guided demo · No changes or messages are sent.</span>
-                <span className="hidden lg:inline">Guided demo · Browse features and try the forms. Action buttons explain what happens without saving changes or contacting guests.</span>
+                <span className="hidden lg:inline">Demo: try the forms. Buttons explain actions; nothing is saved or sent.</span>
               </p>
             </div>
             <a
@@ -457,7 +428,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
             </a>
           </div>
         )}
-        <main className="flex-1 overflow-auto px-4 py-6 pb-28 md:px-10 md:py-8 md:pb-8">
+        <main className={`admin-main min-h-0 min-w-0 flex-1 ${pathname === "/inbox" ? "overflow-hidden p-0 lg:px-6 lg:py-6 xl:px-10 xl:py-8" : "overflow-auto px-4 py-6 pb-8 md:px-6 md:py-6 xl:px-10 xl:py-8"} ${pathname === "/" ? dashboardStyles.dashboardMain : ""}`}>
           {readOnly && !isDemoPathVisible(pathname) ? (
             <div className="ui-card mx-auto max-w-md p-8 text-center">
               <h2 className="text-lg font-semibold">This section is not part of the demo</h2>
@@ -467,7 +438,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
             <div className="flex items-center justify-center min-h-[50vh]">
               <div className="ui-card px-10 py-9 text-center max-w-sm">
                 <h2 className="text-lg font-semibold text-[var(--ck-text-strong)] mb-1">Feature Unavailable</h2>
-                <p className="text-sm text-[var(--ck-text-muted)]">This section is not accessible while your subscription is suspended. You can still access Reports, Invoices, Refunds, and Settings.</p>
+                <p className="text-sm text-[var(--ck-text-muted)]">Subscription suspended. Reports, Invoices, Refunds and Settings remain available.</p>
               </div>
             </div>
           ) : readOnly ? <DemoActionGuide>{children}</DemoActionGuide> : children}
@@ -480,7 +451,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
             const isActive = isNavItemActive(pathname, n.href, visibleHrefs);
             const mobileBlocked = isSuspended && !isSuspendedAllowed(n.href);
             return (
-              <Link key={n.href} href={mobileBlocked ? pathname : n.href} className={"relative flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center rounded-lg px-1 text-[11px] " + (isActive ? "font-semibold" : "font-medium") + (mobileBlocked ? " opacity-30 pointer-events-none" : "")} aria-disabled={mobileBlocked} tabIndex={mobileBlocked ? -1 : undefined} style={{ color: isActive ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>
+              <Link key={n.href} href={mobileBlocked ? pathname : n.href} className={"relative flex min-h-[52px] min-w-0 flex-1 flex-col items-center justify-center rounded-lg px-1 text-[11px] " + (isActive ? "font-semibold" : "font-medium") + (mobileBlocked ? " opacity-30 pointer-events-none" : "")} aria-current={isActive ? "page" : undefined} aria-disabled={mobileBlocked} tabIndex={mobileBlocked ? -1 : undefined} style={{ color: isActive ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>
                 <div className="relative mb-1">
                   <Icon size={20} weight={isActive ? "fill" : "regular"} />
                   {n.href === "/inbox" && <div className="absolute -top-1 -right-2 transform scale-75"><NotificationBadge /></div>}
@@ -491,7 +462,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
               </Link>
             );
           })}
-          <MobileMenuDrawer nav={visibleNav} active={mobileMoreActive} />
+          <MobileMenuDrawer nav={menuNav} active={mobileMoreActive} collapsedGroups={collapsedGroups} onToggleGroup={toggleGroup} />
           </div>
         </nav>
       </div>

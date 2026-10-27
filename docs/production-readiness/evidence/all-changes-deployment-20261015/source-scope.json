@@ -1,0 +1,23 @@
+{
+  "preserved_production_fixes": [
+    "supabase/functions/_shared/marketing-batch.ts",
+    "supabase/functions/_shared/marketing-outbox.ts",
+    "supabase/functions/auto-messages/index.ts",
+    "supabase/functions/broadcast/index.ts",
+    "supabase/functions/marketing-automation-dispatch/index.ts",
+    "supabase/functions/marketing-dispatch/index.ts",
+    "supabase/functions/wa-webhook/index.ts"
+  ],
+  "removed_routes_or_configs": [
+    "app/api/departures/[id]/preview/route.ts",
+    "app/bookings/departures/[slotId]/preview/page.tsx",
+    "playwright.deployed.config.ts",
+    "playwright.release.config.ts"
+  ],
+  "guest_delta": [
+    "app/components/ChatWidget.tsx"
+  ],
+  "new_migration": "20261015200000_guide_simple_manifest.sql",
+  "source_packaging_note": "Native marketing workers were unchanged and retain their deployed helper. Restore the helper in working source for subsequent deployments.",
+  "routing_correction": "Include current root proxy.ts alongside the new /simpleguide client routes."
+}

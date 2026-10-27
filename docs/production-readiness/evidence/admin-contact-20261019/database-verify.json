@@ -1,0 +1,64 @@
+{
+  "at": "2026-10-19T09:24:17.377Z",
+  "version": "20261019110000",
+  "sha256": "a972e6e04c1cc1402af92ab3b7aa40be5570ee0b6288387372097858dcb62806",
+  "definitions": [
+    {
+      "proname": "guard_admin_contact_email",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.guard_admin_contact_email()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nBEGIN\n  NEW.email := lower(trim(NEW.email));\n  PERFORM pg_advisory_xact_lock(hashtextextended('admin-email:' || NEW.email, 0));\n  IF EXISTS (SELECT 1 FROM public.admin_users WHERE lower(email) = NEW.email AND id <> NEW.id) THEN\n    RAISE EXCEPTION 'Email already belongs to another administrator' USING ERRCODE = '23505';\n  END IF;\n  IF NEW.user_id IS NOT NULL AND NOT EXISTS (\n    SELECT 1 FROM auth.users WHERE id = NEW.user_id AND lower(email) = NEW.email\n  ) THEN\n    RAISE EXCEPTION 'Change the sign-in email through account management' USING ERRCODE = '23514';\n  END IF;\n  IF TG_OP = 'UPDATE' AND OLD.email IS DISTINCT FROM NEW.email THEN\n    IF NEW.user_id IS NULL AND EXISTS (SELECT 1 FROM auth.users WHERE lower(email) = NEW.email) THEN\n      RAISE EXCEPTION 'Email already belongs to another sign-in account' USING ERRCODE = '23505';\n    END IF;\n    IF OLD.setup_token_claim_id IS NOT NULL AND OLD.setup_token_claimed_at > now() - interval '5 minutes' THEN\n      RAISE EXCEPTION 'Password setup is in progress. Try again in a few minutes.' USING ERRCODE = '55000';\n    END IF;\n    NEW.setup_token_hash := NULL;\n    NEW.setup_token_hash_used := NULL;\n    NEW.setup_token_expires_at := NULL;\n    NEW.setup_token_claim_id := NULL;\n    NEW.setup_token_claimed_at := NULL;\n    NEW.invite_sent_at := NULL;\n  END IF;\n  RETURN NEW;\nEND;\n$function$\n",
+      "anon_execute": false,
+      "authenticated_execute": false
+    },
+    {
+      "proname": "sync_admin_auth_email",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "definition": "CREATE OR REPLACE FUNCTION public.sync_admin_auth_email()\n RETURNS trigger\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\nBEGIN\n  UPDATE public.admin_users SET email = lower(trim(NEW.email)) WHERE user_id = NEW.id;\n  RETURN NEW;\nEND;\n$function$\n",
+      "anon_execute": false,
+      "authenticated_execute": false
+    }
+  ],
+  "triggers": [
+    {
+      "tgname": "guard_admin_contact_email",
+      "tgenabled": "O",
+      "definition": "CREATE TRIGGER guard_admin_contact_email BEFORE INSERT OR UPDATE OF email, user_id ON public.admin_users FOR EACH ROW EXECUTE FUNCTION guard_admin_contact_email()"
+    },
+    {
+      "tgname": "sync_admin_auth_email",
+      "tgenabled": "O",
+      "definition": "CREATE TRIGGER sync_admin_auth_email AFTER UPDATE OF email ON auth.users FOR EACH ROW WHEN (((old.email)::text IS DISTINCT FROM (new.email)::text)) EXECUTE FUNCTION sync_admin_auth_email()"
+    }
+  ],
+  "columns": [
+    {
+      "column_name": "phone",
+      "data_type": "text",
+      "is_nullable": "YES"
+    }
+  ],
+  "grants": [
+    {
+      "rolname": "anon",
+      "read": false,
+      "write": false
+    },
+    {
+      "rolname": "authenticated",
+      "read": true,
+      "write": false
+    },
+    {
+      "rolname": "service_role",
+      "read": true,
+      "write": true
+    }
+  ],
+  "rest_schema_verified": true
+}

@@ -1,0 +1,80 @@
+import {test,expect,type Page} from "@playwright/test";
+const origin='https://admin.bookingtours.co.za';
+const biz="10000000-0000-4000-8000-000000000001",user="10000000-0000-4000-8000-000000000010",slot="10000000-0000-4000-8000-000000000040";
+const email="guide+cape-kayak@guides.bookingtours.co.za";
+function session(){const encode=(v:unknown)=>Buffer.from(JSON.stringify(v)).toString('base64url');const expires=Math.floor(Date.now()/1000)+3600;return {access_token:`${encode({alg:'HS256',typ:'JWT'})}.${encode({sub:user,role:'authenticated',aud:'authenticated',exp:expires})}.fixture`,refresh_token:'synthetic-refresh',expires_in:3600,expires_at:expires,token_type:'bearer',user:{id:user,email,aud:'authenticated',role:'authenticated',app_metadata:{provider:'email',providers:['email']},user_metadata:{},created_at:new Date().toISOString()}};}
+async function fixture(page:Page,signedIn=false,owner=false){
+ const auth=session(),calls:{path:string;body:any}[]=[];
+ await page.routeWebSocket(/realtime/,()=>{});
+ await page.addInitScript(({auth,signedIn,email,biz})=>{localStorage.setItem('ck_welcome_done','1');if(signedIn){localStorage.setItem('sb-ukdsrndqhsatjkmxijuj-auth-token',JSON.stringify(auth));localStorage.setItem('ck_admin_email',email);localStorage.setItem('ck_admin_time',String(Date.now()));localStorage.setItem('ck_admin_business_id',biz);}}, {auth,signedIn,email,biz});
+ await page.route('**/*',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  const json=(body:unknown,status=200)=>route.fulfill({status,contentType:'application/json',headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'GET,POST,OPTIONS'},body:JSON.stringify(body)});
+  if(request.method()==='OPTIONS')return json(null,204);
+  if(url.pathname==='/api/admin/login'){
+   calls.push({path:url.pathname,body:request.postDataJSON()});
+   return request.headers().authorization?json({auth_ready:true,admin:{id:'guide-a',email,role:'GUIDE',business_id:biz,name:'Guides',read_only:false}}):json({code:'AUTH_REQUIRED'},401);
+  }
+  if(url.pathname==='/api/guide/access'){
+   if(request.method()==='GET') return json({guide:null});
+   const body=request.postDataJSON();calls.push({path:url.pathname,body});
+   return body.action==='validate'?json({login:'guide@cape-kayak'}):body.action==='complete'?json({ok:true,email,login:'guide@cape-kayak'}):body.action==='issue'&&owner?json({guide:{login_name:'guide@cape-kayak',must_set_password:true,suspended:false},setup_url:origin+'/guide-setup?login=guide%40cape-kayak&token=synthetic'}):json({error:'Synthetic preview refuses management writes'},403);
+  }
+  if(url.pathname==='/api/guide/check-ins'){const body=request.postDataJSON();calls.push({path:url.pathname,body});return json({ok:true,arrived_count:body.arrived_count});}
+  if(url.pathname==='/api/guide/photo-upload'){calls.push({path:url.pathname,body:request.postData()});return json({ok:true});}
+  if(url.pathname==='/api/marketing/setup')return json({"email_service_configured": true, "email_feedback_configured": false, "operator_status": "policy_approval_pending", "welcome_back_available": false});
+  if(url.pathname.startsWith('/api/'))return json({error:'Synthetic preview refuses other APIs'},403);
+  if(url.hostname===new URL(origin).hostname)return route.continue();
+  if(url.hostname!=='ukdsrndqhsatjkmxijuj.supabase.co')return route.abort();
+  if(url.pathname.includes('/auth/v1/user'))return json(auth.user);
+  if(url.pathname.includes('/auth/v1/token'))return json(auth);
+  if(url.pathname.includes('/auth/v1/logout'))return json({});
+  if(url.pathname.endsWith('/rpc/marketing_audience_summary'))return json({eligible:0,permission_unknown:1,suppressed:0});
+  if(url.pathname.endsWith('/rpc/marketing_goal_audiences'))return json({reviews:{included:0,excluded:1},welcome:{included:0,excluded:1},winback:{included:0,excluded:1},vouchers:{included:null,excluded:null}});
+  if(url.pathname.endsWith('/admin_users'))return json(owner?[{id:'owner-a',user_id:user,email,business_id:biz,role:'MAIN_ADMIN',name:'Owner',suspended:false,read_only:false,created_at:new Date().toISOString()}]:[]);
+  if(url.pathname.endsWith('/businesses'))return json([{id:biz,name:'Example Tours',business_name:'Example Tours',timezone:'Africa/Johannesburg',subscription_status:'ACTIVE',subdomain:'cape-kayak',currency:'ZAR'}]);
+  if(url.pathname.endsWith('/guide_accounts'))return json([{id:'guide-a',business_id:biz,login_name:'guide@cape-kayak'}]);
+  if(url.pathname.endsWith('/rpc/guide_context'))return json({id:biz,name:'Example Tours',business_name:'Example Tours',timezone:'Africa/Johannesburg',subscription_status:'ACTIVE',subdomain:'cape-kayak'});
+  if(url.pathname.endsWith('/rpc/guide_simple_day'))return json({date:'2026-10-15',currency:'ZAR',unbooked_departures:[],departures:[{id:slot,tour_id:'tour-a',tour_name:'Morning paddle',start_time:'2026-10-15T08:00Z',status:'OPEN',capacity_total:20,available_capacity:null,can_book:false,booked_guests:7,arrived_guests:0,settled_guests:7,bookings:[{id:'10000000-0000-4000-8000-000000000050',slot_id:slot,customer_name:'Alex Guest',phone:'27825550100',email:'alex@example.invalid',qty:7,status:'PAID',waiver_status:'SIGNED',arrived_count:0,checked_in:false,total_amount:700,total_captured:700}]}]});
+  if(url.pathname.endsWith('/rpc/guide_day'))return json([{id:slot,tour_name:'Morning paddle',start_time:'2026-10-15T08:00Z',pax_expected:7,booking_count:3,photo_count:1},{id:'10000000-0000-4000-8000-000000000041',tour_name:'Coastal walk',start_time:'2026-10-15T09:00Z',pax_expected:4,booking_count:2,photo_count:0}]);
+  if(url.pathname.endsWith('/rpc/guide_photos'))return json({slot:{tour_name:'Morning paddle',start_time:'2026-10-15T08:00Z'},photos:[{id:'photo-a',photo_url:'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22%3E%3Crect width=%2232%22 height=%2232%22 fill=%22%23d6e9bc%22/%3E%3C/svg%3E',gdrive_view_url:'https://drive.google.com/file/d/synthetic/view',uploaded_at:'2026-10-15T08:00Z'}]});
+  return json([]);
+ });
+ return calls;
+}
+
+test('live marketing screen reports actual setup blockers and a useful support draft',async({page})=>{
+ await fixture(page,true,true);await page.setViewportSize({width:390,height:844});await page.goto('/marketing');
+ const panel=page.getByRole('region',{name:'Email sending setup'});
+ await expect(panel.getByText('Marketing emails need setup',{exact:true})).toBeVisible();
+ await expect(panel.getByText('BookingTours: connect bounced-email and spam reports.')).toBeVisible();
+ await expect(panel.getByText('BookingTours: enable marketing emails for this operator.')).toBeVisible();
+ await expect(panel.getByText('BookingTours: finish automatic welcome-back emails.')).toBeVisible();
+ const email=panel.getByRole('link',{name:'Email BookingTours'});
+ const href=await email.getAttribute('href');const url=new URL(href!);
+ expect(url.pathname).toBe('support@bookingtours.co.za');
+ expect(url.searchParams.get('body')).toContain('Operator ID: '+biz);
+ expect(url.searchParams.get('body')).toContain('connect bounced-email and spam reports');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:'.vercel/marketing-setup-20261016/live-phone.png',fullPage:true});
+});
+test('live setup error can be retried without a false setup claim',async({page})=>{
+ await fixture(page,true,true);
+ await page.route('**/api/marketing/setup',route=>route.fulfill({status:503,json:{error:'Unavailable'}}));
+ await page.goto('/marketing');const panel=page.getByRole('region',{name:'Email sending setup'});
+ await expect(panel.getByRole('alert')).toHaveText('Email setup could not be checked.');
+ await expect(panel.getByRole('link',{name:'Email BookingTours'})).toHaveCount(0);
+ await page.route('**/api/marketing/setup',route=>route.fulfill({json:{email_service_configured:true,email_feedback_configured:true,operator_status:'eligible',welcome_back_available:false}}));
+ await panel.getByRole('button',{name:'Check again'}).click();
+ await expect(panel.getByText('Automatic welcome-back emails are not available yet',{exact:true})).toBeVisible();
+ await expect(panel.getByText('BookingTours: enable marketing emails for this operator.')).toHaveCount(0);
+});
+
+test('missing operator time zone gives a real support action',async({page})=>{
+ await fixture(page,true,true);await page.route('**/api/marketing/setup',route=>route.fulfill({json:{email_service_configured:true,email_feedback_configured:true,operator_status:'timezone_unavailable',welcome_back_available:false}}));
+ await page.goto('/marketing');const panel=page.getByRole('region',{name:'Email sending setup'});
+ await expect(panel.getByText('BookingTours: set this operator’s local time zone.')).toBeVisible();
+ await expect(panel.getByRole('link',{name:'Open Settings'})).toHaveCount(0);
+ const href=await panel.getByRole('link',{name:'Email BookingTours'}).getAttribute('href');
+ expect(new URL(href!).searchParams.get('body')).toContain('set this operator’s local time zone');
+});

@@ -89,6 +89,7 @@ function createHarness(loadSimpleDay: ReturnType<typeof vi.fn>) {
 
   const { useSimpleDay } = sourceExports("app/simple/use-simple-day.ts", {
     react,
+    "@/app/lib/simple-view": {restoreReturnPosition: vi.fn()},
     "@/app/lib/bookings-realtime": { bookingRealtimeFilter: (businessId: string) => "business_id=eq." + businessId },
     "@/app/lib/supabase": { supabase },
     "./simple-data": { loadSimpleDay },
@@ -160,8 +161,8 @@ describe("useSimpleDay request ordering", () => {
     void oldReload(true);
     expect(load).toHaveBeenCalledTimes(2);
     expect(load.mock.calls.map(([params]) => params)).toEqual([
-      { businessId: "operator-a", date: "2026-09-20", timeZone: "Africa/Johannesburg" },
-      { businessId: "operator-a", date: "2026-09-21", timeZone: "UTC" },
+      { businessId: "operator-a", date: "2026-09-20", timeZone: "Africa/Johannesburg", guide: false },
+      { businessId: "operator-a", date: "2026-09-21", timeZone: "UTC", guide: false },
     ]);
 
     newer.resolve(day("2026-09-21", "NEW"));
@@ -203,7 +204,7 @@ describe("useSimpleDay request ordering", () => {
     const failed = harness.render();
     expect(failed.data).toBeNull();
     expect(failed.loading).toBe(false);
-    expect(failed.error).toContain("couldn’t load");
+    expect(failed.error).toContain("Day unavailable");
 
     older.resolve(day("2026-09-20"));
     await settle();

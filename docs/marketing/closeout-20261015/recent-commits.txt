@@ -1,0 +1,12 @@
+43304b6 Fix Simple View spacing on phones and tablets
+b152398 Limit Simple View to phone and tablet layouts
+c4c9ff6 Merge branch 'feature/simple-view-2026-09-20' of https://github.com/GideonLangenhoven/Admin into feature/simple-view-2026-09-20
+6f0a5f0 Open Claire demo directly on its admin host
+7f57db1 Release simple view and invoice fixes
+e25b15b Prepare simple view and invoice release
+e499caf Keep expanded booking rows within tablet viewport
+3b0cc0d Use invoice issue date and omit weekday in invoice PDFs
+8ca187c Document first-booking trip email independent of marketing consent
+5817840 Ask WhatsApp bot bookers before sending updates
+388701f Introduce My Bookings to first-time operator bookers
+7367dcf Count Kayak admin seat by role instead of email

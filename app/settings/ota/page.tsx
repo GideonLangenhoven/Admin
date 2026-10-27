@@ -45,13 +45,13 @@ const CHANNELS: ChannelConfig[] = [
     key: "VIATOR", label: "Viator", webhookFunction: "viator-webhook",
     primaryCredLabel: "API Key (exp-api-key)", secondaryCredLabel: null,
     webhookSecretLabel: "Webhook Secret (for signature verification)",
-    syncNote: "Availability syncs to Viator every hour at :07. Next 90 days of OPEN slots are pushed.",
+    syncNote: "Syncs open slots for the next 90 days to Viator hourly at :07.",
   },
   {
     key: "GETYOURGUIDE", label: "GetYourGuide", webhookFunction: "getyourguide-webhook",
     primaryCredLabel: "Client ID", secondaryCredLabel: "Client Secret",
     webhookSecretLabel: "Webhook Secret (for signature verification)",
-    syncNote: "Availability syncs to GetYourGuide every hour at :12. Next 90 days of OPEN slots are pushed.",
+    syncNote: "Syncs open slots for the next 90 days to GetYourGuide hourly at :12.",
   },
 ];
 
@@ -206,7 +206,7 @@ export default function OtaSettingsPage() {
         <section className="ui-card p-5" aria-labelledby="ota-readiness-title">
           <h2 id="ota-readiness-title" className="text-[15px] font-semibold mb-2">Direct connections are not available yet</h2>
           <p className="text-sm text-[var(--ck-text-muted)]">{OTA_UNAVAILABLE_MESSAGE}</p>
-          <p className="text-sm text-[var(--ck-text-muted)] mt-2">You can prepare product mappings below. No bookings, availability updates or reconciliation will run, including for previously enabled connections. Continue managing marketplace bookings manually.</p>
+          <p className="text-sm text-[var(--ck-text-muted)] mt-2">Prepare mappings below. All connections are paused, including booking, availability and reconciliation updates. Manage marketplace bookings manually.</p>
         </section>
       )}
 

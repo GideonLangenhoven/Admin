@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-19",
+  "status": "Deployed and verified on 2026-10-20",
+  "prior_review": "PARTNERSHIPS_REVIEW_20261019.json",
+  "application_deployed": true,
+  "migration_applied_to_production": true,
+  "changes": {
+    "partnerships": [
+      "Only the invited operator can accept through the dashboard; invitation secrets are omitted from API responses and consumed on acceptance.",
+      "Email GET displays an escaped confirmation form without mutation. Acceptance requires explicit POST, the current token and the matching recipient email.",
+      "A revoked pair can be invited again through a conditional update, preserving its identity and historical references.",
+      "Revocation atomically deactivates affected legacy and multi-tour offers. Database guards prevent activation and new checkout without active partnerships.",
+      "Checkout checks partnership eligibility before holding slots or contacting a payment provider; a second database guard covers revocation races.",
+      "Failed invitation-email delivery is reported accurately while keeping the dashboard invitation."
+    ],
+    "email_copy": "Accessible copy icon beside email in the admin bookings Details column and individual booking customer details, with success and failure feedback.",
+    "customer_panels": "Opaque white panels and readable dark text for trip management, Profile, cancellation credit, voucher balance, contact, history and sign-in confirmation. Existing operator action colours remain."
+  },
+  "verification": {
+    "unit_tests": {
+      "files": 5,
+      "passed": 29
+    },
+    "browser_tests": {
+      "passed": 5,
+      "viewports": [
+        390,
+        1440
+      ],
+      "clipboard_verified": true
+    },
+    "disposable_postgresql": "PASS: atomic rollback, legacy and multi-tour revocation, inferred collectors, own-tour and independent-partnership preservation, historical-booking preservation, blocked reactivation and checkout, re-invitation, fresh acceptance, concurrent revocation and service-only helper access",
+    "targeted_admin_typecheck": "PASS",
+    "booking_typecheck": "PASS",
+    "edge_deno_check": "PASS",
+    "targeted_lint": "PASS",
+    "ui_detector": "No findings",
+    "visual_evidence": "booking-account-surfaces-20261019/",
+    "browser_fixture_notes": "Admin preview uses a fixed client clock and a minimal shell, causing a date hydration warning and notification-layer warning. Clipboard contents and navigation were verified; notification success/failure handling was verified in unit tests.",
+    "full_root_typecheck": "Blocked by existing archived source files under docs/production-readiness/evidence/extra-pax-deployment-20261016/source; current app/components typecheck passes."
+  },
+  "production_test_pair_from_previous_review": {
+    "operators": [
+      "Kayak",
+      "Claire's Hiking"
+    ],
+    "partnership_id": "ad9f7f4a-bbc3-4ade-aa04-4d746555eb43",
+    "last_verified_status": "ACTIVE",
+    "aonyx_used": false,
+    "changed_during_this_fix": false
+  },
+  "remaining_release_steps": [],
+  "migration_effects": [
+    "Withdraws previously exposed invitation tokens. Pending invitations can still be accepted through the recipient dashboard, or revoked and re-invited for a fresh email link.",
+    "Deactivates any active combo offer lacking required active partnerships. Existing customer bookings and settlement records remain unchanged."
+  ],
+  "not_performed": [
+    "Real invitation email delivery",
+    "Real payment capture, refunds or settlement transfers"
+  ],
+  "deployment_evidence": "PARTNERSHIP_BOOKING_DEPLOYMENT_20261020.json"
+}

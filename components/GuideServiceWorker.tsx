@@ -1,5 +1,6 @@
 "use client";
 
+import { guideWorkerScope, guideWorkerScript, guideQueueAuthorityKey } from "@/app/lib/browser-session";
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 import type { GuideQueueStatus } from "@/app/lib/guide-offline";
@@ -89,7 +90,7 @@ export default function GuideServiceWorker() {
       publishAuth().catch(() => {});
     };
     const onStorage = (event: StorageEvent) => {
-      if (event.key === "guide-queue-authority-v2") publishAuth().catch(() => {});
+      if (event.key === guideQueueAuthorityKey) publishAuth().catch(() => {});
     };
 
     navigator.serviceWorker.addEventListener("message", onMessage);
@@ -98,7 +99,7 @@ export default function GuideServiceWorker() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       publishAuth(session).catch(() => {});
     });
-    navigator.serviceWorker.register("/guide/sw.js", { scope: "/guide/" })
+    navigator.serviceWorker.register(guideWorkerScript, { scope: guideWorkerScope })
       .then(() => publishAuth())
       .catch(() => {});
 

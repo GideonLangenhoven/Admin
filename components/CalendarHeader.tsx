@@ -1,6 +1,7 @@
 
 import React from "react";
 import { DatePicker } from "./DatePicker";
+import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 
 interface CalendarHeaderProps {
   currentDate: Date;
@@ -37,23 +38,23 @@ export default function CalendarHeader({ currentDate, viewMode, onDateChange, on
   };
 
   const formatDate = (date: Date) => {
-    return date.toISOString().split("T")[0];
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   };
 
   return (
-    <div className="ui-card flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
-      <div className="w-full md:w-auto">
-        <div className={`grid w-full ${onToggleMonthView ? "grid-cols-3" : "grid-cols-2"} rounded-lg bg-gray-100 p-1 md:flex md:w-auto`}>
+    <div className="ui-card flex flex-col gap-2 p-3 md:flex-row md:items-center md:justify-between md:p-4">
+      <div className="flex w-full items-center gap-2 md:w-auto">
+        <div className={`grid flex-1 ${onToggleMonthView ? "grid-cols-3" : "grid-cols-2"} rounded-lg bg-gray-100 p-1 md:flex md:w-auto`}>
           <button
             onClick={() => onViewModeChange("week")}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === "week" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+            className={`min-h-10 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === "week" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
               }`}
           >
             Week
           </button>
           <button
             onClick={() => onViewModeChange("day")}
-            className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === "day" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+            className={`min-h-10 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === "day" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
               }`}
           >
             Day
@@ -61,33 +62,33 @@ export default function CalendarHeader({ currentDate, viewMode, onDateChange, on
           {onToggleMonthView && (
             <button
               onClick={onToggleMonthView}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${monthViewOpen ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+              className={`min-h-10 px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${monthViewOpen ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
                 }`}
             >
               Month
             </button>
           )}
         </div>
+        <button type="button" onClick={handleToday} className="ui-btn ui-btn-ghost min-h-11 !px-3 md:hidden">Today</button>
       </div>
 
-      <div className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 md:flex md:w-auto">
-        <button onClick={handlePrev} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
+      <div className="grid w-full grid-cols-[44px_minmax(0,1fr)_44px] items-center gap-2 md:flex md:w-auto">
+        <button type="button" aria-label={viewMode === "week" ? "Previous week" : "Previous day"} onClick={handlePrev} className="ui-btn ui-btn-ghost min-h-11 min-w-11 !px-2">
+          <CaretLeft size={20} aria-hidden="true" />
         </button>
 
         <button
           onClick={handleToday}
-          className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 whitespace-nowrap"
+          className="hidden rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 whitespace-nowrap md:block"
         >
           Today
         </button>
 
-        <div className="col-span-3 md:col-auto md:min-w-[170px]">
+        <div className="min-w-0 md:min-w-[170px]">
           <DatePicker
             alignRight={true}
             value={formatDate(currentDate)}
+            className="min-h-11 !min-w-0"
             onChange={(val) => {
               if (val) {
                 const parts = val.split("-");
@@ -99,10 +100,8 @@ export default function CalendarHeader({ currentDate, viewMode, onDateChange, on
           />
         </div>
 
-        <button onClick={handleNext} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600 transition-colors">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
+        <button type="button" aria-label={viewMode === "week" ? "Next week" : "Next day"} onClick={handleNext} className="ui-btn ui-btn-ghost min-h-11 min-w-11 !px-2">
+          <CaretRight size={20} aria-hidden="true" />
         </button>
       </div>
     </div>

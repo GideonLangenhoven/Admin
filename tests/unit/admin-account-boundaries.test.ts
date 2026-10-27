@@ -1,3 +1,4 @@
+import { guideAuthEmail } from "../../app/lib/guide-access";
 import { describe, expect, it } from "vitest";
 import { canManageAdmin, isPrivilegedRole } from "../../app/lib/role-utils";
 import { sourceHandler } from "../helpers/source-handler";
@@ -90,6 +91,7 @@ function fixture(targetBusiness = "business-a", targetRole = "ADMIN", caller: ty
       "@supabase/supabase-js": { createClient: () => db },
       "../../../lib/api-auth": { getCallerAdmin: async () => caller, canManageAdmin, isPrivilegedRole },
       "../../../lib/admin-password": { setAdminAuthPassword },
+      "../../../lib/guide-access": { guideAuthEmail },
     });
     const req = Object.assign(new Request("https://admin.example.invalid/api/admin/" + route, {
       method: "POST",

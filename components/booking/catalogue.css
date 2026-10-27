@@ -1,0 +1,256 @@
+/* Original storefront recipes, scoped to the application preview.
+   Keep the two app copies identical. The public page uses globals.css. */
+.catalogue-preview {
+  --text: var(--ink);
+  --textMuted: var(--ink-muted);
+  --focusRing: var(--cfg-main);
+  --danger: #bf4540;
+  --dur-fast: 170ms;
+  --dur-base: 200ms;
+  --ease-soft: cubic-bezier(0.2, 0.7, 0.2, 1);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  container-type: inline-size;
+  color-scheme: light;
+  color: var(--ink);
+  background: var(--cfg-bg);
+  border: 1px solid var(--ck-border-subtle);
+  border-radius: 1rem;
+  font-size: 16px;
+  line-height: 1.55;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01", "ss03", "cv02", "calt";
+}
+.catalogue-preview :is(h1, h2, h3, h4),
+.catalogue-preview .font-display {
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  letter-spacing: -0.02em;
+}
+.catalogue-preview p { color: var(--ink-muted); max-width: 70ch; }
+.catalogue-preview .app-container { margin-inline: auto; width: 100%; max-width: 64rem; padding-inline: 1rem; }
+.catalogue-preview .page-wrap { padding-block: 2.5rem; }
+.catalogue-preview [data-shot="tour-card"] > div:first-child > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.catalogue-preview .preview-desktop-nav { display: none; }
+.catalogue-preview .preview-menu-button { display: flex; }
+.catalogue-preview .catalogue-preview-grid { grid-template-columns: minmax(0, 1fr); gap: 1.25rem; }
+@container (min-width: 768px) {
+  .catalogue-preview .catalogue-preview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
+  .catalogue-preview .page-wrap { padding-block: 3.5rem; }
+}
+@container (min-width: 1024px) {
+  .catalogue-preview .preview-desktop-nav { display: flex; }
+  .catalogue-preview .preview-menu-button, .catalogue-preview .preview-mobile-nav { display: none; }
+}
+@container (min-width: 1280px) {
+  .catalogue-preview .catalogue-preview-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+  :where(.catalogue-preview) .font-display {
+    font-family: var(--font-display), Georgia, "Times New Roman", serif;
+    letter-spacing: -0.02em;
+  }
+
+  :where(.catalogue-preview) .page-header {
+    @apply mb-8 md:mb-10;
+  }
+
+  :where(.catalogue-preview) .eyebrow {
+    /* --accent-text: raw accent only when it passes AA on the card surface,
+       else the computed ink (theme-engine, spec §5 rule 6). */
+    color: var(--accent-text, var(--accent));
+    @apply text-xs font-semibold uppercase tracking-[0.14em];
+  }
+
+  :where(.catalogue-preview) .headline-display {
+    /* Spec §6: hero title 34–40px mobile → 56–72px desktop */
+    font-size: clamp(2.125rem, 5vw, 4rem);
+    line-height: 1.06;
+    @apply mt-3 font-semibold;
+  }
+
+  :where(.catalogue-preview) .subhead {
+    color: var(--textMuted);
+    @apply mt-3 hidden text-base md:block md:text-lg;
+  }
+
+  :where(.catalogue-preview) .btn {
+    /* py-3 below sm: ≥44px touch target on phones; desktop keeps the compact 2.5 */
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-5 py-3 text-sm font-semibold no-underline sm:py-2.5;
+    transition:
+      background-color var(--dur-fast) var(--ease-soft),
+      color var(--dur-fast) var(--ease-soft),
+      border-color var(--dur-fast) var(--ease-soft),
+      box-shadow var(--dur-fast) var(--ease-soft),
+      transform var(--dur-fast) var(--ease-soft);
+  }
+
+  :where(.catalogue-preview) .btn:active {
+    transform: translateY(1px);
+  }
+
+  :where(.catalogue-preview) .btn-primary {
+    /* Engine-picked ink + AA repair overlay layered via background-image so
+       mid-tone operator CTAs still pass 4.5:1 — the hue shows through. */
+    background-color: var(--cta);
+    background-image: linear-gradient(var(--cta-overlay), var(--cta-overlay));
+    border: 1px solid transparent;
+    color: var(--ink-on-cta);
+    box-shadow: 0 8px 18px color-mix(in srgb, var(--cta) 26%, transparent);
+  }
+
+  :where(.catalogue-preview) .btn-primary:hover {
+    filter: brightness(1.06);
+    box-shadow: 0 10px 24px color-mix(in srgb, var(--cta) 34%, transparent);
+  }
+
+  :where(.catalogue-preview) .btn-ghost {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--ink-muted);
+  }
+
+  :where(.catalogue-preview) .btn-ghost:hover {
+    color: var(--ink);
+    background: var(--hover-overlay);
+  }
+
+  :where(.catalogue-preview) .btn:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+:where(.catalogue-preview) .glass,
+:where(.catalogue-preview) .glass-nav,
+:where(.catalogue-preview) .glass-sheet {
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22), var(--shadow-card);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+}
+:where(.catalogue-preview) .glass {
+  background: var(--glass-tint-card);
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+}
+:where(.catalogue-preview) .glass-nav {
+  background: var(--glass-tint-nav);
+  color: var(--ink-nav);
+}
+:where(.catalogue-preview) .glass-sheet {
+  background: var(--glass-tint-sheet);
+  border-radius: var(--radius-xl);
+  color: var(--ink-sheet);
+}
+:where(.catalogue-preview) .glass-chip {
+  background: var(--glass-tint-card);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 2px 10px rgb(0 0 0 / 0.14);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  backdrop-filter: blur(12px) saturate(150%);
+  color: var(--ink);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :where(.catalogue-preview) .glass, :where(.catalogue-preview) .glass-chip { background: var(--glass-solid-card); }
+  :where(.catalogue-preview) .glass-nav { background: var(--glass-solid-nav); }
+  :where(.catalogue-preview) .glass-sheet { background: var(--glass-solid-sheet); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :where(.catalogue-preview) .glass, :where(.catalogue-preview) .glass-nav, :where(.catalogue-preview) .glass-sheet, :where(.catalogue-preview) .glass-chip {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  :where(.catalogue-preview) .glass, :where(.catalogue-preview) .glass-chip { background: var(--glass-solid-card); }
+  :where(.catalogue-preview) .glass-nav { background: var(--glass-solid-nav); }
+  :where(.catalogue-preview) .glass-sheet { background: var(--glass-solid-sheet); }
+}
+
+@media (prefers-contrast: more) {
+  :where(.catalogue-preview) .glass, :where(.catalogue-preview) .glass-chip { background: var(--glass-solid-card); }
+  :where(.catalogue-preview) .glass-nav { background: var(--glass-solid-nav); }
+  :where(.catalogue-preview) .glass-sheet { background: var(--glass-solid-sheet); }
+  :where(.catalogue-preview) .glass, :where(.catalogue-preview) .glass-nav, :where(.catalogue-preview) .glass-sheet, :where(.catalogue-preview) .glass-chip { border-color: var(--ink); }
+}
+:where(.catalogue-preview) .glass-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+:where(.catalogue-preview) .glass-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--backdrop-scrim);
+}
+:where(.catalogue-preview) .glass-backdrop img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+:where(.catalogue-preview) .glass-backdrop-mesh {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(90% 70% at 12% 8%, color-mix(in srgb, var(--cfg-main, var(--accent)) 75%, transparent), transparent 62%),
+    radial-gradient(80% 65% at 88% 18%, color-mix(in srgb, var(--cfg-hover, var(--accent)) 60%, transparent), transparent 64%),
+    radial-gradient(70% 55% at 78% 82%, color-mix(in srgb, var(--cfg-cta, var(--cta)) 45%, transparent), transparent 66%),
+    radial-gradient(110% 80% at 50% 108%, color-mix(in srgb, var(--cfg-secondary, #101828) 80%, transparent), transparent 72%),
+    var(--cfg-bg, var(--bg));
+}
+:where(.catalogue-preview) .glass-backdrop-mesh::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+:where(.catalogue-preview) .glass-photo-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim-photo);
+  pointer-events: none;
+}
+
+:where(.catalogue-preview) .glass-hover {
+  transition: transform var(--dur-base) var(--ease-soft), box-shadow var(--dur-base) var(--ease-soft);
+}
+:where(.catalogue-preview) .glass-hover:hover {
+  transform: translateY(-3px);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.22), 0 14px 40px rgb(0 0 0 / 0.28);
+}
+:where(.catalogue-preview) .glass-hover:hover::after { background: var(--hover-overlay); }
+:where(.catalogue-preview) .glass-eyebrow {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+:where(.catalogue-preview) .glass-sheet .prose,
+:where(.catalogue-preview) .glass-sheet .prose * {
+  color: var(--ink-sheet) !important;
+}
+:where(.catalogue-preview) .glass-sheet .prose a {
+  color: var(--accent-text) !important;
+  text-decoration: underline;
+}
+
+.catalogue-preview .glass-backdrop { position: absolute; }
+
+/* Match the storefront's utilities even when admin CSS loads first. */
+.catalogue-preview .glass-eyebrow.normal-case { text-transform: none; }
+.catalogue-preview .glass-eyebrow.tracking-normal { letter-spacing: 0; }
+.catalogue-preview .text-center .eyebrow { text-indent: 0.14em; }
+.catalogue-preview .btn { padding-block: 0.75rem; }
+.catalogue-preview [data-shot="tour-card"] .btn { font-size: 13px; }
+.catalogue-preview .preview-desktop-nav .btn-ghost { padding: 0.5rem 0.75rem; }
+.catalogue-preview .preview-desktop-nav .btn-primary { padding: 0.5rem 1rem; }
+.catalogue-preview .glass-nav h1 { font-size: 1rem; }
+.catalogue-preview .headline-display { font-size: clamp(2.125rem, 5cqw, 4rem); }
+@container (min-width: 640px) {
+  .catalogue-preview .btn { padding-block: 0.625rem; }
+  .catalogue-preview .glass-nav h1 { font-size: 1.125rem; }
+}

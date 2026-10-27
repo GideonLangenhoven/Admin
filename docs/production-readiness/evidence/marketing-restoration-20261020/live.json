@@ -1,0 +1,27 @@
+{
+  "at": "2026-10-20T04:43:41.566Z",
+  "deployment": "dpl_5kkZGSKTP5rTJUdeUnHeDGjzXVx5",
+  "checks": [
+    {
+      "path": "/marketing",
+      "status": 200
+    },
+    {
+      "path": "/marketing/automations",
+      "status": 200
+    },
+    {
+      "path": "/marketing/contacts",
+      "status": 200
+    },
+    {
+      "path": "/settings",
+      "status": 200
+    },
+    {
+      "path": "/api/marketing/permission",
+      "method": "POST without sign-in",
+      "status": 403
+    }
+  ]
+}

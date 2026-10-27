@@ -1,0 +1,26 @@
+{
+  "at": "2026-10-15T16:32:42.416Z",
+  "articles": [
+    "guide",
+    "simple-view",
+    "settings",
+    "photos",
+    "new-booking",
+    "dashboard",
+    "bookings",
+    "marketing",
+    "payment-reminders"
+  ],
+  "verified_chunks": 71,
+  "all_chunks": 176,
+  "unrelated_articles_unchanged": true,
+  "chatbot": {
+    "slug": "admin-help-chat",
+    "version": 21,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  "unrelated_functions_unchanged": true,
+  "bundle_sha256": "93f5d96782c5d473c457b73614a42e44b919dbb22f54560015d5da9460660c25",
+  "source_sha256": "f44379e2a650fbe4e624497110c1a07bc93af4ff61e55b4d8f771afa8da06922"
+}

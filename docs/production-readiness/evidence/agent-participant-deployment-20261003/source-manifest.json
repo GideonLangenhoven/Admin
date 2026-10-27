@@ -1,0 +1,12 @@
+{
+  "baseline_deployment": "dpl_7Gy8PAtiUue5QERVdTkEWR29eZJS",
+  "candidate": "/private/tmp/bookingtours-agent-participant-deploy-20261003/admin",
+  "baseline_runtime_files": 449,
+  "unchanged_runtime_files": 447,
+  "changed_runtime_files": {
+    "app/lib/agent-tools.ts": "71f538357ddc6a21f3fb1de6240ec376bb0d789a5f50e57beecb53c6be7af544",
+    "app/lib/agent-read-service.ts": "947041cfea9ad095dcab3d6d774780057af357ba48438aadd4fc4dddee6f7830"
+  },
+  "production_sql_changes": 0,
+  "external_agent_access_enabled": false
+}

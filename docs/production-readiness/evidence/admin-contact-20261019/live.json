@@ -1,0 +1,27 @@
+{
+  "at": "2026-10-19T09:27:22.989Z",
+  "deployment": "dpl_EPVCgC5T3JdAZ3CEoh4bmKktyCBo",
+  "checks": [
+    {
+      "path": "/settings",
+      "status": 200
+    },
+    {
+      "path": "/super-admin",
+      "status": 200
+    },
+    {
+      "path": "/bookings",
+      "status": 200
+    },
+    {
+      "path": "/simpleguide",
+      "status": 200
+    },
+    {
+      "path": "/api/admin/contact",
+      "method": "POST without sign-in",
+      "status": 403
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
+import { isAgentTelemetry } from "./app/lib/agent-telemetry";
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
@@ -10,7 +11,10 @@ Sentry.init({
   release: process.env.NEXT_PUBLIC_SENTRY_RELEASE || process.env.VERCEL_GIT_COMMIT_SHA,
   ignoreErrors: [
   ],
+  beforeSendTransaction: event => isAgentTelemetry(event) ? null : event,
+  beforeBreadcrumb: breadcrumb => isAgentTelemetry(breadcrumb) ? null : breadcrumb,
   beforeSend(event) {
+    if (isAgentTelemetry(event)) return null;
     if (event.request) {
       delete event.request.cookies;
       delete event.request.data;

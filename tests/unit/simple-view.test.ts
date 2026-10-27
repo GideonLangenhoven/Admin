@@ -27,6 +27,8 @@ describe("simple view return navigation", () => {
     expect(safeSimpleReturn("https://evil.example/simple")).toBe("/simple");
     expect(safeSimpleReturn("//evil.example/simple")).toBe("/simple");
     expect(safeSimpleReturn("/bookings")).toBe("/simple");
+    expect(safeSimpleReturn("/simpleguide/check-ins?date=2026-10-15")).toBe("/simpleguide/check-ins?date=2026-10-15");
+    expect(safeSimpleReturn("/simpleguide/new-booking")).toBe("/simple");
   });
 
   it("builds a walk-in URL with preserved date, departure and return context", () => {

@@ -1,4 +1,5 @@
-import type { TenantBusiness } from "./tenant.ts";
+// The fields this helper reads; keeping the type local lets the browser reuse its URL logic.
+type WaiverBusiness = { id: string; name: string; waiver_url?: string | null; booking_site_url?: string | null; timezone: string; currency: string };
 
 function appendQuery(base: string, params: Record<string, string>) {
   const url = new URL(base);
@@ -8,7 +9,7 @@ function appendQuery(base: string, params: Record<string, string>) {
   return url.toString();
 }
 
-export function resolveWaiverLink(business: Pick<TenantBusiness, "waiver_url"> & { booking_site_url?: string | null } | null | undefined, bookingId: string, waiverToken?: string | null) {
+export function resolveWaiverLink(business: Pick<WaiverBusiness, "waiver_url"> & { booking_site_url?: string | null } | null | undefined, bookingId: string, waiverToken?: string | null) {
   if (!bookingId || !waiverToken) return "";
   const customUrl = String(business?.waiver_url || "").trim();
   if (customUrl) return appendQuery(customUrl, { booking: bookingId, token: waiverToken });
@@ -33,11 +34,13 @@ export async function getWaiverContext(supabase: any, options: {
   let waiverToken = options.waiverToken || "";
 
   if (bookingId && (!businessId || !waiverStatus || !waiverToken)) {
-    const bookingRes = await supabase
+    let bookingQuery = supabase
       .from("bookings")
       .select("id, business_id, waiver_status, waiver_token")
-      .eq("id", bookingId)
-      .maybeSingle();
+      .eq("id", bookingId);
+    if (businessId) bookingQuery = bookingQuery.eq("business_id", businessId);
+    const bookingRes = await bookingQuery.maybeSingle();
+    if (bookingRes.error || !bookingRes.data) throw new Error("Booking waiver status could not be loaded");
     if (bookingRes.data) {
       businessId = businessId || bookingRes.data.business_id;
       waiverStatus = waiverStatus || bookingRes.data.waiver_status;
@@ -45,14 +48,14 @@ export async function getWaiverContext(supabase: any, options: {
     }
   }
 
-  let business: TenantBusiness | null = null;
+  let business: WaiverBusiness | null = null;
   if (businessId) {
     const businessRes = await supabase
       .from("businesses")
       .select("id, name, waiver_url, booking_site_url, timezone, currency")
       .eq("id", businessId)
       .maybeSingle();
-    business = (businessRes.data || null) as TenantBusiness | null;
+    business = (businessRes.data || null) as WaiverBusiness | null;
   }
 
   return {

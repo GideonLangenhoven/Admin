@@ -1,0 +1,181 @@
+{
+  "verified_at": "2026-10-01T14:04:58.847775+00:00",
+  "request": "Publish the approved shared guest calendar visual redesign.",
+  "public_url": "https://kayak.booking.bookingtours.co.za/book?tour=96e07644-315b-4e96-8f36-bb070b665cf8",
+  "deployment": {
+    "id": "dpl_HfxVu4rKbgP8YobipgnzU26SBzzs",
+    "url": "https://booking-j4x8yzr38-jerrys-projects-f4e4eaf9.vercel.app",
+    "target": "production",
+    "ready_state": "READY",
+    "promotion": "Public tenant domain verified on this deployment",
+    "manifest": {
+      "baseDeployment": "dpl_B1WFFDH2F7gjzY628cc2KVsrZ1Jo",
+      "baseRevision": "87d9907c67f427950c621e7f76f6136a0ffaeea3",
+      "source": "/private/tmp/bookingtours-calendar-20261001/deploy",
+      "changedFiles": [
+        "app/book/page.tsx",
+        "app/globals.css"
+      ],
+      "files": {
+        "app/book/page.tsx": "15552c5326edb01107d014a1244bebd4dcd93354863f146983d8ddc2dfccee50",
+        "app/globals.css": "e5636cd0718d7a06e60cb4ce977e9f0511947010c90c567615926a917abf419a"
+      },
+      "businessDeclarationsUnchanged": 92,
+      "behaviorAttributesUnchanged": 56,
+      "scope": "Calendar/departure styling, accessible states and compact progress spacing only. No business logic or environment changes."
+    }
+  },
+  "changes": [
+    "Quiet seven-column calendar with explicit gaps and aligned weekday labels",
+    "One brand-colored selection with check mark, distinct inset keyboard focus, subdued struck unavailable dates and small today dot",
+    "Restrained month controls and consistent departure choices",
+    "Compact progress spacing prevents the existing 320px overflow"
+  ],
+  "preservation": {
+    "business_declarations_unchanged": 92,
+    "interaction_attributes_unchanged": 56,
+    "production_base_preserved": "dpl_B1WFFDH2F7gjzY628cc2KVsrZ1Jo",
+    "excluded": "Unrelated workspace booking questions, availability, checkout, tenant and admin changes were excluded.",
+    "database_changes": "None",
+    "booking_payment_notification_submissions": 0
+  },
+  "validation": {
+    "production_build": "Next.js 16.3.3 build and TypeScript passed on Vercel",
+    "local_source_checks": "TypeScript passed; lint had zero errors and eight existing warnings",
+    "calendar_states": "Available, selected, unavailable, today, hover, keyboard focus and reduced motion passed",
+    "behavior": "Date selection clears time selection; departure selection, month navigation, deep link, local draft persistence and Continue/Back passed",
+    "live_browser": {
+      "url": "https://kayak.booking.bookingtours.co.za/book?tour=96e07644-315b-4e96-8f36-bb070b665cf8",
+      "readings": [
+        {
+          "viewport": 1440,
+          "overflow": 0,
+          "gap": "6px",
+          "cellWidth": 46,
+          "cellHeight": 46,
+          "alignment": true,
+          "collisions": false,
+          "textFits": true,
+          "targetsUsable": true
+        },
+        {
+          "viewport": 1024,
+          "overflow": 0,
+          "gap": "6px",
+          "cellWidth": 46,
+          "cellHeight": 46,
+          "alignment": true,
+          "collisions": false,
+          "textFits": true,
+          "targetsUsable": true
+        },
+        {
+          "viewport": 768,
+          "overflow": 0,
+          "gap": "4px",
+          "cellWidth": 42,
+          "cellHeight": 44,
+          "alignment": true,
+          "collisions": false,
+          "textFits": true,
+          "targetsUsable": true
+        },
+        {
+          "viewport": 640,
+          "overflow": 0,
+          "gap": "4px",
+          "cellWidth": 48,
+          "cellHeight": 48,
+          "alignment": true,
+          "collisions": false,
+          "textFits": true,
+          "targetsUsable": true
+        },
+        {
+          "viewport": 390,
+          "overflow": 0,
+          "gap": "4px",
+          "cellWidth": 48,
+          "cellHeight": 48,
+          "alignment": true,
+          "collisions": false,
+          "textFits": true,
+          "targetsUsable": true
+        },
+        {
+          "viewport": 360,
+          "overflow": 0,
+          "gap": "4px",
+          "cellWidth": 44.28125,
+          "cellHeight": 44.28125,
+          "alignment": true,
+          "collisions": false,
+          "textFits": true,
+          "targetsUsable": true
+        },
+        {
+          "viewport": 320,
+          "overflow": 0,
+          "gap": "4px",
+          "cellWidth": 40.859375,
+          "cellHeight": 44,
+          "alignment": true,
+          "collisions": false,
+          "textFits": true,
+          "targetsUsable": true
+        }
+      ],
+      "identities": [
+        {
+          "id": "ca7a0de0-0000-4000-8000-202610020101",
+          "time": "2026-10-02T06:30:00+00:00",
+          "label": "08:30, 19 spots available"
+        },
+        {
+          "id": "97685ae3-c06f-4270-9a5c-22050a108b19",
+          "time": "2026-10-02T07:00:00+00:00",
+          "label": "09:00, 20 spots available"
+        }
+      ],
+      "selectedId": "ca7a0de0-0000-4000-8000-202610020101",
+      "selectedTime": "2026-10-02T06:30:00+00:00",
+      "dateLabel": "Friday, 2 October 2026, departures available",
+      "deepLink": "https://kayak.booking.bookingtours.co.za/book?tour=96e07644-315b-4e96-8f36-bb070b665cf8&slot=ca7a0de0-0000-4000-8000-202610020101&date=2026-10-02&source=calendar-review",
+      "attemptedBookingWrites": 0,
+      "pageErrors": []
+    },
+    "existing_smoke": {
+      "expected": 6,
+      "unexpected": 0,
+      "projects": [
+        "desktop Chromium",
+        "phone Chromium",
+        "phone WebKit"
+      ],
+      "checks": [
+        "Kayak calendar reaches guest details and cookie notice clears mobile Continue",
+        "Claires retains its own catalog and tenant branding"
+      ],
+      "writes": "Every request other than GET, HEAD and OPTIONS was blocked"
+    }
+  },
+  "screenshots": {
+    "desktop": "calendar-redesign-20261001/desktop.png",
+    "mobile_320": "calendar-redesign-20261001/mobile-320.png",
+    "calendar_320": "calendar-redesign-20261001/calendar-320.png"
+  },
+  "patch": "calendar-redesign-20261001/calendar.patch",
+  "unrelated_defects": [
+    {
+      "issue": "The separately reported session-dependent departure discrepancy",
+      "status": "Outside this visual change; existing production filtering and selection behavior preserved."
+    },
+    {
+      "issue": "Existing date-heading mismatch across browser and tenant timezones",
+      "evidence": "An Africa/Johannesburg browser with America/New_York fixture tenant displayed Thu, 01 Oct while calendar selection and departure ID were Friday, 2 October. The existing Date/formatting logic is unchanged from the previous production source.",
+      "status": "Not changed as part of the visual redesign."
+    }
+  ],
+  "limitations": "No booking, payment or provider notification submitted; validation stops at guest details and returns to the calendar.",
+  "rollout": "Scoped calendar deployment only; broader production qualification remains paused."
+}

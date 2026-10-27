@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-20T08:26:44.945Z",
+  "articles": 30,
+  "chunks": 179,
+  "changed": 9,
+  "result": {
+    "ok": true,
+    "total": 179,
+    "embedded": 9,
+    "skipped": 170,
+    "removed": 0,
+    "failed": 0,
+    "errors": []
+  }
+}

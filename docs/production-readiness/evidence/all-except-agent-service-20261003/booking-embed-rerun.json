@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "name": "embed calendar links resolve the same tour and departure",
+      "project": "",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 24595
+        }
+      ]
+    }
+  ],
+  "passed": 1,
+  "failed": 0
+}

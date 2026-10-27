@@ -1,0 +1,53 @@
+{
+  "at": "2026-10-18T11:38:45.119Z",
+  "columns": [
+    {
+      "table_name": "tours",
+      "column_name": "voucher_image_url"
+    },
+    {
+      "table_name": "vouchers",
+      "column_name": "gift_image_url"
+    },
+    {
+      "table_name": "vouchers",
+      "column_name": "gift_tour_id"
+    },
+    {
+      "table_name": "vouchers",
+      "column_name": "gift_tour_name"
+    }
+  ],
+  "functions": [
+    {
+      "proname": "enqueue_manual_payment_reminders",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_execute": true
+    },
+    {
+      "proname": "snapshot_gift_voucher_design",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=\"\""
+      ],
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_execute": true
+    }
+  ],
+  "ledger": [
+    {
+      "version": "20261018120000",
+      "name": "manual_booking_deadlines"
+    },
+    {
+      "version": "20261018160000",
+      "name": "gift_voucher_photographs"
+    }
+  ]
+}

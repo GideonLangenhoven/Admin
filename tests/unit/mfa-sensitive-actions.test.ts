@@ -1,8 +1,5 @@
-import React from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { sourceExports, sourceHandler } from "../helpers/source-handler";
-import { MfaSensitiveActionPanel } from "../../components/MfaSensitiveActionPanel";
 
 const ACTOR = "11111111-1111-4111-8111-111111111111";
 const USER = "22222222-2222-4222-8222-222222222222";
@@ -27,7 +24,7 @@ function mfaClient(options: {
 } = {}) {
   const factors = options.factors ?? [{ id: FACTOR, factor_type: "totp", status: "verified", created_at: "2026-09-21T07:00:00.000Z", updated_at: "2026-09-21T07:01:00.000Z" }];
   const admin = {
-    id: ACTOR, user_id: USER, role: options.role ?? "MAIN_ADMIN", business_id: BUSINESS,
+    id: ACTOR, user_id: USER, role: options.role ?? "SUPER_ADMIN", business_id: BUSINESS,
     suspended: options.suspended ?? false, read_only: options.readOnly ?? false,
   };
   const query = (table: string) => {
@@ -51,39 +48,40 @@ function mfaClient(options: {
         error: null,
       })) },
     },
-    from: query,
+    from: vi.fn(query),
   };
 }
 
-async function inspect(options: Parameters<typeof mfaClient>[0], token = jwt()) {
+async function inspect(options: Parameters<typeof mfaClient>[0], token = jwt(), allowedRoles = ["MAIN_ADMIN", "SUPER_ADMIN"]) {
   const client = mfaClient(options);
   const exports = sourceExports("app/lib/mfa-sensitive.ts", {
     "@supabase/supabase-js": { createClient: () => client },
   });
   const result = await (exports.requireSensitiveMfa as any)(new Request("https://test.invalid", {
     headers: { authorization: `Bearer ${token}` },
-  }), { allowedRoles: ["MAIN_ADMIN", "SUPER_ADMIN"], expectedActorId: ACTOR });
+  }), { allowedRoles, expectedActorId: ACTOR });
   return { result, client };
 }
 
 describe("sensitive-action MFA authority", () => {
-  it("denies AAL1 before a sensitive effect", async () => {
-    const { result } = await inspect({ currentLevel: "aal1" });
-    expect(result).toMatchObject({ ok: false, status: 403, code: "MFA_REQUIRED" });
+  it.each(["OPERATOR", "ADMIN", "MAIN_ADMIN", "SUPER_ADMIN"])("does not require MFA for operator role %s", async (role) => {
+    const { result, client } = await inspect({ role, currentLevel: "aal1", factors: [] }, jwt({ sub: USER, aal: "aal1" }), [role]);
+    expect(result).toMatchObject({ ok: true, actor: { id: ACTOR, role }, ready: true, reEnrollRequired: false });
+    expect(client.auth.getUser).toHaveBeenCalledOnce();
+    expect(client.auth.mfa.getAuthenticatorAssuranceLevel).not.toHaveBeenCalled();
+    expect(client.from).not.toHaveBeenCalledWith("mfa_recovery_state");
   });
 
-  it("accepts a signed AAL2 session only while a verified TOTP factor still exists", async () => {
-    const { result } = await inspect({});
-    expect(result).toMatchObject({ ok: true, actor: { id: ACTOR, role: "MAIN_ADMIN" } });
-  });
-
-  it("rejects stale aal2 when its verified factors have been deleted", async () => {
-    const { result } = await inspect({ factors: [] });
-    expect(result).toMatchObject({ ok: false, status: 403, code: "MFA_FACTOR_MISSING" });
+  it.each(["PENDING", "PARTIAL", "COMPLETED"])("does not block an operator with a legacy %s recovery record", async (status) => {
+    const { result, client } = await inspect({ role: "MAIN_ADMIN", currentLevel: "aal1", factors: [], recovery: { status, completed_at: "2030-01-01T00:00:00Z" } });
+    expect(result).toMatchObject({ ok: true, ready: true, recoveryState: "none", reEnrollRequired: false });
+    expect(client.auth.mfa.getAuthenticatorAssuranceLevel).not.toHaveBeenCalled();
+    expect(client.from).not.toHaveBeenCalledWith("mfa_recovery_state");
   });
 
   it.each([
     ["ADMIN", false, false, "ROLE_FORBIDDEN"],
+    ["UNKNOWN", false, false, "ROLE_FORBIDDEN"],
     ["MAIN_ADMIN", true, false, "ACCOUNT_INACTIVE"],
     ["MAIN_ADMIN", false, true, "DEMO_READ_ONLY"],
   ])("rejects role=%s suspended=%s demo=%s", async (role, suspended, readOnly, code) => {
@@ -92,31 +90,17 @@ describe("sensitive-action MFA authority", () => {
   });
 
   it("rejects malformed, forged, or expired JWTs when Auth validation fails", async () => {
-    const { result } = await inspect({ userError: new Error("invalid token") }, "not-a-jwt");
+    const { result } = await inspect({ role: "MAIN_ADMIN", userError: new Error("invalid token") }, "not-a-jwt");
     expect(result).toMatchObject({ ok: false, status: 401, code: "INVALID_SESSION" });
   });
 
-  it("keeps an operator blocked while recovery is pending", async () => {
-    const { result } = await inspect({ recovery: { status: "PARTIAL", completed_at: null } });
-    expect(result).toMatchObject({ ok: false, status: 423, code: "MFA_RECOVERY_PENDING" });
+  it.each(["PENDING", "PARTIAL", "COMPLETED"])("does not block Super Admin sign-in for legacy %s recovery", async (status) => {
+    const { result, client } = await inspect({ role: "SUPER_ADMIN", currentLevel: "aal1", factors: [], recovery: { status, completed_at: "2030-01-01T00:00:00Z" } });
+    expect(result).toMatchObject({ ok: true, ready: true, recoveryState: "none", reEnrollRequired: false });
+    expect(client.auth.mfa.getAuthenticatorAssuranceLevel).not.toHaveBeenCalled();
+    expect(client.from).not.toHaveBeenCalledWith("mfa_recovery_state");
   });
 
-  it("requires a factor and challenge created after completed recovery", async () => {
-    const { result } = await inspect({
-      recovery: { status: "COMPLETED", completed_at: "2030-01-01T00:00:00.000Z" },
-      factors: [{ id: FACTOR, factor_type: "totp", status: "verified", created_at: "2026-09-21T07:00:00.000Z", updated_at: "2026-09-21T07:01:00.000Z" }],
-    });
-    expect(result).toMatchObject({ ok: false, code: "MFA_REENROLL_REQUIRED" });
-  });
-
-  it("accepts only a new verified factor and challenge after completed recovery", async () => {
-    const { result } = await inspect({
-      recovery: { status: "COMPLETED", completed_at: "2030-01-01T00:00:00.000Z" },
-      factors: [{ id: FACTOR, factor_type: "totp", status: "verified", created_at: "2030-01-01T00:01:00.000Z", updated_at: "2030-01-01T00:02:00.000Z" }],
-      methods: [{ method: "mfa/totp", timestamp: Date.parse("2030-01-01T00:03:00.000Z") / 1000 }],
-    });
-    expect(result).toMatchObject({ ok: true, ready: true });
-  });
 });
 
 describe("credentials handler", () => {
@@ -126,15 +110,25 @@ describe("credentials handler", () => {
     const route = sourceHandler("app/api/credentials/route.ts", {
       "@supabase/supabase-js": { createClient: () => ({ rpc, from: () => query }) },
       "../../lib/api-auth": { getCallerAdmin: async () => caller, isPrivilegedRole: (role: string) => role === "MAIN_ADMIN" || role === "SUPER_ADMIN" },
-      "../../lib/mfa-sensitive": { requireSensitiveMfa: async () => mfa },
+      "../../lib/mfa-sensitive": { requireSensitiveMfa: typeof mfa === "function" ? mfa : async () => mfa },
     }, { SETTINGS_ENCRYPTION_KEY: "fixture-encryption-key-".repeat(2) });
     return { route, rpc };
   }
 
-  it("does not reach provider or database effects for AAL1", async () => {
-    const { route, rpc } = handler({ ok: false, status: 403, code: "MFA_REQUIRED", message: "Authenticator code required" });
-    const response = await route(new Request("https://test.invalid", { method: "POST", headers: { authorization: `Bearer ${jwt()}` }, body: JSON.stringify({ business_id: BUSINESS, section: "yoco", yoco_secret_key: "sk_live_fixture", yoco_webhook_secret: "whsec_fixture" }) }));
-    expect(response.status).toBe(403);
+  it.each(["MAIN_ADMIN", "SUPER_ADMIN"])("lets %s save credentials with normal sign-in and no authenticator", async (role) => {
+    const client = mfaClient({ role, currentLevel: "aal1", factors: [] });
+    const { requireSensitiveMfa } = sourceExports("app/lib/mfa-sensitive.ts", { "@supabase/supabase-js": { createClient: () => client } });
+    const { route, rpc } = handler(requireSensitiveMfa, { id: ACTOR, role, business_id: BUSINESS });
+    const response = await route(new Request("https://test.invalid", { method: "POST", headers: { authorization: `Bearer ${jwt({ sub: USER, aal: "aal1" })}`, "x-admin-business-id": BUSINESS }, body: JSON.stringify({ business_id: BUSINESS, section: "yoco", yoco_secret_key: "sk_live_fixture", yoco_webhook_secret: "whsec_fixture" }) }));
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("set_sensitive_credentials_audited", expect.objectContaining({ p_actor_id: ACTOR, p_business_id: BUSINESS }));
+    expect(client.auth.mfa.getAuthenticatorAssuranceLevel).not.toHaveBeenCalled();
+  });
+
+  it("does not reach database effects when server identity verification fails", async () => {
+    const { route, rpc } = handler({ ok: false, status: 401, code: "INVALID_SESSION", message: "Sign in again" }, { id: ACTOR, role: "SUPER_ADMIN", business_id: BUSINESS });
+    const response = await route(new Request("https://test.invalid", { method: "POST", headers: { authorization: `Bearer ${jwt()}`, "x-admin-business-id": BUSINESS }, body: JSON.stringify({ business_id: BUSINESS, section: "yoco", yoco_secret_key: "sk_live_fixture", yoco_webhook_secret: "whsec_fixture" }) }));
+    expect(response.status).toBe(401);
     expect(rpc).not.toHaveBeenCalled();
   });
 
@@ -152,31 +146,5 @@ describe("credentials handler", () => {
     const response = await route(new Request("https://test.invalid", { method: "POST", headers: { authorization: `Bearer ${jwt()}`, "x-admin-business-id": OTHER_BUSINESS }, body: JSON.stringify({ business_id: BUSINESS, section: "yoco", yoco_secret_key: "sk_live_fixture", yoco_webhook_secret: "whsec_fixture" }) }));
     expect(response.status).toBe(403);
     expect(rpc).not.toHaveBeenCalled();
-  });
-});
-
-describe("MFA inline UI", () => {
-  it("distinguishes first-time authenticator setup from an existing code", () => {
-    const markup = renderToStaticMarkup(React.createElement(MfaSensitiveActionPanel, {
-      mode: "enroll", actionLabel: "Save bank details", code: "", qrCode: "data:image/svg+xml,fixture",
-      secret: "FIXTURE", error: "", busy: false, onCodeChange: () => {}, onVerify: () => {}, onCancel: () => {},
-    }));
-    expect(markup).toContain("Set up an authenticator");
-    expect(markup).toContain("Other account");
-    expect(markup).toContain("Google Authenticator");
-    expect(markup).toContain("Confirm BookingTours appears in the app");
-    expect(markup).toContain("https://www.microsoft.com/en-us/security/authenticator/mobile-app");
-    expect(markup).toContain("Cancel");
-    expect(markup).not.toContain("bank_account_number");
-
-    const challenge = renderToStaticMarkup(React.createElement(MfaSensitiveActionPanel, {
-      mode: "challenge", actionLabel: "Save WhatsApp credentials", code: "", error: "", busy: false,
-      onCodeChange: () => {}, onVerify: () => {}, onCancel: () => {},
-    }));
-    expect(challenge).toContain("Look for a BookingTours entry");
-    expect(challenge).toContain("BookingTours cannot tell which app you chose");
-    expect(challenge).toContain("Google&#x27;s transfer guide");
-    expect(challenge).toContain("https://support.microsoft.com/en-us/authenticator/restore-account-credentials-from-microsoft-authenticator");
-    expect(challenge).not.toContain("Get Microsoft Authenticator");
   });
 });

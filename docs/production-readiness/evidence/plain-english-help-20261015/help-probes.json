@@ -1,0 +1,86 @@
+{
+  "at": "2026-10-15T16:16:10.637Z",
+  "caller": "internal service check; no customer session or record used",
+  "results": [
+    {
+      "question": "Where do I see a failed Yoco payment and how do I know it has been paid?",
+      "status": 200,
+      "ok": true,
+      "answer": "Open [Dashboard](/). In the **Payment recovery** panel:\n\n- **Needs payment** lists failed Yoco booking payments.\n- After Yoco confirms payment, the booking leaves **Needs payment** and appears as **Paid** under **All outcomes**.\n- Select **Refresh** to check the latest payment status.\n\nYou can also see the same panel in [Simple View](/simple).\n\n[[open:/]]",
+      "sources": [
+        {
+          "title": "Payment reminders and unpaid bookings",
+          "route": "/bookings"
+        },
+        {
+          "title": "Dashboard home",
+          "route": "/"
+        },
+        {
+          "title": "Simple View, roll call and check-ins",
+          "route": "/simple"
+        }
+      ]
+    },
+    {
+      "question": "Where do I change the WhatsApp bot discount for repeat bookings and group sizes?",
+      "status": 200,
+      "ok": true,
+      "answer": "Go to [Marketing → Promotions](/marketing/promotions), then open **Automatic WhatsApp discounts**. Select **Add discount rule** and choose:\n\n- **Time since last booking** for repeat bookings\n- **Group size** for group-size discounts\n\nSet the thresholds, discount percentage, enable each rule, then select **Save automatic discounts**. Only paid or completed bookings count, and the largest matching discount applies without stacking.",
+      "sources": [
+        {
+          "title": "Marketing",
+          "route": "/marketing"
+        },
+        {
+          "title": "New Booking",
+          "route": "/new-booking"
+        },
+        {
+          "title": "Bookings",
+          "route": "/bookings"
+        }
+      ]
+    },
+    {
+      "question": "Do welcome-back sequences use signup date, and do emails start automatically when I save?",
+      "status": 200,
+      "ok": true,
+      "answer": "No. Welcome-back sequences use the number of days since the customer’s last paid or completed booking, not their signup date.\n\nNo. Saving only saves and previews the draft. Automatic welcome-back emails and promotional delivery are currently held, so emails do not start automatically. Manage this under [Marketing → Automations](/marketing/automations).",
+      "sources": [
+        {
+          "title": "Marketing",
+          "route": "/marketing"
+        },
+        {
+          "title": "WhatsApp and automatic messages",
+          "route": "/inbox"
+        },
+        {
+          "title": "Bookings",
+          "route": "/bookings"
+        }
+      ]
+    },
+    {
+      "question": "What can guides see when signed in with guide@operator-name?",
+      "status": 200,
+      "ok": true,
+      "answer": "Guides using `guide@operator-name` are signed into [Simple View](/simple), where they can:\n\n- See expected passenger totals for departures on the selected day.\n- Use the date arrows or date picker, and **Refresh**, to view another day or update counts.\n- Open **Trip photos** to view galleries and upload photos through the operator’s Google Drive connection.\n\nThey cannot access the office dashboard, bookings, walk-ins, check-ins, payments, customer contact, marketing, or customer email controls. The shared login is created and managed by the main admin under [Settings → Admin Users → Guide login](/settings#admins).",
+      "sources": [
+        {
+          "title": "Simple View, roll call and check-ins",
+          "route": "/simple"
+        },
+        {
+          "title": "Guide access and the Guide app",
+          "route": "/guide"
+        },
+        {
+          "title": "Finding your way around",
+          "route": "/"
+        }
+      ]
+    }
+  ]
+}

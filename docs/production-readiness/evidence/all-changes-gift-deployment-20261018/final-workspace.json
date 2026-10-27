@@ -1,0 +1,16 @@
+[
+  {
+    "app": "admin",
+    "files": 491,
+    "matches_current_workspace": true,
+    "new_runtime_files_omitted": 0,
+    "excluded_comparison": "supabase/.temp CLI metadata"
+  },
+  {
+    "app": "booking",
+    "files": 170,
+    "matches_current_workspace": true,
+    "new_runtime_files_omitted": 0,
+    "excluded_comparison": "supabase/.temp CLI metadata"
+  }
+]

@@ -1,0 +1,6 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "incremental": false },
+  "include": ["helpers/agent-read-fixture.ts", "helpers/chatgpt-mcp-fixture.ts", "unit/chatgpt-mcp-fixture.test.ts", "unit/agent-read-service.test.ts", "unit/agent-mcp-backend.test.ts", "unit/agent-runtime.test.ts", "unit/agent-native-auth.test.ts"],
+  "exclude": ["../node_modules"]
+}

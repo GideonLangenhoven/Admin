@@ -1,3 +1,4 @@
+import { operationalCancellationFollowup } from "../_shared/marketing-outbox.ts";
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -21,7 +22,7 @@ import { retrieveKb, retrieveKbContext } from "../_shared/kb.ts";
 import { assembleBotSystem, buildBlockB, buildBlockC } from "../_shared/bot-prompt.ts";
 import { hashedUserKey } from "../_shared/openrouter-provider.ts";
 import { botReply, type BotOut, type BotUsage } from "../_shared/bot-llm.ts";
-import { verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
+import { calculateChatBookingPricing, verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
 import { getPaidPortions } from "../_shared/vouchers.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
 import { formatTourMeetingPoints, isAvailabilityQuery } from "../_shared/bot-guards.ts";
@@ -470,12 +471,10 @@ async function getLoyaltyCount(tenant: TenantContext, phone: any) {
   try { const r = await supabase.rpc("check_loyalty", { p_phone: phone, p_business_id: tenant.business.id }); return r.data || 0; } catch (e) { return 0; }
 }
 async function calcDiscount(tenant: TenantContext, qty: any, phone: any) {
-  const pol = await supabase.from("policies").select().eq("business_id", tenant.business.id).single();
-  const p = pol.data; let discount = { type: "", percent: 0 };
-  const lc = await getLoyaltyCount(tenant, phone);
-  if (p && lc >= (p.loyalty_bookings_threshold || 2)) discount = { type: "LOYALTY", percent: p.loyalty_discount_percent || 10 };
-  if (p && qty >= (p.group_discount_min_qty || 6)) { const gp = p.group_discount_percent || 5; if (gp > discount.percent) discount = { type: "GROUP", percent: gp }; }
-  return discount;
+  const result = await supabase.rpc("resolve_booking_discount", { p_business_id: tenant.business.id, p_phone: phone, p_qty: Number(qty) });
+  if (result.error || !result.data) throw new Error("Could not verify booking discounts");
+  return result.data as { type: string; percent: number; label: string };
+
 }
 function genVoucherCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let code = "";
@@ -1007,11 +1006,16 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     try {
       const { data: queuedMsgs } = await supabase
         .from("outbox")
-        .select("id, message_body")
+        .select("id, message_body, message_type, booking_id")
         .eq("status", "WAITING_WINDOW")
         .eq("business_id", tenant.business.id)
         .eq("phone", phone);
       for (const qm of (queuedMsgs || [])) {
+        // Old broadcasts and unknown free-form retries remain held, even on a new inbound reply.
+        if ((qm as any).message_type !== "CANCEL_FOLLOWUP" || !(qm as any).booking_id) continue;
+        const { data: followupBooking, error: followupError } = await supabase.from("bookings")
+          .select("id, business_id, status").eq("id", (qm as any).booking_id).eq("business_id", tenant.business.id).maybeSingle();
+        if (followupError || !operationalCancellationFollowup(tenant.business.id, qm as any, followupBooking)) continue;
         try {
           const drainRes = await sendWhatsappFreeformOrSignal(tenant, phone, (qm as any).message_body);
           if (drainRes.ok) {
@@ -1148,10 +1152,23 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       state = "IDLE";
     }
 
+    // Re-check persisted cancellation policy even for old interactive buttons or conversation state.
+    const actionBookingId = rid.match(/^(?:BK_|ACT_[A-Z_]+_|WEATHER_REFUND_)([0-9a-f-]{36})$/i)?.[1] || sd.booking_id;
+    if (actionBookingId && !isResetKeyword) {
+      const managed = await supabase.from("bookings").select("status, cancellation_self_service")
+        .eq("id", actionBookingId).eq("business_id", tenant.business.id).maybeSingle();
+      if (managed.error) throw managed.error;
+      if (managed.data?.status === "CANCELLED" && managed.data.cancellation_self_service === false) {
+        await sendText(tenant, phone, "This cancellation is being handled by our team. Please contact us directly for follow-up.");
+        await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+        return;
+      }
+    }
+
     // Weather cancellation response intercept
     if ((input === "1" || input === "2" || input === "3" || input === "1️⃣" || input === "2️⃣" || input === "3️⃣" || input.includes("refund") || input.includes("voucher") || input.includes("reschedule")) && (state === "IDLE" || state === "MENU")) {
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const cb = await supabase.from("bookings").select("id, status, cancellation_reason, slot_id, qty, total_amount, tour_id, refund_status")
+      const cb = await supabase.from("bookings").select("id, status, cancellation_reason, slot_id, qty, total_amount, tour_id, refund_status, cancellation_self_service")
         .eq("business_id", tenant.business.id)
         .eq("phone", phone)
         .eq("status", "CANCELLED")
@@ -1159,6 +1176,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         .order("cancelled_at", { ascending: false }).limit(1).single();
 
       if (cb.data && cb.data.cancellation_reason && cb.data.cancellation_reason.includes("Weather")) {
+        if (cb.data.cancellation_self_service === false) {
+          await sendText(tenant, phone, "This cancellation is being handled by our team. Please contact us directly for follow-up.");
+          await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+          return;
+        }
         let choiceDesc = "";
         if (input.includes("1") || input.includes("reschedule")) choiceDesc = "RESCHEDULE";
         else if (input.includes("2") || input.includes("voucher")) choiceDesc = "VOUCHER";
@@ -2278,13 +2300,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       const price = await getSlotPrice(slot);
-      const baseTotal = price * sd.qty;
+      const baseTotal = Math.round(price * Number(sd.qty) * 100) / 100;
       const disc = await calcDiscount(tenant, sd.qty, phone);
       let finalTotal = baseTotal; let discountMsg = "";
       if (disc.percent > 0) {
-        const saving = Math.round(baseTotal * disc.percent / 100); finalTotal = baseTotal - saving;
-        if (disc.type === "GROUP") discountMsg = "\n\u{1F389} *5% group discount applied!* You save R" + saving;
-        if (disc.type === "LOYALTY") discountMsg = "\n\u{1F31F} *10% loyalty discount!* You save R" + saving;
+        const priced = calculateChatBookingPricing({ qty: Number(sd.qty), unitPrice: price, groupDiscountPercent: disc.percent, groupDiscountMinQty: 1 });
+        const saving = priced.discount; finalTotal = priced.total;
+        discountMsg = "\n*" + disc.percent + "% " + disc.label + " applied!* You save R" + saving;
       }
       // Check if voucher booking — subtract voucher value from total
       // Supports FREE_TRIP pax limit (only covers pax_limit guests) and peak arbitrage
@@ -2458,15 +2480,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const finalUnitPrice = finalSlotCheck.data.price_per_person_override != null
         ? Number(finalSlotCheck.data.price_per_person_override)
         : Number(finalTourCheck.data?.base_price_per_person || 0);
+      const finalDiscount = await calcDiscount(tenant, Number(sd.qty || 0), phone);
       const finalPriceCheck = verifyChatBookingPricing({
         quotedTotal: Number(sd.total || 0),
+        tolerance: 0.005,
         qty: Number(sd.qty || 0),
         unitPrice: finalUnitPrice,
         voucherDeduction: sd.voucher_id ? Number(sd.voucher_deduction || 0) : 0,
-        groupDiscountPercent: Number(sd.discount_percent || 0),
-        // Loyalty discounts apply at any group size; the default min-qty of 6
-        // silently dropped the quoted 10% and triggered a bogus "price changed".
-        groupDiscountMinQty: sd.discount_type === "LOYALTY" ? 1 : undefined,
+        groupDiscountPercent: finalDiscount.percent,
+        groupDiscountMinQty: 1,
       });
       if (!finalPriceCheck.ok && finalPriceCheck.reason !== "PRICE_CHANGED") {
         await sendText(tenant, phone, "I couldn't verify the price for that trip, so I won't create the booking yet. Please type *book* to start again.");
@@ -2478,7 +2500,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await sendButtons(tenant, phone, "The price has changed since we started. The correct total is *R" + fp.total + "*.\n\nPlease confirm again.", [{ id: "CONFIRM", title: fp.total > 0 ? "\u2705 Pay R" + fp.total : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }]);
         await setConvo(convo.id, {
           current_state: "CONFIRM_BOOKING",
-          state_data: { ...sd, tour_id: finalSlotCheck.data.tour_id, unit_price: fp.unitPrice, base_total: fp.baseTotal, total: fp.total, voucher_deduction: fp.voucherDeduction },
+          state_data: { ...sd, discount_type: finalDiscount.type, discount_percent: finalDiscount.percent, tour_id: finalSlotCheck.data.tour_id, unit_price: fp.unitPrice, base_total: fp.baseTotal, total: fp.total, voucher_deduction: fp.voucherDeduction },
         });
         return;
       }
@@ -2490,6 +2512,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const verifiedPricing = finalPriceCheck.pricing;
       const verifiedSd = {
         ...sd,
+        discount_type: finalDiscount.type,
+        discount_percent: finalDiscount.percent,
         tour_id: finalSlotCheck.data.tour_id,
         unit_price: verifiedPricing.unitPrice,
         base_total: verifiedPricing.baseTotal,
@@ -2501,7 +2525,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         business_id: tenant.business.id, tour_id: verifiedSd.tour_id, slot_id: verifiedSd.slot_id,
         customer_name: sd.customer_name, phone: phone, email: email,
         qty: verifiedSd.qty, unit_price: verifiedSd.unit_price, total_amount: verifiedSd.total,
-        original_total: verifiedSd.base_total, discount_type: verifiedSd.discount_type || null, discount_percent: verifiedSd.discount_percent || 0,
+        original_total: verifiedSd.base_total, discount_type: verifiedSd.discount_percent > 0 ? "PERCENT" : null, discount_percent: verifiedSd.discount_percent || 0,
+        discount_amount: verifiedPricing.discount,
+        discount_notes: verifiedSd.discount_percent > 0 ? finalDiscount.label : null,
         voucher_amount_paid: Number(verifiedSd.voucher_deduction || 0),
         status: "PENDING", source: "WHATSAPP", custom_fields: sd.custom_fields || {},
         marketing_opt_in: null, whatsapp_booking_updates_opt_in: sd.whatsapp_booking_updates_opt_in === true,
@@ -2702,7 +2728,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           business_id: tenant.business.id, code: vcode, status: "PENDING", type: "FREE_TRIP",
           recipient_name: sd.recipient_name, gift_message: sd.gift_message || null,
           buyer_name: sd.buyer_name, buyer_email: sd.buyer_email, buyer_phone: phone,
-          tour_name: sd.tour_name, value: sd.value, purchase_amount: sd.value, current_balance: sd.value,
+          tour_name: sd.tour_name, gift_tour_id: sd.tour_id, value: sd.value, purchase_amount: sd.value, current_balance: sd.value,
           pax_limit: 1, purchase_value: sd.value,
           expires_at: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString(),
         });

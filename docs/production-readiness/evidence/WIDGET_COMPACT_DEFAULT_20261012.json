@@ -1,0 +1,71 @@
+{
+  "date": "2026-10-12",
+  "authorization": "please deploy",
+  "status": "published_and_verified",
+  "deployment": {
+    "id": "dpl_D1SAyy1B3aVZmem8wg89seDwbcRC",
+    "url": "https://booking-dc7e8qvfo-jerrys-projects-f4e4eaf9.vercel.app",
+    "ready_state": "READY",
+    "previous": "dpl_E1NoUXrNb99uxSKupRksTbYtbh15",
+    "promotion_confirmed": true,
+    "production_domain_verified": "https://booking.bookingtours.co.za"
+  },
+  "scope": {
+    "changed_files": [
+      "app/embed/page.tsx",
+      "public/widget.js"
+    ],
+    "behavior": "Start with no experience selected and the experience list closed. Resize the iframe to its content. Explicit tour preselection and custom minimum heights remain supported.",
+    "source_files_verified": 168,
+    "all_uploaded_source_hashes_match": true,
+    "existing_upload_exclusions": [
+      ".claude/launch.json",
+      "docs/PARTNER_WIDGET.md"
+    ],
+    "source_snapshot": "/private/tmp/bookingtours-widget-release-20261012-thSRhJ"
+  },
+  "validation": {
+    "production_build": "passed",
+    "production_typescript": "passed",
+    "focused_local_browser_tests": {
+      "passed": 3,
+      "cases": [
+        "multiple experiences compact default and expansion",
+        "single experience compact default and expansion",
+        "preselected tour departure deep link"
+      ]
+    },
+    "focused_lint": "passed",
+    "public_browser": {
+      "checkedAt": "2026-10-12T09:11:32.374Z",
+      "results": [
+        {
+          "tenant": "aonyx",
+          "loaderMatches": true,
+          "compactDefault": true,
+          "desktopHeight": 213,
+          "mobileFits": true,
+          "experienceCount": 3,
+          "selectionExpands": true,
+          "bookingOrigin": "https://aonyx.booking.bookingtours.co.za"
+        },
+        {
+          "tenant": "kayak",
+          "loaderMatches": true,
+          "compactDefault": true,
+          "desktopHeight": 213,
+          "mobileFits": true,
+          "experienceCount": 3,
+          "selectionExpands": true,
+          "bookingOrigin": "https://kayak.booking.bookingtours.co.za"
+        }
+      ],
+      "passed": true
+    }
+  },
+  "boundaries": {
+    "database_changes": false,
+    "git_commit_or_push": false,
+    "customer_booking_payment_or_message_submitted": false
+  }
+}

@@ -1,0 +1,170 @@
+[
+  {
+    "path": "app/lib/marketing-journey.ts",
+    "baseline_sha256": "604676ded40e34955f00d3d73ea481730c88979fe3f3fef4f9850ed6d29ceef9",
+    "candidate_sha256": "1b95b3868dfcd1fadcbc910225e49ea1e2e9d5413e35278725730ccf0efac7d2",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "app/marketing/layout.tsx",
+    "baseline_sha256": "775dee17cae24c52699903a21638f18d9db4727cacb31ea87e4da034ca811aaf",
+    "candidate_sha256": "1042dcc77e788bdd86ceb69b13f827025e309d11ce38da4740e2c86a2dbe8580",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "app/marketing/automations/page.tsx",
+    "baseline_sha256": "9fea38faddf0c22adf3610439320ee1e2709a84e1e04117f5d2c023e13a7d065",
+    "candidate_sha256": "5fe78eb3818e4fec454872d1632d79862d164b92840a2daeadf66c14709e1554",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "app/marketing/automations/[id]/page.tsx",
+    "baseline_sha256": "73060deb06691d420cd143602e057f3cc1ce2e419eb00a779f4fc48ad5f8b662",
+    "candidate_sha256": "11f82e63c709ec004171325fe5363a5ef3fbdc9cd2e34141e815c6d3ea94368b",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "supabase/functions/_shared/marketing-batch.ts",
+    "baseline_sha256": "7f7109c3fe1085c63879417e4e3a059ae970bea9912b2ffe5541404398776398",
+    "candidate_sha256": "c4bba4e5795c833db7331236a920a2596267cd939e15f872b08249fab44d04e3",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "supabase/functions/_shared/marketing-outbox.ts",
+    "baseline_sha256": null,
+    "candidate_sha256": "d35df6e5004f7c7a550ebfa0856ac6d37dfdba0e3e815e48fc98b3fcbbc7dbac",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "supabase/functions/broadcast/index.ts",
+    "baseline_sha256": "2da04c33972535a2231e383b72377e651ae054d480d314258b41015c480e2087",
+    "candidate_sha256": "a90ed2e1134b5e5e8c4af6a2855ecb74a97ed7cc24b55c75884c5d02b9658823",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "supabase/functions/send-email/index.ts",
+    "baseline_sha256": "3f264371ecc78257363b63807225e5d708fc43fb7abbb97a29c59475dbac0c0b",
+    "candidate_sha256": "ada29fab33de6b5cc2b1a4af358ee225f81bd6388964f97fb44bcdef8b76b5a3",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "supabase/functions/auto-messages/index.ts",
+    "baseline_sha256": "4dff2f22691bd0df8c68109246832aa550d9f2c58df4fc4c7b8244d905979bf8",
+    "candidate_sha256": "fdc77f11180f31897f5b9e7b8c4c0f3948371f314525bc349eafc0ed5dd257cc",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "supabase/functions/wa-webhook/index.ts",
+    "baseline_sha256": "79a22b637aff9b05ded294d659c825657ed6e814804c463415291231fd5b83f9",
+    "candidate_sha256": "611ce9be99222acdd30af9868e75ee67e51c084aedd1f2744b0783745b0988ca",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "supabase/functions/marketing-dispatch/index.ts",
+    "baseline_sha256": "54a1e6d254e84e0be68cf25ea93374342bf46f5358c5ee4454851e08ce4e9b8c",
+    "candidate_sha256": "88a10b13fac2a779f36749c851cc72f28fda1e1ee5a71435e01453c307fb151e",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "supabase/functions/marketing-automation-dispatch/index.ts",
+    "baseline_sha256": "b7ebb5b13f7e3e8625a39781dd1e4443c8de27232988fde57a5f056add5c6b80",
+    "candidate_sha256": "dbc96953316c47820ee8943e07f95d4956835ad394f02da1a36b23b6b8ebb862",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "supabase/migrations/20261015180000_marketing_closeout_hold.sql",
+    "baseline_sha256": null,
+    "candidate_sha256": "a9e2a8fe73a6d0b2b635feecc469a74f7a23b54c68639339bdfe9802a9fef3f1",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "supabase/security-baseline.json",
+    "baseline_sha256": "26ae2034f9a607823b0c4d22221227e56dce6371def024446f7d574e99a3881b",
+    "candidate_sha256": "d9e7eef851ca91fe035aeb3b2bb8c0e7a5d48f37a2a41498c5ae64fc15e1154b",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "tests/marketing-safety-local.mjs",
+    "baseline_sha256": "318bdfbfba2e8e8bedb18a8af66da65cc1f134b447cc1e337bc0020d5f4bc7df",
+    "candidate_sha256": "5ee3aab7365f78989b04eb1ad65f3747dcbe12181f4485905b8dd55dd890899a",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "tests/marketing-schema-closeout.ts",
+    "baseline_sha256": null,
+    "candidate_sha256": "54c933ddf74307f595649c37ec43ceacc08611c0815febc42916e251d854ac14",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "tests/marketing-policy-closeout.ts",
+    "baseline_sha256": null,
+    "candidate_sha256": "bad1fcc619ce6b31fea96784bd92aa581037e6c3d9aaa72bbdada6c455d743a0",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "tests/unit/marketing-batch-dispatch.test.ts",
+    "baseline_sha256": "778e5b9516ece3670de51862a1bd3c6a9463f14a02d505272063c30449742153",
+    "candidate_sha256": "de58b5e33e7a646081776c0968dd8a4abd5daa0119ae404a4534ef04ee630b16",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "tests/unit/marketing-closeout.test.ts",
+    "baseline_sha256": null,
+    "candidate_sha256": "6707780342e143812143054a53eaeb72ca8fbb9852c6ce1288e32e16b4abf8a6",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "tests/unit/message-job-boundaries.test.ts",
+    "baseline_sha256": "393ac3eb71b1427cb7d4905343fd616d51d8d7c71aa54e5cc676dde541f771d1",
+    "candidate_sha256": "46cf8bb1bf3c057594843174f054906183182702df5b7ffa6ef8eb34836a9a94",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "tests/helpers/marketing-preview.mjs",
+    "baseline_sha256": "84711ac30ad0ec217be757235fdc75feddac4aa76e66da261f6f3716bcf6200c",
+    "candidate_sha256": "9793f1aa354fa33b5835611d62977b789ee199f857bf8367844bc0a13bbe93db",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "tests/e2e/marketing-safety-mocked.spec.ts",
+    "baseline_sha256": "1e30a380277453e153a4ee26fb64605a8609fc66a67f45a54a18b45b80d6c956",
+    "candidate_sha256": "aa8aec50e80fcd58130ca426d56ea57fc3237a5f2d2a7ab87c890145069ded8e",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "playwright.marketing-safety.config.ts",
+    "baseline_sha256": "edc8ef5e3e3bf800c799d1117f3b9ae8d80fdb0b8e777271622f2722f889886d",
+    "candidate_sha256": "c42ce22bf92556d7c6e2fa6be797019275e5cfc6cfda2f86b04eef79ae31fd89",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  },
+  {
+    "path": "docs/marketing/IMPLEMENTATION_20261015.md",
+    "baseline_sha256": "e0178fa2a22ea4006a2e7c758c251a8fc44494bce0722ba5e07276b26e3a9ec6",
+    "candidate_sha256": "d6935197459bee029fc371bcb3c86df57d956c9cce443720f370a0b36a2a0c6b",
+    "shared_file_changed_since_baseline": false,
+    "candidate_only": true
+  }
+]

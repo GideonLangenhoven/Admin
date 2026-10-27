@@ -2,9 +2,10 @@ import { describe, it, expect } from "vitest";
 import { formatDuration, tourEndDate, isMultiDay } from "../../app/lib/duration";
 
 describe("formatDuration", () => {
-  it("renders minutes below an hour and non-whole hours", () => {
+  it("renders minutes below an hour and mixed hours and minutes", () => {
     expect(formatDuration(45)).toBe("45 min");
-    expect(formatDuration(90)).toBe("90 min");
+    expect(formatDuration(90)).toBe("1 hour 30 min");
+    expect(formatDuration(150)).toBe("2 hours 30 min");
   });
   it("renders whole hours", () => {
     expect(formatDuration(60)).toBe("1 hour");

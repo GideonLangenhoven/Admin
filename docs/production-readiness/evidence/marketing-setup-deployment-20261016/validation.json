@@ -1,0 +1,17 @@
+{
+  "targeted_unit_tests": 42,
+  "final_setup_unit_tests": 16,
+  "local_browser_tests": 8,
+  "typescript": "PASS",
+  "eslint": "PASS",
+  "deno": [
+    "marketing-setup-status",
+    "admin-help-chat"
+  ],
+  "new_setup_endpoint_write_capability": false,
+  "no_real_customer_sends": true,
+  "verification_scope": "Handler tests use in-memory auth/database/provider dependencies. Browser checks intercept synthetic auth and data; hosted Edge probes are internal read-only diagnostics. No live provider send, webhook registration or sender-domain verification performed.",
+  "deployed_synthetic_browser_tests": 3,
+  "deployed_http_checks": 4,
+  "deployed_browser_duration_seconds": 9.1
+}

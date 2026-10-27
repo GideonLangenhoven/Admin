@@ -68,7 +68,7 @@ function fail(req: any, msg: string, status: number) {
 //   3. Admin dashboard / magic-link customers — Supabase Auth JWT. Admins
 //      must belong to the booking's business (SUPER_ADMIN exempt); other
 //      authenticated users must match the booking's email.
-type CallerAuthz = { ok: true } | { ok: false; status: number; message: string };
+type CallerAuthz = { ok: true; isAdmin?: boolean } | { ok: false; status: number; message: string };
 
 async function authorizeCaller(req: any, body: any, booking: any): Promise<CallerAuthz> {
   const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
@@ -102,7 +102,7 @@ async function authorizeCaller(req: any, body: any, booking: any): Promise<Calle
         .maybeSingle();
       if (admin && !admin.suspended) {
         if (admin.read_only) return { ok: false, status: 403, message: "This demonstration account is read-only." };
-        if (admin.role === "SUPER_ADMIN" || admin.business_id === booking.business_id) return { ok: true };
+        if (admin.role === "SUPER_ADMIN" || admin.business_id === booking.business_id) return { ok: true, isAdmin: true };
         return { ok: false, status: 403, message: "This booking belongs to a different business." };
       }
       const userEmail = String(user.email || "").toLowerCase();
@@ -1268,6 +1268,10 @@ Deno.serve(async function (req: any) {
 
     const authz = await authorizeCaller(req, body, booking);
     if (authz.ok !== true) return fail(req, authz.message, authz.status);
+    if (booking.status === "CANCELLED" && booking.cancellation_self_service === false && !authz.isAdmin
+      && ["RESCHEDULE", "CLAIM_CREDIT", "CANCEL_REFUND", "CANCEL_VOUCHER"].includes(action)) {
+      return fail(req, "This cancellation is being handled by the operator. Please contact them directly.", 403);
+    }
 
     // Combo legs: the offer's cancellation policy and date rules govern
     // self-service changes. Ordinary bookings resolve to null and fall

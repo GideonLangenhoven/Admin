@@ -1,0 +1,61 @@
+{
+  "date": "2026-10-20",
+  "stage": "PRE_APPLICATION",
+  "connection_ready": false,
+  "supabase_project_ref": "ukdsrndqhsatjkmxijuj",
+  "additional_supabase_project_created": false,
+  "owner_confirmed": {
+    "approved_viator_pilot_operator": false,
+    "technical_evaluation_approval": false,
+    "use_current_prelaunch_supabase_project": true
+  },
+  "current_project": {
+    "operation": "read-only inventory",
+    "evidence": "project-preflight.json",
+    "ota_runtime_boundary": "BLOCKED",
+    "viator_integrations": 0,
+    "viator_product_mappings": 0,
+    "writes_performed": false,
+    "test_schema_provisioned": false,
+    "provider_credentials_provisioned": false
+  },
+  "local_checks": {
+    "unit": {
+      "result": "PASS",
+      "tests_passed": 54,
+      "files": [
+        "tests/unit/ota-supplier-contracts.test.ts",
+        "tests/unit/ota-runtime.test.ts",
+        "tests/unit/external-integration-readiness.test.ts"
+      ]
+    },
+    "postgres": {
+      "result": "PASS",
+      "regression_groups_passed": 14,
+      "runner": "tests/ota-transactions-local.mjs",
+      "environment": "disposable local PostgreSQL fixture database; not Supabase",
+      "output": "postgres-regressions.txt",
+      "server_stopped_after_run": true
+    },
+    "deno_typecheck": {
+      "result": "PASS",
+      "files": [
+        "supabase/functions/_shared/viator.ts",
+        "supabase/functions/_shared/ota-backend.ts",
+        "supabase/functions/_shared/ota-availability.ts",
+        "supabase/functions/_shared/ota-supplier.ts"
+      ]
+    }
+  },
+  "not_performed": [
+    "Viator eligibility assessment",
+    "Viator official contract-tool tests",
+    "Viator sandbox requests",
+    "joint certification",
+    "hosted throughput, latency or uptime qualification",
+    "booking mutations in the current Supabase project",
+    "outbound customer messages or payment transactions",
+    "sending the eligibility enquiry"
+  ],
+  "next_action": "Owner sends the eligibility enquiry and identifies a genuine registered Viator operator using BookingTours. Confirm accepted scope before further connector development."
+}

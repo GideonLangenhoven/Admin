@@ -1,0 +1,140 @@
+{
+  "date": "2026-10-15",
+  "verified_at": "2026-10-15T16:54:20.729196+00:00",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "admin": {
+    "id": "dpl_749ZGg63mBwEQ4zfdG8bdWUPEuCZ",
+    "url": "caepweb-admin-f3iwnhty7-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 478,
+    "production_url": "https://admin.bookingtours.co.za"
+  },
+  "guest_booking": {
+    "id": "dpl_DEtYg9jBcEThHpReFGiaJE6dX4qZ",
+    "url": "booking-cf1uto1o1-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 169,
+    "verified_domains": [
+      "https://kayak.booking.bookingtours.co.za",
+      "https://claires-hiking.booking.bookingtours.co.za"
+    ]
+  },
+  "scope": [
+    "Deploy remaining current dashboard and guest-site changes, retaining earlier payment recovery, booking history, discount configuration and simplified marketing UI releases.",
+    "Guides sign in to restricted Simple View at /simpleguide, see guest contacts and pax, use WhatsApp/call links, record full or partial arrivals, and access trip photos.",
+    "Updated guest chatbot contact validation and current operator-help guidance.",
+    "Remove obsolete departure-preview routes; retain production marketing delivery protections."
+  ],
+  "database": {
+    "at": "2026-10-15T16:47:04.809Z",
+    "migration": "20261015200000_guide_simple_manifest.sql",
+    "sha256": "51a5fab7a7e1824c9c90e6f9d9f282f68ce6711dd9fa7e7410b23652974894e9",
+    "grants": [
+      {
+        "proname": "guide_simple_day",
+        "anon": false,
+        "authenticated": true,
+        "service": true
+      },
+      {
+        "proname": "record_guide_booking_arrival",
+        "anon": false,
+        "authenticated": true,
+        "service": false
+      }
+    ],
+    "guide_audit_column": true
+  },
+  "edge_functions": {
+    "functions": [
+      {
+        "slug": "admin-help-chat",
+        "version": 22,
+        "verify_jwt": false,
+        "status": "ACTIVE"
+      },
+      {
+        "slug": "web-chat",
+        "version": 151,
+        "verify_jwt": false,
+        "status": "ACTIVE"
+      }
+    ],
+    "bundled_source_files_verified": 25,
+    "unrelated_functions_unchanged": true
+  },
+  "help": {
+    "at": "2026-10-15T16:46:14.764Z",
+    "articles": [
+      "guide",
+      "simple-view",
+      "settings",
+      "photos",
+      "new-booking",
+      "dashboard",
+      "bookings",
+      "marketing",
+      "payment-reminders"
+    ],
+    "result": {
+      "ok": true,
+      "total": 176,
+      "embedded": 2,
+      "skipped": 174,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    },
+    "verified_chunks": 71
+  },
+  "validation": {
+    "admin_and_guest_production_builds": "PASS",
+    "admin_typescript": "PASS",
+    "unit_test_files_passed": 142,
+    "unit_test_files_skipped": 2,
+    "unit_tests_passed": 2336,
+    "unit_tests_skipped": 58,
+    "edge_type_checks": "PASS web-chat and admin-help-chat",
+    "production_browser": {
+      "status": "PASS",
+      "passed": 6,
+      "failed": 0,
+      "duration_seconds": 46.3,
+      "target": "https://admin.bookingtours.co.za",
+      "scope": "Production JavaScript and routes with synthetic intercepted auth, tenant data and writes; no real account, booking, photo, payment or customer message created.",
+      "checks": [
+        "Shared guide sign-in, pax, contacts and office-route exclusion",
+        "Guide trip photos and synthetic upload",
+        "One-time guide password setup",
+        "Operator shared guide setup link",
+        "Full and partial guide arrivals with no desk payment controls",
+        "Plain-English marketing actions and email setup link"
+      ]
+    },
+    "live_http_checks_passed": 18,
+    "uploaded_admin_source_files_verified": 478,
+    "uploaded_guest_source_files_verified": 169,
+    "mobile_visual_review": "PASS guide roll call and plain-English marketing screenshots"
+  },
+  "release_corrections": [
+    "Initial admin snapshot omitted the updated proxy.ts and redirected guides to /simple instead of /simpleguide. Live browser tests detected it; admin was rolled back, corrected snapshot rebuilt, source verified and promoted. All six browser checks then passed.",
+    "A native source download selected the root project and overwrote local Edge sources. Local pending web-chat was restored to its previously recorded exact SHA-256; shared source restored and OTA source checked against recorded hashes. Final unit suite and deployed native source comparisons passed. Future downloads used an explicit isolated workdir."
+  ],
+  "limitations": [
+    "Automated promotional and welcome-back email sending still requires email setup and existing permission/policy conditions. The dashboard exposes Request email setup and Review contacts. Drafts and configuration remain available.",
+    "Dormant OTA and MCP integrations and broader paused qualification remain unchanged.",
+    "Browser write checks used intercepted synthetic data; no real customer payment, booking or message was submitted."
+  ],
+  "evidence_directory": "all-changes-deployment-20261015",
+  "previous_records": [
+    "TODAYS_CHANGES_DEPLOYMENT_20261015.json",
+    "GUIDE_ACCESS_DEPLOYMENT_20261015.json",
+    "PLAIN_ENGLISH_HELP_DEPLOYMENT_20261015.json"
+  ],
+  "rollback": "Dashboard and guest deployments may be rolled back independently. Retain the additive guide migration and production promotional delivery protections.",
+  "latest_follow_up": {
+    "record": "MARKETING_SETUP_DEPLOYMENT_20261016.json",
+    "deployment": "dpl_BUdA5CF8mUHjAtj1h4L7qHWwPZwT",
+    "scope": "Read-only marketing setup diagnostics and chatbot instructions; no sending activation."
+  }
+}

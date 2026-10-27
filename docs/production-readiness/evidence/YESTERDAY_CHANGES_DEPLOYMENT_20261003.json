@@ -1,0 +1,149 @@
+{
+  "verified_at_utc": "2026-10-03T05:42:09.219144+00:00",
+  "authorization": "User: please deploy changes made yesterday",
+  "changes_date": "2026-10-02",
+  "status": "published_and_verified",
+  "scope": "Restored traveller catalogue layout and matching Admin Booking Page Preview; preserve the separately published disabled agent safeguards.",
+  "deployments": {
+    "admin": {
+      "id": "dpl_7Gy8PAtiUue5QERVdTkEWR29eZJS",
+      "url": "https://caepweb-admin-3k63qviy9-jerrys-projects-f4e4eaf9.vercel.app",
+      "live_domain": "https://admin.bookingtours.co.za",
+      "status": "READY",
+      "promoted": true,
+      "previous_live_deployment": "dpl_32yBpxp6MkoQ65d1bfiriymbSyQR"
+    },
+    "booking": {
+      "id": "dpl_3QgwFZKnDSUuPkcfCxFtsgdpvT2b",
+      "url": "https://booking-jcf8y8pnq-jerrys-projects-f4e4eaf9.vercel.app",
+      "live_domain": "https://kayak.booking.bookingtours.co.za",
+      "additional_verified_tenant": "https://claires-hiking.booking.bookingtours.co.za",
+      "status": "READY",
+      "promoted": true,
+      "previous_live_deployment": "dpl_DUxb9t2yu3t3pkAYE8uWfaGSXYBP"
+    }
+  },
+  "source": {
+    "admin": {
+      "base_deployment": "dpl_32yBpxp6MkoQ65d1bfiriymbSyQR",
+      "changed_files": {
+        "components/booking/BookingSitePreview.tsx": "5858d18bb3f48b9a7c7d23f234c1242744dc9f621adbb5ae76746ad6a8adb138",
+        "components/booking/Catalogue.tsx": "f8007b5026b5a8c8f87a8064049749cb6b339cc8412cebe7a98fb616baac7aaa",
+        "components/booking/catalogue.css": "35306e47634f35083c4b685ac8068b09bcd3482cf978eaa725025c222ade6940"
+      },
+      "preserved_files": 448,
+      "uploaded_base_deployment": "dpl_8SAj3nTCJB6CAMrxzD4EYRHxoPrC",
+      "already_live_agent_safeguards_preserved": true
+    },
+    "booking": {
+      "base_deployment": "dpl_DUxb9t2yu3t3pkAYE8uWfaGSXYBP",
+      "changed_files": {
+        "app/page.tsx": "b3d9ba097acafc867b7008c33f76a9fc28ecac27f35c6e345f7f8f3bbda15234",
+        "app/components/Header.tsx": "7b89d9c40a8b4c19d938e245afe55acfb7be9e9804ffc717c696bf0d1d08415d",
+        "app/components/Catalogue.tsx": "f8007b5026b5a8c8f87a8064049749cb6b339cc8412cebe7a98fb616baac7aaa",
+        "app/components/catalogue.css": "35306e47634f35083c4b685ac8068b09bcd3482cf978eaa725025c222ade6940",
+        "app/components/Footer.tsx": "d48dd4ed07699aeabdcd80e8fa1600d71dbb4a4574af1dd3a9fd91e889462110",
+        "app/components/GlassBackdrop.tsx": "5beb5d3559f74fd5e852aa924bc9bb3ca51d64ae813d9469bf891cd98256f46b"
+      },
+      "preserved_files": 157
+    }
+  },
+  "concurrent_release": {
+    "new_live_baseline": "dpl_32yBpxp6MkoQ65d1bfiriymbSyQR",
+    "remote_archive_uid": "0c67aba5f2b68cb3ec8ae84cc75cb6c6158faff6",
+    "baseline_files": 451,
+    "preserved_files": 448,
+    "changed_files": [
+      "components/booking/BookingSitePreview.tsx",
+      "components/booking/Catalogue.tsx",
+      "components/booking/catalogue.css"
+    ],
+    "already_built_candidate_preserves_concurrent_agent_fixes": true
+  },
+  "checks": {
+    "focused_agent_tests": {
+      "passed": 128,
+      "environment": "Fictional Auth/grant/provider fixtures in the isolated candidate; not a real connector journey"
+    },
+    "typescript_admin": "passed",
+    "typescript_booking": "passed",
+    "focused_lint_admin": "zero errors",
+    "focused_lint_booking": "zero errors; one existing unused totalBookings warning",
+    "cloud_production_builds": "both passed",
+    "live_alias_ids": "both verified",
+    "candidate_browser": {
+      "passed": 9,
+      "unexpected": 0,
+      "devices": [
+        "desktop Chrome",
+        "phone Chrome",
+        "phone WebKit"
+      ]
+    },
+    "live_browser": {
+      "passed": 9,
+      "unexpected": 0,
+      "devices": [
+        "desktop Chrome",
+        "phone Chrome",
+        "phone WebKit"
+      ],
+      "scope": "Public tenant branding, restored tour cards, photos, overflow, calendar selection and Continue to guest details; every browser write blocked"
+    },
+    "candidate_http": [
+      {
+        "case": "candidate-admin-home",
+        "status": 200,
+        "cache_control": "public, max-age=0, must-revalidate"
+      },
+      {
+        "case": "candidate-agent",
+        "status": 503,
+        "cache_control": "no-store"
+      },
+      {
+        "case": "candidate-admin-auth",
+        "status": 401,
+        "cache_control": "public, max-age=0, must-revalidate"
+      },
+      {
+        "case": "candidate-booking",
+        "status": 200,
+        "cache_control": "private, no-cache, no-store, max-age=0, must-revalidate"
+      }
+    ],
+    "live_http": [
+      {
+        "path": "/",
+        "domain": "admin.bookingtours.co.za",
+        "status": 200,
+        "protection_bypass": false
+      },
+      {
+        "path": "/api/agent/read",
+        "status": 503,
+        "code": "INTEGRATION_DISABLED",
+        "cache_control": "no-store"
+      }
+    ]
+  },
+  "verification_notes": [
+    "The first candidate browser invocation stopped before page access because the access-cookie redirect prevented storage-state preparation. Following that redirect resolved the harness issue; the subsequent nine candidate checks passed.",
+    "Vercel inspect JSON/log redirection returned no usable data; live deployment IDs and READY status were verified using its standard inspection output."
+  ],
+  "limitations": [
+    "Authenticated Admin Settings preview was not exercised in a live browser. Its isolated source passed TypeScript, focused lint and the production build."
+  ],
+  "boundaries": {
+    "production_sql_changes": 0,
+    "agent_sql_uploaded": false,
+    "provider_connections_enabled": false,
+    "external_agent_access_enabled": false,
+    "booking_payment_notification_submissions": 0,
+    "git_push_or_merge": false,
+    "marketing_site_deployed": false,
+    "broader_rollout": "paused",
+    "broader_verdict": "FAILED_GATE"
+  },
+  "artifacts": "yesterday-release-20261003/"
+}

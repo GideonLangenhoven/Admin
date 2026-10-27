@@ -1,0 +1,40 @@
+{
+  "at": "2026-10-21T13:56:24.985Z",
+  "articles": [
+    "new-booking",
+    "broadcasts",
+    "reports",
+    "inbox",
+    "dashboard",
+    "billing",
+    "bookings"
+  ],
+  "changed": [
+    "help:billing:0",
+    "help:billing:4",
+    "help:billing:5",
+    "help:broadcasts:2",
+    "help:inbox:1",
+    "help:inbox:5",
+    "help:new-booking:3",
+    "help:new-booking:6",
+    "help:new-booking:7",
+    "help:reports:1",
+    "help:reports:2",
+    "help:reports:4"
+  ],
+  "removed": [
+    "help:billing:6",
+    "help:broadcasts:3"
+  ],
+  "result": {
+    "ok": true,
+    "total": 177,
+    "embedded": 12,
+    "skipped": 165,
+    "removed": 2,
+    "failed": 0,
+    "errors": []
+  },
+  "all_chunks_verified": 177
+}

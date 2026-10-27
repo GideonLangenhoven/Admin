@@ -1,0 +1,20 @@
+{
+  "verified_at": "2026-10-08T18:27:01.577Z",
+  "target_project": "gwwnkihblioayklptdab",
+  "build_result": "PASS",
+  "typescript_result": "PASS",
+  "static_pages_generated": 95,
+  "public_artifacts_scanned": 191,
+  "server_credentials_absent": true,
+  "connectors_enabled": false,
+  "hosting_changes": 0,
+  "build_environment": "preview",
+  "source_sha256": {
+    "app/lib/agent-db.ts": "6e538ddfcc5a1849fb40dc8a07471ca24aabd89e5a6af6aebb279354b3694c84",
+    "app/lib/agent-config.ts": "63187af9c017e7a7617ce5d8539bf19491e2a437c9fc13d3343e20f5a9ae1e93",
+    "app/api/admin/login/route.ts": "496ebe840cb63f19bd0d67f63c0c21d935a4499eaa305bea2d87b47f2a972666",
+    "components/AuthGate.tsx": "4f9c4f6ba10ede56e24d54df7e7b6dc07ac56b894e8f13d5abae10f20152e667",
+    "proxy.ts": "0af7b8c1e86d1dbd20a1ce0a77c17c918e0b47de0983011485f47011a0248626",
+    "scripts/check-service-auth.mjs": "1cee806d2db3d847c12727bae579b62cb6c592b0aba5361423e69fe83871fbaf"
+  }
+}

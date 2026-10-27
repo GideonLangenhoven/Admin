@@ -131,6 +131,7 @@ Deno.serve(async (req: any) => {
 
     let waSent = false;
     let emailSent = false;
+    let emailQueued = false;
     let waError = "";
     let emailError = "";
 
@@ -220,7 +221,8 @@ Deno.serve(async (req: any) => {
           emailError = String(emailInvokeErr?.message || emailData?.error || "Email send failed");
           console.error("CONFIRM_BOOKING_EMAIL_ERR:", emailError);
         } else {
-          emailSent = true;
+          emailQueued = emailData?.queued === true;
+          emailSent = !emailQueued;
         }
       } catch (e) {
         emailError = e instanceof Error ? e.message : String(e);
@@ -233,13 +235,14 @@ Deno.serve(async (req: any) => {
         source: "confirm-booking-fallback",
         wa_sent: waSent,
         email_sent: emailSent,
+        email_queued: emailQueued,
         wa_error: waError || null,
         email_error: emailError || null,
       },
     }).eq("id", claimData.id);
 
     return new Response(
-      JSON.stringify({ ok: true, email_sent: emailSent, wa_sent: waSent }),
+      JSON.stringify({ ok: true, email_sent: emailSent, email_queued: emailQueued, wa_sent: waSent }),
       { status: 200, headers: cors() },
     );
   } catch (err: any) {

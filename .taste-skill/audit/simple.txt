@@ -1,0 +1,28 @@
+TASTESKILL · INSPECT   http://127.0.0.1:3000/simple
+
+MEASURED (first viewport listed)
+  hero headline   "Roll call"  2 words · 1 line(s) · 28px (2.7vw) · satoshi 600 · tracking -0.03em · leading 1.2
+  @768px          1 line(s) · 28px
+  @390px          1 line(s) · 28px
+  typefaces       Plus Jakarta Sans 98%, satoshi 2%
+  sizes in use    12 / 14 / 16 / 18 / 20 / 28 px
+  colour          page #f7f5f0 · sections #141815 #fbfbf8 · button #edede7
+  page            1 screens · 76 words · 1 images · hero media none
+  headings        1 · longest 1 line(s) · median - words
+
+WARN — fix, or be able to defend
+  [palette-cream] @1024px (+768, 390)  Yellow-cream background (page background #f7f5f0, section #fbfbf8, text #f6f5ef).
+      → Use the drawn palette. If you want warmth, take a low-chroma stone or bone, not a yellow cream.
+  [colour-sprawl] @1024px (+768, 390)  21% of the first screen is strongly coloured.
+      → Keep the screen neutral and spend colour on data and status: the studied screens sit near 3%, and only tinted styles reach 10–15%, as pale tints rather than saturated fills.
+
+LOOK AT THE RENDER — open these with your image viewer / Read tool before saying anything about quality:
+  tablet 1024px   .taste-skill/audit/simple/tablet-1024-fold.jpg
+                  .taste-skill/audit/simple/tablet-1024-page-01.jpg
+  tablet 768px    .taste-skill/audit/simple/tablet-768-fold.jpg
+                  .taste-skill/audit/simple/tablet-768-page-01.jpg
+  mobile 390px    .taste-skill/audit/simple/mobile-fold.jpg
+                  .taste-skill/audit/simple/mobile-page-01.jpg
+
+report: .taste-skill/audit/simple/report.json
+RESULT: 0 FAIL, 2 WARN — measurements pass. Passing the meter is the floor, not the grade: score the screenshots with references/critique.md.

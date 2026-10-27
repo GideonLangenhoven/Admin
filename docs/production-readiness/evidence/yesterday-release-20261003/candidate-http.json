@@ -1,0 +1,22 @@
+[
+  {
+    "case": "candidate-admin-home",
+    "status": 200,
+    "cache_control": "public, max-age=0, must-revalidate"
+  },
+  {
+    "case": "candidate-agent",
+    "status": 503,
+    "cache_control": "no-store"
+  },
+  {
+    "case": "candidate-admin-auth",
+    "status": 401,
+    "cache_control": "public, max-age=0, must-revalidate"
+  },
+  {
+    "case": "candidate-booking",
+    "status": 200,
+    "cache_control": "private, no-cache, no-store, max-age=0, must-revalidate"
+  }
+]

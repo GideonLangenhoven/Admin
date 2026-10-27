@@ -1,0 +1,21 @@
+{
+  "at": "2026-10-16T05:34:52.194Z",
+  "checks": [
+    {
+      "table": "slots",
+      "select": "id,start_time,tours(name),businesses(timezone)",
+      "status": 200
+    },
+    {
+      "table": "trip_photos",
+      "select": "id,photo_url,gdrive_view_url,uploaded_by_guide_id,slots(start_time,tours(name))",
+      "status": 200
+    },
+    {
+      "table": "bookings",
+      "select": "id,phone,email,customer_name",
+      "status": 200
+    }
+  ],
+  "customer_rows_read": 0
+}

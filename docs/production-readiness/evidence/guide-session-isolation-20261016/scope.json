@@ -1,0 +1,23 @@
+{
+  "baseline": "dpl_DV7xuxRfeemH3XhLj7jr3TvA4xPS",
+  "changed": [
+    "app/lib/browser-session.ts",
+    "app/lib/supabase.ts",
+    "components/AuthGate.tsx",
+    "components/SignOutButton.tsx",
+    "app/lib/guide-offline.ts",
+    "components/GuideServiceWorker.tsx",
+    "proxy.ts",
+    "public/guide/sw.js",
+    "app/lib/admin-auth.ts",
+    "app/lib/admin-timezone.ts",
+    "app/lib/booking-actions.ts",
+    "app/lib/guide-access.ts",
+    "components/guide/GuideDay.tsx",
+    "components/simple/DepartureCard.tsx",
+    "app/simpleguide/photos/[slotId]/page.tsx"
+  ],
+  "functions": [],
+  "database_changes": false,
+  "marketing_activation": false
+}

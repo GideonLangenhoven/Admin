@@ -329,6 +329,7 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
 
   let waSent = false;
   let emailSent = false;
+  let emailQueued = false;
   let waError = "";
   let emailError = "";
 
@@ -396,7 +397,8 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
         emailError = String(emailData?.error || emailRes.statusText || "Email send failed");
         console.error("CONFIRM_EMAIL_ERR:", emailError);
       } else {
-        emailSent = true;
+        emailQueued = emailData?.queued === true;
+        emailSent = !emailQueued;
       }
     } catch (e) {
       emailError = e instanceof Error ? e.message : String(e);
@@ -414,6 +416,7 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
       amount,
       wa_sent: waSent,
       email_sent: emailSent,
+      email_queued: emailQueued,
       wa_error: waError || null,
       email_error: emailError || null,
     },
@@ -699,29 +702,24 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
 
       const fbCols = "id, status, email, payment_url, customer_name, qty, total_amount, business_id, slots(start_time), tours(name)";
       let fb = checkoutId
-        ? await supabase.from("bookings").select(fbCols).eq("yoco_checkout_id", checkoutId).maybeSingle()
-        : { data: null } as any;
+        ? await supabase.from("bookings").select(fbCols).eq("yoco_checkout_id", checkoutId).eq("business_id", businessId).maybeSingle()
+        : { data: null, error: null } as any;
+      if (fb.error) throw new Error(fb.error.message);
       if (!fb.data && metaBookingId) {
-        fb = await supabase.from("bookings").select(fbCols).eq("id", metaBookingId).maybeSingle();
+        fb = await supabase.from("bookings").select(fbCols).eq("id", metaBookingId).eq("business_id", businessId).maybeSingle();
       }
+      if (fb.error) throw new Error(fb.error.message);
       const fbk = fb.data as any;
-      if (fbk && (fbk.status === "HELD" || fbk.status === "PENDING" || fbk.status === "CONFIRMED")) {
-        await supabase.from("bookings").update({ status: "PENDING PAYMENT" }).eq("id", fbk.id);
-        console.log("PAYMENT FAILED - Marking as PENDING PAYMENT for booking:" + fbk.id);
-      }
-
-      // Email the payment link on the 3rd distinct failed attempt (the timeout
-      // path in cron-tasks covers the abandon case). Dedup each attempt via
-      // idempotency_keys — payment.failed is NOT deduped above like succeeded —
-      // then count booking_payment_failed logs. ponytail: log-count as the
-      // counter avoids a schema change; distinct Yoco payment IDs make it exact.
-      const paidStatuses = ["PAID", "CONFIRMED", "COMPLETED", "CANCELLED"];
-      if (fbk && (yocoPaymentId || checkoutId) && fbk.email && fbk.payment_url && !paidStatuses.includes(fbk.status)) {
-        const failKey = "yoco_failed:" + businessId + ":" + String(payload.mode || "legacy") + ":" + (yocoPaymentId || checkoutId);
-        const dedup = await supabase.from("idempotency_keys").insert({ key: failKey }).select("id").maybeSingle();
-        if (!(dedup.error && dedup.error.code === "23505")) {
-          await supabase.from("logs").insert({ business_id: fbk.business_id, booking_id: fbk.id, event: "booking_payment_failed", payload: { checkout_id: checkoutId, payment_id: yocoPaymentId } });
-          const failCount = await supabase.from("logs").select("id", { count: "exact", head: true }).eq("booking_id", fbk.id).eq("event", "booking_payment_failed");
+      // Record every verified attempt, including guests without an email/link.
+      // The RPC deduplicates and cannot downgrade a concurrent successful payment.
+      if (fbk) {
+        const failure = await supabase.rpc("record_booking_payment_failure", {
+          p_booking_id: fbk.id, p_business_id: businessId, p_checkout_id: checkoutId,
+          p_payment_id: yocoPaymentId, p_reason: typeof payload.failureReason === "string" ? payload.failureReason : "Payment was not completed",
+        });
+        if (failure.error) throw new Error(failure.error.message);
+        const failCount = { count: failure.data?.recorded ? failure.data.count : 0 };
+        if (fbk.email && fbk.payment_url) {
           if ((failCount.count || 0) === 3) {
             try {
               const tenant = await getTenantByBusinessId(supabase, fbk.business_id);
@@ -1080,6 +1078,9 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
           gift_message: gv.gift_message,
           buyer_name: gv.buyer_name,
           tour_name: gv.tour_name,
+          gift_tour_name: gv.gift_tour_name,
+          gift_image_url: gv.gift_image_url,
+          voucher_type: gv.type,
           value: gv.value || gv.purchase_amount,
           expires_at: expiresLabel,
         };

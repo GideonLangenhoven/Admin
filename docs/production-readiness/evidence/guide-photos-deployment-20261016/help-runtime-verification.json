@@ -1,0 +1,61 @@
+{
+  "at": "2026-10-16T05:41:18.252Z",
+  "function": {
+    "slug": "admin-help-chat",
+    "version": 26,
+    "status": "ACTIVE"
+  },
+  "sourceChecks": [
+    {
+      "path": "supabase/functions/admin-help-chat/index.ts",
+      "sha256": "6cda975dff5f428166e9a916d07b757beb371ab5c65f08ec2fd339be6f034f6a"
+    },
+    {
+      "path": "supabase/functions/_shared/tenant.ts",
+      "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+    },
+    {
+      "path": "supabase/functions/_shared/pagination.ts",
+      "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+    },
+    {
+      "path": "supabase/functions/_shared/auth.ts",
+      "sha256": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade"
+    },
+    {
+      "path": "supabase/functions/_shared/llm.ts",
+      "sha256": "e7bed1f1ed96a04d6b326ee3580fc6550c37821b19d2618321f4d4be9b3c85c1"
+    },
+    {
+      "path": "supabase/functions/_shared/openrouter-provider.ts",
+      "sha256": "52aa270a8467d6476d17a8881a4fe29ced09b52cdb44b4bec9e05246af202cd8"
+    },
+    {
+      "path": "supabase/functions/_shared/kb.ts",
+      "sha256": "5d89feee2c9ef467716d48625b112ecb86b81b84679e48c7a22da42a5f88b68d"
+    },
+    {
+      "path": "supabase/functions/_shared/demo-guide.ts",
+      "sha256": "f9d714820fd3340ad1dc00a680be2e7207f9feeb0d44f98cd9344b954d666c49"
+    }
+  ],
+  "internal_probe": {
+    "ok": true,
+    "answer": "Yes. Guides can upload videos and send the trip photos and thank-you message.\n\n1. Guides start at [Guide Simple View](/simpleguide) using the shared guide login.\n2. Open the relevant departure and select **Trip photos**.\n3. Upload images or videos, or add photo links.\n4. Choose **Send photos and thank you email**, then confirm.\n\nUploading alone does not notify guests. Guides can only send photos for their own operator's trips.",
+    "sources": [
+      {
+        "title": "Simple View, roll call and check-ins",
+        "route": "/simple"
+      },
+      {
+        "title": "Trip Photos",
+        "route": "/photos"
+      },
+      {
+        "title": "Guide access and the Guide app",
+        "route": "/guide"
+      }
+    ]
+  },
+  "no_customer_actions": true
+}

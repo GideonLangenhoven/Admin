@@ -1,0 +1,26 @@
+{
+  "web-chat": {
+    "runtime_source_files": 15,
+    "changed_file_sha256": {
+      "web-chat/index.ts": "60bacc25279e713b82a3c8c04e50666fe4718f0a0ce049083369cd087ffbefc3",
+      "_shared/intent.ts": "1f30d72abfbae3acd6b55401bec08302ff79d36fff79a058f37dad06c2d262be",
+      "_shared/chat-booking-pricing.ts": "f936f6c6a1c43cd6fe932d02697e04d02575273685886b68dbd646d1b9163d80"
+    },
+    "matches_tested_workspace": true
+  },
+  "create-checkout": {
+    "runtime_source_files": 8,
+    "changed_file_sha256": {
+      "create-checkout/index.ts": "29e7fc582a647a581be2adfb94ed37dd51449939f3e6922349c0cff258540ca2",
+      "_shared/booking-custom-fields.ts": "3ec06c7dceb92fb96c17fce49e87752af04bf62f59c628b4230be6fcfa90e277"
+    },
+    "matches_tested_workspace": true
+  },
+  "wa-webhook": {
+    "runtime_source_files": 16,
+    "changed_file_sha256": {
+      "_shared/chat-booking-pricing.ts": "f936f6c6a1c43cd6fe932d02697e04d02575273685886b68dbd646d1b9163d80"
+    },
+    "matches_tested_workspace": true
+  }
+}

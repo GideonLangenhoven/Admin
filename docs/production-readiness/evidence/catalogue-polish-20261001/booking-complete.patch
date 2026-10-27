@@ -1,0 +1,870 @@
+--- a/app/components/Catalogue.tsx
++++ b/app/components/Catalogue.tsx
+@@ -0,0 +1,51 @@
++import type { ReactNode } from "react";
++import "./catalogue.css";
++
++// Presentation only. The public catalogue supplies its existing price and
++// booking URL; the admin preview carries an identical copy across repo builds.
++export function CatalogueCard({ name, duration, price, description, image, reviews, urgency, action }: {
++  name: string;
++  duration: string;
++  price: number | null | undefined;
++  description?: string | null;
++  image?: ReactNode;
++  reviews?: string;
++  urgency?: string | null;
++  action: ReactNode;
++}) {
++  return (
++    <article className="catalogue-card" data-shot="tour-card">
++      {image && <div className="catalogue-photo">{image}</div>}
++      <div className="catalogue-card-content">
++        <div className="catalogue-card-heading">
++          <h3>{name}</h3>
++          <div className="catalogue-card-details">
++            <span className="catalogue-supporting">{duration}</span>
++            {typeof price === "number" && Number.isFinite(price) && (
++              <p className="catalogue-price">R{price}<span>per person</span></p>
++            )}
++          </div>
++        </div>
++        {reviews && <p className="catalogue-supporting">{reviews}</p>}
++        {urgency && <p className="catalogue-availability">{urgency}</p>}
++        <div className="catalogue-card-action">{action}</div>
++        {description && <p className="catalogue-description">{description}</p>}
++      </div>
++    </article>
++  );
++}
++
++export function CatalogueIntro({ title, eyebrow, subtitle }: {
++  title?: string | null;
++  eyebrow?: string | null;
++  subtitle?: string | null;
++}) {
++  if (!title?.trim()) return null;
++  return (
++    <div className="catalogue-intro catalogue-surface">
++      {eyebrow && <p className="catalogue-supporting">{eyebrow}</p>}
++      <h2>{title}</h2>
++      {subtitle && <p className="catalogue-description">{subtitle}</p>}
++    </div>
++  );
++}
+--- a/app/components/Footer.tsx
++++ b/app/components/Footer.tsx
+@@ -1,19 +1,21 @@
+ "use client";
+ import { useTheme } from "./ThemeProvider";
+ import { BrandMark, BrandWordmark } from "./BrandLogo";
++import { usePathname } from "next/navigation";
+ 
+ export default function Footer({ withBottomNav }: { withBottomNav: boolean }) {
+   const theme = useTheme();
++  const catalogue = usePathname() === "/";
+   const name = theme.business_name || "Your Booking";
+   const line1 = theme.footer_line_one || (name + (theme.business_tagline ? " \u00B7 " + theme.business_tagline : ""));
+   const line2 = theme.footer_line_two || "";
+ 
+   return (
+-    <footer className={`mt-14 px-4 ${withBottomNav ? "pb-24" : "pb-6"} lg:pb-6`}>
+-      <div className="glass-sheet app-container py-8 text-center text-sm text-[color:var(--ink-muted)]">
++    <footer className={catalogue ? `app-container catalogue-footer ${withBottomNav ? "pb-24 lg:pb-6" : "pb-6"}` : `mt-14 px-4 ${withBottomNav ? "pb-24" : "pb-6"} lg:pb-6`}>
++      <div className={catalogue ? "catalogue-surface p-4 text-center text-sm text-[color:var(--catalogue-muted)]" : "glass-sheet app-container py-8 text-center text-sm text-[color:var(--ink-muted)]"}>
+         <p className="max-w-none">{line1}</p>
+         {line2 && <p className="mt-1 max-w-none">{line2}</p>}
+-        <p className="glass-chip mx-auto mt-4 inline-flex max-w-full items-center gap-2 px-4 py-2 text-xs">
++        <p className={catalogue ? "mx-auto mt-3 max-w-full text-xs" : "glass-chip mx-auto mt-4 inline-flex max-w-full items-center gap-2 px-4 py-2 text-xs"}>
+           <span>Secure checkout: payments processed by PCI DSS compliant providers &middot; card details never touch our servers &middot; TLS encrypted</span>
+         </p>
+         <nav className="mt-4 flex flex-wrap justify-center gap-4">
+--- a/app/components/GlassBackdrop.tsx
++++ b/app/components/GlassBackdrop.tsx
+@@ -45,7 +45,7 @@
+   if (isEmbed) return null;
+ 
+   return (
+-    <div className="glass-backdrop" aria-hidden="true">
++    <div className={`glass-backdrop${pathname === "/" ? " catalogue-backdrop" : ""}`} aria-hidden="true">
+       {/* Mesh always renders — it's the blur content while an uploaded
+           background loads, and the permanent backdrop when none is set. */}
+       <div className="glass-backdrop-mesh" />
+--- a/app/components/Header.tsx
++++ b/app/components/Header.tsx
+@@ -1,8 +1,8 @@
+ "use client";
+ import Link from "next/link";
+ import Image from "next/image";
+-import { useState } from "react";
+ import { useTheme } from "./ThemeProvider";
++import "./catalogue.css";
+ 
+ export default function Header() {
+   const theme = useTheme();
+@@ -11,74 +11,29 @@
+   const logoUrl = theme.logo_url;
+   const voucherLabel = theme.nav_gift_voucher_label || "Gift Voucher";
+   const bookingsLabel = theme.nav_my_bookings_label || "My Bookings";
+-  const [menuOpen, setMenuOpen] = useState(false);
+ 
+   return (
+-    <header className="glass-nav sticky top-0 z-40">
+-      <div className="app-container flex items-center justify-between py-3">
+-        <Link href="/" className="flex items-center gap-3 rounded-full px-2 py-1 transition-colors hover:bg-[color:var(--hover-overlay)]">
++    <header className="catalogue-header">
++      <div className="app-container catalogue-header-content">
++        <Link href="/" className="catalogue-brand">
+           {logoUrl ? (
+-            <Image src={logoUrl} alt={name} width={120} height={36} className="h-9 w-auto object-contain" />
++            <Image src={logoUrl} alt={name} width={120} height={36} />
+           ) : (
+-            /* No logo configured → glass monogram chip from the business initial */
+-            <span
+-              aria-hidden="true"
+-              className="glass-chip flex h-9 w-9 shrink-0 items-center justify-center font-display text-base font-bold"
+-              style={{ color: "var(--accent-text)" }}
+-            >
++            <span aria-hidden="true" className="catalogue-monogram">
+               {name.trim().charAt(0).toUpperCase() || "B"}
+             </span>
+           )}
+-          <div>
+-            <h1 className="font-display text-base font-semibold leading-tight text-[color:var(--ink-nav)] sm:text-lg">{name}</h1>
+-            {tagline && <p className="glass-eyebrow normal-case tracking-normal">{tagline}</p>}
++          <div className="min-w-0">
++            <h1>{name}</h1>
++            {tagline && <p>{tagline}</p>}
+           </div>
+         </Link>
+ 
+-        {/* Desktop nav */}
+-        <nav className="hidden items-center gap-1 text-sm lg:flex">
+-          <Link href="/voucher" className="btn btn-ghost px-3 py-2">{voucherLabel}</Link>
+-          <Link href="/my-bookings" className="btn btn-primary px-4 py-2">{bookingsLabel}</Link>
++        <nav className="catalogue-nav" aria-label="Booking">
++          <Link href="/voucher">{voucherLabel}</Link>
++          <Link href="/my-bookings">{bookingsLabel}</Link>
+         </nav>
+-
+-        {/* Mobile/tablet hamburger (primary nav also lives in the bottom glass bar) */}
+-        <button
+-          type="button"
+-          onClick={() => setMenuOpen((o) => !o)}
+-          className="relative flex h-11 w-11 items-center justify-center rounded-full text-[color:var(--ink-nav)] transition-colors hover:bg-[color:var(--hover-overlay)] lg:hidden"
+-          aria-label="Menu"
+-          aria-expanded={menuOpen}
+-        >
+-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+-            {menuOpen ? (
+-              <>
+-                <line x1="18" y1="6" x2="6" y2="18" />
+-                <line x1="6" y1="6" x2="18" y2="18" />
+-              </>
+-            ) : (
+-              <>
+-                <line x1="4" y1="7" x2="20" y2="7" />
+-                <line x1="4" y1="12" x2="20" y2="12" />
+-                <line x1="4" y1="17" x2="20" y2="17" />
+-              </>
+-            )}
+-          </svg>
+-        </button>
+       </div>
+-
+-      {/* Mobile dropdown */}
+-      {menuOpen && (
+-        <div className="border-t border-[color:var(--glass-border)] lg:hidden">
+-          <nav className="app-container flex flex-col gap-1 py-3">
+-            <Link href="/voucher" onClick={() => setMenuOpen(false)} className="rounded-full px-4 py-3 text-sm font-medium text-[color:var(--ink-nav)] hover:bg-[color:var(--hover-overlay)]">
+-              {voucherLabel}
+-            </Link>
+-            <Link href="/my-bookings" onClick={() => setMenuOpen(false)} className="rounded-full px-4 py-3 text-sm font-medium text-[color:var(--ink-nav)] hover:bg-[color:var(--hover-overlay)]">
+-              {bookingsLabel}
+-            </Link>
+-          </nav>
+-        </div>
+-      )}
+     </header>
+   );
+ }
+--- a/app/components/catalogue.css
++++ b/app/components/catalogue.css
+@@ -0,0 +1,408 @@
++/* Shared catalogue presentation. Keep the admin's components/booking copy
++   identical: the two apps deploy from separate repositories. */
++.catalogue-page,
++.catalogue-footer,
++.catalogue-preview {
++  --catalogue-space: 0.25rem;
++  --catalogue-radius: 0.75rem;
++  --catalogue-border: color-mix(in srgb, var(--catalogue-ink, var(--ink)) 14%, transparent);
++}
++
++.catalogue-page {
++  --ink: var(--catalogue-ink);
++  --ink-muted: var(--catalogue-muted);
++  padding-block: calc(var(--catalogue-space) * 6);
++}
++
++.catalogue-footer {
++  --ink: var(--catalogue-ink);
++  --ink-muted: var(--catalogue-muted);
++}
++
++.catalogue-footer .catalogue-surface { color: var(--catalogue-muted); }
++
++/* Existing resume, deal and combo panels use the same restrained surfaces. */
++.catalogue-page .glass {
++  border-radius: var(--catalogue-radius);
++  background: var(--catalogue-surface);
++  box-shadow: 0 2px 6px rgb(0 0 0 / 0.05);
++  -webkit-backdrop-filter: none;
++  backdrop-filter: none;
++}
++
++.catalogue-page .glass-chip {
++  border-radius: 0.5rem;
++  background: transparent;
++  box-shadow: none;
++  -webkit-backdrop-filter: none;
++  backdrop-filter: none;
++}
++
++.catalogue-page .glass-hover:hover { transform: none; }
++.catalogue-page .btn {
++  min-height: 2.75rem;
++  border-radius: 0.5rem;
++  white-space: normal;
++  box-shadow: none;
++}
++
++.catalogue-page .btn-primary:hover { filter: none; text-decoration: underline; }
++
++.catalogue-grid {
++  display: grid;
++  grid-template-columns: minmax(0, 1fr);
++  gap: calc(var(--catalogue-space) * 6);
++}
++
++.catalogue-card,
++.catalogue-surface {
++  min-width: 0;
++  border: 1px solid var(--catalogue-border);
++  border-radius: var(--catalogue-radius);
++  background: var(--catalogue-surface, var(--cfg-bg, var(--bg)));
++  color: var(--catalogue-ink, var(--ink));
++  box-shadow: 0 2px 6px rgb(0 0 0 / 0.05);
++}
++
++.catalogue-card {
++  position: relative;
++  display: flex;
++  flex-direction: column;
++  text-align: left;
++}
++
++.catalogue-photo {
++  position: relative;
++  flex-shrink: 0;
++  aspect-ratio: 16 / 9;
++  overflow: hidden;
++  border-radius: calc(var(--catalogue-radius) - 1px) calc(var(--catalogue-radius) - 1px) 0 0;
++}
++
++.catalogue-photo img {
++  width: 100%;
++  height: 100%;
++  object-fit: cover;
++  object-position: center;
++}
++
++.catalogue-card-content {
++  display: flex;
++  flex: 1;
++  flex-direction: column;
++  gap: calc(var(--catalogue-space) * 3);
++  padding: calc(var(--catalogue-space) * 4);
++  min-width: 0;
++  overflow-wrap: anywhere;
++}
++
++.catalogue-card h3 {
++  margin: 0;
++  color: inherit;
++  font-family: var(--font-display, inherit);
++  font-size: 1.25rem;
++  font-weight: 600;
++  line-height: 1.35;
++  letter-spacing: -0.015em;
++}
++
++.catalogue-card-details {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: baseline;
++  gap: calc(var(--catalogue-space) * 2) calc(var(--catalogue-space) * 4);
++  margin-top: calc(var(--catalogue-space) * 2);
++}
++
++.catalogue-price {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: baseline;
++  gap: calc(var(--catalogue-space) * 2);
++  margin: 0 0 0 auto;
++  color: var(--catalogue-ink, var(--ink));
++  font-size: 1.125rem;
++  font-weight: 600;
++  line-height: 1.5;
++  font-variant-numeric: tabular-nums;
++}
++
++.catalogue-price span,
++.catalogue-supporting,
++.catalogue-description {
++  margin-block: 0;
++  color: var(--catalogue-muted, var(--ink-muted));
++  font-size: 0.875rem;
++  font-weight: 400;
++  line-height: 1.55;
++}
++
++.catalogue-availability {
++  margin: 0;
++  color: var(--catalogue-ink, var(--ink));
++  font-size: 0.875rem;
++  font-weight: 600;
++  line-height: 1.5;
++}
++
++.catalogue-action {
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  width: 100%;
++  min-height: 2.75rem;
++  padding: calc(var(--catalogue-space) * 3) calc(var(--catalogue-space) * 4);
++  border: 1px solid transparent;
++  border-radius: 0.5rem;
++  background-color: var(--cta);
++  background-image: linear-gradient(var(--cta-overlay), var(--cta-overlay));
++  color: var(--ink-on-cta);
++  font-size: 0.875rem;
++  font-weight: 600;
++  line-height: 1.5;
++  text-align: center;
++  text-decoration: none;
++  white-space: normal;
++  overflow-wrap: anywhere;
++}
++
++/* One link and one tab stop per tour. Its hit area includes the card. */
++.catalogue-card .catalogue-action::after {
++  content: "";
++  position: absolute;
++  inset: 0;
++  border-radius: var(--catalogue-radius);
++}
++
++.catalogue-action:focus-visible {
++  outline: 2px solid var(--catalogue-ink, var(--ink));
++  outline-offset: 3px;
++  box-shadow: none;
++}
++
++.catalogue-card .catalogue-action:focus-visible::after {
++  outline: 2px solid var(--catalogue-ink, var(--ink));
++  outline-offset: 3px;
++}
++
++.catalogue-intro {
++  display: grid;
++  gap: calc(var(--catalogue-space) * 2);
++  margin-bottom: calc(var(--catalogue-space) * 6);
++  padding: calc(var(--catalogue-space) * 4);
++  overflow-wrap: anywhere;
++}
++
++.catalogue-intro h2 {
++  margin: 0;
++  color: inherit;
++  font-family: var(--font-display, inherit);
++  font-size: 1.75rem;
++  font-weight: 600;
++  line-height: 1.25;
++}
++
++.catalogue-header {
++  position: sticky;
++  top: 0;
++  z-index: 40;
++  border-bottom: 1px solid color-mix(in srgb, var(--catalogue-nav-ink, var(--ink-nav)) 14%, transparent);
++  background: var(--catalogue-nav-surface, var(--cfg-nav, var(--surface)));
++  color: var(--catalogue-nav-ink, var(--ink-nav));
++}
++
++.catalogue-header-content {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: center;
++  justify-content: space-between;
++  gap: 0.5rem 1rem;
++  padding-block: 0.75rem;
++}
++
++.catalogue-brand {
++  display: flex;
++  flex: 1 1 12rem;
++  align-items: center;
++  gap: 0.75rem;
++  min-width: 0;
++  color: inherit;
++  text-decoration: none;
++  overflow-wrap: anywhere;
++}
++
++.catalogue-brand img {
++  width: auto;
++  height: auto;
++  max-width: 6rem;
++  max-height: 2.25rem;
++  object-fit: contain;
++}
++
++.catalogue-monogram {
++  display: flex;
++  flex-shrink: 0;
++  align-items: center;
++  justify-content: center;
++  width: 2.25rem;
++  height: 2.25rem;
++  border: 1px solid currentColor;
++  border-radius: 0.5rem;
++  font-weight: 600;
++}
++
++.catalogue-brand h1,
++.catalogue-brand-name {
++  margin: 0;
++  color: inherit;
++  font-family: var(--font-display, inherit);
++  font-size: 1.125rem;
++  font-weight: 600;
++  line-height: 1.4;
++}
++
++.catalogue-brand p {
++  margin: 0;
++  color: inherit;
++  font-size: 0.875rem;
++  line-height: 1.5;
++}
++
++.catalogue-nav {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: center;
++  gap: 0.25rem;
++  min-width: 0;
++}
++
++.catalogue-nav a {
++  display: flex;
++  align-items: center;
++  min-height: 2.75rem;
++  padding: 0.5rem 0.75rem;
++  border: 1px solid transparent;
++  border-radius: 0.5rem;
++  color: inherit;
++  font-size: 0.875rem;
++  font-weight: 500;
++  line-height: 1.5;
++  text-decoration: none;
++  overflow-wrap: anywhere;
++}
++
++.catalogue-brand:focus-visible,
++.catalogue-nav a:focus-visible {
++  outline: 2px solid var(--catalogue-nav-ink, var(--ink-nav));
++  outline-offset: 2px;
++  box-shadow: none;
++}
++
++/* The uploaded photo stays intact. This treatment only quiets the backdrop. */
++.catalogue-backdrop .glass-backdrop-mesh {
++  position: absolute;
++  inset: 0;
++  background:
++    radial-gradient(90% 70% at 12% 8%, color-mix(in srgb, var(--cfg-main) 16%, transparent), transparent 62%),
++    radial-gradient(80% 65% at 88% 18%, color-mix(in srgb, var(--cfg-hover) 10%, transparent), transparent 64%),
++    var(--cfg-bg);
++}
++
++.catalogue-backdrop .glass-backdrop-mesh::after { content: none; }
++.catalogue-backdrop::after {
++  content: "";
++  position: absolute;
++  inset: 0;
++  background: color-mix(in srgb, var(--cfg-bg) 24%, transparent);
++}
++
++.catalogue-preview {
++  position: relative;
++  isolation: isolate;
++  border: 1px solid var(--ck-border-subtle);
++  border-radius: var(--catalogue-radius);
++  overflow: hidden;
++  container-type: inline-size;
++  background: var(--cfg-bg);
++}
++
++.catalogue-preview .catalogue-backdrop {
++  position: absolute;
++  inset: 0;
++  z-index: -1;
++  pointer-events: none;
++}
++
++.catalogue-preview .catalogue-backdrop img {
++  width: 100%;
++  height: 100%;
++  object-fit: cover;
++  filter: blur(2px);
++}
++
++.catalogue-preview .catalogue-header { position: relative; z-index: auto; }
++.catalogue-preview .catalogue-header-content { padding-inline: 1rem; }
++.catalogue-preview-content { padding: calc(var(--catalogue-space) * 4); }
++.catalogue-preview-footer {
++  margin-top: calc(var(--catalogue-space) * 6);
++  padding: calc(var(--catalogue-space) * 4);
++  text-align: center;
++  overflow-wrap: anywhere;
++}
++
++/* Keep the phone chat launcher clear of catalogue prices and actions. */
++@media (max-width: 479px) {
++  body:has(.catalogue-page):has(.chat-launcher-lift) .catalogue-brand {
++    max-width: calc(100% - 64px);
++    flex-wrap: wrap;
++    gap: 12px;
++  }
++
++  body:has(.catalogue-page):has(.chat-launcher-lift) .catalogue-brand > div {
++    flex: 1 1 8rem;
++  }
++
++  body:has(.catalogue-page):has(.chat-launcher-lift) .catalogue-brand img,
++  body:has(.catalogue-page):has(.chat-launcher-lift) .catalogue-monogram {
++    max-width: 44px;
++    max-height: 44px;
++  }
++
++  body:has(.catalogue-page) .chat-launcher-lift {
++    top: 0.75rem;
++    right: 1rem;
++    bottom: auto;
++  }
++
++  body:has(.catalogue-page) .chat-launcher-lift button {
++    width: 44px;
++    height: 44px;
++  }
++}
++
++@media (min-width: 768px) {
++  .catalogue-page { padding-block: calc(var(--catalogue-space) * 8); }
++  .catalogue-page .catalogue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
++  .catalogue-page .catalogue-photo { aspect-ratio: 2 / 1; }
++}
++
++@media (min-width: 1280px) {
++  .catalogue-page .catalogue-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
++}
++
++@container (min-width: 640px) {
++  .catalogue-preview .catalogue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
++  .catalogue-preview .catalogue-photo { aspect-ratio: 2 / 1; }
++}
++
++@container (min-width: 900px) {
++  .catalogue-preview .catalogue-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
++}
++
++@media (hover: hover) {
++  .catalogue-card:hover {
++    border-color: color-mix(in srgb, var(--cfg-hover) 65%, var(--catalogue-ink, var(--ink)));
++  }
++  .catalogue-action:hover { text-decoration: underline; text-underline-offset: 0.2em; }
++  .catalogue-nav a:hover { text-decoration: underline; text-underline-offset: 0.2em; }
++}
+--- a/app/page.tsx
++++ b/app/page.tsx
+@@ -1,12 +1,13 @@
+ "use client";
+ import { useEffect, useMemo, useState } from "react";
+ import Image from "next/image";
++import Link from "next/link";
+ import { createTenantSupabase } from "./lib/supabase";
+ import { formatDuration } from "./lib/duration";
+ import { fmtDate, fmtTime } from "./lib/format";
+ import { BOOKING_CUTOFF_MINUTES } from "./lib/pricing";
+ import { useRouter } from "next/navigation";
+-import SectionHeader from "./components/ui/SectionHeader";
++import { CatalogueCard, CatalogueIntro } from "./components/Catalogue";
+ import { useTheme } from "./components/ThemeProvider";
+ import OperatorDirectory from "./components/OperatorDirectory";
+ import TenantClosedNotice, { useTenantTrading } from "./components/TenantClosedNotice";
+@@ -175,11 +176,13 @@
+   if (!theme.id) return <OperatorDirectory />;
+ 
+   if (loading) return (
+-    <div className="app-container page-wrap">
+-      {/* Shimmering glass blocks matching the final card grid */}
+-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
++    <div className="app-container catalogue-page">
++      <div className="catalogue-grid" aria-busy="true" aria-label="Loading tours">
+         {[1, 2, 3].map((i) => (
+-          <div key={i} className={`glass-skeleton overflow-hidden ${i > 1 ? "hidden md:block" : ""} ${i > 2 ? "md:hidden xl:block" : ""}`} style={{ borderRadius: 28, height: 420 }} />
++          <div key={i} className={`catalogue-card ${i > 1 ? "hidden md:block" : ""} ${i > 2 ? "md:hidden xl:block" : ""}`} aria-hidden="true">
++            <div className="catalogue-photo glass-skeleton" />
++            <div className="catalogue-card-content"><div className="h-36 glass-skeleton" /></div>
++          </div>
+         ))}
+       </div>
+     </div>
+@@ -192,45 +195,37 @@
+   if (!trading) return <div className="app-container page-wrap"><TenantClosedNotice /></div>;
+ 
+   return (
+-    <div className="app-container page-wrap">
++    <div className="app-container catalogue-page">
+       {draft && (
+-        <div className="glass mb-8 px-5 py-4 animate-in fade-in duration-300">
+-          <div className="flex items-center gap-4">
++        <div className="glass mb-6 p-4">
++          <div className="flex flex-wrap items-center gap-4">
+ 
+             <div className="flex-1 min-w-0">
+               <p className="text-[14px] font-semibold" style={{ color: "var(--ink)" }}>Pick up where you left off?</p>
+-              <p className="truncate text-[13px]" style={{ color: "var(--ink-muted)" }}>
++              <p className="text-sm break-words" style={{ color: "var(--ink-muted)" }}>
+                 {draft.tourName || "Your tour"}
+                 {draft.date && draft.slotTime && (
+                   <> &middot; {new Date(draft.date + "T00:00:00").toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short" })} at {draft.slotTime}</>
+                 )}
+               </p>
+             </div>
+-            <a href={draftResumeUrl(draft)} className="btn btn-primary shrink-0 px-4 py-2.5 text-[13px]">
++            <a href={draftResumeUrl(draft)} className="btn btn-primary shrink-0 px-4 py-2.5 text-sm">
+               Resume
+             </a>
+-            <button onClick={() => { clearDraft(); setDraft(null); }} className="shrink-0 text-[12px] underline underline-offset-2" style={{ color: "var(--ink-muted)" }} aria-label="Dismiss resume banner">
++            <button onClick={() => { clearDraft(); setDraft(null); }} className="min-h-11 shrink-0 text-sm underline underline-offset-2" style={{ color: "var(--ink-muted)" }} aria-label="Dismiss resume banner">
+               Dismiss
+             </button>
+           </div>
+         </div>
+       )}
+-      {/* The title opts the whole hero in; eyebrow and subtitle never render alone. */}
+       {theme.hero_title?.trim() && (
+-        <div className="glass mx-auto mb-8 max-w-3xl px-6 py-6 sm:mb-10 sm:px-10 sm:py-8" style={{ borderRadius: 32 }}>
+-          <SectionHeader
+-            centered
+-            eyebrow={theme.hero_eyebrow || undefined}
+-            title={theme.hero_title || ""}
+-            subtitle={theme.hero_subtitle || undefined}
+-          />
+-        </div>
++        <CatalogueIntro title={theme.hero_title} eyebrow={theme.hero_eyebrow} subtitle={theme.hero_subtitle} />
+       )}
+ 
+ 
+ 
+       {deals.length > 0 && (
+-        <div className="glass mb-8 px-5 py-4" style={{ borderRadius: 28 }}>
++        <div className="glass mb-6 p-4">
+           <div className="flex items-center gap-2">
+             <span className="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide" style={{ background: "var(--accent)", color: "var(--ink-on-main)" }}>
+               Last minute
+@@ -267,8 +262,8 @@
+         </div>
+       )}
+ 
+-      {/* Floating glass tour cards — one grid: 1 col mobile, 2 ≥768px, 3 ≥1280px */}
+-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
++      {/* Same tour order and booking URLs, with shared preview presentation. */}
++      <div className="catalogue-grid">
+         {tours.map((tour, idx) => {
+           const rv = reviewStats[tour.id];
+           const spots = spotsThisWeek[tour.id];
+@@ -276,67 +271,27 @@
+             ? `Only ${spots} spot${spots === 1 ? "" : "s"} left this week`
+             : null;
+           return (
+-            <button type="button" key={tour.id} data-shot="tour-card"
+-              className="glass glass-hover group cursor-pointer overflow-hidden text-left active:scale-[0.98] flex flex-col"
+-              style={{ borderRadius: 28 }}
+-              onClick={() => router.push("/book?tour=" + tour.id)}>
+-              {/* No image on the tour means a plain glass tile — the chips
+-                  below stay readable on it, and there is no house photo to
+-                  borrow on a multi-tenant storefront. */}
+-              <div className="relative aspect-[4/3] overflow-hidden">
+-                {tour.image_url && (
+-                  <>
+-                    <Image src={tour.image_url} alt={tour.name + " tour"}
+-                      fill sizes="(max-width: 767px) 92vw, (max-width: 1279px) 46vw, 30vw" className="object-cover transition-transform duration-300 group-hover:scale-[1.04]" priority={idx === 0} loading={idx === 0 ? "eager" : "lazy"} />
+-                    {/* Text over imagery always sits on a scrim or a glass capsule */}
+-                    <div className="glass-photo-scrim" />
+-                  </>
+-                )}
+-                <span className="glass-chip absolute bottom-3 left-3 px-3.5 py-1.5 font-display text-[15px] font-bold">
+-                  R{tour.base_price_per_person}
+-                  <span className="ml-1 text-[11px] font-normal" style={{ color: "var(--ink-muted)" }}>pp</span>
+-                </span>
+-                <span className="glass-chip absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true">
+-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></svg>
+-                </span>
+-                {urgencyLabel && (
+-                  <span className="absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide shadow-sm" style={{ background: "var(--danger)", color: "#fff" }}>
+-                    {urgencyLabel}
+-                  </span>
+-                )}
+-              </div>
+-              <div className="px-5 pb-5 pt-4">
+-                <h3 className="font-display text-xl font-semibold leading-tight" style={{ color: "var(--ink)", fontSize: "1.25rem" }}>
+-                  {tour.name}
+-                </h3>
+-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+-                  <span className="glass-chip inline-flex items-center px-2.5 py-1 text-[11px] font-semibold">
+-                    {formatDuration(tour.duration_minutes)}
+-                  </span>
+-                  {rv && (
+-                    <span className="glass-chip inline-flex items-center px-2.5 py-1 text-[11px] font-semibold">
+-                      {rv.avg.toFixed(1)} · {rv.count} review{rv.count !== 1 ? "s" : ""}
+-                    </span>
+-                  )}
+-                </div>
+-                {tour.description && (
+-                  <p className="mt-3 line-clamp-2 text-[13px] leading-relaxed" style={{ color: "var(--ink-muted)" }}>
+-                    {tour.description}
+-                  </p>
+-                )}
+-                <span className="btn btn-primary mt-4 w-full text-[13px]">
++            <CatalogueCard key={tour.id} name={tour.name} duration={formatDuration(tour.duration_minutes)}
++              price={tour.base_price_per_person} description={tour.description} urgency={urgencyLabel}
++              reviews={rv ? `${rv.avg.toFixed(1)} · ${rv.count} review${rv.count !== 1 ? "s" : ""}` : undefined}
++              image={tour.image_url ? (
++                <Image src={tour.image_url} alt={tour.name + " tour"} fill
++                  sizes="(max-width: 767px) 92vw, (max-width: 1279px) 46vw, 320px"
++                  priority={idx === 0} loading={idx === 0 ? "eager" : "lazy"} />
++              ) : undefined}
++              action={(
++                <Link href={"/book?tour=" + tour.id} className="catalogue-action" aria-label={`${theme.card_cta_label || "Book Now"}: ${tour.name}`}>
+                   {theme.card_cta_label || "Book Now"}
+-                </span>
+-              </div>
+-            </button>
++                </Link>
++              )} />
+           );
+         })}
+       </div>
+ 
+-      {/* Combo Packages — same compact glass strip as the last-minute block, so
+-          the section sits alongside the tour grid instead of above it. */}
++      {/* Existing offers keep their own routes, prices and availability. */}
+       {comboOffers.length > 0 && (
+-        <div className="glass mt-8 px-5 py-4" style={{ borderRadius: 28 }}>
++        <div className="mt-6">
++          <div className="catalogue-surface p-4">
+           <div className="flex items-center gap-2">
+             <span className="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide" style={{ background: "var(--accent)", color: "var(--ink-on-main)" }}>
+               Save More
+@@ -346,7 +301,8 @@
+           <p className="mt-1 hidden text-[13px] md:block" style={{ color: "var(--ink-muted)" }}>
+             Bundle two adventures together and save.
+           </p>
+-          <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
++          </div>
++          <div className="catalogue-grid mt-6">
+             {comboOffers.map((combo) => {
+               const comboTours = (combo.items || [])
+                 .slice()
+@@ -360,7 +316,7 @@
+               return (
+                 <button type="button" key={combo.id} className="relative w-full group cursor-pointer text-left" aria-label={"Book combo: " + combo.name}
+                   onClick={() => router.push("/combo/" + combo.id)}>
+-                  <div className="glass glass-hover overflow-hidden" style={{ borderRadius: 28 }}>
++                  <div className="glass glass-hover overflow-hidden h-full">
+                     {/* Dual image strip */}
+                     <div className="flex h-[120px]">
+                       <div className="w-1/2 relative overflow-hidden">
+--- a/lib/theme-engine.ts
++++ b/lib/theme-engine.ts
+@@ -94,13 +94,13 @@
+  * button must render under its label: a translucent black/white layer strong
+  * enough to get the chosen ink to 4.5:1 — the operator's hue shows through.
+  */
+-export type ButtonInk = { ink: RGB; overlay: string | null };
++export type ButtonInk = { ink: RGB; overlay: string | null; surface: RGB };
+ 
+ export function solveButtonInk(base: RGB): ButtonInk {
+   const dark = contrast(base, INK_DARK);
+   const light = contrast(base, INK_LIGHT);
+   if (Math.max(dark, light) >= 4.5) {
+-    return { ink: dark >= light ? INK_DARK : INK_LIGHT, overlay: null };
++    return { ink: dark >= light ? INK_DARK : INK_LIGHT, overlay: null, surface: base };
+   }
+   // Mid-tone: darken under light ink (usually cheaper perceptually).
+   const white: RGB = [255, 255, 255];
+@@ -108,14 +108,21 @@
+   for (let a = 0.1; a <= 0.75; a += 0.05) {
+     const darkened = over(black, a, base);
+     if (contrast(darkened, INK_LIGHT) >= 4.5) {
+-      return { ink: INK_LIGHT, overlay: rgba(black, +a.toFixed(2)) };
++      return { ink: INK_LIGHT, overlay: rgba(black, +a.toFixed(2)), surface: darkened };
+     }
+     const lightened = over(white, a, base);
+     if (contrast(lightened, INK_DARK) >= 4.5) {
+-      return { ink: INK_DARK, overlay: rgba(white, +a.toFixed(2)) };
++      return { ink: INK_DARK, overlay: rgba(white, +a.toFixed(2)), surface: lightened };
+     }
+   }
+-  return { ink: light >= dark ? INK_LIGHT : INK_DARK, overlay: rgba(black, 0.75) };
++  return { ink: light >= dark ? INK_LIGHT : INK_DARK, overlay: rgba(black, 0.75), surface: over(black, 0.75, base) };
++}
++
++// Supporting catalogue text can be quieter only while it still passes AA.
++function supportingInk({ ink, surface }: ButtonInk): string {
++  let alpha = 0.72;
++  while (alpha < 1 && contrast(over(ink, alpha, surface), surface) < 4.5) alpha += 0.04;
++  return rgba(ink, Math.min(1, alpha));
+ }
+ 
+ // ── Theme derivation ──────────────────────────────────────────────────────
+@@ -186,6 +193,10 @@
+ 
+   const ctaInk = solveButtonInk(cta);
+   const mainInk = solveButtonInk(main);
++  // Opaque catalogue surfaces keep uploaded backgrounds outside the text
++  // layer. Reuse the existing small contrast repair for mid-tone palettes.
++  const catalogue = solveButtonInk(bg);
++  const catalogueNav = solveButtonInk(nav);
+ 
+   // Accent as TEXT (links, eyebrows): only when the raw accent passes AA on
+   // the card surface over every worst backdrop; otherwise fall back to ink
+@@ -210,6 +221,12 @@
+     "--cfg-bg": rgbToHex(bg),
+     "--cfg-nav": rgbToHex(nav),
+     "--cfg-hover": rgbToHex(hover),
++
++    "--catalogue-surface": rgbToHex(catalogue.surface),
++    "--catalogue-ink": rgbToHex(catalogue.ink),
++    "--catalogue-muted": supportingInk(catalogue),
++    "--catalogue-nav-surface": rgbToHex(catalogueNav.surface),
++    "--catalogue-nav-ink": rgbToHex(catalogueNav.ink),
+ 
+     "--ink": rgbToHex(ink),
+     "--ink-muted": rgba(ink, 0.72),

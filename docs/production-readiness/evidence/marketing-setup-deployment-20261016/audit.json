@@ -1,0 +1,17 @@
+{
+  "at": "2026-10-16T04:47:46.134Z",
+  "read_only": true,
+  "secret_presence": {
+    "RESEND_API_KEY": true,
+    "RESEND_FROM_EMAIL": true,
+    "RESEND_WEBHOOK_SECRET": false
+  },
+  "policies": [
+    {
+      "policy_rows": 0,
+      "enabled_operators": 0
+    }
+  ],
+  "sender_domain_verified": "Not checked; no Resend account credential available locally.",
+  "customer_actions": 0
+}

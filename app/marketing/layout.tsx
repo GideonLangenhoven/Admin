@@ -1,16 +1,19 @@
 "use client";
 import SectionTabs from "../../components/SectionTabs";
+import MarketingSetupNotice from "../../components/marketing/MarketingSetupNotice";
+import { usePathname } from "next/navigation";
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
+  const contactsPage = usePathname() === "/marketing/contacts";
   return (
     <div className="max-w-7xl space-y-6">
-      <div className="anim-fade-up">
-        <p className="ui-mono-label mb-2">Growth</p>
-        <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Marketing</h1>
-        <p className="text-sm mt-2" style={{ color: "var(--ck-text-muted)" }}>Email campaigns, contacts, and templates</p>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="font-display text-[24px] font-semibold leading-none md:text-[28px]" style={{ color: "var(--ck-text-strong)" }}>Marketing</h1>
+        {!contactsPage && <SectionTabs section="marketing" display="mobile" />}
       </div>
 
-      <SectionTabs section="marketing" />
+      <SectionTabs section="marketing" display="desktop" />
+      <MarketingSetupNotice />
 
       {children}
     </div>

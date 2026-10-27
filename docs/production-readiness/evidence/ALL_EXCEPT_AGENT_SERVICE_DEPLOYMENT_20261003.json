@@ -1,0 +1,132 @@
+{
+  "status": "complete",
+  "recorded_at": "2026-10-03T17:51:58.102308+00:00",
+  "authorization": "please deploy everything beside the agent service update",
+  "requested_domains": [
+    "https://kayak.booking.bookingtours.co.za/",
+    "https://kayak.admin.bookingtours.co.za/"
+  ],
+  "admin": {
+    "deployment_id": "dpl_5K9GzkGeVe3ChTZdCZdQWh7acw2n",
+    "url": "https://kayak.admin.bookingtours.co.za/",
+    "ready_state": "READY",
+    "baseline_deployment": "dpl_87K1ScSv97w5aBRuhYr6V39nZkpW",
+    "source_files": 458,
+    "changed_baseline_files": 19,
+    "new_runtime_files": 9,
+    "unchanged_baseline_files": 430
+  },
+  "booking": {
+    "deployment_id": "dpl_7CVfGAyig6kjNGGTXf5qaYiX8kDC",
+    "url": "https://kayak.booking.bookingtours.co.za/",
+    "ready_state": "READY",
+    "baseline_deployment": "dpl_3QgwFZKnDSUuPkcfCxFtsgdpvT2b",
+    "source_files": 169,
+    "changed_baseline_files": 13,
+    "new_runtime_files": 6,
+    "unchanged_baseline_files": 150
+  },
+  "agent_service_exclusion": {
+    "file": "app/lib/agent-read-service.ts",
+    "published_sha256": "947041cfea9ad095dcab3d6d774780057af357ba48438aadd4fc4dddee6f7830",
+    "local_sha256": "a92763a20e6c9f2678ec00f45895df65286b6a96d707c5802d5ced0fb524f25e",
+    "new_provider_binding_update_deployed": false,
+    "external_access_enabled": false,
+    "connector_enabled": false
+  },
+  "database": {
+    "project_ref": "ukdsrndqhsatjkmxijuj",
+    "migration_version": "20261003160000",
+    "migration_name": "agent_read_foundation",
+    "migration_sha256": "99dfbb1a6d0cb958bb9ab70591df530f59babc5f6ea96f4e63ee6b6e0974136c",
+    "applied": true,
+    "production_rehearsal_rolled_back": true,
+    "production_grants": 0,
+    "enabled_grants": 0,
+    "permissions_verified": true
+  },
+  "backend": [
+    {
+      "slug": "wa-webhook",
+      "version": 237,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    },
+    {
+      "slug": "create-checkout",
+      "version": 106,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    },
+    {
+      "slug": "web-chat",
+      "version": 148,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    }
+  ],
+  "validation": {
+    "unit_passed": 1737,
+    "unit_intentional_skip": 1,
+    "admin_and_booking_typescript": "passed",
+    "repository_lint": {
+      "errors": 0,
+      "existing_admin_warnings": 30,
+      "existing_booking_warnings": 12
+    },
+    "edge_deno_checks": 3,
+    "local_postgresql_checks_passed": 76,
+    "booking_question_browser_cases_passed": 27,
+    "chat_browser_cases_passed": 27,
+    "booking_guest_cases_passed": 24,
+    "booking_guest_rerun": "The completed full suite passed 23 cases; its embed case hit the cold-preview load timeout, then passed with DOM-content navigation and a cold-build timeout.",
+    "admin_production_build_browser_cases_passed": 14,
+    "admin_auth_and_data": "synthetic fixtures; server-side API writes blocked; Supabase requests fulfilled by fixtures",
+    "public_tenant_browser_cases_passed": 9,
+    "public_tenant_writes": "blocked",
+    "cloud_builds": "both passed",
+    "uploaded_source": "all source hashes matched the tested packages; the same archives were read back after interruption",
+    "earlier_reports": "Unit, PostgreSQL, question/chat and full guest-suite results were observed earlier in this same session; temporary raw reports were unavailable after the interrupted continuation."
+  },
+  "verification_notes": [
+    "Outdated catalogue assertions were corrected for lazy photos and the restored hero; image, overflow and keyboard checks pass.",
+    "Revenue permissions checks now target the dashboard heading rather than the identically named sidebar group.",
+    "The local development preview stalled in Safari before authentication; all seven corresponding Safari cases pass against the optimized production build.",
+    "Published backend changed-file hashes match the tested workspace; the webhook entry point was preserved from its live baseline."
+  ],
+  "live_http": [
+    {
+      "url": "https://kayak.booking.bookingtours.co.za/",
+      "method": "HEAD",
+      "status": 200,
+      "protection_bypass_used": false
+    },
+    {
+      "url": "https://kayak.admin.bookingtours.co.za/",
+      "method": "HEAD",
+      "status": 200,
+      "protection_bypass_used": false
+    },
+    {
+      "url": "https://kayak.admin.bookingtours.co.za/api/agent/read",
+      "method": "HEAD",
+      "status": 503,
+      "protection_bypass_used": false,
+      "cache_control": "no-store"
+    },
+    {
+      "url": "https://kayak.admin.bookingtours.co.za/api/admin/chat-faq",
+      "method": "HEAD",
+      "status": 401,
+      "protection_bypass_used": false
+    }
+  ],
+  "broader_rollout": {
+    "status": "PAUSED_BY_USER",
+    "verdict": "FAILED_GATE",
+    "qualification_resumed": false
+  },
+  "customer_booking_payment_or_message_submitted": false,
+  "git_commit_push_or_merge_performed": false,
+  "evidence_directory": "all-except-agent-service-20261003"
+}

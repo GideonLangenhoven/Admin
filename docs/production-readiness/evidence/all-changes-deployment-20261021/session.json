@@ -1,0 +1,72 @@
+[
+  {
+    "path": "app/broadcasts/page.tsx",
+    "base": "7193f0cd7f40691c0e4bfd1cc2d26f285d78b23d",
+    "final": "6095c0f0e3878a66a06f6ca83559c484595e0cd0"
+  },
+  {
+    "path": "app/inbox/page.tsx",
+    "base": "3ecf9c5fe66efa4446df3217ab3b46079e953556",
+    "final": "44aa07d6d314fa4139ad1e532813ff7456706a0a"
+  },
+  {
+    "path": "app/bookings/page.tsx",
+    "base": "71a2c5eb3a9dfcc262ed0f331ba59f9fa711e292",
+    "final": "1fec9822fea2ac56aadc35a256afbe9c5bc117e3"
+  },
+  {
+    "path": "app/new-booking/booking-form.module.css",
+    "base": "5b71c1952348e855fd778e46ef9bef4c56b52ed0",
+    "final": "1394d5ccc6493869ead102cfa627ac0561c138af"
+  },
+  {
+    "path": "app/new-booking/page.tsx",
+    "base": "68ba208dd1de7ee80f1e96e8da4cc6c731c0fe68",
+    "final": "32256ef735b8fba8c9c638fc90aea272cb356f52"
+  },
+  {
+    "path": "app/lib/report-booking-periods.ts",
+    "base": null,
+    "final": "31be352bcf39a307e7b8b3ce395f0ecf673cbbae"
+  },
+  {
+    "path": "app/billing/page.tsx",
+    "base": "aef7b7d41db0f439173377ed8b9eaf1c3d4e35a7",
+    "final": "fc623c08e6f08fc2d1dcee77893e88488826ce26"
+  },
+  {
+    "path": "app/reports/page.tsx",
+    "base": "d365f19886c673dac2000ab6844df05cb456286f",
+    "final": "25edb5a4766c20c28d7e546905c99f351e144f6c"
+  },
+  {
+    "path": "components/AppShell.tsx",
+    "base": "e62a50640b35e48d2fc2f680fc97e7a0c170965d",
+    "final": "115c858c032414e8a2a63b4d9cfbd1f01ad81953"
+  },
+  {
+    "path": "components/ReportsLayout.tsx",
+    "base": "8930673b54abf4781192aefe516141f85aa52cd5",
+    "final": "6b1744a7b028d57fe90f4f6c3f2ca934c6a4a287"
+  },
+  {
+    "path": "components/PaymentRecoveryPanel.tsx",
+    "base": "1ddcc43f4c41de1df5d986a00f583f36a2064396",
+    "final": "88451cd1e02cf60b3d7f47f42ac69bc4183998cf"
+  },
+  {
+    "path": "components/booking/BookingQuestions.tsx",
+    "base": "0c0ce5350bb567552c7dcc58039bcf6dde6b4d96",
+    "final": "e520b3d83991514ebdc3621b83242900996b6e6a"
+  },
+  {
+    "path": "components/booking/BookingSelect.tsx",
+    "base": null,
+    "final": "9464e6b05a1445186ec1113b83f484cea91809af"
+  },
+  {
+    "path": "components/booking/BookingSelect.module.css",
+    "base": null,
+    "final": "272dbcd32ac8834d256aac642913542325250672"
+  }
+]

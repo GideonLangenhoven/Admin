@@ -1,0 +1,389 @@
+{
+  "status": "implemented_and_tested_locally_external_access_disabled",
+  "recorded_at": "2026-10-04T10:23:08.534979+00:00",
+  "application": {
+    "path": "/Users/gideonlangenhoven/dev/capekayak",
+    "branch": "feature/simple-view-2026-09-20",
+    "commit": "43304b65314c2b9974f939304e7b2ebae0a62c0c",
+    "unrelated_work": "preserved; guarded file copy, no branch switch",
+    "marketing_repository": "not modified",
+    "backend": "existing Supabase Auth/PostgreSQL/RLS"
+  },
+  "deployment": {
+    "new_mcp_deployed": false,
+    "new_schema_extension_applied": false,
+    "new_connector_connected": false,
+    "platform_approved": false,
+    "customer_available": false,
+    "production_migrations_in_this_pass": false,
+    "push_merge_dns_purchases_or_live_customer_writes": false,
+    "wider_readiness": "PAUSED_BY_USER / FAILED_GATE preserved",
+    "concurrent_release": {
+      "evidence": "docs/production-readiness/evidence/ALL_EXCEPT_AGENT_SERVICE_DEPLOYMENT_20261003.json",
+      "inspected_at": "2026-10-04",
+      "evidence_recorded_at": "2026-10-03T17:51:58.102308+00:00",
+      "admin_deployment": "dpl_5K9GzkGeVe3ChTZdCZdQWh7acw2n",
+      "foundation_migration": "20261003160000",
+      "foundation_applied_reported": true,
+      "zero_grants_reported": true,
+      "newer_binding_excluded_reported": true,
+      "independent_live_recheck_in_this_pass": false,
+      "documentation_rebased_without_overwriting_release_evidence": true
+    }
+  },
+  "dependencies": {
+    "node": "22.23.3",
+    "next_toolchain": "16.3.8",
+    "mcp_handler": "2.2.0",
+    "mcp_sdk_server": "2.3.0",
+    "oauth_library": "@node-oauth/oauth2-server 5.3.0",
+    "pg": "8.20.0",
+    "zod": "4.5.4",
+    "note": "Promoted existing SDK/PG/Zod runtime dependencies; added OAuth library and PG types; scoped Next patch. Lock version diff contains no unrelated upgrades."
+  },
+  "checks": [
+    {
+      "category": "fixtures_and_local_postgresql_backend",
+      "command": "AGENT_TEST_SOCKET=<disposable /private/tmp/capekayak-db-test-* Unix socket> AGENT_TEST_PORT=55439 npm run test:unit",
+      "result": "passed",
+      "test_files": 119,
+      "passed": 1837,
+      "intentional_skips": 1,
+      "backend_mcp_tests_included": 48,
+      "boundary": "Positive operator identity injected; real local PostgreSQL/RLS, OAuth library and MCP SDK; no live native Auth or provider journey.",
+      "environment": "isolated candidate; current application checkout full suite separately recorded below"
+    },
+    {
+      "category": "post_http_fix_runtime_tests",
+      "command": "npm run test:unit -- tests/unit/agent-runtime.test.ts",
+      "result": "passed",
+      "passed": 16,
+      "boundary": "Re-run after final missing-configuration response correction; included in total test inventory above."
+    },
+    {
+      "category": "application_types",
+      "command": "./node_modules/.bin/tsc --noEmit --incremental false",
+      "result": "passed"
+    },
+    {
+      "category": "fixture_backend_types",
+      "command": "./node_modules/.bin/tsc --noEmit -p tests/tsconfig.agent-mcp.json",
+      "result": "passed"
+    },
+    {
+      "category": "isolated_production_build",
+      "command": "NEXT_PUBLIC_SUPABASE_URL=https://fixture.example.invalid NEXT_PUBLIC_SUPABASE_ANON_KEY=fixture-public-key SUPABASE_SERVICE_ROLE_KEY=fixture-not-a-real-service-key npm run build",
+      "result": "passed",
+      "boundary": "No .env files copied; VERCEL_ENV production probe unset; no deployment. Routes including both well-known documents were present."
+    },
+    {
+      "category": "focused_lint",
+      "command": "npm run lint -- app/lib/agent-config.ts app/lib/agent-db.ts app/lib/agent-mcp.ts app/lib/agent-oauth.ts app/lib/agent-read-service.ts app/lib/agent-telemetry.ts app/api/mcp app/api/agent app/.well-known app/settings/agent-connections/page.tsx sentry.server.config.ts sentry.edge.config.ts instrumentation-client.ts tests/unit/agent-mcp-backend.test.ts tests/unit/agent-runtime.test.ts tests/agent-mcp-disabled-http.mjs tests/unit/runtime-dependency-floors.test.ts",
+      "result": "passed",
+      "warnings": 0
+    },
+    {
+      "category": "whole_repository_lint",
+      "command": "npm run lint",
+      "result": "failed_existing_configuration",
+      "exit_code": 2,
+      "message": "A configuration object specifies react-hooks/rules-of-hooks but could not find plugin react-hooks.",
+      "baseline": "Same failure reproduced in unchanged application source with its original installed Next toolchain before applying MCP files."
+    },
+    {
+      "category": "actual_next_http_disabled_routes",
+      "command": "node tests/agent-mcp-disabled-http.mjs http://127.0.0.1:3119",
+      "result": "passed",
+      "passed": 12,
+      "boundary": "Real isolated Next production build over loopback HTTP; ChatGPT disabled, AGENT_MUSE_ENABLED=true still denied; no database/provider access."
+    },
+    {
+      "category": "dependency_audit",
+      "command": "npm audit --json",
+      "result": "existing_advisories_remain",
+      "exit_code": 1,
+      "vulnerabilities": {
+        "info": 0,
+        "low": 1,
+        "moderate": 0,
+        "high": 7,
+        "critical": 0,
+        "total": 8
+      },
+      "note": "Previous critical Next finding removed by patch; remaining build-tool braces chain and DOMPurify require review."
+    },
+    {
+      "category": "earlier_unrelated_failures_recheck",
+      "command": "npm run test:unit -- tests/unit/db-column-refs.test.ts tests/unit/help-chat-navigation.test.ts",
+      "result": "passed",
+      "passed": 6,
+      "boundary": "Current untouched checkout already contains their fixes; preserved."
+    }
+  ],
+  "resolved_attempt_failures": [
+    "Temporary candidate directory disappeared after session restart; implementation recovered from this session history before tests and guarded application copy.",
+    "Sandbox blocked PostgreSQL/HTTP sockets and Google Fonts/npm audit DNS; required checks re-run with scoped approval.",
+    "OAuth library required URL-encoded content-length; fixed adapter. Incorrect PKCE consumes the code and refresh replay commits family revocation.",
+    "Current SDK protocol requires protocol/method/name headers and params._meta; fixture framing corrected and both protocol formats pass. Top-level OAuth declarations restored after codec serialization.",
+    "Next ESLint pin initially had a caret and failed the exact toolchain floor; aligned exact 16.3.8 pins now pass.",
+    "A full suite run concurrent with the build timed out after five seconds in demo-action-guide. All 28 cases passed independently, then the serial full suite passed 1837 tests without changing or relaxing that test.",
+    "Local HTTP test initially observed UPSTREAM_UNAVAILABLE for missing connection configuration. Corrected to explicit INTEGRATION_DISABLED; runtime types/tests, rebuilt application and all 12 HTTP cases pass."
+  ],
+  "coverage": [
+    "Missing/expired/revoked/insufficient tokens, PKCE/code reuse, refresh replay and wrong client/resource/provider",
+    "Business A requesting B IDs; current roles, suspension, demo/read-only, membership removal, banned/deleted identities and inactive business",
+    "Disconnect, absolute grant expiry and role restoration requiring fresh consent; ordinary native fixture permissions retained",
+    "Atomic shared quota across multiple connections; quota and OAuth storage failures deny access",
+    "Gateway direct table/private-state access denied; unexpected table/definer permissions and unsafe pool role rejected",
+    "Canonical host/origin checks, oversized/invalid/stalled inputs, JSON/SSE error redaction and no private arguments/results/logs",
+    "Canonical booked/held capacity, payment booking counts, waiver participant counts, closed/stale/null/unknown evidence",
+    "Read operations do not change bookings, held capacity, payments or pending reschedules; no write tool or provider/message client exists",
+    "2025-11-25 initialize/list/call and 2026-07-28 discover/list/call; only three scoped read descriptors on the real SDK wire",
+    "Real Next routes reject access by default, including Muse environment flag bypass"
+  ],
+  "unperformed_platform_checks": {
+    "native_supabase_positive_login_consent_browser_flow": "not run",
+    "actual_https_mcp_inspector_oauth": "not run",
+    "chatgpt_linking_and_model_tool_selection": "not run",
+    "muse_connecting_and_review": "blocked; no precise technical onboarding contract/test access",
+    "all_deployed_rest_rpc_edge_admin_external_token_bypass_cases": "not run"
+  },
+  "request_acceptance": {
+    "direct": "Departure schedule/capacity/aggregate questions specified and tested at service/wire level; real model selection pending.",
+    "indirect": "Explicit operator readiness questions may use aggregates; no automatic authorization from retrieved text. Contract/fixture assertions only.",
+    "must_not_run": "Guest/notes/docs lookup, bookings/holds/payments/refunds/messages, unrelated advice and forced recommendations. No matching operation; real platform prompt evaluation pending.",
+    "timezone_bootstrap": "Selected business UUID in authenticated instructions. Initial relative dates require operator-confirmed zone/explicit-offset bounds; no guessed zone."
+  },
+  "blockers": [
+    "Restricted TLS gateway credential and real catalog/ACL/pooler rehearsal against already-applied foundation",
+    "Real native Auth/browser consent and deployed token-bypass checks",
+    "Actual HTTPS Inspector and ChatGPT linking/refresh/disconnect/tool-selection journey",
+    "Existing eight dependency advisories, whole-repository lint configuration and operational retention/release review",
+    "Muse exact transport/version, client registration/identity, redirect/resource/token contract, portal test access and independent approval"
+  ],
+  "attribution": "MCP-only scope; existing acquisition/consent report preserved. No new events/pixels/packages, no linking-as-conversion, no inferred ChatGPT/Muse origin. Website/signup intake coordination remains pending.",
+  "files_changed": [
+    {
+      "path": "app/.well-known/oauth-authorization-server/route.ts",
+      "before_sha256": null,
+      "after_sha256": "78def9b512d380f06b096c41eb25091fa1ea9d984b6e0b8ef450dc61f57eb41d"
+    },
+    {
+      "path": "app/.well-known/oauth-protected-resource/api/mcp/chatgpt/route.ts",
+      "before_sha256": null,
+      "after_sha256": "e4e68686dcdea05a0db473a6fd62464e722a48b421babaa417633c5680bf4ad5"
+    },
+    {
+      "path": "app/api/agent/connections/route.ts",
+      "before_sha256": null,
+      "after_sha256": "e0d5032cd5d634f86f273205165e93b8a9a57289263f64c17768b452e4c72246"
+    },
+    {
+      "path": "app/api/agent/oauth/[action]/route.ts",
+      "before_sha256": null,
+      "after_sha256": "7f283d13a746584aaf18d74d04225700f9f8c01a629e6787730694a649eb0135"
+    },
+    {
+      "path": "app/api/mcp/chatgpt/route.ts",
+      "before_sha256": null,
+      "after_sha256": "d726619d87ba76c99ca5718aa994f108c3f05fb80b1c96c34dc7200c1f7f1694"
+    },
+    {
+      "path": "app/api/mcp/muse/route.ts",
+      "before_sha256": null,
+      "after_sha256": "1a8994541b967f6abc679e1cdd7ca873b26324a338953924975d26127da895ea"
+    },
+    {
+      "path": "app/lib/agent-config.ts",
+      "before_sha256": null,
+      "after_sha256": "63187af9c017e7a7617ce5d8539bf19491e2a437c9fc13d3343e20f5a9ae1e93"
+    },
+    {
+      "path": "app/lib/agent-db.ts",
+      "before_sha256": null,
+      "after_sha256": "05a5ab3e8d29e11a4deb24441b86ed1276d4486c9f8fa2175873e8ce72a141e9"
+    },
+    {
+      "path": "app/lib/agent-mcp.ts",
+      "before_sha256": null,
+      "after_sha256": "642b60c513ef007c74430954dbf6d3e670861e7a33a94037cc678a0c346b51ed"
+    },
+    {
+      "path": "app/lib/agent-oauth.ts",
+      "before_sha256": null,
+      "after_sha256": "3e264e7afde509fa258186946f85f7b790db91643f04319d6db4fdd3fd81c84d"
+    },
+    {
+      "path": "app/lib/agent-read-service.ts",
+      "before_sha256": "a92763a20e6c9f2678ec00f45895df65286b6a96d707c5802d5ced0fb524f25e",
+      "after_sha256": "1e1f33484f58b80792f9c68a13baeaffc0448f8805ecffba6ce763f286b5bbb8"
+    },
+    {
+      "path": "app/lib/agent-telemetry.ts",
+      "before_sha256": null,
+      "after_sha256": "07f3fc3e793a37ec6991308b2a1785f55415e3833e01de9d12934e7accc96cb0"
+    },
+    {
+      "path": "app/settings/agent-connections/page.tsx",
+      "before_sha256": null,
+      "after_sha256": "9266a889bdf3bf482d09e11c0cf60b56d3ca477d21670f924eb9a9e807361cf4"
+    },
+    {
+      "path": "app/settings/page.tsx",
+      "before_sha256": "1479f5cf177c22114ab4c21597ed9e4d194dfdc0a96e1f3992a61be7d9b473cc",
+      "after_sha256": "ed60ad2fdb079c3a887e558b2544714189fce3bee0baebe1a0ca0b1c4e89087a"
+    },
+    {
+      "path": "docs/ai/agent-read-foundation.md",
+      "before_sha256": "5013d3b435fa2b62035f1b010a369f507939e75d17fd308f792dead96b3fe1c5",
+      "after_sha256": "2262f962335772506581442fe72af3f18c6a3df203aa5047133919651da557d7"
+    },
+    {
+      "path": "docs/ai/chatgpt-connection-setup.md",
+      "before_sha256": "8a7f07c4f52fffe461423834fb0d7c726441a4bfa23d081f6ab448a34d61e833",
+      "after_sha256": "445427346d25528aa6bdccd1629a7b70cc05bf3d37cce33cf6d273ed11087e28"
+    },
+    {
+      "path": "docs/ai/mcp-chatgpt-muse-build-plan.md",
+      "before_sha256": "0feb825cd54dae7258fbbc3b552ac5749e225a4eeebd0578a1379f42324c0d54",
+      "after_sha256": "03dd5019d2e1bdbe54c5966477c5051ff5339d2bdd6122555a644d940f2f8d93"
+    },
+    {
+      "path": "docs/ai/mcp-implementation.md",
+      "before_sha256": null,
+      "after_sha256": "cf75c08f91f5c2c3d12b7ec63dfc40a115b6bd979ccd7d57eb8a5566ae9683fc"
+    },
+    {
+      "path": "docs/ai/mcp-security-decision.md",
+      "before_sha256": null,
+      "after_sha256": "e0e081086f4e2ebe6fa1b92e9588a547d6b68c69d1573906186879b49df6b9a0"
+    },
+    {
+      "path": "docs/ai/website-handoff.public.md",
+      "before_sha256": "c661c7e06f4bf040f6380d5ef999a4a9c6df445e7f6f433e4304e8e4c8941f40",
+      "after_sha256": "d0e16cb81ae873cc9fa4e33f5e42abf11de5ad8e2c31947411fa959878180fef"
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "before_sha256": "541a3a4662d1444897a4e6f182207b2229a185568a8fd3eb4a0b741a9c20b2b2",
+      "after_sha256": "38e15e84d6add61b27f37c4c8d9329cef66b81d2bf9f9e443ad2ec93aaeeab35"
+    },
+    {
+      "path": "package-lock.json",
+      "before_sha256": "d00930cb5fd18b9674e49231d24e7948fabbf94206945a202f82b14edfe25e20",
+      "after_sha256": "b81400e5ab4bae5ecb592bd1fef89dcdc1625f401a59cb96cee92e0d80421779"
+    },
+    {
+      "path": "package.json",
+      "before_sha256": "972c713148745b30e466e0d7b032c632f95382692b2ac12363a466fb2f4c48a9",
+      "after_sha256": "4f8902c12dea913639b60fd6724656aff2b1cdc4efbf7da3921dc937926406df"
+    },
+    {
+      "path": "sentry.edge.config.ts",
+      "before_sha256": "fb7b45a90d456e6d636d408095ce0ffd1567b7bd7f60d68da2c417e639bbabbe",
+      "after_sha256": "9caa393854a5dca523a1dec915b136ad25e6bb61cdaf1c93822b941813f72f47"
+    },
+    {
+      "path": "sentry.server.config.ts",
+      "before_sha256": "fb7b45a90d456e6d636d408095ce0ffd1567b7bd7f60d68da2c417e639bbabbe",
+      "after_sha256": "9caa393854a5dca523a1dec915b136ad25e6bb61cdaf1c93822b941813f72f47"
+    },
+    {
+      "path": "supabase/agent-mcp.local.sql",
+      "before_sha256": null,
+      "after_sha256": "3d39b2a373555d1181b85a9e791bfd8fd79cc0654bbb1e09742230797efe28cc"
+    },
+    {
+      "path": "tests/agent-mcp-disabled-http.mjs",
+      "before_sha256": null,
+      "after_sha256": "68d5f145cdfbcca5e5e3786f6bf0262825ef9cd05fbfa2c8128e05be89d11931"
+    },
+    {
+      "path": "tests/tsconfig.agent-mcp.json",
+      "before_sha256": "0db04c80bafbf52c9e9149f601a607303029c9509ab761c3195cef24c24eb4e2",
+      "after_sha256": "2d5f21fd48d7f8638b0cb14cdae8581e7a9b1a067237317b2d93c4cd48ebf914"
+    },
+    {
+      "path": "tests/unit/agent-mcp-backend.test.ts",
+      "before_sha256": null,
+      "after_sha256": "f665ebd63c7f3c8cd0fbd074560bf299170434df0ba84177ff6389acb0c0578d"
+    },
+    {
+      "path": "tests/unit/agent-runtime.test.ts",
+      "before_sha256": null,
+      "after_sha256": "e54a45a1ce7d3312da785d4725e6590973a1b2d81129449606d391e0cd8a4d39"
+    },
+    {
+      "path": "tests/unit/runtime-dependency-floors.test.ts",
+      "before_sha256": "460b1c0b1da853586a1061000fddd0a956030ed5eaef31f77a29572b7f570a7d",
+      "after_sha256": "f5529961aeb92e5057095c9360e904973a4162e9122e4510259da0a716b90083"
+    },
+    {
+      "path": "docs/ai/mcp-implementation-verification-20261004.json",
+      "before_sha256": null,
+      "after_sha256": null,
+      "note": "Verification record is not self-hashed."
+    }
+  ],
+  "application_copy": {
+    "result": "guarded installation completed",
+    "recorded_at": "2026-10-04T10:27:49.934298+00:00",
+    "files": 32,
+    "source_hashes_verified": true,
+    "destination_preconditions_verified": true,
+    "installed_hashes_verified": true,
+    "post_install_checks": "passed",
+    "no_stage_commit_or_deploy": true,
+    "post_install_recorded_at": "2026-10-04T10:33:24.057769+00:00",
+    "dependencies_installed": "npm ci; locked dependencies",
+    "checks": [
+      {
+        "category": "application_types",
+        "command": "./node_modules/.bin/tsc --noEmit --incremental false",
+        "result": "passed",
+        "exit_code": 0
+      },
+      {
+        "category": "fixture_backend_types",
+        "command": "./node_modules/.bin/tsc --noEmit -p tests/tsconfig.agent-mcp.json",
+        "result": "passed",
+        "exit_code": 0
+      },
+      {
+        "category": "focused_lint",
+        "command": "npm run lint -- app/lib/agent-config.ts app/lib/agent-db.ts app/lib/agent-mcp.ts app/lib/agent-oauth.ts app/lib/agent-read-service.ts app/lib/agent-telemetry.ts app/api/mcp app/api/agent app/.well-known app/settings/agent-connections/page.tsx sentry.server.config.ts sentry.edge.config.ts instrumentation-client.ts tests/unit/agent-mcp-backend.test.ts tests/unit/agent-runtime.test.ts tests/agent-mcp-disabled-http.mjs tests/unit/runtime-dependency-floors.test.ts",
+        "result": "passed",
+        "exit_code": 0
+      },
+      {
+        "category": "focused_unit_fixtures",
+        "command": "npm run test:unit -- tests/unit/agent-read-service.test.ts tests/unit/chatgpt-mcp-fixture.test.ts tests/unit/operator-acquisition.test.ts tests/unit/agent-runtime.test.ts tests/unit/runtime-dependency-floors.test.ts",
+        "result": "passed",
+        "exit_code": 0
+      },
+      {
+        "category": "whole_unit_suite_with_local_postgresql",
+        "command": "AGENT_TEST_SOCKET=<disposable /private/tmp/capekayak-db-test-* Unix socket> AGENT_TEST_PORT=55439 npm run test:unit",
+        "result": "passed",
+        "test_files": 119,
+        "passed": 1837,
+        "intentional_skips": 1,
+        "backend_mcp_tests_included": 48,
+        "boundary": "Current application source including preserved concurrent changes; local synthetic PostgreSQL and injected operator identity, no live Auth or provider."
+      }
+    ],
+    "boundary": "Actual application checkout: local types/lint/labelled fixtures only; no native login, production database, provider or deployment.",
+    "concurrent_changes_outside_task_preserved": [
+      "app/simple/check-ins/page.tsx",
+      "components/AppShell.tsx",
+      "components/simple/DepartureCard.tsx",
+      "components/simple/simple-view.css",
+      "docs/production-readiness/STATE.md",
+      "next-env.d.ts",
+      "tests/e2e/simple-view-mocked.spec.ts",
+      "tests/unit/mobile-first-implementation.test.ts"
+    ],
+    "unrelated_existing_files_checked": 1450,
+    "unrelated_existing_files_unchanged_during_final_checks": true
+  }
+}

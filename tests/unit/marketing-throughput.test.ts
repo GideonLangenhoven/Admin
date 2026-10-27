@@ -24,7 +24,7 @@ describe("marketing dispatch throughput", () => {
   });
 
   it("sends chunks in parallel rather than one request per email", () => {
-    expect(src).toContain("chunk(emailPayloads, RESEND_BATCH_MAX)");
+    expect(src).toContain("chunk(reservedPayloads, RESEND_BATCH_MAX)");
     expect(src).toContain("await Promise.all(groups.map(");
   });
 
@@ -54,6 +54,8 @@ describe("marketing dispatch throughput", () => {
 
   it("survives a network error on one chunk", () => {
     expect(src).toContain(".catch((e) => ({ ok: false, status: 0");
-    expect(src).toContain("res.status === 0");
+    expect(src).toContain('"reconcile"');
+    expect(src).toContain('retryable: false');
+    expect(src).not.toContain('retryable: res.status >= 500');
   });
 });

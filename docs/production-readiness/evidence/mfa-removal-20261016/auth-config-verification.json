@@ -1,0 +1,21 @@
+{
+  "at": "2026-10-16T07:02:36.817Z",
+  "before": {
+    "mfa_totp_enroll_enabled": true,
+    "mfa_totp_verify_enabled": true,
+    "mfa_phone_enroll_enabled": false,
+    "mfa_phone_verify_enabled": false,
+    "mfa_web_authn_enroll_enabled": false,
+    "mfa_web_authn_verify_enabled": false
+  },
+  "after": {
+    "mfa_totp_enroll_enabled": false,
+    "mfa_totp_verify_enabled": false,
+    "mfa_phone_enroll_enabled": false,
+    "mfa_phone_verify_enabled": false,
+    "mfa_web_authn_enroll_enabled": false,
+    "mfa_web_authn_verify_enabled": false
+  },
+  "unrelated_config_unchanged": true,
+  "source": "https://supabase.com/docs/reference/api/v1-update-auth-service-config"
+}

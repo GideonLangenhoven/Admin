@@ -1,0 +1,146 @@
+{
+  "cases": [
+    {
+      "name": "shows Simple view in a landscape tablet sidebar and keeps AI help clear of More in portrait",
+      "project": "desktop-chrome",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 3560
+        }
+      ]
+    },
+    {
+      "name": "keeps dashboard data and actions inside the cards across tablet and content breakpoints",
+      "project": "desktop-chrome",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 5838
+        }
+      ]
+    },
+    {
+      "name": "keeps Simple View and selected date through rotation without touch detection",
+      "project": "desktop-chrome",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 3038
+        }
+      ]
+    },
+    {
+      "name": "keeps empty and loading dashboards within tablet width",
+      "project": "desktop-chrome",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 1233
+        }
+      ]
+    },
+    {
+      "name": "preserves ADMIN navigation and section permissions on a landscape tablet",
+      "project": "desktop-chrome",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 1472
+        }
+      ]
+    },
+    {
+      "name": "preserves MAIN_ADMIN navigation and section permissions on a landscape tablet",
+      "project": "desktop-chrome",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 1395
+        }
+      ]
+    },
+    {
+      "name": "preserves SUPER_ADMIN navigation and section permissions on a landscape tablet",
+      "project": "desktop-chrome",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 1856
+        }
+      ]
+    },
+    {
+      "name": "shows Simple view in a landscape tablet sidebar and keeps AI help clear of More in portrait",
+      "project": "webkit",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 2327
+        }
+      ]
+    },
+    {
+      "name": "keeps dashboard data and actions inside the cards across tablet and content breakpoints",
+      "project": "webkit",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 6213
+        }
+      ]
+    },
+    {
+      "name": "keeps Simple View and selected date through rotation without touch detection",
+      "project": "webkit",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 2620
+        }
+      ]
+    },
+    {
+      "name": "keeps empty and loading dashboards within tablet width",
+      "project": "webkit",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 1538
+        }
+      ]
+    },
+    {
+      "name": "preserves ADMIN navigation and section permissions on a landscape tablet",
+      "project": "webkit",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 1759
+        }
+      ]
+    },
+    {
+      "name": "preserves MAIN_ADMIN navigation and section permissions on a landscape tablet",
+      "project": "webkit",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 1724
+        }
+      ]
+    },
+    {
+      "name": "preserves SUPER_ADMIN navigation and section permissions on a landscape tablet",
+      "project": "webkit",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 1933
+        }
+      ]
+    }
+  ],
+  "passed": 14,
+  "failed": 0
+}

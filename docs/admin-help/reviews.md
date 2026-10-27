@@ -4,7 +4,7 @@ route: /reviews
 required_role: OPERATOR
 ---
 
-The Reviews page is where you moderate customer reviews before they appear publicly.
+Open [Reports](/reports), then its **Reviews** tab at /reviews to moderate customer reviews before they appear publicly. Your main admin can hide Reviews for individual staff. Reviews is excluded from the shared demo.
 
 ## Moderating
 

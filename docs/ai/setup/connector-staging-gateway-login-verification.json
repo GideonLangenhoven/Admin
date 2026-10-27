@@ -1,0 +1,11 @@
+{
+  "verified_at": "2026-10-08T13:13:25.584Z",
+  "target_project": "gwwnkihblioayklptdab",
+  "sql_sha256": "1891731270ec53b939ab0311f3a47423e597b1effc2b3c8b88a90738198665da",
+  "checks": 8,
+  "report": {
+    "gateway_login_enabled": true,
+    "enabled_connectors": "0"
+  },
+  "boundary": "Local PostgreSQL 17, non-superuser administrator, synthetic data, private random test password. The Unix-socket fixture uses trust authentication; this does not verify hosted password authentication, Supavisor, TLS, application deployment or provider linking. Test login/password are removed afterward."
+}

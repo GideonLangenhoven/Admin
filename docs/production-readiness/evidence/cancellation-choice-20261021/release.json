@@ -1,0 +1,179 @@
+{
+  "verified_at": "2026-10-21T08:44:43.797204+00:00",
+  "scope": "Per-cancellation operator choice: customer options or notification only, including weather cancellations",
+  "admin": {
+    "id": "dpl_5RajBzqEWsopWBv3orKydKiTiUBQ",
+    "url": "caepweb-admin-ph1ncjdw4-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 505,
+    "changed": [
+      "app/bookings/page.tsx",
+      "app/slots/page.tsx",
+      "app/broadcasts/page.tsx",
+      "app/lib/booking-actions.ts",
+      "app/lib/cancellation-choice.ts"
+    ]
+  },
+  "booking": {
+    "id": "dpl_7D44Kx9Vw9yEPeNs1M2cifuqCNyb",
+    "url": "booking-9i6mdbkt4-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 171,
+    "changed": [
+      "app/lib/types.ts",
+      "app/my-bookings/page.tsx",
+      "app/my-bookings/BookingCard.tsx"
+    ]
+  },
+  "platform": {
+    "verified": [
+      {
+        "slug": "weather-cancel",
+        "version": 92,
+        "files": 4
+      },
+      {
+        "slug": "cancel-booking",
+        "version": 42,
+        "files": 3
+      },
+      {
+        "slug": "rebook-booking",
+        "version": 99,
+        "files": 6
+      },
+      {
+        "slug": "send-email",
+        "version": 197,
+        "files": 11
+      },
+      {
+        "slug": "my-bookings-lookup",
+        "version": 30,
+        "files": 6
+      },
+      {
+        "slug": "wa-webhook",
+        "version": 244,
+        "files": 17
+      }
+    ],
+    "columns": [
+      {
+        "column_name": "cancellation_self_service",
+        "is_nullable": "NO",
+        "column_default": "true"
+      }
+    ],
+    "probes": [
+      {
+        "slug": "weather-cancel",
+        "status": 401
+      },
+      {
+        "slug": "cancel-booking",
+        "status": 400
+      },
+      {
+        "slug": "rebook-booking",
+        "status": 400
+      },
+      {
+        "slug": "my-bookings-lookup",
+        "status": 403
+      }
+    ],
+    "customerMessagesSent": 0,
+    "realCancellations": 0
+  },
+  "final_whatsapp_verification": {
+    "slug": "wa-webhook",
+    "version": 244,
+    "files": 17,
+    "authenticationPreserved": true
+  },
+  "live_http_checks": [
+    {
+      "tenant": "aonyx",
+      "surface": "admin",
+      "path": "/bookings",
+      "status": 200,
+      "notifyOnlyControl": true
+    },
+    {
+      "tenant": "aonyx",
+      "surface": "admin",
+      "path": "/simple/bookings",
+      "status": 200,
+      "notifyOnlyControl": true
+    },
+    {
+      "tenant": "aonyx",
+      "surface": "admin",
+      "path": "/slots",
+      "status": 200,
+      "notifyOnlyControl": true
+    },
+    {
+      "tenant": "aonyx",
+      "surface": "admin",
+      "path": "/broadcasts",
+      "status": 200,
+      "notifyOnlyControl": true
+    },
+    {
+      "tenant": "aonyx",
+      "surface": "customer",
+      "path": "/my-bookings",
+      "status": 200,
+      "persistedChoiceRespected": true
+    },
+    {
+      "tenant": "kayak",
+      "surface": "admin",
+      "path": "/bookings",
+      "status": 200,
+      "notifyOnlyControl": true
+    },
+    {
+      "tenant": "kayak",
+      "surface": "admin",
+      "path": "/simple/bookings",
+      "status": 200,
+      "notifyOnlyControl": true
+    },
+    {
+      "tenant": "kayak",
+      "surface": "admin",
+      "path": "/slots",
+      "status": 200,
+      "notifyOnlyControl": true
+    },
+    {
+      "tenant": "kayak",
+      "surface": "admin",
+      "path": "/broadcasts",
+      "status": 200,
+      "notifyOnlyControl": true
+    },
+    {
+      "tenant": "kayak",
+      "surface": "customer",
+      "path": "/my-bookings",
+      "status": 200,
+      "persistedChoiceRespected": true
+    }
+  ],
+  "migration": "20261020170000_cancellation_notification_only.sql",
+  "checks": {
+    "focused_cancellation_tests": 25,
+    "local_postgres_acceptance_groups": 23,
+    "database_column_and_refund_ui_tests": "passed",
+    "isolated_release_component_tests": 23,
+    "production_builds": "admin and booking passed",
+    "source_isolation": "500 admin files and 168 booking files preserved; shared function dependencies preserved",
+    "real_cancellations": 0,
+    "customer_messages_sent": 0
+  },
+  "limits": [
+    "No live cancellation or real customer notification was triggered."
+  ]
+}

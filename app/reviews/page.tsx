@@ -4,7 +4,9 @@ import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { notify } from "../lib/app-notify";
 import { Star } from "@phosphor-icons/react";
-import SectionTabs from "../../components/SectionTabs";
+import ReportsLayout from "../../components/ReportsLayout";
+import ReportPeriodGroup, { ReportPeriodPicker } from "../../components/ReportPeriodGroup";
+import { groupReportRows, type ReportPeriod } from "../lib/report-booking-periods";
 
 type Review = {
     id: string;
@@ -24,10 +26,11 @@ type Review = {
 const STATUSES = ["PENDING", "APPROVED", "HIDDEN", "SPAM"] as const;
 
 export default function ReviewsPage() {
-    const { businessId } = useBusinessContext();
+    const { businessId, timezone } = useBusinessContext();
     const [reviews, setReviews] = useState<Review[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<string>("PENDING");
+    const [period, setPeriod] = useState<ReportPeriod>("week");
     const [updating, setUpdating] = useState<string | null>(null);
 
     useEffect(() => {
@@ -62,36 +65,36 @@ export default function ReviewsPage() {
     }
 
     return (
-        <div className="p-4 sm:p-6 max-w-5xl mx-auto">
-            <SectionTabs section="reports" />
-            <div className="anim-fade-up mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <p className="ui-mono-label mb-2">Reports · Reviews</p>
-                    <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Reviews</h1>
-                </div>
-                <div className="-mx-4 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:overflow-visible sm:px-0">
-                    <div className="ui-seg w-max">
+        <ReportsLayout activeTab="reviews" description="Approve reviews to publish on your booking site.">
+            <div className="ui-card flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                <h2 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Reviews</h2>
+                <div className="max-w-full overflow-x-auto no-scrollbar">
+                    <div className="ui-seg w-max" role="group" aria-label="Review status">
                         {STATUSES.map(s => (
-                            <button key={s} type="button" className="ui-seg-item" data-active={filter === s} onClick={() => setFilter(s)}>
-                                {s}
+                            <button key={s} type="button" className="ui-seg-item" data-active={filter === s} aria-pressed={filter === s} onClick={() => setFilter(s)}>
+                                {s[0] + s.slice(1).toLowerCase()}
                             </button>
                         ))}
                     </div>
                 </div>
             </div>
 
+            <ReportPeriodPicker value={period} onChange={setPeriod} label="Group reviews by" />
+
             {loading ? (
                 <div className="space-y-4">{[1, 2, 3].map(i => <div key={i} className="ui-skeleton h-24" />)}</div>
             ) : reviews.length === 0 ? (
                 <div className="ui-card">
                     <div className="ui-empty">                        <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No {filter.toLowerCase()} reviews</p>
-                        <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>{filter === "PENDING" ? "Submitted reviews awaiting moderation will appear here." : "Reviews with this status will appear here."}</p>
+                        <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>{filter === "PENDING" ? "New reviews appear here for approval." : "Try another status."}</p>
                     </div>
                 </div>
             ) : (
                 <div className="anim-fade-up anim-d1 space-y-4">
-                    {reviews.map(r => (
-                        <div key={r.id} className="ui-card p-4 sm:p-5">
+                    {groupReportRows(reviews, period, timezone || "UTC", r => r.submitted_at || r.created_at).reverse().map(group => (
+                      <ReportPeriodGroup key={`${filter}:${period}:${group.key}`} label={group.label} summary={`${group.rows.length} ${group.rows.length === 1 ? "review" : "reviews"}`}>
+                    {group.rows.map(r => (
+                        <div key={r.id} className="border-t p-4 sm:p-5">
                             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-3 mb-2">
@@ -111,7 +114,7 @@ export default function ReviewsPage() {
                                     {r.comment && <p className="text-sm leading-relaxed" style={{ color: "var(--ck-text)" }}>{r.comment}</p>}
                                     <div className="mt-2 flex items-center gap-3 text-xs flex-wrap" style={{ color: "var(--ck-text-muted)" }}>
                                         {r.tours?.name && <span>Tour: {r.tours.name}</span>}
-                                        {r.submitted_at && <span>{new Date(r.submitted_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}</span>}
+                                        {r.submitted_at && <span>{new Date(r.submitted_at).toLocaleDateString("en-ZA", { timeZone: timezone || "UTC", day: "numeric", month: "short", year: "numeric" })}</span>}
                                     </div>
                                 </div>
                                 <div className="flex gap-2 shrink-0 self-start sm:self-auto flex-wrap">
@@ -137,8 +140,10 @@ export default function ReviewsPage() {
                             </div>
                         </div>
                     ))}
+                      </ReportPeriodGroup>
+                    ))}
                 </div>
             )}
-        </div>
+        </ReportsLayout>
     );
 }

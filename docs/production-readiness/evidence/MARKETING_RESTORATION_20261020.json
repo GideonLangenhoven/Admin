@@ -1,0 +1,111 @@
+{
+  "at": "2026-10-20T04:44:38.531152+00:00",
+  "scope": "Owner requested restoring marketing for all operators; original admin contact editing remains deployed.",
+  "deployment": {
+    "id": "dpl_5kkZGSKTP5rTJUdeUnHeDGjzXVx5",
+    "url": "caepweb-admin-h9ycyyvkj-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 499
+  },
+  "baseline": "dpl_7pwz1xkCZRMvurXSbrwSHnEoeF3u",
+  "runtime_files_changed": 7,
+  "unrelated_sources_preserved": 492,
+  "provider": {
+    "existing_connection_reused": true,
+    "verified_domain": "bookingtours.co.za",
+    "feedback": {
+      "at": "2026-10-19T12:50:20.074Z",
+      "id": "0af4d3f6-1f9e-471b-9cf5-5747e0341eb4",
+      "endpoint": "https://ukdsrndqhsatjkmxijuj.supabase.co/functions/v1/resend-webhook",
+      "events": [
+        "email.bounced",
+        "email.complained",
+        "email.suppressed"
+      ],
+      "signed_callback_status": 200,
+      "unsigned_callback_status": 401,
+      "customer_messages_sent": 0,
+      "secret_installed": true
+    },
+    "temporary_management_function_removed": true,
+    "sender_unchanged": true
+  },
+  "migration": {
+    "at": "2026-10-20T04:02:18.835Z",
+    "version": "20261020040000",
+    "sha256": "9202c862902b86c98597f890d38093134361cbae08a75fca39b14288683aa5a5",
+    "committed": true
+  },
+  "operators": {
+    "at": "2026-10-20T04:39:57.725Z",
+    "operators": [
+      {
+        "id": "280d9c97-c09d-4ca2-8ffc-37f0b6e31ba7",
+        "business_name": "Aonyx"
+      },
+      {
+        "id": "44ff11ab-c697-47de-9227-0ffa51db127c",
+        "business_name": "Kayak"
+      },
+      {
+        "id": "a236bd31-5ab5-4c75-b9ee-b6fccc6be624",
+        "business_name": "Ocean Adventures"
+      },
+      {
+        "id": "af17838c-fdd6-4b84-97c0-1cea39db7c0a",
+        "business_name": "Claire's Hiking"
+      }
+    ],
+    "policies": [
+      {
+        "business_id": "a236bd31-5ab5-4c75-b9ee-b6fccc6be624",
+        "enabled": true,
+        "minimum_interval_seconds": 86400,
+        "window_start": "08:00:00",
+        "window_end": "20:00:00"
+      },
+      {
+        "business_id": "af17838c-fdd6-4b84-97c0-1cea39db7c0a",
+        "enabled": true,
+        "minimum_interval_seconds": 86400,
+        "window_start": "08:00:00",
+        "window_end": "20:00:00"
+      },
+      {
+        "business_id": "44ff11ab-c697-47de-9227-0ffa51db127c",
+        "enabled": true,
+        "minimum_interval_seconds": 86400,
+        "window_start": "08:00:00",
+        "window_end": "20:00:00"
+      },
+      {
+        "business_id": "280d9c97-c09d-4ca2-8ffc-37f0b6e31ba7",
+        "enabled": true,
+        "minimum_interval_seconds": 86400,
+        "window_start": "08:00:00",
+        "window_end": "20:00:00"
+      }
+    ]
+  },
+  "validation": {
+    "focused_unit_tests_passed": 80,
+    "disposable_postgres": "PASS: tenant and role boundaries, consent evidence, suppression and reimport, callback-before-send race and address edits, paid anchors, duplicate enrollment, unpaid rebooking, refunds and upcoming trips",
+    "production_build": "PASS",
+    "typescript": "PASS",
+    "edge_type_checks": "PASS",
+    "staged_synthetic_browser_cases": 6,
+    "live_synthetic_browser_cases": 6,
+    "live_http_checks": 5,
+    "live_operator_readiness_checks": 4,
+    "real_customer_messages_sent": 0,
+    "actual_provider_delivery_to_recipient_tested": false
+  },
+  "remaining_limits": [
+    "Contacts require genuine recorded permission; no permission was manufactured or backfilled.",
+    "Existing drafts were not activated.",
+    "Automatic voucher/promo issuance, event-tag/date-based journeys and promotional test sends remain unavailable.",
+    "Suspended platform account was not enabled."
+  ],
+  "evidence_directory": "marketing-restoration-20261020",
+  "broader_rollout": "PAUSED; unchanged"
+}

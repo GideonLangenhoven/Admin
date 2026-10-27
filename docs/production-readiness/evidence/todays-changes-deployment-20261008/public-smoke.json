@@ -1,0 +1,54 @@
+{
+  "checkedAt": "2026-10-08T08:47:01.083Z",
+  "passed": true,
+  "rows": [
+    {
+      "url": "https://admin.bookingtours.co.za/",
+      "expected": 200,
+      "status": 200,
+      "cacheControl": "public, max-age=0, must-revalidate"
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/reports",
+      "expected": 200,
+      "status": 200,
+      "cacheControl": "public, max-age=0, must-revalidate"
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/reviews",
+      "expected": 200,
+      "status": 200,
+      "cacheControl": "public, max-age=0, must-revalidate"
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/settings",
+      "expected": 200,
+      "status": 200,
+      "cacheControl": "public, max-age=0, must-revalidate"
+    },
+    {
+      "url": "https://kayak.admin.bookingtours.co.za/",
+      "expected": 200,
+      "status": 200,
+      "cacheControl": "public, max-age=0, must-revalidate"
+    },
+    {
+      "url": "https://claires-hiking.admin.bookingtours.co.za/",
+      "expected": 200,
+      "status": 200,
+      "cacheControl": "public, max-age=0, must-revalidate"
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/api/admin/chat-faq",
+      "expected": 401,
+      "status": 401,
+      "cacheControl": "public, max-age=0, must-revalidate"
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/api/agent/read",
+      "expected": 503,
+      "status": 503,
+      "cacheControl": "no-store"
+    }
+  ]
+}

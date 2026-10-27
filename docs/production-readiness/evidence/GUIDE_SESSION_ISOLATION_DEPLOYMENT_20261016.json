@@ -1,0 +1,92 @@
+{
+  "at": "2026-10-16T08:58:35.141037+00:00",
+  "deployment": {
+    "id": "dpl_HmTU5CGaSLZkrD5ocFv8WTeB2vks",
+    "url": "caepweb-admin-qjx6bg1i8-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 486
+  },
+  "baseline": "dpl_DV7xuxRfeemH3XhLj7jr3TvA4xPS",
+  "live_hosts": [
+    "admin.bookingtours.co.za",
+    "aonyx.admin.bookingtours.co.za"
+  ],
+  "source_files": 486,
+  "scope": [
+    "app/lib/browser-session.ts",
+    "app/lib/supabase.ts",
+    "components/AuthGate.tsx",
+    "components/SignOutButton.tsx",
+    "app/lib/guide-offline.ts",
+    "components/GuideServiceWorker.tsx",
+    "proxy.ts",
+    "public/guide/sw.js",
+    "app/lib/admin-auth.ts",
+    "app/lib/admin-timezone.ts",
+    "app/lib/booking-actions.ts",
+    "app/lib/guide-access.ts",
+    "components/guide/GuideDay.tsx",
+    "components/simple/DepartureCard.tsx",
+    "app/simpleguide/photos/[slotId]/page.tsx"
+  ],
+  "checks": {
+    "unit": {
+      "passed": 2399,
+      "skipped": 58,
+      "files_passed": 145,
+      "files_skipped": 2
+    },
+    "typescript": "passed",
+    "production_build": "passed",
+    "live_browser_tests": 15,
+    "aonyx_and_central_guide_browser_tests": 1,
+    "live_http_access_checks": 10,
+    "help_unit_checks": 4
+  },
+  "browser_coverage": [
+    "independent operator and guide identities and offline authority",
+    "refresh both sessions",
+    "guide photo navigation",
+    "sign out guide without changing operator",
+    "sign out operator without changing guide",
+    "guide sign-out propagates to other guide tabs only",
+    "local Supabase sign-out scope",
+    "stale guide cookie cannot trap operator",
+    "guide cannot open office views",
+    "one-time guide password setup",
+    "owner and super-admin integration settings without MFA",
+    "partial arrivals",
+    "photo uploads, retry, bulk links, thank-you email with mocked delivery"
+  ],
+  "help": {
+    "updated": [
+      "help:guide:4"
+    ],
+    "other_live_chunks_preserved": 175
+  },
+  "limitations": [
+    "Browser auth, data, photo uploads and messages were synthetic and intercepted; no customer credentials or messages used.",
+    "Existing guide tabs need refresh and a fresh sign-in for the separate session storage."
+  ],
+  "database_migrations": [],
+  "edge_deployments": [],
+  "authentication_configuration_changes": false,
+  "marketing_activation": false,
+  "runtime_sha256": {
+    "app/lib/browser-session.ts": "0339d657bd1f7835938823f9aae66d3b7e89ea954e0699395c4ae2625e213a69",
+    "app/lib/supabase.ts": "1a1c5e4a988bc397ce4e6c980c5d714a19cf7f6ad634e16703ad8cad0741cbf8",
+    "components/AuthGate.tsx": "d33d9376b602ad48e6e004d2c2a217fac5f463a76fefa0fd328e6b88bcf73ea3",
+    "components/SignOutButton.tsx": "20c6e421fdeb6b7f325b7e770dd3e601bb18bb3bc1dcbef4d4d732e85252b45c",
+    "app/lib/guide-offline.ts": "2888ae7d0d5b0cdb1fd1e45198880d89007656a23eb0c7d6f36245815cc4b70a",
+    "components/GuideServiceWorker.tsx": "bb56d619816ec559797295c917c52f6220ef86131de98bd9394826664553d7ba",
+    "proxy.ts": "dc87f42a2de37aa665499d178a1044af2ee52fbb09433a3bc043de418e99981f",
+    "public/guide/sw.js": "d061ab514bbc927effac892565fe8c21bdbd26664f2116de53b8dba57fcb04ff",
+    "app/lib/admin-auth.ts": "10a7328a2a9ef60b3af87ab985591dbd4deac0f00d992224eb8f4e41ce4e1c72",
+    "app/lib/admin-timezone.ts": "870a6ee0f9679f0f7bf74078e3338d4a537b2f6e15a886cdc3fdbdb7f3e89981",
+    "app/lib/booking-actions.ts": "c238b6f20424dffa6cf0da7f771be0c0cc43d04409c0d8fca42fb68307fdbe4e",
+    "app/lib/guide-access.ts": "6ee36194dc635fcc1a3b1c8a9494d598d7b68cc2de7cc6c05764e15dbbd7f443",
+    "components/guide/GuideDay.tsx": "bb418577099b640480e6339995aca89020b5fbd036fd76c4a159e2185d3c9746",
+    "components/simple/DepartureCard.tsx": "62b60036660f11bea9d2ebf16ad76682ef00eae77a66c61609fc14f65ffcb431",
+    "app/simpleguide/photos/[slotId]/page.tsx": "5c53665c4f5d0325f3c2f3d20d8af9ad596bac95ba368e4acd9004f4b01f155d"
+  }
+}

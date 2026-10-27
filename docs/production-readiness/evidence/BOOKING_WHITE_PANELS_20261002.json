@@ -1,0 +1,60 @@
+{
+  "date": "2026-10-02",
+  "status": "published_and_verified",
+  "requested_url": "https://kayak.booking.bookingtours.co.za/book?tour=96e07644-315b-4e96-8f36-bb070b665cf8",
+  "source_manifest": {
+    "baseDeployment": "dpl_eFbqMkYez62RS1HuUSwZgRdGUs9L",
+    "source": "/private/tmp/bookingtours-white-panels-20261002/booking",
+    "changedFiles": [
+      "app/book/booking-panels.css",
+      "app/book/layout.tsx",
+      "app/book/page.tsx"
+    ],
+    "unchangedFiles": 162,
+    "hashes": {
+      "app/book/booking-panels.css": "f2fe6081f1367bd899d7dd483c2331f02f466325b0108f9b20294ab0c3e85b57",
+      "app/book/layout.tsx": "1c13dc0ebfd917e1874030a4c5df67faeef7a02df0a8901773975aabc9f60e2b",
+      "app/book/page.tsx": "4cd1ec237e3821aef03f8402be3b682ca2118d98b9212380f5eeae554f175fd4"
+    },
+    "scope": "White booking panels and form controls, shared card typography and operator-coloured primary actions. Page change adds one CSS scoping class only.",
+    "businessLogicChanges": 0
+  },
+  "deployment": {
+    "id": "dpl_DUxb9t2yu3t3pkAYE8uWfaGSXYBP",
+    "url": "https://booking-82ouju8sn-jerrys-projects-f4e4eaf9.vercel.app",
+    "public_url": "https://kayak.booking.bookingtours.co.za",
+    "ready_state": "READY",
+    "preserved_deployment": "dpl_eFbqMkYez62RS1HuUSwZgRdGUs9L",
+    "supersedes": "dpl_eFbqMkYez62RS1HuUSwZgRdGUs9L",
+    "alias_verified": true,
+    "deployed_at": "2026-10-02T05:17:26Z",
+    "promoted_at": "2026-10-02T05:19:04Z"
+  },
+  "workspace_files": [
+    "booking/app/book/booking-panels.css",
+    "booking/app/book/layout.tsx"
+  ],
+  "validation": {
+    "isolated_next_production_build": "passed on Vercel (build duration: 48s)",
+    "typescript": "passed",
+    "lint": "zero errors; eight existing booking-page warnings",
+    "diff_check": "passed; exactly 3 presentation files modified from base dpl_eFbqMkYez62RS1HuUSwZgRdGUs9L",
+    "browser": "verified via browser subagent: loaded live booking page, verified white container panels for calendar and booking details, high contrast and fully functional controls",
+    "live_access": "HTTP 200 OK verified on live domain kayak.booking.bookingtours.co.za and claires-hiking.booking.bookingtours.co.za",
+    "screenshot": "booking-white-panels-20261002/live.png"
+  },
+  "booking_payment_notification_submissions": 0,
+  "patch": "booking-white-panels-20261002/booking-panels.patch",
+  "deployment_history": [
+    {
+      "attempted_at": "2026-10-02T04:51:18Z",
+      "diagnostic": "Vercel authentication discovery failed: getaddrinfo ENOTFOUND vercel.com at https://vercel.com/.well-known/openid-configuration due to sandboxed DNS restriction in previous environment"
+    },
+    {
+      "completed_at": "2026-10-02T05:19:04Z",
+      "deployment_id": "dpl_DUxb9t2yu3t3pkAYE8uWfaGSXYBP",
+      "status": "READY",
+      "promoted": true
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "at": "2026-10-21T13:33:31.882375+00:00",
+  "scope": [
+    "Mobile Slots management menu and inline date navigation",
+    "Refund queue redesign and removal of phone/email line",
+    "Invoice mobile heading and compact sort/date filters",
+    "Marketing mobile navigation, expandable contacts, anchored action panels and copy removals"
+  ],
+  "deployment": {
+    "id": "dpl_DK5faqEwVrFbgE4gVVBkyx9u5MQX",
+    "url": "caepweb-admin-h6xowo1qi-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 506,
+    "changed": [
+      "app/slots/page.tsx",
+      "components/CalendarHeader.tsx",
+      "app/refunds/page.tsx",
+      "app/invoices/page.tsx",
+      "components/DatePicker.tsx",
+      "app/marketing/layout.tsx",
+      "components/SectionTabs.tsx",
+      "app/marketing/contacts/page.tsx",
+      "app/marketing/automations/page.tsx",
+      "app/lib/date-input.ts"
+    ],
+    "production_target_verified": true,
+    "build": "READY"
+  },
+  "live": {
+    "at": "2026-10-21T13:33:17.255Z",
+    "origin": "https://admin.bookingtours.co.za",
+    "checks": [
+      {
+        "path": "/slots",
+        "status": 200,
+        "assets_checked": 18,
+        "copy_verified": true
+      },
+      {
+        "path": "/refunds",
+        "status": 200,
+        "assets_checked": 16,
+        "copy_verified": true
+      },
+      {
+        "path": "/invoices",
+        "status": 200,
+        "assets_checked": 17,
+        "copy_verified": true
+      },
+      {
+        "path": "/marketing/contacts",
+        "status": 200,
+        "assets_checked": 19,
+        "copy_verified": true
+      },
+      {
+        "path": "/marketing/automations",
+        "status": 200,
+        "assets_checked": 18,
+        "copy_verified": true
+      }
+    ]
+  },
+  "source_integrity": {
+    "previous_files": 505,
+    "uploaded_files_verified": 506,
+    "unchanged_files": 496,
+    "changed_existing_files": 9,
+    "added_files": [
+      "app/lib/date-input.ts"
+    ]
+  },
+  "validation": {
+    "focused_unit_tests": {
+      "passed": 94,
+      "groups": {
+        "slots_refunds_invoices_and_typed_dates": 53,
+        "marketing_and_navigation": 41
+      }
+    },
+    "lint_errors": 0,
+    "refund_payment_and_invoice_handlers": "preserved",
+    "contact_and_automation_data_handlers": "preserved apart from panel state updates",
+    "browser_automation": "None. User requested no Chrome or Playwright.",
+    "visual_review": "Left to user as requested."
+  },
+  "rollback": {
+    "id": "dpl_HrqD12M6ke6z6hqr7nY23bgyEfV6",
+    "url": "caepweb-admin-ou6hp6wvi-jerrys-projects-f4e4eaf9.vercel.app"
+  }
+}

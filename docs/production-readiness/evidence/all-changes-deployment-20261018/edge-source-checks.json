@@ -1,0 +1,17 @@
+[
+  {
+    "slug": "marketing-unsubscribe",
+    "path": "supabase/functions/marketing-unsubscribe/index.ts",
+    "sha256": "9df22455f3600048397eb88f9153678e42a558dc87e9e9bfdf4001f2f6122b18"
+  },
+  {
+    "slug": "marketing-unsubscribe",
+    "path": "supabase/functions/_shared/tenant.ts",
+    "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+  },
+  {
+    "slug": "marketing-unsubscribe",
+    "path": "supabase/functions/_shared/pagination.ts",
+    "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+  }
+]

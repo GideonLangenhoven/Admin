@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import crypto from "crypto";
+import { randomBytes } from "crypto";
 import { getCallerAdmin, isPrivilegedRole } from "../../lib/api-auth";
+
+const PUBLIC_COLUMNS = "id,business_a_id,business_b_id,status,initiated_by,accepted_at,revoked_at,created_at,invite_sent_at";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function serviceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -27,9 +30,10 @@ const TOKEN_RATE_WINDOW_MS = 60 * 60 * 1000;
 export async function GET(req: NextRequest) {
   const caller = await getCallerAdmin(req);
   if (!caller) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  if (!isPrivilegedRole(caller.role)) return NextResponse.json({ error: "MAIN_ADMIN or SUPER_ADMIN required" }, { status: 403 });
 
   const businessId = req.nextUrl.searchParams.get("business_id");
-  if (!businessId) return NextResponse.json({ error: "business_id query param is required" }, { status: 400 });
+  if (!businessId || !UUID.test(businessId)) return NextResponse.json({ error: "A valid business_id is required" }, { status: 400 });
 
   if (caller.role !== "SUPER_ADMIN" && caller.business_id !== businessId) {
     return NextResponse.json({ error: "You can only view partnerships for your own business" }, { status: 403 });
@@ -38,7 +42,7 @@ export async function GET(req: NextRequest) {
   const supabase = serviceClient();
   const { data, error } = await supabase
     .from("business_partnerships")
-    .select("*, business_a:businesses!business_partnerships_business_a_id_fkey(id, name, business_name), business_b:businesses!business_partnerships_business_b_id_fkey(id, name, business_name)")
+    .select(PUBLIC_COLUMNS + ", business_a:businesses!business_partnerships_business_a_id_fkey(id, name, business_name), business_b:businesses!business_partnerships_business_b_id_fkey(id, name, business_name)")
     .or(`business_a_id.eq.${businessId},business_b_id.eq.${businessId}`)
     .order("created_at", { ascending: false });
 
@@ -62,8 +66,15 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   let body: any;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }); }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
 
   const { business_id, action } = body;
+  if (action !== "accept_token" && (typeof business_id !== "string" || !UUID.test(business_id))) {
+    return NextResponse.json({ error: "A valid business_id is required" }, { status: 400 });
+  }
+  if (["accept", "revoke"].includes(action) && (typeof body.partnership_id !== "string" || !UUID.test(body.partnership_id))) {
+    return NextResponse.json({ error: "A valid partnership_id is required" }, { status: 400 });
+  }
   const supabase = serviceClient();
 
   // accept_token is token-gated (no session required — email link flow)
@@ -81,7 +92,7 @@ export async function POST(req: NextRequest) {
   if (action === "invite") {
     if (!business_id) return NextResponse.json({ error: "business_id is required" }, { status: 400 });
     const { partner_email } = body;
-    if (!partner_email?.trim()) return NextResponse.json({ error: "partner_email is required" }, { status: 400 });
+    if (typeof partner_email !== "string" || !partner_email.trim()) return NextResponse.json({ error: "partner_email is required" }, { status: 400 });
 
     const normalizedEmail = partner_email.trim().toLowerCase();
 
@@ -99,26 +110,22 @@ export async function POST(req: NextRequest) {
     const partnerId = adminUser.business_id;
     if (partnerId === business_id) return NextResponse.json({ error: "Cannot partner with yourself." }, { status: 400 });
 
-    // Check for existing active/pending partnership
-    const { data: existing } = await supabase
-      .from("business_partnerships")
-      .select("id, status")
-      .or(`and(business_a_id.eq.${business_id},business_b_id.eq.${partnerId}),and(business_a_id.eq.${partnerId},business_b_id.eq.${business_id})`)
-      .in("status", ["PENDING", "ACTIVE"])
-      .maybeSingle();
-
-    if (existing) return NextResponse.json({ error: "A partnership already exists (status: " + existing.status + ")." }, { status: 409 });
-
-    // Canonical ordering
     const aId = business_id < partnerId ? business_id : partnerId;
     const bId = business_id < partnerId ? partnerId : business_id;
+    const { data: existing, error: existingErr } = await supabase
+      .from("business_partnerships")
+      .select("id, status")
+      .eq("business_a_id", aId)
+      .eq("business_b_id", bId)
+      .maybeSingle();
+
+    if (existingErr) return NextResponse.json({ error: existingErr.message }, { status: 500 });
+    if (existing && existing.status !== "REVOKED") return NextResponse.json({ error: "A partnership already exists (status: " + existing.status + ")." }, { status: 409 });
 
     // Generate invite token
-    const inviteToken = crypto.randomBytes(32).toString("hex");
+    const inviteToken = randomBytes(32).toString("hex");
 
-    const { data: created, error: createErr } = await supabase
-      .from("business_partnerships")
-      .insert({
+    const invitation = {
         business_a_id: aId,
         business_b_id: bId,
         status: "PENDING",
@@ -126,11 +133,17 @@ export async function POST(req: NextRequest) {
         invite_token: inviteToken,
         invite_email: normalizedEmail,
         invite_sent_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+        accepted_at: null,
+        revoked_at: null,
+    };
+    // Reuse the unique pair, preserving historical offer/settlement references.
+    const write = existing
+      ? supabase.from("business_partnerships").update(invitation).eq("id", existing.id).eq("status", "REVOKED")
+      : supabase.from("business_partnerships").insert(invitation);
+    const { data: created, error: createErr } = await write.select(PUBLIC_COLUMNS).maybeSingle();
 
-    if (createErr) return NextResponse.json({ error: createErr.message }, { status: 500 });
+    if (createErr) return NextResponse.json({ error: createErr.code === "23505" ? "A partnership invitation already exists." : createErr.message }, { status: createErr.code === "23505" ? 409 : 500 });
+    if (!created) return NextResponse.json({ error: "The partnership changed. Refresh and try again." }, { status: 409 });
 
     // Load inviting business name for the email
     const { data: inviterBiz } = await supabase
@@ -156,6 +169,7 @@ export async function POST(req: NextRequest) {
       : (process.env.NEXT_PUBLIC_APP_URL || "https://admin.bookingtours.co.za");
     const approveUrl = adminAppUrl + "/api/partnerships/approve?token=" + inviteToken;
 
+    let emailSent = false;
     try {
       const emailRes = await fetch(supabaseUrl + "/functions/v1/send-email", {
         method: "POST",
@@ -172,13 +186,16 @@ export async function POST(req: NextRequest) {
         }),
       });
       if (!emailRes.ok) {
-        console.error("Partnership invite email failed:", emailRes.status, await emailRes.text());
+        console.error("Partnership invite email failed:", emailRes.status);
+      } else {
+        const result = await emailRes.json().catch(() => null);
+        emailSent = result?.ok === true;
       }
     } catch (e) {
       console.error("Partnership invite email error:", e);
     }
 
-    return NextResponse.json({ partnership: created });
+    return NextResponse.json({ partnership: created, email_sent: emailSent });
   }
 
   // --- ACCEPT (from dashboard, requires business_id) ---
@@ -189,15 +206,16 @@ export async function POST(req: NextRequest) {
 
     const { data: updated, error: acceptErr } = await supabase
       .from("business_partnerships")
-      .update({ status: "ACTIVE", accepted_at: new Date().toISOString() })
+      .update({ status: "ACTIVE", accepted_at: new Date().toISOString(), invite_token: null })
       .eq("id", partnership_id)
       .eq("status", "PENDING")
+      .neq("initiated_by", business_id)
       .or(`business_a_id.eq.${business_id},business_b_id.eq.${business_id}`)
-      .select()
-      .single();
+      .select(PUBLIC_COLUMNS)
+      .maybeSingle();
 
     if (acceptErr) return NextResponse.json({ error: acceptErr.message }, { status: 500 });
-    if (!updated) return NextResponse.json({ error: "Partnership not found or not pending." }, { status: 404 });
+    if (!updated) return NextResponse.json({ error: "Only the invited operator can accept a pending partnership." }, { status: 409 });
     return NextResponse.json({ partnership: updated });
   }
 
@@ -207,7 +225,7 @@ export async function POST(req: NextRequest) {
   if (action === "accept_token") {
     const { token } = body;
     const inviteEmailFromCaller = String((body as any).invite_email || "").trim().toLowerCase();
-    if (!token) return NextResponse.json({ error: "token is required" }, { status: 400 });
+    if (typeof token !== "string" || !/^[0-9a-f]{64}$/.test(token)) return NextResponse.json({ error: "A valid invite token is required" }, { status: 400 });
     if (!inviteEmailFromCaller) {
       return NextResponse.json({ error: "invite_email is required (the email address the invite was sent to)" }, { status: 400 });
     }
@@ -240,7 +258,7 @@ export async function POST(req: NextRequest) {
     }
 
     const expectedEmail = String(pending.invite_email || "").trim().toLowerCase();
-    if (expectedEmail && expectedEmail !== inviteEmailFromCaller) {
+    if (!expectedEmail || expectedEmail !== inviteEmailFromCaller) {
       attempt.count += 1;
       return NextResponse.json({ error: "Email does not match the invitation." }, { status: 403 });
     }
@@ -255,8 +273,9 @@ export async function POST(req: NextRequest) {
       })
       .eq("id", pending.id)
       .eq("status", "PENDING")  // concurrency guard
-      .select()
-      .single();
+      .eq("invite_token", token)
+      .select(PUBLIC_COLUMNS)
+      .maybeSingle();
 
     if (tokenErr) return NextResponse.json({ error: tokenErr.message }, { status: 500 });
     if (!tokenPartnership) {
@@ -275,18 +294,16 @@ export async function POST(req: NextRequest) {
 
     const { data: revoked, error: revokeErr } = await supabase
       .from("business_partnerships")
-      .update({ status: "REVOKED", revoked_at: new Date().toISOString() })
+      .update({ status: "REVOKED", revoked_at: new Date().toISOString(), invite_token: null })
       .eq("id", partnership_id)
       .or(`business_a_id.eq.${business_id},business_b_id.eq.${business_id}`)
-      .select()
-      .single();
+      .select(PUBLIC_COLUMNS)
+      .maybeSingle();
 
     if (revokeErr) return NextResponse.json({ error: revokeErr.message }, { status: 500 });
     if (!revoked) return NextResponse.json({ error: "Partnership not found." }, { status: 404 });
 
-    // Deactivate all combo offers under this partnership
-    await supabase.from("combo_offers").update({ active: false }).eq("partnership_id", partnership_id);
-
+    // The database trigger deactivates every affected offer in this transaction.
     return NextResponse.json({ partnership: revoked });
   }
 

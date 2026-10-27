@@ -120,6 +120,11 @@ export interface FaqCandidate {
   answer: string;
   score: number;
   keywords: string[];
+  exactMatch: boolean;
+}
+
+function faqWords(value: unknown): string[] {
+  return String(value || "").normalize("NFKC").toLowerCase().replace(/[’']/g, "").match(/[\p{L}\p{N}]+/gu) || [];
 }
 
 export async function loadFaqCandidates(
@@ -134,41 +139,50 @@ export async function loadFaqCandidates(
     .eq("enabled", true);
   if (!entries || entries.length === 0) return [];
 
-  const words = String(message || "").toLowerCase().split(/\s+/).filter(Boolean);
+  const words = faqWords(message);
+  if (words.length === 0) return [];
   const scored: FaqCandidate[] = [];
   for (const entry of entries) {
-    const keywords: string[] = entry.match_keywords || [];
-    if (keywords.length === 0) continue;
+    if (!String(entry.answer || "").trim()) continue;
+    const keywords = [...new Set<string>((Array.isArray(entry.match_keywords) ? entry.match_keywords : [])
+      .map((keyword: unknown) => faqWords(keyword).join(" ")).filter(Boolean))]
+      .sort((a, b) => b.split(" ").length - a.split(" ").length);
+    const exactMatch = faqWords(entry.question_pattern).join(" ") === words.join(" ");
     let score = 0;
-    for (const rawKw of keywords) {
-      const kw = String(rawKw || "").toLowerCase();
-      if (!kw) continue;
-      // Match if any word in the message contains the keyword (or vice versa).
-      // Substring tolerance handles plurals ("vouchers" vs "voucher") and
-      // light morphology ("paying" vs "pay") without needing a stemmer.
-      if (words.some((w) => w.includes(kw) || kw.includes(w))) {
+    const matchedWords = new Set<number>();
+    for (const kw of keywords) {
+      // Match words and common suffixes; short words such as "I" must not
+      // count as matches for "visa" and "credit".
+      const tokens = kw.split(" ");
+      const start = words.findIndex((_, start) => tokens.every((token, offset) => {
+        const word = words[start + offset];
+        return !matchedWords.has(start + offset) && (word === token || (token.length >= 3 && word?.startsWith(token) && /^(?:s|es|ing|ed)$/.test(word.slice(token.length))));
+      }));
+      if (start >= 0) {
+        tokens.forEach((_, offset) => matchedWords.add(start + offset));
         score++;
       }
     }
-    if (score > 0) {
+    if (score > 0 || exactMatch) {
       scored.push({
         id: entry.id,
         question: entry.question_pattern || "",
         answer: entry.answer,
         keywords,
         score,
+        exactMatch,
       });
     }
   }
-  scored.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => Number(b.exactMatch) - Number(a.exactMatch) || b.score - a.score);
   return scored.slice(0, limit);
 }
 
 /**
  * Backwards-compatible single-match helper. Returns the top match's
- * answer iff it scored at least `minScore` (default 2 keyword matches —
- * tuned so single-word coincidences like "pay" don't trigger a verbatim
- * reply that ignores the rest of the user's question). Increments
+ * answer for an exact question, or an unambiguous match with at least
+ * `minScore` distinct keywords. Competing topics belong in the grounded
+ * answer path, rather than silently dropping part of a question. Increments
  * use_count + last_used_at when a match is returned.
  *
  * `intent` is accepted for back-compat but ignored — the keyword-score
@@ -182,16 +196,16 @@ export async function findFaqMatch(
   minScore = 2,
 ): Promise<string | null> {
   void intent; // legacy param, retained for callers that still pass it
-  const candidates = await loadFaqCandidates(db, businessId, message, 1);
+  const candidates = await loadFaqCandidates(db, businessId, message);
   if (candidates.length === 0) return null;
   const top = candidates[0];
-  if (top.score < minScore) return null;
+  if (!top.exactMatch && top.score < minScore) return null;
+  if (candidates.slice(1).some((candidate) => candidate.answer !== top.answer &&
+      (top.exactMatch ? candidate.exactMatch : candidate.score >= minScore))) return null;
   await db.from("chat_faq_entries").update({
-    use_count: db.rpc ? undefined : undefined, // no rpc bump available — do a read-modify-write
     last_used_at: new Date().toISOString(),
-  }).eq("id", top.id);
-  // Increment use_count atomically via select-then-update fallback
-  const { data: cur } = await db.from("chat_faq_entries").select("use_count").eq("id", top.id).maybeSingle();
-  await db.from("chat_faq_entries").update({ use_count: (cur?.use_count ?? 0) + 1 }).eq("id", top.id);
+  }).eq("business_id", businessId).eq("id", top.id);
+  const { data: cur } = await db.from("chat_faq_entries").select("use_count").eq("business_id", businessId).eq("id", top.id).maybeSingle();
+  await db.from("chat_faq_entries").update({ use_count: (cur?.use_count ?? 0) + 1 }).eq("business_id", businessId).eq("id", top.id);
   return top.answer;
 }

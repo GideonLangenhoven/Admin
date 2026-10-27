@@ -1,0 +1,63 @@
+{
+  "at": "2026-10-17T06:16:56.927382+00:00",
+  "deployment": {
+    "id": "dpl_3xJNNVaSHyEGCRgYx6ihPGQ4Rf4P",
+    "url": "caepweb-admin-oahbyftv7-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 486
+  },
+  "scope": {
+    "baseline": "dpl_HWyBwRqyZyRdz9DWw2fCk4sCBeEn",
+    "changed": [
+      "app/api/guide/photo-session/route.ts",
+      "components/photos/TripPhotosWorkspace.tsx"
+    ],
+    "preserved": 484,
+    "database_changes": [
+      {
+        "table": "trip_photos",
+        "operation": "restore_existing_upload_folder_link",
+        "rows_inserted": 1,
+        "schema_changed": false
+      }
+    ],
+    "functions": [],
+    "marketing_activation": false
+  },
+  "cause": "Google resumable sessions were initialized server-side without the browser Origin. Google stored each file but withheld the final CORS response, so the browser reported failure and never registered the trip folder.",
+  "changes": [
+    "Pass the request origin when initializing each Google Drive resumable session.",
+    "Require a returned file ID before counting an upload as confirmed.",
+    "Display the first provider or network failure while preserving failed files for retry.",
+    "Restore the verified existing folder of four uploads to the affected departure with its shared guide attribution."
+  ],
+  "checks": {
+    "regression_before": "1 failed, 16 passed: missing Origin",
+    "unit": 17,
+    "local_browser": 7,
+    "live_browser": 7,
+    "live_http_access": 11,
+    "production_build": "passed",
+    "typescript": "passed in production build",
+    "eslint": "0 errors; 4 pre-existing warnings",
+    "uploaded_sources_verified": 486,
+    "unrelated_sources_preserved": 484,
+    "real_drive_transfer": "Without initial Origin: browser fetch failed but file existed. With Origin: HTTP 200 and file ID. Both disposable test files deleted.",
+    "original_files": "All three retry folders contained the same four files, verified by MD5; originals untouched."
+  },
+  "recovery": {
+    "at": "2026-10-17T06:13:00.780Z",
+    "inserted": true,
+    "slot_id": "48de1450-d44d-4651-be6a-bc931790f583",
+    "files": 4,
+    "guide_attribution_verified": true,
+    "original_files_unchanged": true,
+    "customer_messages_sent": false
+  },
+  "limits": [
+    "Hosted browser checks simulated authentication, providers and messages; the independent real Drive probe exercised actual browser transfers.",
+    "No customer messages sent. Two earlier duplicate folders left untouched."
+  ],
+  "edge_function_deployments": [],
+  "initial_deploy_attempt": "Vercel returned Not authorized; read access was verified and the same release succeeded on retry."
+}

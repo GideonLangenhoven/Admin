@@ -1,0 +1,377 @@
+[
+  {
+    "slug": "admin-help-chat",
+    "path": "supabase/functions/admin-help-chat/index.ts",
+    "sha256": "651e950aa00fb49749f06bc929ffabf387498f947ce326f28113220f5a8e52e2"
+  },
+  {
+    "slug": "admin-help-chat",
+    "path": "supabase/functions/_shared/tenant.ts",
+    "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+  },
+  {
+    "slug": "admin-help-chat",
+    "path": "supabase/functions/_shared/pagination.ts",
+    "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+  },
+  {
+    "slug": "admin-help-chat",
+    "path": "supabase/functions/_shared/auth.ts",
+    "sha256": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade"
+  },
+  {
+    "slug": "admin-help-chat",
+    "path": "supabase/functions/_shared/llm.ts",
+    "sha256": "e7bed1f1ed96a04d6b326ee3580fc6550c37821b19d2618321f4d4be9b3c85c1"
+  },
+  {
+    "slug": "admin-help-chat",
+    "path": "supabase/functions/_shared/openrouter-provider.ts",
+    "sha256": "52aa270a8467d6476d17a8881a4fe29ced09b52cdb44b4bec9e05246af202cd8"
+  },
+  {
+    "slug": "admin-help-chat",
+    "path": "supabase/functions/_shared/kb.ts",
+    "sha256": "5d89feee2c9ef467716d48625b112ecb86b81b84679e48c7a22da42a5f88b68d"
+  },
+  {
+    "slug": "admin-help-chat",
+    "path": "supabase/functions/_shared/demo-guide.ts",
+    "sha256": "f9d714820fd3340ad1dc00a680be2e7207f9feeb0d44f98cd9344b954d666c49"
+  },
+  {
+    "slug": "auto-messages",
+    "path": "supabase/functions/auto-messages/index.ts",
+    "sha256": "bb81de3ade2aad1a8fd725d5d5382ce0bcfe8521f9d29ffd5dab38077854aebc"
+  },
+  {
+    "slug": "auto-messages",
+    "path": "supabase/functions/_shared/tenant.ts",
+    "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+  },
+  {
+    "slug": "auto-messages",
+    "path": "supabase/functions/_shared/pagination.ts",
+    "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+  },
+  {
+    "slug": "auto-messages",
+    "path": "supabase/functions/_shared/waiver.ts",
+    "sha256": "def8bb4c226f45a473419ef49fc3d7b49f9d786c9dde17396f9069f8c6ffc579"
+  },
+  {
+    "slug": "auto-messages",
+    "path": "supabase/functions/_shared/sentry.ts",
+    "sha256": "cf5cad26d7ddb3a103a60d658dab85fa647d98e574d5ddb44ab83700c915bafb"
+  },
+  {
+    "slug": "auto-messages",
+    "path": "supabase/functions/_shared/auth.ts",
+    "sha256": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade"
+  },
+  {
+    "slug": "cron-tasks",
+    "path": "supabase/functions/cron-tasks/index.ts",
+    "sha256": "20f5b4d07e92b20ced7950efafaee6a51ecde00a62bcc7c1de0e4751df939c7b"
+  },
+  {
+    "slug": "cron-tasks",
+    "path": "supabase/functions/_shared/tenant.ts",
+    "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+  },
+  {
+    "slug": "cron-tasks",
+    "path": "supabase/functions/_shared/pagination.ts",
+    "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+  },
+  {
+    "slug": "cron-tasks",
+    "path": "supabase/functions/_shared/sentry.ts",
+    "sha256": "cf5cad26d7ddb3a103a60d658dab85fa647d98e574d5ddb44ab83700c915bafb"
+  },
+  {
+    "slug": "cron-tasks",
+    "path": "supabase/functions/_shared/auth.ts",
+    "sha256": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade"
+  },
+  {
+    "slug": "send-email",
+    "path": "supabase/functions/send-email/index.ts",
+    "sha256": "67ae65694501b9458d771ac2dc87c89105dd8a7502b28106774aa47326931645"
+  },
+  {
+    "slug": "send-email",
+    "path": "supabase/functions/_shared/gift-voucher-face.ts",
+    "sha256": "65fdcaac91278e5757d25497eaa204996f034e3bc87f5491cf1a5102971352ec"
+  },
+  {
+    "slug": "send-email",
+    "path": "supabase/functions/_shared/sentry.ts",
+    "sha256": "cf5cad26d7ddb3a103a60d658dab85fa647d98e574d5ddb44ab83700c915bafb"
+  },
+  {
+    "slug": "send-email",
+    "path": "supabase/functions/_shared/waiver.ts",
+    "sha256": "def8bb4c226f45a473419ef49fc3d7b49f9d786c9dde17396f9069f8c6ffc579"
+  },
+  {
+    "slug": "send-email",
+    "path": "supabase/functions/_shared/tenant.ts",
+    "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+  },
+  {
+    "slug": "send-email",
+    "path": "supabase/functions/_shared/pagination.ts",
+    "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+  },
+  {
+    "slug": "send-email",
+    "path": "supabase/functions/_shared/duration.ts",
+    "sha256": "4f6eb2b814536b6066378deb29002e829e4784ff09e26245009ea76aee22626c"
+  },
+  {
+    "slug": "send-email",
+    "path": "supabase/functions/_shared/marketing-tokens.ts",
+    "sha256": "ac28048ac64a3e0bca6d84db933d91aa2f33479804e457e2922f595b3934ab12"
+  },
+  {
+    "slug": "send-email",
+    "path": "supabase/functions/_shared/marketing-email-html.ts",
+    "sha256": "fa51d920412113136b15c3bf90b694cf5bfc33caec1588357bb64b5bc9c29b42"
+  },
+  {
+    "slug": "send-email",
+    "path": "supabase/functions/_shared/auth.ts",
+    "sha256": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade"
+  },
+  {
+    "slug": "send-email",
+    "path": "supabase/functions/_shared/payment-deadline.ts",
+    "sha256": "afb8e3a68337c44ddd81d5f2c90a5f1504f89530ee2077b109ce9e57388bb3a7"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/wa-webhook/index.ts",
+    "sha256": "71cbbcc44bf4bd454833fc82a5905a4f5e619120546b19769b6d59e5917b943d"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/_shared/marketing-outbox.ts",
+    "sha256": "d35df6e5004f7c7a550ebfa0856ac6d37dfdba0e3e815e48fc98b3fcbbc7dbac"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/_shared/tenant.ts",
+    "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/_shared/pagination.ts",
+    "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/_shared/waiver.ts",
+    "sha256": "def8bb4c226f45a473419ef49fc3d7b49f9d786c9dde17396f9069f8c6ffc579"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/_shared/duration.ts",
+    "sha256": "4f6eb2b814536b6066378deb29002e829e4784ff09e26245009ea76aee22626c"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/_shared/bot-gate.ts",
+    "sha256": "30425c3387f0d75194ec396a5d262fb3f656410fc781f58f2bd15e50a04959e0"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/_shared/subscription.ts",
+    "sha256": "6d8af89fb9e7f48e9b06024b3fa4396bca41fa58ea2265753032222c71060e14"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/_shared/llm.ts",
+    "sha256": "e7bed1f1ed96a04d6b326ee3580fc6550c37821b19d2618321f4d4be9b3c85c1"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/_shared/openrouter-provider.ts",
+    "sha256": "52aa270a8467d6476d17a8881a4fe29ced09b52cdb44b4bec9e05246af202cd8"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/_shared/kb.ts",
+    "sha256": "5d89feee2c9ef467716d48625b112ecb86b81b84679e48c7a22da42a5f88b68d"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/_shared/bot-prompt.ts",
+    "sha256": "16adc1057f0ce25a940d75db0eea1a35a39e8a9c4fc38f19a05b982d788bacfa"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/_shared/platform-invariants.ts",
+    "sha256": "79654892dfbe8e52a93ab7bf7a5d5189ecb74747fe3751470579c77bf47ea22f"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/_shared/bot-llm.ts",
+    "sha256": "3cd079e84ecade8ff0ada2e62b6bd11daf3cb06bc1b90c78a269d74189b983fc"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/_shared/chat-booking-pricing.ts",
+    "sha256": "f936f6c6a1c43cd6fe932d02697e04d02575273685886b68dbd646d1b9163d80"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/_shared/vouchers.ts",
+    "sha256": "246719c3db51bf23646f740ae89ce17faf0a31dce20105a5d386b4305eb07f99"
+  },
+  {
+    "slug": "wa-webhook",
+    "path": "supabase/functions/_shared/bot-guards.ts",
+    "sha256": "a6b4c6961536772ca33061f581a6660e82bd85f8fea840dd785c630a8ff77937"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/web-chat/index.ts",
+    "sha256": "ed4f5e493f8d8ea4729b7f07986e6a2334da2bd36cf06c1985c7e0644adfc48d"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/sentry.ts",
+    "sha256": "cf5cad26d7ddb3a103a60d658dab85fa647d98e574d5ddb44ab83700c915bafb"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/duration.ts",
+    "sha256": "4f6eb2b814536b6066378deb29002e829e4784ff09e26245009ea76aee22626c"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/tenant.ts",
+    "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/pagination.ts",
+    "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/bot-guards.ts",
+    "sha256": "a6b4c6961536772ca33061f581a6660e82bd85f8fea840dd785c630a8ff77937"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/intent.ts",
+    "sha256": "7145715b15c90fe49ca1986bda5b1f5806539ee7ca6063cadc029044fbb9f0f4"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/subscription.ts",
+    "sha256": "6d8af89fb9e7f48e9b06024b3fa4396bca41fa58ea2265753032222c71060e14"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/booking-custom-fields.ts",
+    "sha256": "3ec06c7dceb92fb96c17fce49e87752af04bf62f59c628b4230be6fcfa90e277"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/chat-booking-pricing.ts",
+    "sha256": "f936f6c6a1c43cd6fe932d02697e04d02575273685886b68dbd646d1b9163d80"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/chat-contact.ts",
+    "sha256": "7da516d1acd7766f66e7e78cda8e657b5a73ed760be80577b45f8a07dcf0e36e"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/platform-invariants.ts",
+    "sha256": "79654892dfbe8e52a93ab7bf7a5d5189ecb74747fe3751470579c77bf47ea22f"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/llm.ts",
+    "sha256": "e7bed1f1ed96a04d6b326ee3580fc6550c37821b19d2618321f4d4be9b3c85c1"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/openrouter-provider.ts",
+    "sha256": "52aa270a8467d6476d17a8881a4fe29ced09b52cdb44b4bec9e05246af202cd8"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/kb.ts",
+    "sha256": "5d89feee2c9ef467716d48625b112ecb86b81b84679e48c7a22da42a5f88b68d"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/customer-session.ts",
+    "sha256": "d0a7724dd8efff914e0040a3571813566a71b0d9ac954ea8debd2aaefc560750"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/web-chat-session.ts",
+    "sha256": "d2b3fe2717fe367bcf307380f5806d44b39ed9c07c7c871d3a0372d7d71c11d2"
+  },
+  {
+    "slug": "yoco-webhook",
+    "path": "supabase/functions/yoco-webhook/index.ts",
+    "sha256": "cd9f9567cbd43150051bfd3272648582fd5110fd06dbdb463ce3be48394d598c"
+  },
+  {
+    "slug": "yoco-webhook",
+    "path": "supabase/functions/_shared/voucher-balances.ts",
+    "sha256": "81cfd970364a2c9958d30d3a262cad0eb2b759d83c9f722a706a94c5993c2252"
+  },
+  {
+    "slug": "yoco-webhook",
+    "path": "supabase/functions/_shared/tenant.ts",
+    "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+  },
+  {
+    "slug": "yoco-webhook",
+    "path": "supabase/functions/_shared/pagination.ts",
+    "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+  },
+  {
+    "slug": "yoco-webhook",
+    "path": "supabase/functions/_shared/waiver.ts",
+    "sha256": "def8bb4c226f45a473419ef49fc3d7b49f9d786c9dde17396f9069f8c6ffc579"
+  },
+  {
+    "slug": "yoco-webhook",
+    "path": "supabase/functions/_shared/combo.ts",
+    "sha256": "9d9194012b9ae8b16188845bf9fd814987835654245d174b69126dc6e4dd0a6b"
+  },
+  {
+    "slug": "yoco-webhook",
+    "path": "supabase/functions/_shared/sentry.ts",
+    "sha256": "cf5cad26d7ddb3a103a60d658dab85fa647d98e574d5ddb44ab83700c915bafb"
+  },
+  {
+    "slug": "booking-payment",
+    "path": "supabase/functions/booking-payment/index.ts",
+    "sha256": "aef654c52f18b10181e20f1b4dfd3bf386969ab518ab63bbc6472fa1361631cc"
+  },
+  {
+    "slug": "booking-payment",
+    "path": "supabase/functions/_shared/tenant.ts",
+    "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+  },
+  {
+    "slug": "booking-payment",
+    "path": "supabase/functions/_shared/pagination.ts",
+    "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+  },
+  {
+    "slug": "booking-payment",
+    "path": "supabase/functions/_shared/payment-deadline.ts",
+    "sha256": "afb8e3a68337c44ddd81d5f2c90a5f1504f89530ee2077b109ce9e57388bb3a7"
+  }
+]

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
+import { guideAuthEmail } from "../../../lib/guide-access";
 import { setAdminAuthPassword } from "../../../lib/admin-password";
 
 // Legacy SHA-256 hash check — matches what the browser admin-auth.ts produces.
@@ -28,7 +29,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const email = String(body.email || "").trim().toLowerCase();
+  const suppliedEmail = String(body.email || "").trim().toLowerCase();
+  const email = guideAuthEmail(suppliedEmail) || suppliedEmail;
   const password = String(body.password || "");
   const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
   if (!token && (!email || !password)) return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
@@ -57,20 +59,28 @@ export async function POST(req: NextRequest) {
     "id, email, name, role, business_id, password_hash, user_id, must_set_password, suspended, settings_permissions, read_only",
   );
   lookup = token ? lookup.eq("user_id", authUserId) : lookup.eq("email", email);
-  const { data: user, error: lookupErr } = await lookup.maybeSingle();
+  const { data: adminUser, error: lookupErr } = await lookup.maybeSingle();
+  let user = adminUser;
 
   if (lookupErr) {
     console.error("ADMIN_LOGIN_LOOKUP_ERR", lookupErr.message);
     return NextResponse.json({ error: "Lookup failed" }, { status: 500 });
   }
   if (!user) {
-    return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    let guideLookup = admin.from("guide_accounts").select("id, email, user_id, business_id, login_name, suspended, must_set_password");
+    guideLookup = token ? guideLookup.eq("user_id", authUserId) : guideLookup.eq("email", email);
+    const { data: guide } = await guideLookup.maybeSingle();
+    if (guide) user = { ...guide, role: "GUIDE", name: "Guides", password_hash: null, settings_permissions: {}, read_only: false };
   }
+  if (!user) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   if (user.suspended) {
     return NextResponse.json(
       { error: "Account is suspended. Contact support." },
       { status: 403 },
     );
+  }
+  if (user.must_set_password && user.role === "GUIDE") {
+    return NextResponse.json({ error: "Ask your operator for your private guide password setup link.", code: "GUIDE_SETUP_REQUIRED" }, { status: 403 });
   }
   if (user.must_set_password) {
     return NextResponse.json(

@@ -286,7 +286,7 @@ export async function POST(req: NextRequest) {
       if (!isParty && !item) return NextResponse.json({ error: "Not authorized to change this combo offer" }, { status: 403 });
     }
     const { data, error } = await supabase.from("combo_offers").update({ active: action === "activate" }).eq("id", combo_offer_id).select().single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return NextResponse.json({ error: error.message }, { status: error.code === "23514" ? 409 : 500 });
     return NextResponse.json({ combo_offer: data });
   }
 

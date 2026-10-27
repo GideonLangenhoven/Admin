@@ -1,0 +1,16 @@
+{
+  "verified_at": "2026-10-08T20:04:03.787Z",
+  "target_project": "gwwnkihblioayklptdab",
+  "local_origin": "https://bookingtours-connector-test-gwwn.vercel.app",
+  "result": "PASS",
+  "native_password_sign_in_tested": true,
+  "actual_admin_login_verified": true,
+  "native_role": "MAIN_ADMIN",
+  "sample_business_context_verified": true,
+  "disabled_connections_notice_visible": false,
+  "empty_grants_with_disabled_provider_verified": true,
+  "connectors_enabled": false,
+  "temporary_test_session_cleanup": "temporary_test_session_revoked",
+  "credentials_printed": false,
+  "boundary": "Real hosted browser AuthGate, Supabase password sign-in, server administrator verification and restricted TLS-backed connection listing in the approved isolated HTTPS test deployment. No provider enabled or grant issued."
+}

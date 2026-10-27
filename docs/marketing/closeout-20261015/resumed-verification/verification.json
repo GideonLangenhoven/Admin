@@ -1,0 +1,11 @@
+{
+  "checked_at_utc": "2026-10-15T10:55:04.152354+00:00",
+  "candidate_paths_verified": 24,
+  "shared_candidate_paths_unchanged": true,
+  "admin_build_exit": 0,
+  "booking_build_exit": 0,
+  "focused_unit_exit": 0,
+  "focused_tests_passed": 180,
+  "patch_integrated": false,
+  "production_actions": false
+}

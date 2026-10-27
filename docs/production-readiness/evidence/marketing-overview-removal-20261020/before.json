@@ -1,0 +1,2002 @@
+{
+  "id": "dpl_5kkZGSKTP5rTJUdeUnHeDGjzXVx5",
+  "url": "caepweb-admin-h9ycyyvkj-jerrys-projects-f4e4eaf9.vercel.app",
+  "files": [
+    {
+      "path": ".github/PULL_REQUEST_TEMPLATE.md",
+      "uid": "4cf4d5e094426d747e5b57e36218584532906176"
+    },
+    {
+      "path": ".github/workflows/README.md",
+      "uid": "07b88e8fee3dd9547da331c9fb704212ce5826bd"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "uid": "9f9b2907d9b9143e69a288cf01817891c07ec80f"
+    },
+    {
+      "path": ".github/workflows/e2e-on-main.yml",
+      "uid": "df1c78dea55bcb807a8d2ea1943428d13fad0005"
+    },
+    {
+      "path": ".github/workflows/lighthouse.yml",
+      "uid": "84ee1c5fa96bd7f98a64709c94a7ed429655db09"
+    },
+    {
+      "path": ".github/workflows/main.yml",
+      "uid": "3069917255f83fee8f65a3287d377dfe64d9457b"
+    },
+    {
+      "path": ".nvmrc",
+      "uid": "d0758565fd06c37aa66b071160d156f5628cd518"
+    },
+    {
+      "path": ".vercelignore",
+      "uid": "f3da5094a0e8a40731a3551440f5eb04c417b2e1"
+    },
+    {
+      "path": "CLAUDE.md",
+      "uid": "a132a7c518b7762c6768f050840473cfd899aca6"
+    },
+    {
+      "path": "MARKETING_ENGINE_GUIDE.md",
+      "uid": "24d38af7faa684b35d31bee78a1348052db4d4c6"
+    },
+    {
+      "path": "ONBOARDING_GUIDE.md",
+      "uid": "7f9623304be81f3d655fe2c274637babc8b806e3"
+    },
+    {
+      "path": "PRODUCT.md",
+      "uid": "104720564b63c350e913adf8f5640f03bdf64429"
+    },
+    {
+      "path": "PRODUCTION_RUNBOOK.md",
+      "uid": "2f430e8db6a7ba06a149722ad0dccdd9ab299406"
+    },
+    {
+      "path": "README.md",
+      "uid": "7ba16f1bf099196063e5d413cf00a5aa850b043d"
+    },
+    {
+      "path": "app/.well-known/oauth-authorization-server/route.ts",
+      "uid": "07534a8865ce52e41fa3d56a227f05fb88e576d5"
+    },
+    {
+      "path": "app/.well-known/oauth-protected-resource/api/mcp/chatgpt/route.ts",
+      "uid": "10f4e9ce60672c7ed122a3d853df0f7bf0cb2793"
+    },
+    {
+      "path": "app/ai-usage/page.tsx",
+      "uid": "b40ed5e45cd20417f2d2ff92d86937aaa8f2428c"
+    },
+    {
+      "path": "app/api/admin/add/route.ts",
+      "uid": "95dd749d4f11b4a2a4ca7313544d71621071a892"
+    },
+    {
+      "path": "app/api/admin/chat-faq/[id]/route.ts",
+      "uid": "b92db14b92676c4f2f17311f8ed7ea704966171f"
+    },
+    {
+      "path": "app/api/admin/chat-faq/route.ts",
+      "uid": "3458ca6e092180fd4aac34e1d38896a384f1e78b"
+    },
+    {
+      "path": "app/api/admin/contact/route.ts",
+      "uid": "5aa3ddf9f43555f8979a72408c507e9b3c284b76"
+    },
+    {
+      "path": "app/api/admin/data-requests/[id]/export/route.ts",
+      "uid": "f1bef4244d6b5be14af928bed897a230344c63a7"
+    },
+    {
+      "path": "app/api/admin/data-requests/[id]/fulfill/route.ts",
+      "uid": "624988f13dee97f04bf29f3e3faa80500d97f7cf"
+    },
+    {
+      "path": "app/api/admin/data-requests/[id]/reject/route.ts",
+      "uid": "6f39a9086f98de58f95c9b18603cc6650e661ca8"
+    },
+    {
+      "path": "app/api/admin/data-requests/route.ts",
+      "uid": "2e4dec0dec62bafa21b63a5e2a0a0040d056335c"
+    },
+    {
+      "path": "app/api/admin/login/route.ts",
+      "uid": "0f472cc8b24abeca622daca67edeaa5ecba37837"
+    },
+    {
+      "path": "app/api/admin/notifications/[id]/retry/route.ts",
+      "uid": "025886444b9bc7c1f1562885acf1f17e48571c9e"
+    },
+    {
+      "path": "app/api/admin/notifications/route.ts",
+      "uid": "bf1e8e049ec8d3c8dfd4f59fbecfed94dabb0084"
+    },
+    {
+      "path": "app/api/admin/remove/route.ts",
+      "uid": "e213d144f51485daac0fe9d4a9a73cf25ec7e6b6"
+    },
+    {
+      "path": "app/api/admin/setup-link/route.ts",
+      "uid": "33139ec35fcd310b8f2e16377c5d79312088bde3"
+    },
+    {
+      "path": "app/api/admin/update/route.ts",
+      "uid": "9986a1cb25783893beac80db606367fe7370346e"
+    },
+    {
+      "path": "app/api/admin/wa-failures/route.ts",
+      "uid": "fce9a523cbd868e681b6c5d11bc23bca820e8aa2"
+    },
+    {
+      "path": "app/api/admin/web-push/route.ts",
+      "uid": "2d94bc37069c19d21babf1f08567bd2d183f1334"
+    },
+    {
+      "path": "app/api/admin/whatsapp/bot-mode/route.ts",
+      "uid": "d5dc62e43cffb74290be1faa9dc3425c3739f586"
+    },
+    {
+      "path": "app/api/agent/connections/route.ts",
+      "uid": "b42e78c403baa47e26057c5a41d065f411dc6c3a"
+    },
+    {
+      "path": "app/api/agent/oauth/[action]/route.ts",
+      "uid": "f29b6dc999a19ceb52266506c9634c36c758c104"
+    },
+    {
+      "path": "app/api/agent/read/route.ts",
+      "uid": "0bea21f72e3dbe72d55daa08018f4031e2bf0f92"
+    },
+    {
+      "path": "app/api/billing/history/route.ts",
+      "uid": "100524cb2e189d018455405955bf6e98350117db"
+    },
+    {
+      "path": "app/api/billing/pause/route.ts",
+      "uid": "b4afcf2e7d11dd97d16ac8dec6240ec321cd04c6"
+    },
+    {
+      "path": "app/api/billing/plan/route.ts",
+      "uid": "78de1fc809299379c60a3c63c562a6f3a54766c7"
+    },
+    {
+      "path": "app/api/billing/resume/route.ts",
+      "uid": "1415b74029252a4dd64c4033b19c590cabfdd566"
+    },
+    {
+      "path": "app/api/billing/seats/route.ts",
+      "uid": "550df1b711f76e2d4582f62a3793b388ad47fd75"
+    },
+    {
+      "path": "app/api/billing/subscription/route.ts",
+      "uid": "72af7d31c3df7e37da88e7e89f5867515e082678"
+    },
+    {
+      "path": "app/api/check-ins/route.ts",
+      "uid": "57d1b3f594fc295d5734fef243e2616747ba932a"
+    },
+    {
+      "path": "app/api/combo-cancel/route.ts",
+      "uid": "74b16be748201a33490e9d32797c9a8a3df38443"
+    },
+    {
+      "path": "app/api/combo-offers/route.ts",
+      "uid": "f52416f5c031875a259fccc522b7bca5c1e2dcf4"
+    },
+    {
+      "path": "app/api/combo-settlements/route.ts",
+      "uid": "e92fd7b9ab46acfe70a2d52d97cc897de172f9ab"
+    },
+    {
+      "path": "app/api/credentials/route.ts",
+      "uid": "85ca0b0ec9413f147c5f28fbd0b7f5d9e7966c9e"
+    },
+    {
+      "path": "app/api/debug/sentry-test/route.ts",
+      "uid": "a69d97480eb378fd10e04df9fffcc3df26989c6a"
+    },
+    {
+      "path": "app/api/guide/access/route.ts",
+      "uid": "ee2b3949e1a2d4b2f94ba3382aa6c6142976acdd"
+    },
+    {
+      "path": "app/api/guide/check-in/route.ts",
+      "uid": "5dae725b0856f5c32c9eb37be11a84440a1da8c7"
+    },
+    {
+      "path": "app/api/guide/check-ins/route.ts",
+      "uid": "6f6f741500975a3c86afd7610b44521d58cdbc27"
+    },
+    {
+      "path": "app/api/guide/photo-session/route.ts",
+      "uid": "4de3e618879080f732d6b9eea16d4589d07b5919"
+    },
+    {
+      "path": "app/api/guide/photo-upload/route.ts",
+      "uid": "e22abe09294874a8e892a011c43413907dd2d05c"
+    },
+    {
+      "path": "app/api/guide/photos/route.ts",
+      "uid": "a62d70fafb4e6a0008f59587f3e36289b652543e"
+    },
+    {
+      "path": "app/api/guide/send-thank-you/route.ts",
+      "uid": "47c327092a629153cdb38e9c0bbc4ad0bef8d306"
+    },
+    {
+      "path": "app/api/internal/voucher-image/route.ts",
+      "uid": "f0e5ef026fcb5e44daa4f8a94824ed94864c16a5"
+    },
+    {
+      "path": "app/api/internal/web-chat-push/route.ts",
+      "uid": "8ffea779d787e21ed3ad6ffd4a655860ab7b2d99"
+    },
+    {
+      "path": "app/api/marketing/permission/route.ts",
+      "uid": "ace5385b9fb553114b549f31793d6c77afb80bc3"
+    },
+    {
+      "path": "app/api/marketing/setup/route.ts",
+      "uid": "8ee289ccbe2f1d6330447f1cdd160d2e6bdc1706"
+    },
+    {
+      "path": "app/api/mcp/chatgpt/route.ts",
+      "uid": "16d952d707e8f16ad9d73f5e4c0187ee2a56d6d8"
+    },
+    {
+      "path": "app/api/mcp/muse/route.ts",
+      "uid": "98e1899ff71d5bc8a93857de2d9c86a05ee37343"
+    },
+    {
+      "path": "app/api/mfa/recovery/route.ts",
+      "uid": "8be2be7bd20503af7da4544f0d1630551a242019"
+    },
+    {
+      "path": "app/api/mfa/status/route.ts",
+      "uid": "0f172ffd99a0e1c533c65d05a1c23a67d456df53"
+    },
+    {
+      "path": "app/api/ota/route.ts",
+      "uid": "bd396a5673fe6626a05e8241e3074569d645fdeb"
+    },
+    {
+      "path": "app/api/partner-tours/route.ts",
+      "uid": "9c375dadb87941903013678b45dc3b7c83515bc7"
+    },
+    {
+      "path": "app/api/partnerships/approve/route.ts",
+      "uid": "107ab956a5e9f29e5b171bbe81f1b3004c8cc48f"
+    },
+    {
+      "path": "app/api/partnerships/route.ts",
+      "uid": "94fb3a208abf54769129c5b6ef854346bef45b69"
+    },
+    {
+      "path": "app/api/platform-invoices/create-payment-link/route.ts",
+      "uid": "72a751de9718b37d59c4825b426fedff7ee573ab"
+    },
+    {
+      "path": "app/api/platform-invoices/generate/route.ts",
+      "uid": "d7f839d0bd52955b0ecc66e72602d3b9d2ec003b"
+    },
+    {
+      "path": "app/api/platform-invoices/list/route.ts",
+      "uid": "46b0a37fc644ec893377a3936e3ee5174353f85a"
+    },
+    {
+      "path": "app/api/platform-invoices/mark-paid/route.ts",
+      "uid": "3475c5e3df585d4fd9de25dda0c54658b486cd16"
+    },
+    {
+      "path": "app/api/platform-invoices/send/route.ts",
+      "uid": "687828c184afa74d233986763538c58341306ba4"
+    },
+    {
+      "path": "app/api/platform-invoices/void/route.ts",
+      "uid": "c9f844c71cbe9be5d65cb1fb8bd23a5c9db90aad"
+    },
+    {
+      "path": "app/api/platform-settings/route.ts",
+      "uid": "adb506123eaf231da66745e2aa73905987ef795a"
+    },
+    {
+      "path": "app/api/popia/cancel/route.ts",
+      "uid": "08c42804686917b645094a8526bf8ccb68da620e"
+    },
+    {
+      "path": "app/api/popia/confirm/route.ts",
+      "uid": "daa473730c893c68837e61dfdb698ee22bb855c5"
+    },
+    {
+      "path": "app/api/popia/request/route.ts",
+      "uid": "7f1f2bd213ba7540396cc7bc5475d416c9cedca3"
+    },
+    {
+      "path": "app/api/super-admin/business/route.ts",
+      "uid": "400a484bd949d9990d0b78b8a0754954f82abbd5"
+    },
+    {
+      "path": "app/api/super-admin/operations/route.ts",
+      "uid": "56ce43586e738ef51820d1154f4831c323ea8689"
+    },
+    {
+      "path": "app/api/widget-availability/route.ts",
+      "uid": "6c4e1f4f50c653d5c2146d918e631a6e17b762d1"
+    },
+    {
+      "path": "app/billing/page.tsx",
+      "uid": "587bc68506a09d3ad91d3b5724537bed328f6e40"
+    },
+    {
+      "path": "app/bookings/[id]/page.tsx",
+      "uid": "17539d4efbb690c9d6b6c15e16a68a6e168829f3"
+    },
+    {
+      "path": "app/bookings/page.tsx",
+      "uid": "fc79688443be03502f060c4570d6fa78266bf4fe"
+    },
+    {
+      "path": "app/broadcasts/page.tsx",
+      "uid": "13f0e66d6cfc2200ca99e93ced7c64801d19690b"
+    },
+    {
+      "path": "app/case-study/cape-kayak/page.tsx",
+      "uid": "9dfc166fe11facf54dc9208819582ffc2bdec7cb"
+    },
+    {
+      "path": "app/change-password/page.tsx",
+      "uid": "fdb5094b024fae0c5ab8ad749d90c36c077660e4"
+    },
+    {
+      "path": "app/compare/manual-vs-disconnected-tools/page.tsx",
+      "uid": "723ac11bc89f0880534c7715ad31e347c4cc249d"
+    },
+    {
+      "path": "app/customers/page.tsx",
+      "uid": "e4e56cbc089a13b5dee0e5d25bf78b7b854e6833"
+    },
+    {
+      "path": "app/dashboard.module.css",
+      "uid": "7aaf9d7dcb06014f241ef5661d6d662b957c676d"
+    },
+    {
+      "path": "app/embed/embed/availability/page.tsx",
+      "uid": "4bb87fe64828c08ec3ec1944ade49d9e9504cde9"
+    },
+    {
+      "path": "app/favicon.ico",
+      "uid": "9f3d7b821c24a36d285b34130b16429521990350"
+    },
+    {
+      "path": "app/icon.png",
+      "uid": "9f3d7b821c24a36d285b34130b16429521990350"
+    },
+    {
+      "path": "app/fonts/Satoshi-LICENSE.txt",
+      "uid": "6f0e23cc458c571fc14c44ae73747cae114c7a54"
+    },
+    {
+      "path": "app/fonts/Satoshi-Variable.woff2",
+      "uid": "2d34d398b398a7fd88d21fae7642cdca908bf3ee"
+    },
+    {
+      "path": "app/global-error.tsx",
+      "uid": "31815cdf180d304ca9a3c8358989fee1a98de8f0"
+    },
+    {
+      "path": "app/globals.css",
+      "uid": "9542efcb8d9a06b5f2f8cccf536e98f3418caf1e"
+    },
+    {
+      "path": "app/google-callback/page.tsx",
+      "uid": "466325bbb93cb0c12604fc7ace56512c528e790e"
+    },
+    {
+      "path": "app/guide-setup/page.tsx",
+      "uid": "9ab98b02a591668646c5e4c0e8d38538fc4c1e87"
+    },
+    {
+      "path": "app/guide/GuideShell.tsx",
+      "uid": "a3a2e73da085aa55896a08896f2dae5be1a7136e"
+    },
+    {
+      "path": "app/guide/layout.tsx",
+      "uid": "4c181bbdb960d54519e2fbbe663a071dceefb909"
+    },
+    {
+      "path": "app/guide/page.tsx",
+      "uid": "710487708f011dbaf2500dd21d82f7df9cd78e14"
+    },
+    {
+      "path": "app/guide/photos/[slotId]/page.tsx",
+      "uid": "b728f5050011d7e3911a9c1a2465ce8ff226b1f6"
+    },
+    {
+      "path": "app/guide/slot/[slotId]/page.tsx",
+      "uid": "9bde251494c81397fb2747423f206caf4a1c46c6"
+    },
+    {
+      "path": "app/inbox/components/BotStatusBanner.tsx",
+      "uid": "7b466bf75e0fed3048ec6fdc1f00c2c30e1f38d9"
+    },
+    {
+      "path": "app/inbox/page.tsx",
+      "uid": "fa4abdd6b91f4ac66ce1158cee6ed6654a63a05e"
+    },
+    {
+      "path": "app/invoices/page.tsx",
+      "uid": "8391ce5c43854e0338a779f602bb27c225e5fe71"
+    },
+    {
+      "path": "app/layout.tsx",
+      "uid": "deb59f2168f74938998018ae88c719454763eef9"
+    },
+    {
+      "path": "app/lib/admin-auth.ts",
+      "uid": "a82eb31dbd41c1c253078dd034cf66e82da2203a"
+    },
+    {
+      "path": "app/lib/admin-password.ts",
+      "uid": "56e92f90c659549bb68ce4cc86bd75c3c42cac37"
+    },
+    {
+      "path": "app/lib/admin-timezone.ts",
+      "uid": "374523cbf4b07629d836668ddb57b9eec0a90c04"
+    },
+    {
+      "path": "app/lib/agent-config.ts",
+      "uid": "0ac266c8dddfde5466f8df4dad979cfaab3a531e"
+    },
+    {
+      "path": "app/lib/agent-db.ts",
+      "uid": "e20085934c01bc3fc0f684d93a9fad3a48c7498d"
+    },
+    {
+      "path": "app/lib/agent-mcp.ts",
+      "uid": "2b0382ca4063e4c6543a2657a98426cedb33cb1c"
+    },
+    {
+      "path": "app/lib/agent-oauth.ts",
+      "uid": "50e6ec38e6dfa5b049b3485ef9b223f93a645c0e"
+    },
+    {
+      "path": "app/lib/agent-read-service.ts",
+      "uid": "80a1334db46737726e26ccd857b908d117016fa1"
+    },
+    {
+      "path": "app/lib/agent-telemetry.ts",
+      "uid": "264881b620a050cf0753d2224d6e6e47419eec4c"
+    },
+    {
+      "path": "app/lib/agent-tools.ts",
+      "uid": "ab806c30bd18f20d7d98c2d7b5bbe70e7e59d60a"
+    },
+    {
+      "path": "app/lib/api-auth.ts",
+      "uid": "da1675456c4dff0382852a04b18acf43230f971a"
+    },
+    {
+      "path": "app/lib/app-notify.ts",
+      "uid": "10d04e3e6dcc65dffc2ff23ba5fcd8331ab5a22d"
+    },
+    {
+      "path": "app/lib/automation-copy.ts",
+      "uid": "14f2f83369c06bf7fc76e8ac7f757f433dc49e70"
+    },
+    {
+      "path": "app/lib/billing-period.ts",
+      "uid": "c79a409213e426d3357eb15887071ef598961913"
+    },
+    {
+      "path": "app/lib/billing.ts",
+      "uid": "5d84d45e800fa5d1ba212670e434c54d83c46a52"
+    },
+    {
+      "path": "app/lib/booking-actions.ts",
+      "uid": "de68fabd85559ae427edd3b3116d02600d83d88f"
+    },
+    {
+      "path": "app/lib/booking-arrivals-server.ts",
+      "uid": "0a6eab87e6136c167e99549cdf00fd2dec561e87"
+    },
+    {
+      "path": "app/lib/booking-discounts.ts",
+      "uid": "d438abe658b084bfc5011ae8d94a40e9c2b1b0cc"
+    },
+    {
+      "path": "app/lib/booking-palettes.ts",
+      "uid": "e3a466360073253612b6eae6a4ba2c10e545d930"
+    },
+    {
+      "path": "app/lib/bookings-realtime.ts",
+      "uid": "fb4ae1f3ec25eb961704165d8998e9ca0ae86128"
+    },
+    {
+      "path": "app/lib/browser-session.ts",
+      "uid": "f37c4f10cb47b41803cb420357762c4f59e1c322"
+    },
+    {
+      "path": "app/lib/business-hours.ts",
+      "uid": "727d8e5f584e2bd6c66fb1ce4e1ec53461cc5524"
+    },
+    {
+      "path": "app/lib/combo-rules.ts",
+      "uid": "117e18c6c618b516cfc9e24646a0b9d9d2b26169"
+    },
+    {
+      "path": "app/lib/combo-settlements.ts",
+      "uid": "1962c3603f15433a2e621b88fdc7007338fd14dc"
+    },
+    {
+      "path": "app/lib/combo-splits.ts",
+      "uid": "b55a631568e4bc6b8b4d06e0c63ef493a99b3f81"
+    },
+    {
+      "path": "app/lib/contact-links.ts",
+      "uid": "b6cd609b0a6ec9b20d8b78a3a4d67a1354d0366e"
+    },
+    {
+      "path": "app/lib/customer-notes.ts",
+      "uid": "92481b2ed238df26dfb33e1fc378f8566210e0fd"
+    },
+    {
+      "path": "app/lib/demo-guide.ts",
+      "uid": "6b66619557104b320fb111b3e0e16a0c96cf32bb"
+    },
+    {
+      "path": "app/lib/duration.ts",
+      "uid": "5ff59683774b836bf50f1c68fdecc608d2f99cdb"
+    },
+    {
+      "path": "app/lib/feature-flags.ts",
+      "uid": "425bae2ba90044d86c6891fdabfe33ca0cc6c53d"
+    },
+    {
+      "path": "app/lib/gift-voucher-image.ts",
+      "uid": "cb0876ada163427991778dcf1d347a692914acc1"
+    },
+    {
+      "path": "app/lib/google-drive-upload.ts",
+      "uid": "a82e008b2f65925e93e15be08e2fdce8144324bc"
+    },
+    {
+      "path": "app/lib/guide-access.ts",
+      "uid": "de5ee72ff2febb4b5060390dfbce5b9f8870d79b"
+    },
+    {
+      "path": "app/lib/guide-api-auth.ts",
+      "uid": "8b53722d3939615c6991a151be090e76a8f8ec47"
+    },
+    {
+      "path": "app/lib/guide-offline.ts",
+      "uid": "57b9302de5b49acc7b3abfb078898bb9f9f0351c"
+    },
+    {
+      "path": "app/lib/intent-types.ts",
+      "uid": "ed46643c5d91e75d9544c3502dbd5f45cc73a60f"
+    },
+    {
+      "path": "app/lib/marketing-journey.ts",
+      "uid": "0ec1dfd21a4c556c835adafc52d2d8c2b82a077f"
+    },
+    {
+      "path": "app/lib/marketing-setup.ts",
+      "uid": "4fed769fd9aa82a5d2d5f3875d423cb93f31ba45"
+    },
+    {
+      "path": "app/lib/marketing-test-recipient.ts",
+      "uid": "e694fa824bed35c74cd8f098a77785b2a54947d9"
+    },
+    {
+      "path": "app/lib/mfa-sensitive.ts",
+      "uid": "6ddbe4801d6bc30fc567ddfbdd7487db63003e30"
+    },
+    {
+      "path": "app/lib/operator-booking-draft.ts",
+      "uid": "3b2a81774bdbe5cd9345f19521de8cb011fa9542"
+    },
+    {
+      "path": "app/lib/operator-day.ts",
+      "uid": "4da942b6b88f3917a9b3cde407e3806f03e69d0c"
+    },
+    {
+      "path": "app/lib/operator-sections.ts",
+      "uid": "8cad712e0d9101672254aabf27a07a4b6c69d9e4"
+    },
+    {
+      "path": "app/lib/photo-folder-token.ts",
+      "uid": "24625a7e4f2d756ceaadcedf6f722178793ac06f"
+    },
+    {
+      "path": "app/lib/platform-billing.ts",
+      "uid": "ffeba333b6bb40d5d9992c9ba2335a009a82f3a5"
+    },
+    {
+      "path": "app/lib/platform-invoice-preview.ts",
+      "uid": "da51ddafe07aaf951307c5fc1198d8f2a3877c26"
+    },
+    {
+      "path": "app/lib/rate-limit.ts",
+      "uid": "889b5495ab43c4254e95380e31a587b47a30335b"
+    },
+    {
+      "path": "app/lib/report-accounting.ts",
+      "uid": "d8f88d445cf79be2ccbd078b228d78c7b953335c"
+    },
+    {
+      "path": "app/lib/reschedule-price.ts",
+      "uid": "b9c6a7f185e0c82bf46bf789c6d61779e0ea29fe"
+    },
+    {
+      "path": "app/lib/role-utils.ts",
+      "uid": "622d514f816a952ffd53547edea557f05a4d10a7"
+    },
+    {
+      "path": "app/lib/sanitize.ts",
+      "uid": "07b215bfb888be0dab671719a7989aa5d6cc3026"
+    },
+    {
+      "path": "app/lib/settings-sections.ts",
+      "uid": "300848705d01a51368feea27474f9fdf3dce108b"
+    },
+    {
+      "path": "app/lib/simple-view.ts",
+      "uid": "ff8e8e87655150e4dc0fe6783f736dc6c1b96cdb"
+    },
+    {
+      "path": "app/lib/slot-availability.ts",
+      "uid": "c8f76ca19de9a06405405946c2701811523a6196"
+    },
+    {
+      "path": "app/lib/slot-generation.ts",
+      "uid": "1062907e555f3718a2cf59506d8c308af262194f"
+    },
+    {
+      "path": "app/lib/supabase.ts",
+      "uid": "eef618d0598c19d4e7096b61cf3e287d0d6f7527"
+    },
+    {
+      "path": "app/lib/theme-engine.ts",
+      "uid": "c60796cb7f53c47d82345b6db493a067d9a862a9"
+    },
+    {
+      "path": "app/lib/tour-slot-generation.ts",
+      "uid": "eafc4399aeb6686bafa937c002782b7cccbde036"
+    },
+    {
+      "path": "app/lib/voucher-fonts.conf",
+      "uid": "49c2d9c263543f03ab8f170e2d0818ad4086dc12"
+    },
+    {
+      "path": "app/loading.tsx",
+      "uid": "b11b72c8d934135251fa652eb5cb8dc84f9e1280"
+    },
+    {
+      "path": "app/manifest.ts",
+      "uid": "c932f37bec4d8a38bb9607161e0f633fa1fbd862"
+    },
+    {
+      "path": "app/marketing/automations/[id]/page.tsx",
+      "uid": "4fb7ae4ea39f540afccfcc916d52c46046f6a672"
+    },
+    {
+      "path": "app/marketing/automations/page.tsx",
+      "uid": "92751d43c2bbac08fb4cd6d0ae1677475d6cb04f"
+    },
+    {
+      "path": "app/marketing/contacts/[id]/page.tsx",
+      "uid": "f7343ddaf174542d012e0295945be4d52989f58c"
+    },
+    {
+      "path": "app/marketing/contacts/page.tsx",
+      "uid": "604ba0459f3a4193b7e0a7122b661f5df639fb21"
+    },
+    {
+      "path": "app/marketing/layout.tsx",
+      "uid": "5bb428b15ee5359867d8b6a22f98f928b8be53ad"
+    },
+    {
+      "path": "app/marketing/page.tsx",
+      "uid": "a5216f1b69bae47341f596664d437979e5d0b9df"
+    },
+    {
+      "path": "app/marketing/promotions/page.tsx",
+      "uid": "78cdb539f096af852c69d7724eb29bf6c3ef1dcf"
+    },
+    {
+      "path": "app/marketing/templates/page.tsx",
+      "uid": "9f1173cdbcce090c289092beea84551f385b90fc"
+    },
+    {
+      "path": "app/new-booking/booking-form.module.css",
+      "uid": "5b71c1952348e855fd778e46ef9bef4c56b52ed0"
+    },
+    {
+      "path": "app/new-booking/page.tsx",
+      "uid": "e6ce14b9700e2d42f2605ca0fa176b1afc954d94"
+    },
+    {
+      "path": "app/not-found.tsx",
+      "uid": "93065c4aabb1141586fc7da5b6976edc73039e89"
+    },
+    {
+      "path": "app/notifications/page.tsx",
+      "uid": "f845e4049bc60b26c6b6f251131f5c3566155aad"
+    },
+    {
+      "path": "app/operators/page.tsx",
+      "uid": "e0c9073434b4d35444d8198deb53846345d69fb0"
+    },
+    {
+      "path": "app/ota-drift/page.tsx",
+      "uid": "8b300c770a4e3284ac1b7ead4c383d0acc272b12"
+    },
+    {
+      "path": "app/page.tsx",
+      "uid": "dd70d3015c018daefe76a7da40b7ebdb19000fd7"
+    },
+    {
+      "path": "app/partnerships/page.tsx",
+      "uid": "d928bae4e76a1050752f1fed69b855857db58625"
+    },
+    {
+      "path": "app/photos/page.tsx",
+      "uid": "9b46e50b110c27b32613ce5a8bd4d249f8b1f64b"
+    },
+    {
+      "path": "app/popia/confirm/page.tsx",
+      "uid": "91e1f7895acb2e05f8ed68f2a93b801cf1966e99"
+    },
+    {
+      "path": "app/pricing/page.tsx",
+      "uid": "cda19b8057091707fbaee01224aafa21c252b98f"
+    },
+    {
+      "path": "app/privacy/data-requests/page.tsx",
+      "uid": "5929534e1a4803f2575a75acac01a7e3ba90545c"
+    },
+    {
+      "path": "app/refunds/page.tsx",
+      "uid": "142a29648cd1c1227b79a4b4b0f322b2b1a4490e"
+    },
+    {
+      "path": "app/reports/page.tsx",
+      "uid": "71582eba7e31a98e5abb8af3ff078bf75ca32c7d"
+    },
+    {
+      "path": "app/reviews/page.tsx",
+      "uid": "c3b472312921a5baf46f4d9c47f9b6c1d557e16d"
+    },
+    {
+      "path": "app/robots.ts",
+      "uid": "4b8a4d40fe02db199852028f78962f5edd95e9e1"
+    },
+    {
+      "path": "app/settings/agent-connections/page.tsx",
+      "uid": "109cd0dc1a3feda3e4c69859b54bbc9dc34f6007"
+    },
+    {
+      "path": "app/settings/chat-faq/page.tsx",
+      "uid": "780da3dfd1f5571086b25949aed630ea357b36b7"
+    },
+    {
+      "path": "app/settings/components/LiveStatusBadge.tsx",
+      "uid": "d39a22ede135d1b5cf211d2d809ee590f91afa36"
+    },
+    {
+      "path": "app/settings/components/ModeOption.tsx",
+      "uid": "f133063342988057977d9babb6c46854afe5cae9"
+    },
+    {
+      "path": "app/settings/components/WhatsAppBotSection.tsx",
+      "uid": "faf5daa3b6046d3864273159c9f3cb796e2da109"
+    },
+    {
+      "path": "app/settings/ota/page.tsx",
+      "uid": "a687460959bb1ba7bd348c2f26cbfd30af0f0feb"
+    },
+    {
+      "path": "app/settings/page.tsx",
+      "uid": "07ab05176b9afecd0d1b1ed819af074c8bd1fb8b"
+    },
+    {
+      "path": "app/simple/bookings/page.tsx",
+      "uid": "d929de3bb2cbc59e032d4ed451b510f3564b7709"
+    },
+    {
+      "path": "app/simple/calendar/page.tsx",
+      "uid": "9c090b7ff2b8f9e40602f5966f813a8c116a8540"
+    },
+    {
+      "path": "app/simple/check-ins/page.tsx",
+      "uid": "ece47b89557a9178e165d20bfcb9f3381dc135d1"
+    },
+    {
+      "path": "app/simple/help/page.tsx",
+      "uid": "fc9cdb7eac2915b4583cd8139030eb5a1b3680f4"
+    },
+    {
+      "path": "app/simple/new-booking/page.tsx",
+      "uid": "533782e05611e7723e0c34d185860014e3191b35"
+    },
+    {
+      "path": "app/simple/page.tsx",
+      "uid": "d5efd709c40dba8e1bfa948877bb7797530966a8"
+    },
+    {
+      "path": "app/simple/photos/[slotId]/page.tsx",
+      "uid": "c25b7ce70b8ce8715ce82a6a4bf24ece7ddd76b5"
+    },
+    {
+      "path": "app/simple/photos/page.tsx",
+      "uid": "c02f9a07372327f990ce2c71778b01d2ab72bd06"
+    },
+    {
+      "path": "app/simple/simple-data.ts",
+      "uid": "9e5439b21ec560083529334191f80aa96e3bcaea"
+    },
+    {
+      "path": "app/simple/use-simple-day.ts",
+      "uid": "c7c6af84885464fbd760069b88652cd275e61227"
+    },
+    {
+      "path": "app/simpleguide/photos/[slotId]/page.tsx",
+      "uid": "c25b7ce70b8ce8715ce82a6a4bf24ece7ddd76b5"
+    },
+    {
+      "path": "app/simpleguide/check-ins/page.tsx",
+      "uid": "b462cc6a845a7a12aea228d4aceeec84a83589ff"
+    },
+    {
+      "path": "app/simpleguide/page.tsx",
+      "uid": "44dc674350326a231905f21ce44adca882d7a7c4"
+    },
+    {
+      "path": "app/slots/page.tsx",
+      "uid": "eb294dc8d56401a8bb59ca1a0ad136ea9047fec2"
+    },
+    {
+      "path": "app/super-admin/page.tsx",
+      "uid": "75748d2fad541cc7b516c2b1d32c3fccf9ae5eac"
+    },
+    {
+      "path": "app/super-admin/sensitive-actions/page.tsx",
+      "uid": "0ccea19c4e918a25e415a3a90c5057b27841198a"
+    },
+    {
+      "path": "app/vouchers/page.tsx",
+      "uid": "2da20e9a6bed575099f16740cc332e0ede96128c"
+    },
+    {
+      "path": "app/vouchers/voucher-purchase.ts",
+      "uid": "c77bac8e9c3431abf86b006c6d49d2c0acb0953e"
+    },
+    {
+      "path": "app/whatsapp-privacy/page.tsx",
+      "uid": "f21569a1dc1ecee06323a644d860567a55bd4352"
+    },
+    {
+      "path": "apply_migration.js",
+      "uid": "309789624019555874d3ae520f36ddd1c93ed141"
+    },
+    {
+      "path": "bookingtours-messaging-bible.md",
+      "uid": "9750778119e65e53fd9a2fbd8096a83bb409291c"
+    },
+    {
+      "path": "components/AdminContactEditor.tsx",
+      "uid": "a48e702ce3c776bdf284d05acddec1f0b4c2f40b"
+    },
+    {
+      "path": "components/AppNotifications.tsx",
+      "uid": "e35d161b1e84ddd78cc7694961ae38a9fa54eab7"
+    },
+    {
+      "path": "components/AppShell.tsx",
+      "uid": "fd7d7ab31a43ab019bcab8585cf7bc9b880e4832"
+    },
+    {
+      "path": "components/AuthGate.tsx",
+      "uid": "b49fb3c273671d706210c2fdc1b922c59dcefec6"
+    },
+    {
+      "path": "components/AvailabilityCalendar.tsx",
+      "uid": "0b20ece7fa5bfef3c1d593fb962b8f50badd2a0b"
+    },
+    {
+      "path": "components/BookingsMonthCalendar.tsx",
+      "uid": "e3d3f3447d7e7e9a92a90870c4a2ce453b335414"
+    },
+    {
+      "path": "components/BrandLogo.tsx",
+      "uid": "6cc77c81563c46f2f4d11e58b058dc3d1dd58d80"
+    },
+    {
+      "path": "components/BulkSlotWizard.tsx",
+      "uid": "13dec852fb09e502516e73db123966e419549660"
+    },
+    {
+      "path": "components/BusinessContext.tsx",
+      "uid": "d6e87c2fba073cae092c28f55b997a53668f80be"
+    },
+    {
+      "path": "components/CalendarHeader.tsx",
+      "uid": "0eb1f77deaa3957d3d30549f3b88f734bfba85d8"
+    },
+    {
+      "path": "components/DataRequestBadge.tsx",
+      "uid": "f907d690520ec5c40b137caed4ba3227840a1998"
+    },
+    {
+      "path": "components/DatePicker.tsx",
+      "uid": "b24b96dc77bcdf16eb947e5efc60194e22b9a7cd"
+    },
+    {
+      "path": "components/DayView.tsx",
+      "uid": "0a01a703244d902f060d09ae052f3318f460c126"
+    },
+    {
+      "path": "components/DemoActionGuide.tsx",
+      "uid": "bd1e1b74f0b58a8d9bb75a739659a06134c78824"
+    },
+    {
+      "path": "components/ExternalBookingSettings.tsx",
+      "uid": "186af999845477d0a97492724af87e7b86eb033d"
+    },
+    {
+      "path": "components/GuideServiceWorker.tsx",
+      "uid": "4f109c649fc3deacffc6c94ac847a7c5e67c206d"
+    },
+    {
+      "path": "components/GuideSignInContext.tsx",
+      "uid": "e484518f7851735cbe40bfdee0b3cb9cd1964aaa"
+    },
+    {
+      "path": "components/HelpChat.tsx",
+      "uid": "1028ac1826bb0a0d874c8888f6c165c0dc5940c3"
+    },
+    {
+      "path": "components/InlineSlotManager.tsx",
+      "uid": "23ab75ff29f73352b7f8e4cbc8f4677ba3c2c7f0"
+    },
+    {
+      "path": "components/MobileMenuDrawer.tsx",
+      "uid": "58a9c86cdcd13b53099721e4d4353720c49b18e0"
+    },
+    {
+      "path": "components/MonthPicker.tsx",
+      "uid": "ce28c6e2ceddbefe4c3f52e69c21680ae5e8979e"
+    },
+    {
+      "path": "components/NotificationBadge.tsx",
+      "uid": "093f22df9d79be13e170adb826ec3070f3eaf58f"
+    },
+    {
+      "path": "components/PaymentRecoveryPanel.tsx",
+      "uid": "78b0fa7845e8b1d3b71bb5410394cd539ec78682"
+    },
+    {
+      "path": "components/PlatformOperations.tsx",
+      "uid": "f0f6f5ccb4f715cd8c5e620d4a8637069a3ddedc"
+    },
+    {
+      "path": "components/RefundBadge.tsx",
+      "uid": "3548044095965b41cd3ee7b596ab16df108a1614"
+    },
+    {
+      "path": "components/RemoveIntegrationButton.tsx",
+      "uid": "c88ff0a726da2deeabe8003d61ad23aef0d5b29f"
+    },
+    {
+      "path": "components/ReportsLayout.tsx",
+      "uid": "6165219462a87e5854e476ead8c6769855af9457"
+    },
+    {
+      "path": "components/RichTextEditor.tsx",
+      "uid": "b6e22b0333b1c9ed226752fe10f664e4a73237e0"
+    },
+    {
+      "path": "components/SectionTabs.tsx",
+      "uid": "ddad3cd1b0331e4c6732da2ec9b42a7c99def2f7"
+    },
+    {
+      "path": "components/SignOutButton.tsx",
+      "uid": "821e26b605b559b08cacb790e304eeb82ee5a9fa"
+    },
+    {
+      "path": "components/SimpleViewShell.tsx",
+      "uid": "724d98bc596905ada3c327c7c890c0518b138e20"
+    },
+    {
+      "path": "components/ThemeProvider.tsx",
+      "uid": "3ec8ad818307eecb3dafdd762292aa458ba1c7e3"
+    },
+    {
+      "path": "components/ThemeToggle.tsx",
+      "uid": "0339e0612c4d97f2c32b6190a8d63be63f8b0348"
+    },
+    {
+      "path": "components/WaFailureWatcher.tsx",
+      "uid": "10bce31deec674958272533fe7a40416233d1f7e"
+    },
+    {
+      "path": "components/WeekView.tsx",
+      "uid": "915107ded273f8646cfc7085ca6ea7fadd1f4ad0"
+    },
+    {
+      "path": "components/WelcomeChecklist.tsx",
+      "uid": "afbfa56b21a8455226319b38f707b75c9d2b71c0"
+    },
+    {
+      "path": "components/WindguruWidget.tsx",
+      "uid": "62678e0424c6fc17a000b08d83deb1dd3b7a9923"
+    },
+    {
+      "path": "components/booking/ArrivalApproval.tsx",
+      "uid": "7cfd0e55af13e3ae3e7f35b13a13cc69f5ffe082"
+    },
+    {
+      "path": "components/booking/BookingQuestions.tsx",
+      "uid": "0c0ce5350bb567552c7dcc58039bcf6dde6b4d96"
+    },
+    {
+      "path": "components/booking/BookingSitePreview.tsx",
+      "uid": "84e287e5424cd8bff2697a44cb7772c54a30ea2d"
+    },
+    {
+      "path": "components/booking/Catalogue.tsx",
+      "uid": "3609f6fb0422e3e2cd03b94f165a2a941a997237"
+    },
+    {
+      "path": "components/booking/CopyEmailButton.tsx",
+      "uid": "d3950842bac7ae70ff627f6ae364039ea37efcb1"
+    },
+    {
+      "path": "components/booking/catalogue.css",
+      "uid": "0089c4de62be4f2049eaeb00e5215b2dc6e47758"
+    },
+    {
+      "path": "components/guide/GuideAccessSettings.tsx",
+      "uid": "d7966feeea9a088cce997ae47b52aad761dd1056"
+    },
+    {
+      "path": "components/guide/GuideDay.tsx",
+      "uid": "404043d59d98c75769e13c4cb7693a5210d17651"
+    },
+    {
+      "path": "components/helpChatActions.ts",
+      "uid": "daff72192a271d96e92b5b9afb219da3ebd515ef"
+    },
+    {
+      "path": "components/inbox/IntentBadge.tsx",
+      "uid": "34a1dfce7a905ac0b7b18751191a680dfc60f973"
+    },
+    {
+      "path": "components/inbox/PhoneAlerts.tsx",
+      "uid": "6dfda2b7e80548a92a3b137f43f26e2feaad8e14"
+    },
+    {
+      "path": "components/marketing/BookingDiscountSettings.tsx",
+      "uid": "fd3f542254f55d1e5344cb94600fced74a5e5563"
+    },
+    {
+      "path": "components/marketing/ContactPermissionEditor.tsx",
+      "uid": "a1d99532096ccb8624bcb1aec5ea2b94c6c8fc5b"
+    },
+    {
+      "path": "components/marketing/EmailBuilder.tsx",
+      "uid": "74811a263bdb48496135c84c5001b906accfc0d0"
+    },
+    {
+      "path": "components/marketing/MarketingSetupNotice.tsx",
+      "uid": "b31afdd7a60aaa3684f4bfc75b0dee80bc7fa681"
+    },
+    {
+      "path": "components/marketing/blocks/block-editors.tsx",
+      "uid": "001c2be77e3168f10db29fe38419bd8dc7523af5"
+    },
+    {
+      "path": "components/marketing/blocks/block-types.ts",
+      "uid": "8ba13abfc7be684a600bf6e9b101f4157eedb655"
+    },
+    {
+      "path": "components/marketing/blocks/blocks-to-html.ts",
+      "uid": "117966479e5c4d8a4ca9cd43201988b46c2b4c71"
+    },
+    {
+      "path": "components/marketing/blocks/social-icons.ts",
+      "uid": "6efb8bc4d74dd4f199ba2c855f81f453d8043e80"
+    },
+    {
+      "path": "components/marketing/starter-templates.ts",
+      "uid": "758c68520e1d448b6760e2aa2e14c50be66feb73"
+    },
+    {
+      "path": "components/nav-active.ts",
+      "uid": "a7aa8db0705ccceb3ce021bb7b0c3932c4e2c892"
+    },
+    {
+      "path": "components/photos/TripPhotosWorkspace.tsx",
+      "uid": "92cba0a0c759fde1edc445a1e869dd0bda84d93a"
+    },
+    {
+      "path": "components/simple/BookingContact.tsx",
+      "uid": "7e017ad43029ba2ced7846b669c2643207a9e8d2"
+    },
+    {
+      "path": "components/simple/DayFreshness.tsx",
+      "uid": "a4a19361b77a09569164a22ae58ba6673599349e"
+    },
+    {
+      "path": "components/simple/DepartureCard.tsx",
+      "uid": "44a55a6584f0539a30186e41b76f87e41d28e532"
+    },
+    {
+      "path": "components/simple/simple-view.css",
+      "uid": "1d4c7b8c2fc1ae56736b4241399debe68095885a"
+    },
+    {
+      "path": "deno.lock",
+      "uid": "438671ee936ae773db5d8f4ac6db42bc95da1dfa"
+    },
+    {
+      "path": "eslint.config.mjs",
+      "uid": "3b955ee1e274ee2c4c28668254551f6396036771"
+    },
+    {
+      "path": "get_logs.js",
+      "uid": "9d0161f283b2baa86502fc0d06f2ced496e969cf"
+    },
+    {
+      "path": "handoff.md",
+      "uid": "0bb8f7658880534cf5d34f7232683c5895a60ea0"
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "uid": "8f37fbcbaadbda2322fc11a4064c1f8527216f3e"
+    },
+    {
+      "path": "instrumentation.ts",
+      "uid": "7a0e238d2b9d261f75035d9dec66937b777cd534"
+    },
+    {
+      "path": "lighthouserc.json",
+      "uid": "87d5db924f92e6a01e9a8d4502ac7ace6c9b78ce"
+    },
+    {
+      "path": "next.config.base.ts",
+      "uid": "32d4f9fb6989a5eef1984cce2b4379d328bbff1d"
+    },
+    {
+      "path": "next.config.ts",
+      "uid": "6cc0f2bb25e93ef3bf8ef4603f26678c2fb9d263"
+    },
+    {
+      "path": "package-lock.json",
+      "uid": "2d1458e92604e0c4eacd32390e07b6a2b4e914f3"
+    },
+    {
+      "path": "package.json",
+      "uid": "abc341bb35897fe51d7382dcb8e144fa81732151"
+    },
+    {
+      "path": "playwright.booking-guest.config.ts",
+      "uid": "df3fd436a1d3b92b8d4fcea18e4a5fe7b1edb35f"
+    },
+    {
+      "path": "playwright.catalogue.config.ts",
+      "uid": "ad3c9448d64ce2a5cc2265b64ad20e070b954912"
+    },
+    {
+      "path": "playwright.claires-hiking.config.ts",
+      "uid": "1c993f865cb1c1930ba53f7f971414a072ebed0d"
+    },
+    {
+      "path": "playwright.custom-questions.config.ts",
+      "uid": "af8415954ad9965c2574d1ab03e631c9f5d352e6"
+    },
+    {
+      "path": "playwright.guide-access.config.ts",
+      "uid": "d5c2e981d7eb72a3a86d777420ef029decef2d7c"
+    },
+    {
+      "path": "playwright.kayak-demo-hosted.config.ts",
+      "uid": "6c2d85b9a11a3547c6958805172a92ab309c5a47"
+    },
+    {
+      "path": "playwright.kayak-demo.config.ts",
+      "uid": "59ef93747658adf045e621607fea833e3d6e3ef4"
+    },
+    {
+      "path": "playwright.marketing-safety.config.ts",
+      "uid": "46dab078e29a503a0a402c8fe89c8b59a87934ef"
+    },
+    {
+      "path": "playwright.operator-usability.config.ts",
+      "uid": "d91c848c6db200f6e6cee21c2aa0811ba2f07310"
+    },
+    {
+      "path": "playwright.web-chat.config.ts",
+      "uid": "a3a3096f65466245debc93848ad869672e04e30e"
+    },
+    {
+      "path": "postcss.config.js",
+      "uid": "58086d3ba69f69df1df1cfe907d6f5934fb4590b"
+    },
+    {
+      "path": "proxy.ts",
+      "uid": "e2851aaae0b31ec96e648cb181312db3be41e061"
+    },
+    {
+      "path": "public/admin-sw.js",
+      "uid": "b548d70bd512ee10aefec41b20b48ec6aefbcc51"
+    },
+    {
+      "path": "public/brand/bt-mark-ivory.png",
+      "uid": "73d3a88135f0194daa3513d8bac7764e69dc3a81"
+    },
+    {
+      "path": "public/brand/bt-mark.png",
+      "uid": "146e103f9862dd2fb6721ade4a9a44dbc4cfcd2e"
+    },
+    {
+      "path": "public/claires-hiking.html",
+      "uid": "65fe188d2ff119dcb6f61504c9101a8d0a4bfbc4"
+    },
+    {
+      "path": "public/demo/claires-hiking/index.html",
+      "uid": "65fe188d2ff119dcb6f61504c9101a8d0a4bfbc4"
+    },
+    {
+      "path": "public/demo/claires-hiking/assets/cape-town.jpg",
+      "uid": "688ef043861405a0920a1064a9956406478588f3"
+    },
+    {
+      "path": "public/demo/claires-hiking/assets/kayak-cape-town.webp",
+      "uid": "c6ece87ae90421e3ddf36c62385f97eaa4075df4"
+    },
+    {
+      "path": "public/demo/claires-hiking/assets/kayak-morning.webp",
+      "uid": "9f519923ba89367ff763e33e3951f5050035b146"
+    },
+    {
+      "path": "public/demo/claires-hiking/assets/kayak-sunset.webp",
+      "uid": "8c4b545367ba4d447f2b524661832c2b38953a13"
+    },
+    {
+      "path": "public/demo/claires-hiking/logo.png",
+      "uid": "7f2fb8cd1e0f1fe00c67e2931322442131a69655"
+    },
+    {
+      "path": "public/file.svg",
+      "uid": "fb380eeffe87d50b597383664c02982964d0d28c"
+    },
+    {
+      "path": "public/globe.svg",
+      "uid": "2eba23b01a46733bb8423e6d38ebf5f7e95abec5"
+    },
+    {
+      "path": "public/guide/icon-192.png",
+      "uid": "4b6ea27a54711e679834c258f7e14ac60653e488"
+    },
+    {
+      "path": "public/guide/icon-512.png",
+      "uid": "719cc34c763c5098895f13b21f8878014002deeb"
+    },
+    {
+      "path": "public/guide/manifest.webmanifest",
+      "uid": "a599f177f236cb4d38811728daaf9e83c5fd2786"
+    },
+    {
+      "path": "public/guide/sw.js",
+      "uid": "7fcc32688468995c07c6f340cc3d7bb801f79b0a"
+    },
+    {
+      "path": "public/landing-pages/templates/aerial.html",
+      "uid": "66d64656defbef5e2282596c39b4a383acdeda45"
+    },
+    {
+      "path": "public/landing-pages/templates/alpine.html",
+      "uid": "699dd047a54659c2d0d2978742436aadd04c00bc"
+    },
+    {
+      "path": "public/landing-pages/templates/desert.html",
+      "uid": "58c9336e98633756c24888adf7e0d7d128c73efd"
+    },
+    {
+      "path": "public/landing-pages/templates/dive.html",
+      "uid": "373bb27756bd305ddbdd7fdd3954ff6d333365ad"
+    },
+    {
+      "path": "public/landing-pages/templates/jungle.html",
+      "uid": "db97369040c85c5ee61f0f7bffb90918da1c2dd5"
+    },
+    {
+      "path": "public/landing-pages/templates/nordic.html",
+      "uid": "3c7909e8de700cbeb59a50929e8adac6c1605ebe"
+    },
+    {
+      "path": "public/landing-pages/templates/polar.html",
+      "uid": "82aeb63232e6e99e36d10e434a0f5c644cbe7e2d"
+    },
+    {
+      "path": "public/landing-pages/templates/safari.html",
+      "uid": "ef2854983b6450037fd13e054bb3341ea2993f43"
+    },
+    {
+      "path": "public/landing-pages/templates/sea_kayak.html",
+      "uid": "a5b54f948bd556c54353c07674dc8c6d6e3551e7"
+    },
+    {
+      "path": "public/landing-pages/templates/wine_cycling.html",
+      "uid": "329c2e9294acce16a3d819b3bfd1bbe5f0bce8b8"
+    },
+    {
+      "path": "public/mock-kayak.html",
+      "uid": "de74658d9a9eef38513ceeeffb77d7e13f29cb66"
+    },
+    {
+      "path": "public/next.svg",
+      "uid": "3f3e95622612b989c5bd6a03299a308c6f3c7e6b"
+    },
+    {
+      "path": "public/vercel.svg",
+      "uid": "cebb8852d58c8886be3e9051a26957f42bb82f1a"
+    },
+    {
+      "path": "public/window.svg",
+      "uid": "54c48e0daa6caa317fe1b4c419007fd93e948db9"
+    },
+    {
+      "path": "scripts/apply-daily-demos.mjs",
+      "uid": "6134c539675868a333a6979a9cfb2cb41e256d8d"
+    },
+    {
+      "path": "scripts/bot-goldens/goldens.json",
+      "uid": "575de68dcef805c2346a2fdad25f3646375d9a10"
+    },
+    {
+      "path": "scripts/bot-goldens/replay.ts",
+      "uid": "7311d0fc2810702577ae007a98c7a861a396c87f"
+    },
+    {
+      "path": "scripts/bt500-inventory.mjs",
+      "uid": "d7d104dd41220ca7e487de12fcc882f81884a6f7"
+    },
+    {
+      "path": "scripts/bt500-pages.mjs",
+      "uid": "5862c68e1274b9aaa0cdcb74affd1717b0d4f3ac"
+    },
+    {
+      "path": "scripts/bt500-preflight.mjs",
+      "uid": "6b76650c6786384a0fab630d99468c5a27abec2c"
+    },
+    {
+      "path": "scripts/bt500-run-mixed.mjs",
+      "uid": "26adbc36a1ca10e7ba8984456feb1221f2a83ba0"
+    },
+    {
+      "path": "scripts/bt500-run-read-smoke.mjs",
+      "uid": "ec7447ba430cd7b7e6ce24a6a04bae6b2b2caca0"
+    },
+    {
+      "path": "scripts/bt500-seed.mjs",
+      "uid": "79a6c98f51292aa18f9c6b92054922f71f7b7e9c"
+    },
+    {
+      "path": "scripts/capture-screens.mjs",
+      "uid": "31fb7898de8e2e42dbc3da4935c1e459c73f4f8a"
+    },
+    {
+      "path": "scripts/check-jerrys.js",
+      "uid": "66afe5dcb3a7f52e167a0e7541dde837b0d5f89a"
+    },
+    {
+      "path": "scripts/check-security-drift.mjs",
+      "uid": "cc774aa57fdae12b992d2751ea72f9c957fe241a"
+    },
+    {
+      "path": "scripts/check-service-auth.mjs",
+      "uid": "a3ef5bcb20feb00ed7cb1f9115a81826b319a7e3"
+    },
+    {
+      "path": "scripts/demo-capture/beats.mjs",
+      "uid": "db45e7425767cd3c8560eb989ad07129fc1dae69"
+    },
+    {
+      "path": "scripts/demo-capture/capture-features.mjs",
+      "uid": "ce70a06646bba8139110eb0c8549a162af779c3e"
+    },
+    {
+      "path": "scripts/demo-capture/capture.mjs",
+      "uid": "838c0ba68ffc28da083c7328ab1cfea4d0257a7e"
+    },
+    {
+      "path": "scripts/demo-capture/check-stage.mjs",
+      "uid": "49c7fd251f01d819346c25fbfcab3af18a22eb33"
+    },
+    {
+      "path": "scripts/demo-capture/cursor.mjs",
+      "uid": "8da48562fcedecb759ee15a06bf14f2e2d874f2c"
+    },
+    {
+      "path": "scripts/demo-capture/measure-widths.mjs",
+      "uid": "4efcbfd5e7586aee7839d49535b27c7cd155408a"
+    },
+    {
+      "path": "scripts/demo-capture/mobile-review.mjs",
+      "uid": "78be9aebe8fc72c06f8f69eaf3afaf2a42b238b7"
+    },
+    {
+      "path": "scripts/e2e-mint-session.mjs",
+      "uid": "194e264c54c31b8dfeb037c9a0d9c3e909d0ab1f"
+    },
+    {
+      "path": "scripts/operator-acquisition-report.mjs",
+      "uid": "d1a97708e90b7b2edc818b55d9808111a79963ff"
+    },
+    {
+      "path": "scripts/package-platform-release.mjs",
+      "uid": "c58cad0237f411452b9074b5c5df01d414fbbc8b"
+    },
+    {
+      "path": "scripts/perf-summary.ts",
+      "uid": "876ff164d9c3fd53e7d369e95c4fcf5a6c889015"
+    },
+    {
+      "path": "scripts/predev-port-check.mjs",
+      "uid": "ea008781c651678228f27e8ea845beea9350fd43"
+    },
+    {
+      "path": "scripts/provision-demo-account.mjs",
+      "uid": "985db071f17f5ea86c3fdee95ec348cfc2d08ab9"
+    },
+    {
+      "path": "scripts/recreate_templates.js",
+      "uid": "b6e23f4984e8f84ca731d503dab91d2d48958dd6"
+    },
+    {
+      "path": "scripts/release-evidence-check.mjs",
+      "uid": "d51a04d30eb77aeff92ee6f375120b29fedb2dca"
+    },
+    {
+      "path": "scripts/release-monitoring.mjs",
+      "uid": "fc4a04a748eccfe87112d99b84c58231c2ee15c3"
+    },
+    {
+      "path": "scripts/release-platform-check.mjs",
+      "uid": "6312695280917d1d9c594b8eb0396b3dab6e515d"
+    },
+    {
+      "path": "scripts/release-sql.mjs",
+      "uid": "fa80daac53e788f7fc0a4d5cb1b351bd9912a769"
+    },
+    {
+      "path": "scripts/smoke-onboarding-wizard.mjs",
+      "uid": "0c93ae31012c172b6f85bb825942a6172bca4705"
+    },
+    {
+      "path": "scripts/sync-admin-help.mjs",
+      "uid": "68b5983451e9fbe628459d9bf20e0eeb76d8363c"
+    },
+    {
+      "path": "scripts/validate_templates.js",
+      "uid": "8cc69f1cb05ab5bab4db9e90393b8aaf4e05448a"
+    },
+    {
+      "path": "sentry.edge.config.ts",
+      "uid": "22efc5b3fe02587b02ff0ca0cf2440c7ed907ea3"
+    },
+    {
+      "path": "sentry.server.config.ts",
+      "uid": "22efc5b3fe02587b02ff0ca0cf2440c7ed907ea3"
+    },
+    {
+      "path": "skills-lock.json",
+      "uid": "891393355aea0e3a41279b5f7f7c74f35dfcdae8"
+    },
+    {
+      "path": "supabase/.temp/cli-latest",
+      "uid": "3ea3747d906697011e52d3e511280909b48b448b"
+    },
+    {
+      "path": "supabase/config.toml",
+      "uid": "9f4c433148567ba6bf8521b0ece39d88abfbd8e5"
+    },
+    {
+      "path": "supabase/functions/_shared/auth.ts",
+      "uid": "d88ac8155ffc752b6b173d6ed10f56a4cc283faf"
+    },
+    {
+      "path": "supabase/functions/_shared/billing.ts",
+      "uid": "38057bec8d6d7fe95513c9c296df6c961371d6d8"
+    },
+    {
+      "path": "supabase/functions/_shared/booking-custom-fields.ts",
+      "uid": "6e9f17cd4cef04d43d6912bf9976cd9cea84b743"
+    },
+    {
+      "path": "supabase/functions/_shared/booking-success.ts",
+      "uid": "f43f3de7d6ad42e1414ab0386dbc4fd782546cb6"
+    },
+    {
+      "path": "supabase/functions/_shared/bot-gate.ts",
+      "uid": "55ee84e005e61822932d91684c03ce1c7fc968c5"
+    },
+    {
+      "path": "supabase/functions/_shared/bot-guards.ts",
+      "uid": "d3f8ed79b4e6e7c655bf12c811fddbb8ca0ec44b"
+    },
+    {
+      "path": "supabase/functions/_shared/bot-llm.test.ts",
+      "uid": "f6efb3f23c11d2f5b46a6c9403526c2ba7a207c9"
+    },
+    {
+      "path": "supabase/functions/_shared/bot-llm.ts",
+      "uid": "d7a5944f36cef1f7fbdf862fe07f2c2378d60685"
+    },
+    {
+      "path": "supabase/functions/_shared/bot-prompt.ts",
+      "uid": "9a8ae8a49d79bc06acdf8e776b120ea04a29c91b"
+    },
+    {
+      "path": "supabase/functions/_shared/chat-booking-pricing.ts",
+      "uid": "244f9bb981aff80ecc7b2bf4f21ec3f691265174"
+    },
+    {
+      "path": "supabase/functions/_shared/chat-contact.ts",
+      "uid": "565393cda4533bf83e8602e3d8c9a7860efb2f59"
+    },
+    {
+      "path": "supabase/functions/_shared/combo-rules.test.ts",
+      "uid": "aaf8cb5b8822b4ad33b76bf16b749247b84a28a3"
+    },
+    {
+      "path": "supabase/functions/_shared/combo.ts",
+      "uid": "ad4cc770190918cea912b1e92ef43057137427db"
+    },
+    {
+      "path": "supabase/functions/_shared/customer-session.ts",
+      "uid": "f5c0359d913bb9d26bc7f193870a88817b7b683f"
+    },
+    {
+      "path": "supabase/functions/_shared/demo-guide.ts",
+      "uid": "7a8a9fe82096f4f9545a277a93df276750178e65"
+    },
+    {
+      "path": "supabase/functions/_shared/duration.ts",
+      "uid": "0945872164e1005a803b89c5b9185f602318ef4c"
+    },
+    {
+      "path": "supabase/functions/_shared/getyourguide.ts",
+      "uid": "b905b9df274dc3b54a8db443d583eefc78739978"
+    },
+    {
+      "path": "supabase/functions/_shared/gift-voucher-face.ts",
+      "uid": "78dbf535cca9e748bab755945f37ce860338849c"
+    },
+    {
+      "path": "supabase/functions/_shared/google-drive-oauth.ts",
+      "uid": "38fb96bcc1f1339fe69f1a6ca8d9b72a213eac75"
+    },
+    {
+      "path": "supabase/functions/_shared/intent.ts",
+      "uid": "88ceaf767339bb892dcc1c4b8a76c92f89475038"
+    },
+    {
+      "path": "supabase/functions/_shared/kb.ts",
+      "uid": "ec8cc4251143a6a3817ac04b7fb6e3a337dfb86c"
+    },
+    {
+      "path": "supabase/functions/_shared/llm.ts",
+      "uid": "15824ea641ec1afd6c1becdf1945c7952e2c5ad7"
+    },
+    {
+      "path": "supabase/functions/_shared/logger.ts",
+      "uid": "afaf8fb644c55b8b782155228cf2b4b71889f84c"
+    },
+    {
+      "path": "supabase/functions/_shared/marketing-batch.ts",
+      "uid": "96a5e9020e35ef0ae680bb3ee96a23ec6980f6e2"
+    },
+    {
+      "path": "supabase/functions/_shared/marketing-calendar.ts",
+      "uid": "283584dffae712d9d7b84cbdf855cf3b4b63db13"
+    },
+    {
+      "path": "supabase/functions/_shared/marketing-delivery.ts",
+      "uid": "0b5231f1f7ad6dca861397389c113c9719faad6e"
+    },
+    {
+      "path": "supabase/functions/_shared/marketing-email-html.ts",
+      "uid": "75d2613978a59b671d3505a8726772ef8642f88f"
+    },
+    {
+      "path": "supabase/functions/_shared/marketing-outbox.ts",
+      "uid": "e6685fe396058338854746436a390ed2015044fb"
+    },
+    {
+      "path": "supabase/functions/_shared/marketing-tokens.ts",
+      "uid": "081ebd9c989343989f048ef0629599738c35717c"
+    },
+    {
+      "path": "supabase/functions/_shared/my-bookings-lookup.ts",
+      "uid": "d9ddbe7baa9708f2da7940ab029b93418cbf6135"
+    },
+    {
+      "path": "supabase/functions/_shared/onboarding-guards.test.ts",
+      "uid": "bbfc3c626d3fa07e3468e7b9d9e74eb1ddeccbd5"
+    },
+    {
+      "path": "supabase/functions/_shared/onboarding-guards.ts",
+      "uid": "df3e22e800a59cc11ccde754ed1b8f3aab877865"
+    },
+    {
+      "path": "supabase/functions/_shared/openrouter-provider.ts",
+      "uid": "8b271f07afa04ac75d0c539bdc385ef9774e7bc4"
+    },
+    {
+      "path": "supabase/functions/_shared/ota-availability.ts",
+      "uid": "5c12693d02da80e47048ce496ecb5ecba586b8ef"
+    },
+    {
+      "path": "supabase/functions/_shared/ota-backend.ts",
+      "uid": "b5c12d137d63c05839e6db8850c1717a5504c661"
+    },
+    {
+      "path": "supabase/functions/_shared/ota-readiness.ts",
+      "uid": "9618f02b911163364a456b0d1448d02543c2a8c9"
+    },
+    {
+      "path": "supabase/functions/_shared/ota-runtime.ts",
+      "uid": "3b953cdadee2a11fb2b767b0a080728e2e13c35f"
+    },
+    {
+      "path": "supabase/functions/_shared/ota-supplier.ts",
+      "uid": "7514e312f59a89a35d40f7114d2f71bd1a7d0c7b"
+    },
+    {
+      "path": "supabase/functions/_shared/otp-attempts.ts",
+      "uid": "3de1042421c957d327fbdb587b680d700247194f"
+    },
+    {
+      "path": "supabase/functions/_shared/pagination.ts",
+      "uid": "ed3552790bfb79a5651bbe9cc333f43f3fa8978f"
+    },
+    {
+      "path": "supabase/functions/_shared/payment-deadline.ts",
+      "uid": "b28d48aca078c0f6149065abcf405aecddb3c2f7"
+    },
+    {
+      "path": "supabase/functions/_shared/platform-invariants.ts",
+      "uid": "b6620902b6d7aa9529b09eefe9336dd764a85be8"
+    },
+    {
+      "path": "supabase/functions/_shared/sentry.ts",
+      "uid": "dd0c68bce0ede3026487191e3a54355470fecc9e"
+    },
+    {
+      "path": "supabase/functions/_shared/slot-generation.test.ts",
+      "uid": "5c7ee1ad45b58fb45de83fa48be7bc2b3f1079d7"
+    },
+    {
+      "path": "supabase/functions/_shared/slot-generation.ts",
+      "uid": "656ba99908ef70bfc67c9c784d460148ec6176b1"
+    },
+    {
+      "path": "supabase/functions/_shared/subscription.ts",
+      "uid": "8cfbb9e612479f59936e1741457f00a76759b55e"
+    },
+    {
+      "path": "supabase/functions/_shared/tenant.ts",
+      "uid": "2d4d83fa11c17864d42becb59d402be469a139c6"
+    },
+    {
+      "path": "supabase/functions/_shared/viator.ts",
+      "uid": "b45d517333f6b4f762d799b3f79ac9b14243e46c"
+    },
+    {
+      "path": "supabase/functions/_shared/voucher-balances.ts",
+      "uid": "b1ab50014c2b9a938c9f3d1c71debc65a0506233"
+    },
+    {
+      "path": "supabase/functions/_shared/vouchers.ts",
+      "uid": "9441c95afc332a2f08090945fbffc7a49b170747"
+    },
+    {
+      "path": "supabase/functions/_shared/waiver.ts",
+      "uid": "12917c071891a0fbf0fad496bd9552204b87b5cd"
+    },
+    {
+      "path": "supabase/functions/_shared/web-chat-session.ts",
+      "uid": "f38a35969c3627476c46af366111fe82306241c4"
+    },
+    {
+      "path": "supabase/functions/_shared/yoco.ts",
+      "uid": "72c01acd2d4b615dbc60705fbda1f8e56abc0861"
+    },
+    {
+      "path": "supabase/functions/admin-help-chat/index.ts",
+      "uid": "53484793080d12e323b79c91c87a5ccc1ff1d0c8"
+    },
+    {
+      "path": "supabase/functions/admin-reply/index.ts",
+      "uid": "a9f0def4e05f8aee0cd275cffb17d697ee9c6c84"
+    },
+    {
+      "path": "supabase/functions/auto-messages/index.ts",
+      "uid": "54ca36abf881d64ef462b0506ceed029ab997246"
+    },
+    {
+      "path": "supabase/functions/bank-details/index.ts",
+      "uid": "e54865c44f809e52b538ac4c4335c4f002c70770"
+    },
+    {
+      "path": "supabase/functions/batch-refund/index.ts",
+      "uid": "0e0f007ceca0c3972f4706d772a4c545b587481e"
+    },
+    {
+      "path": "supabase/functions/billing-enforcement/index.ts",
+      "uid": "6585cf50ab632fa19081f7b5f8c164fc8d10b806"
+    },
+    {
+      "path": "supabase/functions/booking-payment/index.ts",
+      "uid": "b090bba823b21dc766415ea6d80f3a26f10b4775"
+    },
+    {
+      "path": "supabase/functions/booking-success/index.ts",
+      "uid": "4b52d66505130a9fc73d15ad2e3dba944547af7c"
+    },
+    {
+      "path": "supabase/functions/broadcast/.npmrc",
+      "uid": "5ac6b3af4c3d14462b9d71d5699b69e9f433882a"
+    },
+    {
+      "path": "supabase/functions/broadcast/deno.json",
+      "uid": "36238020d7262634922fef22ebfaad024ae2aff1"
+    },
+    {
+      "path": "supabase/functions/broadcast/index.ts",
+      "uid": "7ce07fac9fff51b784747c478d1a7790a3d9b02d"
+    },
+    {
+      "path": "supabase/functions/manual-mark-paid/.npmrc",
+      "uid": "5ac6b3af4c3d14462b9d71d5699b69e9f433882a"
+    },
+    {
+      "path": "supabase/functions/manual-mark-paid/deno.json",
+      "uid": "36238020d7262634922fef22ebfaad024ae2aff1"
+    },
+    {
+      "path": "supabase/functions/manual-mark-paid/index.ts",
+      "uid": "baca600189c9f5f20c943ff92c0b46bb7ecbedb1"
+    },
+    {
+      "path": "supabase/functions/cancel-booking/index.ts",
+      "uid": "35c2908f091c08223f817bc81e4794d2a962a2ca"
+    },
+    {
+      "path": "supabase/functions/combo-settlement-link/index.ts",
+      "uid": "578cf6361ba9e817fb31935b332c4e70eb7d9724"
+    },
+    {
+      "path": "supabase/functions/confirm-booking/index.ts",
+      "uid": "d53eb3f7733bf179ddcb871a116063ae0624608a"
+    },
+    {
+      "path": "supabase/functions/create-checkout/index.ts",
+      "uid": "3189e97cc88dfc57c959f14bc4e8473d718266f9"
+    },
+    {
+      "path": "supabase/functions/create-paysafe-checkout/index.ts",
+      "uid": "cdaebc1c242432a9f2f4fdd22d38300eccb1ac94"
+    },
+    {
+      "path": "supabase/functions/cron-jobs/index.ts",
+      "uid": "1a3872429cac7940a04248f0519d5f9eb204f522"
+    },
+    {
+      "path": "supabase/functions/cron-tasks/index.ts",
+      "uid": "421c378518f86a486184e556d7316ecee30d42b6"
+    },
+    {
+      "path": "supabase/functions/debug-logs/index.ts",
+      "uid": "ecd90ea778abf88dae10d2b73a8012ea41cecd2d"
+    },
+    {
+      "path": "supabase/functions/deno.json",
+      "uid": "df98d2ccae7506cf01785739bba3d3089e169241"
+    },
+    {
+      "path": "supabase/functions/external-booking/README.md",
+      "uid": "3842f74eb86004e6a77df9042eebc295ffa90e30"
+    },
+    {
+      "path": "supabase/functions/external-booking/index.ts",
+      "uid": "64d3416cc8d817bcc21dffa14e0846a0d39dead6"
+    },
+    {
+      "path": "supabase/functions/fetch-google-reviews/index.ts",
+      "uid": "25f5af716bf703fcec8d6549812943de48f51e31"
+    },
+    {
+      "path": "supabase/functions/generate-invite-token/index.ts",
+      "uid": "16701a5fbe4f8e89b892840718b9977ca273bbd5"
+    },
+    {
+      "path": "supabase/functions/getyourguide-availability-sync/index.ts",
+      "uid": "3d7927fa8d1ba91e3528f22a7f60488d5e457701"
+    },
+    {
+      "path": "supabase/functions/getyourguide-webhook/index.ts",
+      "uid": "0734112e74e254fdf8f7749920b786821575c3e8"
+    },
+    {
+      "path": "supabase/functions/google-drive/index.ts",
+      "uid": "a0706244d89fdf455a275c0cb7c9e746fba5c119"
+    },
+    {
+      "path": "supabase/functions/hold-expiry/index.ts",
+      "uid": "fa0376846efdbafe61a1e59e4e428b58486c077d"
+    },
+    {
+      "path": "supabase/functions/kb-sync/index.ts",
+      "uid": "41418470a608d40ce2a2e44a1016fbc7521177d4"
+    },
+    {
+      "path": "supabase/functions/marketing-automation-dispatch/index.ts",
+      "uid": "376b4f43dfb642e169e6458bd9ceff5c59ee97d0"
+    },
+    {
+      "path": "supabase/functions/marketing-dispatch/index.ts",
+      "uid": "6e89ca652a08960058a170a4c028fb948073efda"
+    },
+    {
+      "path": "supabase/functions/marketing-setup-status/index.ts",
+      "uid": "f1ab7196050a6bb7f6142e33e2a61c3bd2f19ab4"
+    },
+    {
+      "path": "supabase/functions/marketing-track/index.ts",
+      "uid": "7380263348503f152f3fcafa6aa4bcf34074e2ed"
+    },
+    {
+      "path": "supabase/functions/marketing-unsubscribe/index.ts",
+      "uid": "048c932160fe7d0e43adc194b6ba3d9f2a36a3fc"
+    },
+    {
+      "path": "supabase/functions/my-bookings-lookup/index.ts",
+      "uid": "4c493b35fb13f10b49f961d4b9ba5459ce952e0c"
+    },
+    {
+      "path": "supabase/functions/onboarding-wizard/index.ts",
+      "uid": "add6a58f0f15ab7e5ec9816b1c82fc54306a2f13"
+    },
+    {
+      "path": "supabase/functions/ota-reconcile/index.ts",
+      "uid": "d896d219e41a5ba4cc99777861af5c9cabed8b33"
+    },
+    {
+      "path": "supabase/functions/outbox-send/index.ts",
+      "uid": "4a8d98698b2be1576881bcda48ed1edfc2306e5c"
+    },
+    {
+      "path": "supabase/functions/payfast-itn/index.ts",
+      "uid": "b4b9474a737ea7e8ea62024d6bf9e792b28b0fee"
+    },
+    {
+      "path": "supabase/functions/paysafe-webhook/index.ts",
+      "uid": "534a0b7e699ba530275dfc8fcea317b7f32e6858"
+    },
+    {
+      "path": "supabase/functions/platform-bank-details/index.ts",
+      "uid": "88cb4cc6f3ad5b9e0a23e66dc275300ec006bd3e"
+    },
+    {
+      "path": "supabase/functions/platform-invoice-checkout/index.ts",
+      "uid": "746422fd5d8c33d6844b2b0ed5738d6c5f2854c6"
+    },
+    {
+      "path": "supabase/functions/platform-invoice-webhook/index.ts",
+      "uid": "28f52766c54fb85d5d8836de3a21699f38941096"
+    },
+    {
+      "path": "supabase/functions/process-refund/index.ts",
+      "uid": "2ed805cc72e40880553c6d3a4d900ef1f337297e"
+    },
+    {
+      "path": "supabase/functions/rebook-booking/index.ts",
+      "uid": "8164ead83fddb8ce121857a15e1b2115c855c5e6"
+    },
+    {
+      "path": "supabase/functions/reminder-scheduler/index.ts",
+      "uid": "7638ac1e36841292f9d87dfc413ea2c559f37112"
+    },
+    {
+      "path": "supabase/functions/resend-webhook/index.ts",
+      "uid": "9f646ae8e27427defbb4adfcd2cb1f7fa7afb19e"
+    },
+    {
+      "path": "supabase/functions/send-email/README.md",
+      "uid": "999c3ecc38f7388be273b63c61db9e56d43dbfc0"
+    },
+    {
+      "path": "supabase/functions/send-email/index.ts",
+      "uid": "d1c64dc6c9da914eeff82769e8e4720136ae0a35"
+    },
+    {
+      "path": "supabase/functions/send-invoice/index.ts",
+      "uid": "9c614be27e614fd83713d222466d3166dcaa4a4f"
+    },
+    {
+      "path": "supabase/functions/send-otp/index.ts",
+      "uid": "06ab021785bc32569cbc17944d8a628ca3af827f"
+    },
+    {
+      "path": "supabase/functions/send-trip-photos/index.ts",
+      "uid": "22eed7608a5da6e55a2f734444b5c2b798b2124f"
+    },
+    {
+      "path": "supabase/functions/send-whatsapp-text/index.ts",
+      "uid": "b7258a864fd40ec9e56c9e26d4286db60626c5ac"
+    },
+    {
+      "path": "supabase/functions/super-admin-onboard/index.ts",
+      "uid": "fa51065487b9bc94f4b30f49ada512c1e4d737db"
+    },
+    {
+      "path": "supabase/functions/viator-availability-sync/index.ts",
+      "uid": "a3187a30037d73e6bc06db7a211f20869bff98bf"
+    },
+    {
+      "path": "supabase/functions/viator-webhook/index.ts",
+      "uid": "be57a3b9a3180e82908e76d16c6d637e46195e06"
+    },
+    {
+      "path": "supabase/functions/wa-send/index.ts",
+      "uid": "bde84599075934889f54bc063688f703f3677fa6"
+    },
+    {
+      "path": "supabase/functions/wa-webhook/index.ts",
+      "uid": "f02715ed69a24561922439cbbc7139b6871abf96"
+    },
+    {
+      "path": "supabase/functions/waiver-form/index.ts",
+      "uid": "4f31d81aca1285f2b3859bcf781bf7de10dcc85e"
+    },
+    {
+      "path": "supabase/functions/weather-cancel/index.ts",
+      "uid": "5869564dbe8f51a50fcc4e9c58859054c2996891"
+    },
+    {
+      "path": "supabase/functions/web-chat/index.ts",
+      "uid": "53a3d3b69f1ab557940fe2c9abee2579f50b7f4a"
+    },
+    {
+      "path": "supabase/functions/yoco-webhook/index.ts",
+      "uid": "e29c5aacbea8ef32662236d58c4d5c2fc243da09"
+    },
+    {
+      "path": "supabase/security-baseline.json",
+      "uid": "e24f28038a9f2a568d03ca06d70606b879e5e6fb"
+    },
+    {
+      "path": "tailwind.config.js",
+      "uid": "a930f49460e0a1e8410cbd4ad7ef03f4347220d4"
+    },
+    {
+      "path": "test_windguru.js",
+      "uid": "322d369b83fa0b11f53d6a31c540ecfb1f88c994"
+    },
+    {
+      "path": "tsconfig.json",
+      "uid": "4906acbccab04ae6a29d681074c1c4b0f125ae95"
+    },
+    {
+      "path": "vitest.config.ts",
+      "uid": "bd56748ed4ef59ba29b0e4dec0cb7711d79d4ac5"
+    }
+  ]
+}

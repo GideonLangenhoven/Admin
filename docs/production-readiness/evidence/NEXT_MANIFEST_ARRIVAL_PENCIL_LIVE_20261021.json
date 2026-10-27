@@ -1,0 +1,136 @@
+{
+  "released_at": "2026-10-21T15:38:13.071538+00:00",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "production_url": "https://admin.bookingtours.co.za",
+  "deployment": {
+    "id": "dpl_F9Gu4GcQHhe6rPaR1buU3aqkvsqV",
+    "url": "caepweb-admin-fn5sdmfmp-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 517,
+    "changed": [
+      "app/page.tsx",
+      "app/lib/operator-day.ts",
+      "app/simple/check-ins/page.tsx",
+      "components/simple/DepartureCard.tsx",
+      "components/booking/ArrivalCountLink.tsx"
+    ]
+  },
+  "preserved_source_files": 512,
+  "changes": [
+    "Dashboard Manifest shows the nearest booked departure time, preserving the existing four-minute check-in grace period and keeping simultaneous activities separate.",
+    "Roll Call follows the visible departure automatically while selection by slot ID preserves concurrent activity choices.",
+    "Guest-name and Resolve waiver links have no underline in full and Simple View roll calls and the arrival editor.",
+    "The standalone Edit arrival counts button is removed; a pencil beside each guest count opens that exact booking arrival input.",
+    "Arrival fields are focused and selected after their data loads; existing payment, waiver, quantity and saving checks are retained."
+  ],
+  "validation": {
+    "production_build": "PASS",
+    "active_application_typecheck": "PASS",
+    "focused_unit_tests": 44,
+    "eslint_errors": 0,
+    "eslint_warnings": 8,
+    "candidate": {
+      "at": "2026-10-21T15:35:18.439Z",
+      "origin": "https://caepweb-admin-fn5sdmfmp-jerrys-projects-f4e4eaf9.vercel.app",
+      "checks": [
+        {
+          "path": "/",
+          "status": 200,
+          "scripts_checked": 20,
+          "stylesheets_checked": 4,
+          "copy_verified": true
+        },
+        {
+          "path": "/simple",
+          "status": 200,
+          "scripts_checked": 22,
+          "stylesheets_checked": 4,
+          "copy_verified": true
+        },
+        {
+          "path": "/simple/calendar",
+          "status": 200,
+          "scripts_checked": 19,
+          "stylesheets_checked": 4,
+          "copy_verified": true
+        },
+        {
+          "path": "/simple/check-ins",
+          "status": 200,
+          "scripts_checked": 20,
+          "stylesheets_checked": 4,
+          "copy_verified": true
+        }
+      ]
+    },
+    "production": {
+      "at": "2026-10-21T15:37:02.052Z",
+      "origin": "https://admin.bookingtours.co.za",
+      "checks": [
+        {
+          "path": "/",
+          "status": 200,
+          "scripts_checked": 20,
+          "stylesheets_checked": 4,
+          "copy_verified": true
+        },
+        {
+          "path": "/simple",
+          "status": 200,
+          "scripts_checked": 22,
+          "stylesheets_checked": 4,
+          "copy_verified": true
+        },
+        {
+          "path": "/simple/calendar",
+          "status": 200,
+          "scripts_checked": 19,
+          "stylesheets_checked": 4,
+          "copy_verified": true
+        },
+        {
+          "path": "/simple/check-ins",
+          "status": 200,
+          "scripts_checked": 20,
+          "stylesheets_checked": 4,
+          "copy_verified": true
+        }
+      ]
+    },
+    "source_files_verified": 517,
+    "design_detector": [],
+    "chrome_used": false,
+    "playwright_used": false,
+    "physical_device_tested": false,
+    "customer_actions_performed": false
+  },
+  "help": {
+    "at": "2026-10-21T15:36:58.531Z",
+    "articles": [
+      "dashboard",
+      "simple-view"
+    ],
+    "changed": [
+      "help:dashboard:4",
+      "help:dashboard:5",
+      "help:simple-view:3"
+    ],
+    "removed": [],
+    "result": {
+      "ok": true,
+      "total": 177,
+      "embedded": 3,
+      "skipped": 174,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    },
+    "all_chunks_verified": 177
+  },
+  "baseline": {
+    "id": "dpl_6H2f34jFgDTznFefv9VwfsWvm4An",
+    "url": "caepweb-admin-oriobaizw-jerrys-projects-f4e4eaf9.vercel.app",
+    "newer_dashboard_layout_and_contact_controls_preserved": true
+  },
+  "database_changes": false,
+  "edge_function_changes": false
+}

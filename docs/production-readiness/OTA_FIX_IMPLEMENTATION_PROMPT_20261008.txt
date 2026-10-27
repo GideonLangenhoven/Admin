@@ -1,0 +1,37 @@
+Implement the OTA review fixes in /Users/gideonlangenhoven/dev/capekayak.
+
+User request: "please fix these, please create a prompt and use sol to implement these fixes. please test and ensure it will work easily"
+
+Outcome: reliable, testable Viator/GetYourGuide integration code with an honest setup path. Preserve the production readiness block until official provider access, sandbox contract tests and certification establish compatibility. Do not claim that local tests certify a provider integration.
+
+Read CLAUDE.md, applicable AGENTS.md, docs/OTA_DIRECT_CONNECTIVITY.md, and the existing OTA implementation before editing. Follow the Ponytail skill: smallest complete fix; reuse existing booking/capacity primitives when they preserve transactional correctness. Preserve all unrelated work in this dirty checkout. Do not commit, push, deploy, modify production data/settings, purchase subscriptions, or contact providers.
+
+Confirmed review evidence:
+- Five deployed functions match the workspace and return 503 OTA_NOT_READY: viator-webhook, getyourguide-webhook, viator-availability-sync, getyourguide-availability-sync, ota-reconcile.
+- No production integration rows, mappings, or reconciliation runs exist. The GYG hourly cron is active; the other two OTA cron jobs are inactive. Do not change production schedules as part of implementation.
+- Settings displays an unavailable notice. proxy.ts hides /settings/ota and /ota-drift. Credentials/activation are also blocked in app/api/ota/route.ts.
+- Both prototypes reproducibly acknowledge a failed creation's retry as successful without a booking, ignore a second amendment of the same booking, leave a date amendment on its old slot, ignore option codes when resolving mappings, accept passengers on full slots, and acknowledge success after a capacity RPC failure.
+- Availability code omits closed slots and exports UTC clock values without offsets; currency is hardcoded. Sandbox mode changes outbound hosts but does not isolate database writes.
+- Reconciliation guesses unsupported provider endpoints and uses inconsistent created/modified time windows and unpaginated reads.
+- Evidence/probe harness: /private/tmp/bookingtours-ota-review-20261008/{probes.cjs,prototype-results.json,live-results.json,browser-results.json}. Probe harness enables the dormant code only inside a network-disabled VM. Do not turn off real guards.
+
+Provider contracts must come from primary sources, not guessed payloads:
+- https://docs.viator.com/supplier-api/technical/ (Reservation System API, not the affiliate/reseller Partner API). Uses reservation-system hosted product/availability/reservation/booking/cancellation operations and appropriate provider authentication. Viator requires technical evaluation/approval and registered operators.
+- https://integrator.getyourguide.com/documentation/overview (Supplier API). Both directions use HTTP Basic authentication; OAuth and Bearer are explicitly not accepted. All required supplier endpoints must exist. GYG amendments use the documented replacement-booking/cancellation flow.
+- https://gygconnectivity.zendesk.com/hc/en-us/articles/30171424267037-How-Do-I-Register-my-new-Reservation-System-and-What-Are-the-Next-Steps
+
+Implementation requirements:
+1. Replace incorrect clients/protocol assumptions with implementations grounded in the official supplier contracts. Research current exact request/response shapes, authentication, endpoint paths, retry semantics and timezone/currency rules. Keep unverified or inaccessible capabilities explicitly unavailable; never invent a provider endpoint. Avoid preserving misleading "working" prototype implementations just by hiding them.
+2. Use a database transaction for booking creation/amendment/cancellation plus capacity reservation/release and event completion. Lock relevant rows in a deterministic order. Validate positive quantities, active tenant-owned tours, open/future departures and available capacity (including holds). Do not change unrelated existing booking flows.
+3. Retry identity must include tenant/channel/environment and the provider's stable request/event identity. Identical retries must return the original result; conflicts must fail explicitly. Failed work must remain retryable. Distinct later amendments must not be suppressed. Booking uniqueness must be tenant-scoped where appropriate. Propagate all write failures.
+4. Match product AND option exactly, reject missing/ambiguous/cross-tenant mappings. Resolve departures exactly according to provider contract and the operator timezone, not an arbitrary +/-30 minute window. Date/time/product/option/quantity amendments must move seats atomically and reject invalid changes to cancelled bookings.
+5. Correct availability: closed/sold-out/cancelled departures cannot remain on sale; use contract-correct local times/offsets, operator currency, price categories, finite validated prices. Paginate or bound queries correctly. Do not report a successful sync after a database error or silently skip required closures.
+6. Make sandbox isolation explicit and safe. Keep live activation blocked pending provider certification; do not add an environment-variable or operator-toggle bypass that could enable unverified adapters on production. Do not let test bookings affect live inventory/messages/payments.
+7. Remove or correct unsupported reconciliation assumptions. Keep monitoring and setup status honest and make errors actionable. Any UI changes must use the existing design conventions and relevant frontend skill, without redesigning unrelated pages. Update the existing OTA documentation with implemented behavior, exact remaining prerequisites, and commands to run the test suite.
+
+Tests and verification:
+- Add real regression tests that fail on the reviewed bugs, not only source-text assertions or tests of mocked replacement logic.
+- Exercise actual handlers/adapters with official contract-shaped fixtures and network stubs; verify auth failures, malformed payloads, availability closures/local dates, required provider operations and error responses.
+- Run disposable PostgreSQL tests for concurrent last-seat booking, rollback on injected write failure, duplicate creation, failed-then-retried events, later amendments, date/product/option/quantity rescheduling, cancelled-booking amendments, repeated cancellation, closed/full slots and tenant isolation. Use the existing local database harness/patterns; never production inventory.
+- Keep and run the external-integration-readiness tests. Run scoped lint/TypeScript/Deno checks and the broader unit suite when appropriate. Record exactly what passed and what still requires real provider access.
+- Request an independent parent review when implementation is ready; return changed paths, behavior, tests/commands/results, and any remaining provider contract limitations.

@@ -1,0 +1,1570 @@
+{
+ "url": "http://127.0.0.1:3000/reports",
+ "at": "2026-10-27T15:03:36.174Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 1440,
+   "height": 900,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.76
+   ],
+   "motion": {
+    "elements": 12,
+    "css": 12,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "page": {
+     "height": 900,
+     "screens": 1,
+     "words": 131,
+     "img": 3,
+     "video": 0,
+     "canvas": 0,
+     "svg": 21,
+     "sections": 1,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Claire's Hiking",
+     "words": 2,
+     "chars": 15,
+     "lines": 1,
+     "size": 12,
+     "vw": 0.8,
+     "font": "Plus Jakarta Sans",
+     "weight": 400,
+     "tracking": 0,
+     "leading": 1.63,
+     "top": 51,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "Claire's Hiking",
+     "words": 2,
+     "lines": 1,
+     "size": 12,
+     "font": "Plus Jakarta Sans"
+    },
+    "headings": [
+     {
+      "text": "Reports",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 28,
+      "vw": 1.9,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.07,
+      "top": 157,
+      "tag": "h1",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 0.71,
+       "mono": false
+      },
+      {
+       "family": "Geist Mono",
+       "share": 0.24,
+       "mono": true
+      },
+      {
+       "family": "satoshi",
+       "share": 0.05,
+       "mono": false
+      }
+     ],
+     "familyCount": 3,
+     "sizes": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      28
+     ],
+     "sizeCount": 9,
+     "notLoaded": [],
+     "body": {
+      "font": "Plus Jakarta Sans",
+      "size": 12,
+      "leading": 1.33,
+      "weight": 500,
+      "tracking": 0,
+      "contrast": null
+     },
+     "measureChars": 66,
+     "max": {
+      "size": 28,
+      "vw": 1.9,
+      "font": "satoshi",
+      "text": "Reports"
+     },
+     "monoShare": 0.24,
+     "monoProseShare": 0.24,
+     "monoFamilies": [
+      "Geist Mono"
+     ],
+     "monoSamples": [
+      "Customer view",
+      "Operations",
+      "Guest care",
+      "Revenue",
+      "Growth",
+      "Admin"
+     ],
+     "microLabels": 9,
+     "microLabelShare": 0.108,
+     "microSamples": [
+      "Claire's Hiking",
+      "Reports",
+      "Filter by",
+      "From",
+      "To",
+      "Status"
+     ],
+     "upperShare": 0.22,
+     "centerShare": 0.22,
+     "smallText": 7
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [],
+     "textColors": [
+      {
+       "color": "#17221c",
+       "share": 0.3
+      },
+      {
+       "color": "#66736b",
+       "share": 0.22
+      },
+      {
+       "color": "#125e40",
+       "share": 0.19
+      },
+      {
+       "color": "#85998c",
+       "share": 0.13
+      },
+      {
+       "color": "#b7c9bd",
+       "share": 0.06
+      }
+     ],
+     "button": {
+      "bg": "#ffffff",
+      "hsl": {
+       "h": 0,
+       "s": 0,
+       "l": 1
+      },
+      "fg": "#46534b"
+     },
+     "lowContrast": [
+      {
+       "text": "Financials",
+       "ratio": 4.3,
+       "need": 4.5,
+       "size": 12,
+       "fg": "#66736b",
+       "bg": "#f1ede5"
+      },
+      {
+       "text": "Marketing",
+       "ratio": 4.3,
+       "need": 4.5,
+       "size": 12,
+       "fg": "#66736b",
+       "bg": "#f1ede5"
+      },
+      {
+       "text": "Attendance",
+       "ratio": 4.3,
+       "need": 4.5,
+       "size": 12,
+       "fg": "#66736b",
+       "bg": "#f1ede5"
+      },
+      {
+       "text": "Waivers",
+       "ratio": 4.3,
+       "need": 4.5,
+       "size": 12,
+       "fg": "#66736b",
+       "bg": "#f1ede5"
+      }
+     ]
+    },
+    "buttons": {
+     "count": 6,
+     "inHero": 6,
+     "radius": 8,
+     "height": 38,
+     "withShadow": 1,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "POWERED BY BookingTours",
+      "Sign Out",
+      "AI bot",
+      "Oct 1, 2026",
+      "Oct 27, 2026"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 8,
+     "shadowOverlay": 0,
+     "shadowSamples": [
+      "button.flex.h-11 → rgba(15, 43, 31, 0.06) 0px 4px 10px 0px, rgba(15, 43, 31, 0.2) 0px 28px 56px -20",
+      "button.ui-btn.ui-btn-primary → rgba(255, 255, 255, 0.16) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.28) 0px 1px ",
+      "a.ui-seg-item → rgba(15, 43, 31, 0.06) 0px 1px 2px 0px, rgba(15, 43, 31, 0.04) 0px 1px 3px 0px, ",
+      "div.ui-card.flex → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px "
+     ],
+     "gradients": 3,
+     "scrims": 0,
+     "gradientSamples": [
+      "aside.hidden.shrink-0 → radial-gradient(140% 50% at 50% -8%, rgba(0, 217, 139, 0.07), rgba(0, 0, 0, 0) 60%), radial-gradient(120% 45% ",
+      "div.ui-card.flex → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "section.ui-card.overflow-hidden → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)"
+     ],
+     "gradientText": 0,
+     "hairlines": 4,
+     "hairlineSamples": [
+      "aside.hidden.shrink-0 256px",
+      "a.mt-auto.border-t 255px",
+      "header.ui-glass.flex 1184px",
+      "div.shrink-0.border-b 1184px"
+     ],
+     "outlinedBoxes": 2,
+     "dashed": 0,
+     "blurred": 1,
+     "roundedBoxes": 2,
+     "boxRadius": 16,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 1,
+     "fixed": false,
+     "height": 34,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "plus jakarta sans fallback",
+     "geist mono",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "pageH": 900,
+    "margins": {
+     "left": 24,
+     "right": 36
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Claire's Hiking",
+      "size": 12,
+      "top": 51,
+      "firstScreen": true
+     },
+     {
+      "text": "Reports",
+      "size": 28,
+      "top": 157,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 296,
+      "n": 1
+     },
+     {
+      "x": 313,
+      "n": 1
+     },
+     {
+      "x": 411,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 3,
+    "bodySize": 12,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0.18,
+    "voidBox": {
+     "x": 600,
+     "y": 360,
+     "w": 420,
+     "h": 540
+    }
+   },
+   "app": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": {
+     "w": 256,
+     "tag": "aside",
+     "links": 13,
+     "share": 0.18
+    },
+    "topbar": {
+     "h": 61
+    },
+    "canvas": {
+     "left": 40,
+     "right": 36
+    },
+    "hero": {
+     "text": "Claire's Hiking",
+     "words": 2,
+     "chars": 15,
+     "lines": 1,
+     "size": 12,
+     "vw": 0.8,
+     "font": "Plus Jakarta Sans",
+     "weight": 400,
+     "tracking": 0,
+     "leading": 1.63,
+     "top": 51,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 2,
+     "firstScreen": 2,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 2,
+     "radii": [
+      [
+       16,
+       2
+      ]
+     ],
+     "heavyBorders": 2,
+     "borderSamples": [
+      "#0b2c21 on #f7f5f0 (13.8:1)",
+      "#0b2c21 on #f7f5f0 (13.8:1)"
+     ],
+     "heavyShadows": 2,
+     "softShadows": 2,
+     "shadowSamples": [
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px"
+     ],
+     "glass": 0
+    },
+    "chips": {
+     "count": 0,
+     "hues": 0,
+     "samples": []
+    },
+    "numbers": {
+     "cells": 12,
+     "leftAligned": 0,
+     "figures": 7,
+     "tabularShare": 1,
+     "kpiMax": 14
+    },
+    "rows": {
+     "count": 5,
+     "median": 45
+    },
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.53,
+     "tiny": 10,
+     "tinySamples": [
+      "Customer view 10px",
+      "Operations 10px",
+      "Guest care 10px",
+      "Revenue 10px"
+     ],
+     "sizes": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      28
+     ]
+    },
+    "title": {
+     "text": "Claire's Hiking",
+     "size": 12,
+     "top": 51
+    },
+    "colourShare": 0.003
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 768,
+   "height": 1024,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.68
+   ],
+   "motion": {
+    "elements": 25,
+    "css": 25,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "page": {
+     "height": 1024,
+     "screens": 1,
+     "words": 98,
+     "img": 3,
+     "video": 0,
+     "canvas": 0,
+     "svg": 21,
+     "sections": 1,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Reports",
+     "words": 1,
+     "chars": 7,
+     "lines": 1,
+     "size": 28,
+     "vw": 3.6,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1,
+     "top": 146,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": null,
+    "headings": [
+     {
+      "text": "Reports",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 28,
+      "vw": 3.6,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.12,
+      "top": 146,
+      "tag": "h1",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 0.87,
+       "mono": false
+      },
+      {
+       "family": "Geist Mono",
+       "share": 0.11,
+       "mono": true
+      },
+      {
+       "family": "satoshi",
+       "share": 0.02,
+       "mono": false
+      }
+     ],
+     "familyCount": 3,
+     "sizes": [
+      10,
+      11,
+      12,
+      13,
+      14,
+      16,
+      28
+     ],
+     "sizeCount": 7,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 28,
+      "vw": 3.6,
+      "font": "satoshi",
+      "text": "Reports"
+     },
+     "monoShare": 0.11,
+     "monoProseShare": 0.11,
+     "monoFamilies": [
+      "Geist Mono"
+     ],
+     "monoSamples": [
+      "Filter by",
+      "From",
+      "To",
+      "Status",
+      "Period",
+      "Bookings"
+     ],
+     "microLabels": 7,
+     "microLabelShare": 0.107,
+     "microSamples": [
+      "Filter by",
+      "From",
+      "To",
+      "Status",
+      "Period",
+      "Bookings"
+     ],
+     "upperShare": 0.12,
+     "centerShare": 0.18,
+     "smallText": 1
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [],
+     "textColors": [
+      {
+       "color": "#17221c",
+       "share": 0.47
+      },
+      {
+       "color": "#66736b",
+       "share": 0.29
+      },
+      {
+       "color": "#125e40",
+       "share": 0.16
+      },
+      {
+       "color": "#46534b",
+       "share": 0.07
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.01
+      }
+     ],
+     "button": {
+      "bg": "#ffffff",
+      "hsl": {
+       "h": 0,
+       "s": 0,
+       "l": 1
+      },
+      "fg": "#17221c"
+     },
+     "lowContrast": [
+      {
+       "text": "Financials",
+       "ratio": 4.3,
+       "need": 4.5,
+       "size": 14,
+       "fg": "#66736b",
+       "bg": "#f1ede5"
+      },
+      {
+       "text": "Marketing",
+       "ratio": 4.3,
+       "need": 4.5,
+       "size": 14,
+       "fg": "#66736b",
+       "bg": "#f1ede5"
+      },
+      {
+       "text": "Attendance",
+       "ratio": 4.3,
+       "need": 4.5,
+       "size": 14,
+       "fg": "#66736b",
+       "bg": "#f1ede5"
+      },
+      {
+       "text": "Waivers",
+       "ratio": 4.3,
+       "need": 4.5,
+       "size": 14,
+       "fg": "#66736b",
+       "bg": "#f1ede5"
+      }
+     ]
+    },
+    "buttons": {
+     "count": 5,
+     "inHero": 5,
+     "radius": 7,
+     "height": 44,
+     "withShadow": 2,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Bookings",
+      "Oct 1, 2026",
+      "Oct 27, 2026",
+      "Refresh",
+      "Weeks"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 8,
+     "shadowOverlay": 0,
+     "shadowSamples": [
+      "button.flex.h-11 → rgba(15, 43, 31, 0.06) 0px 4px 10px 0px, rgba(15, 43, 31, 0.2) 0px 28px 56px -20",
+      "button.ui-btn.ui-btn-primary → rgba(255, 255, 255, 0.16) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.28) 0px 1px ",
+      "a.ui-seg-item → rgba(15, 43, 31, 0.06) 0px 1px 2px 0px, rgba(15, 43, 31, 0.04) 0px 1px 3px 0px, ",
+      "div.ui-card.flex → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px "
+     ],
+     "gradients": 2,
+     "scrims": 0,
+     "gradientSamples": [
+      "div.ui-card.flex → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "section.ui-card.overflow-hidden → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)"
+     ],
+     "gradientText": 0,
+     "hairlines": 3,
+     "hairlineSamples": [
+      "header.ui-glass.flex 768px",
+      "div.shrink-0.border-b 768px",
+      "nav.ui-glass.lg:hidden 768px"
+     ],
+     "outlinedBoxes": 2,
+     "dashed": 0,
+     "blurred": 2,
+     "roundedBoxes": 2,
+     "boxRadius": 16,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 0,
+     "fixed": false,
+     "height": 0,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "geist mono",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "pageH": 1024,
+    "margins": {
+     "left": 37,
+     "right": 16
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Claire's Hiking",
+      "size": 16,
+      "top": 18,
+      "firstScreen": true
+     },
+     {
+      "text": "Reports",
+      "size": 28,
+      "top": 146,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 41,
+      "n": 2
+     },
+     {
+      "x": 24,
+      "n": 1
+     },
+     {
+      "x": 139,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 4,
+    "bodySize": 12,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": null,
+    "topbar": {
+     "h": 61
+    },
+    "canvas": {
+     "left": 24,
+     "right": 16
+    },
+    "hero": {
+     "text": "Reports",
+     "words": 1,
+     "chars": 7,
+     "lines": 1,
+     "size": 28,
+     "vw": 3.6,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1,
+     "top": 146,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 2,
+     "firstScreen": 2,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 2,
+     "radii": [
+      [
+       16,
+       2
+      ]
+     ],
+     "heavyBorders": 2,
+     "borderSamples": [
+      "#0b2c21 on #f7f5f0 (13.8:1)",
+      "#0b2c21 on #f7f5f0 (13.8:1)"
+     ],
+     "heavyShadows": 2,
+     "softShadows": 2,
+     "shadowSamples": [
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px"
+     ],
+     "glass": 0
+    },
+    "chips": {
+     "count": 1,
+     "hues": 1,
+     "samples": [
+      {
+       "hue": 156,
+       "size": 46,
+       "radius": "9999px"
+      }
+     ]
+    },
+    "numbers": {
+     "cells": 12,
+     "leftAligned": 0,
+     "figures": 7,
+     "tabularShare": 1,
+     "kpiMax": 14
+    },
+    "rows": {
+     "count": 5,
+     "median": 45
+    },
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.38,
+     "tiny": 10,
+     "tinySamples": [
+      "Customer view 10px",
+      "Operations 10px",
+      "Guest care 10px",
+      "Revenue 10px"
+     ],
+     "sizes": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      28
+     ]
+    },
+    "title": null,
+    "colourShare": 0.004
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 390,
+   "height": 844,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.89
+   ],
+   "motion": {
+    "elements": 16,
+    "css": 16,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "page": {
+     "height": 844,
+     "screens": 1,
+     "words": 98,
+     "img": 3,
+     "video": 0,
+     "canvas": 0,
+     "svg": 21,
+     "sections": 1,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Reports",
+     "words": 1,
+     "chars": 7,
+     "lines": 1,
+     "size": 28,
+     "vw": 7.2,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1,
+     "top": 130,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": null,
+    "headings": [
+     {
+      "text": "Reports",
+      "words": 1,
+      "chars": 7,
+      "lines": 1,
+      "size": 28,
+      "vw": 7.2,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.92,
+      "top": 130,
+      "tag": "h1",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 0.87,
+       "mono": false
+      },
+      {
+       "family": "Geist Mono",
+       "share": 0.11,
+       "mono": true
+      },
+      {
+       "family": "satoshi",
+       "share": 0.02,
+       "mono": false
+      }
+     ],
+     "familyCount": 3,
+     "sizes": [
+      10,
+      11,
+      12,
+      13,
+      14,
+      16,
+      28
+     ],
+     "sizeCount": 7,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 28,
+      "vw": 7.2,
+      "font": "satoshi",
+      "text": "Reports"
+     },
+     "monoShare": 0.11,
+     "monoProseShare": 0.11,
+     "monoFamilies": [
+      "Geist Mono"
+     ],
+     "monoSamples": [
+      "Filter by",
+      "From",
+      "To",
+      "Status",
+      "Period",
+      "Bookings"
+     ],
+     "microLabels": 7,
+     "microLabelShare": 0.107,
+     "microSamples": [
+      "Filter by",
+      "From",
+      "To",
+      "Status",
+      "Period",
+      "Bookings"
+     ],
+     "upperShare": 0.12,
+     "centerShare": 0.18,
+     "smallText": 1
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [],
+     "textColors": [
+      {
+       "color": "#17221c",
+       "share": 0.47
+      },
+      {
+       "color": "#66736b",
+       "share": 0.29
+      },
+      {
+       "color": "#125e40",
+       "share": 0.16
+      },
+      {
+       "color": "#46534b",
+       "share": 0.07
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.01
+      }
+     ],
+     "button": {
+      "bg": "#ffffff",
+      "hsl": {
+       "h": 0,
+       "s": 0,
+       "l": 1
+      },
+      "fg": "#17221c"
+     },
+     "lowContrast": [
+      {
+       "text": "Financials",
+       "ratio": 4.3,
+       "need": 4.5,
+       "size": 14,
+       "fg": "#66736b",
+       "bg": "#f1ede5"
+      },
+      {
+       "text": "Marketing",
+       "ratio": 4.3,
+       "need": 4.5,
+       "size": 14,
+       "fg": "#66736b",
+       "bg": "#f1ede5"
+      },
+      {
+       "text": "Attendance",
+       "ratio": 4.3,
+       "need": 4.5,
+       "size": 14,
+       "fg": "#66736b",
+       "bg": "#f1ede5"
+      },
+      {
+       "text": "Waivers",
+       "ratio": 4.3,
+       "need": 4.5,
+       "size": 14,
+       "fg": "#66736b",
+       "bg": "#f1ede5"
+      }
+     ]
+    },
+    "buttons": {
+     "count": 7,
+     "inHero": 7,
+     "radius": 10,
+     "height": 44,
+     "withShadow": 3,
+     "withGradient": 1,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "CSV",
+      "PDF",
+      "Bookings",
+      "Oct 1, 2026",
+      "Oct 27, 2026"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 8,
+     "shadowOverlay": 0,
+     "shadowSamples": [
+      "button.flex.h-11 → rgba(15, 43, 31, 0.06) 0px 4px 10px 0px, rgba(15, 43, 31, 0.2) 0px 28px 56px -20",
+      "button.ui-btn.ui-btn-primary → rgba(255, 255, 255, 0.16) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.28) 0px 1px ",
+      "a.ui-seg-item → rgba(15, 43, 31, 0.06) 0px 1px 2px 0px, rgba(15, 43, 31, 0.04) 0px 1px 3px 0px, ",
+      "div.ui-card.flex → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px "
+     ],
+     "gradients": 3,
+     "scrims": 0,
+     "gradientSamples": [
+      "button.ui-btn.ui-btn-primary → linear-gradient(rgb(23, 107, 75), rgb(18, 94, 64) 55%, rgb(15, 81, 55))",
+      "div.ui-card.flex → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "section.ui-card.overflow-hidden → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)"
+     ],
+     "gradientText": 0,
+     "hairlines": 3,
+     "hairlineSamples": [
+      "header.ui-glass.flex 390px",
+      "div.shrink-0.border-b 390px",
+      "nav.ui-glass.lg:hidden 390px"
+     ],
+     "outlinedBoxes": 3,
+     "dashed": 0,
+     "blurred": 2,
+     "roundedBoxes": 3,
+     "boxRadius": 16,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 0,
+     "fixed": false,
+     "height": 0,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "geist mono",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "pageH": 844,
+    "margins": {
+     "left": 16,
+     "right": 16
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Claire's Hiking",
+      "size": 16,
+      "top": 18,
+      "firstScreen": true
+     },
+     {
+      "text": "Reports",
+      "size": 28,
+      "top": 130,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 16,
+      "n": 1
+     },
+     {
+      "x": 33,
+      "n": 1
+     },
+     {
+      "x": 48,
+      "n": 1
+     },
+     {
+      "x": 131,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 4,
+    "bodySize": 12,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": null,
+    "topbar": {
+     "h": 61
+    },
+    "canvas": {
+     "left": 16,
+     "right": 16
+    },
+    "hero": {
+     "text": "Reports",
+     "words": 1,
+     "chars": 7,
+     "lines": 1,
+     "size": 28,
+     "vw": 7.2,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1,
+     "top": 130,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 3,
+     "firstScreen": 3,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 3,
+     "radii": [
+      [
+       16,
+       2
+      ],
+      [
+       10,
+       1
+      ]
+     ],
+     "heavyBorders": 3,
+     "borderSamples": [
+      "#0b2c21 on #f1ede5 (12.88:1)",
+      "#0b2c21 on #f7f5f0 (13.8:1)",
+      "#0b2c21 on #f7f5f0 (13.8:1)"
+     ],
+     "heavyShadows": 2,
+     "softShadows": 2,
+     "shadowSamples": [
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px"
+     ],
+     "glass": 0
+    },
+    "chips": {
+     "count": 1,
+     "hues": 1,
+     "samples": [
+      {
+       "hue": 156,
+       "size": 46,
+       "radius": "9999px"
+      }
+     ]
+    },
+    "numbers": {
+     "cells": 12,
+     "leftAligned": 0,
+     "figures": 7,
+     "tabularShare": 1,
+     "kpiMax": 14
+    },
+    "rows": {
+     "count": 5,
+     "median": 45
+    },
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.38,
+     "tiny": 10,
+     "tinySamples": [
+      "Customer view 10px",
+      "Operations 10px",
+      "Guest care 10px",
+      "Revenue 10px"
+     ],
+     "sizes": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      28
+     ]
+    },
+    "title": null,
+    "colourShare": 0.025
+   },
+   "consoleErrors": []
+  }
+ ],
+ "findings": [
+  {
+   "level": "FAIL",
+   "id": "micro-label",
+   "width": 1440,
+   "message": "9 tiny uppercase letter-spaced labels (e.g. \"Claire's Hiking\", \"Reports\", \"Filter by\", \"From\").",
+   "fix": "Use sentence-case text at a readable size, or delete the label.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "gradient",
+   "width": 1440,
+   "message": "3 gradient fill(s): aside.hidden.shrink-0 → radial-gradient(140% 50% at 50% -8%, rgba(0, 217, 139, 0.07), rgba(0, 0, 0, 0) 60%), radial-gradient(120% 45%  | div.ui-card.flex → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%) | section.ui-card.overflow-hidden → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+   "fix": "Use a flat colour or a real image. The only gradient allowed by default is a neutral scrim over a photo for legibility.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "button-fx",
+   "width": 1440,
+   "message": "Buttons with shadow/glow.",
+   "fix": "Flat fill, one colour.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "palette-cream",
+   "width": 1440,
+   "message": "Yellow-cream background (page background #f7f5f0).",
+   "fix": "Use the drawn palette. If you want warmth, take a low-chroma stone or bone, not a yellow cream.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "contrast",
+   "width": 1440,
+   "message": "Low-contrast text: \"Financials\" 4.3:1 needs 4.5:1; \"Marketing\" 4.3:1 needs 4.5:1; \"Attendance\" 4.3:1 needs 4.5:1; \"Waivers\" 4.3:1 needs 4.5:1",
+   "fix": "Darken or lighten the text colour.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "font-count",
+   "width": 1440,
+   "message": "3 typefaces in use (Plus Jakarta Sans, Geist Mono, satoshi).",
+   "fix": "Two at most.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "many-h1",
+   "width": 1440,
+   "message": "2 h1 elements.",
+   "fix": "One h1 per page; section titles are h2.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "heavy-shadow",
+   "width": 1440,
+   "message": "2 panel shadow(s) heavy enough to read as floating: rgba(15, 43, 31, 0.12) 0px 10px 28px -14px | rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+   "fix": "Panels sit on the ground: separate them with a fill one step from the ground or a quiet 1px border. A shadow, if any, is under 8% black with a small blur. Real overlays (menus, dialogs, popovers) may float.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "tiny-text",
+   "width": 1440,
+   "message": "10 text blocks under 11px: Customer view 10px, Operations 10px, Guest care 10px, Revenue 10px.",
+   "fix": "Nothing below 11px; secondary text 12px, data 13–14px.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "no-title",
+   "width": 768,
+   "message": "The screen has no h1.",
+   "fix": "Name the screen in an h1 at the top of the canvas (18–28px): \"Overview\", \"Payouts\", the project's name.",
+   "alsoAt": [
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "heavy-borders",
+   "width": 390,
+   "message": "3 panel borders are dark against their ground: #0b2c21 on #f1ede5 (12.88:1) | #0b2c21 on #f7f5f0 (13.8:1) | #0b2c21 on #f7f5f0 (13.8:1)",
+   "fix": "A panel border is a whisper: about 1.1–1.3:1 against its ground on a light screen (#e5e7eb–#ededed on white), and about 1.2–1.5:1 on a dark one (#1a1a1a on #000, #2e2e2e on #111). Darker lines turn the screen into a grid of boxes; keep the stronger line for controls."
+  }
+ ],
+ "images": [
+  {
+   "viewport": "desktop",
+   "width": 1440,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/reports/desktop-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/reports/desktop-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "tablet",
+   "width": 768,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/reports/tablet-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/reports/tablet-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "mobile",
+   "width": 390,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/reports/mobile-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/reports/mobile-page-01.jpg"
+   ],
+   "film": []
+  }
+ ]
+}

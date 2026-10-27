@@ -1,0 +1,196 @@
+{
+  "at": "2026-10-18T11:42:31.831708+00:00",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "scope": "All current application changes, including per-experience gift voucher photographs, manual booking payment deadlines, and the previously deployed interface polish.",
+  "admin": {
+    "id": "dpl_5wssjrtzAgAisqeX6uS1TrHSENLk",
+    "url": "caepweb-admin-6ulfvi5xc-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 491,
+    "production_url": "https://admin.bookingtours.co.za"
+  },
+  "booking": {
+    "id": "dpl_BrEBohATY3mRNUeV4GvXpF9Jnnkf",
+    "url": "booking-k7pwt4c1e-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 170,
+    "production_urls": [
+      "https://kayak.booking.bookingtours.co.za",
+      "https://claires-hiking.booking.bookingtours.co.za"
+    ]
+  },
+  "database": {
+    "at": "2026-10-18T11:38:28.387Z",
+    "migrations": [
+      {
+        "name": "20261018120000_manual_booking_deadlines.sql",
+        "sha256": "253adf9c06977543df023900965762db1771e0a1987a02bffcaa1929b7b7c1bd"
+      },
+      {
+        "name": "20261018160000_gift_voucher_photographs.sql",
+        "sha256": "a6ffd7d03c9ffa184c3005dbe4a6cf5bc6537d33d599467fc2493398faee0b46"
+      }
+    ],
+    "result": []
+  },
+  "functions": [
+    {
+      "slug": "wa-webhook",
+      "version": 240,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "yoco-webhook",
+      "version": 134,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "web-chat",
+      "version": 153,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "auto-messages",
+      "version": 100,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "send-email",
+      "version": 189,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "cron-tasks",
+      "version": 84,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "admin-help-chat",
+      "version": 30,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "booking-payment",
+      "version": 1,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    }
+  ],
+  "checks": {
+    "production_builds": 2,
+    "typescript": "Passed in both production builds",
+    "edge_typecheck": "Passed",
+    "eslint_errors": 0,
+    "eslint_existing_warnings": 27,
+    "unit_full_run": {
+      "passed": 2435,
+      "failed": 20,
+      "skipped": 58
+    },
+    "unit_fixture_repair": "Updated tour form fixture with voucher_image_url and notification RPC mock with enqueue_manual_payment_reminders. Both affected files rerun: 41 passed, including all 20 prior failures.",
+    "unit_aggregate_after_targeted_recheck": {
+      "passed": 2455,
+      "failed": 0,
+      "skipped": 58
+    },
+    "local_postgres_acceptance_groups": 22,
+    "payment_recovery_postgres": "Passed",
+    "gift_artwork_postgres": "Passed tenant scope, immutability, forged snapshot rejection, fallbacks, deleted tour and migration replay",
+    "hosted_browser_cases_passed": 5,
+    "hosted_browser_widths": [
+      320,
+      1440
+    ],
+    "uploaded_source_files_verified": 661,
+    "edge_source_files_verified": 75,
+    "unrelated_functions_unchanged": true,
+    "live_http_checks": 13,
+    "live_browser": {
+      "at": "2026-10-18T11:41:44.270Z",
+      "checks": [
+        {
+          "subdomain": "kayak",
+          "width": 320,
+          "photoOptions": 3,
+          "preview": true,
+          "noHorizontalOverflow": true,
+          "pageErrors": 0,
+          "writes": 0
+        },
+        {
+          "subdomain": "claires-hiking",
+          "width": 1440,
+          "photoOptions": 5,
+          "preview": true,
+          "noHorizontalOverflow": true,
+          "pageErrors": 0,
+          "writes": 0
+        }
+      ]
+    },
+    "public_data_access": {
+      "at": "2026-10-18T11:40:26.745Z",
+      "checks": [
+        {
+          "subdomain": "kayak",
+          "theme_access": true,
+          "tour_photo_access": true,
+          "tours": 3,
+          "voucher_columns_access": true
+        },
+        {
+          "subdomain": "claires-hiking",
+          "theme_access": true,
+          "tour_photo_access": true,
+          "tours": 5,
+          "voucher_columns_access": true
+        }
+      ]
+    },
+    "workspace": [
+      {
+        "app": "admin",
+        "files": 491,
+        "matches_current_workspace": true,
+        "new_runtime_files_omitted": 0,
+        "excluded_comparison": "supabase/.temp CLI metadata"
+      },
+      {
+        "app": "booking",
+        "files": 170,
+        "matches_current_workspace": true,
+        "new_runtime_files_omitted": 0,
+        "excluded_comparison": "supabase/.temp CLI metadata"
+      }
+    ],
+    "git_diff_check": "Passed for both repositories"
+  },
+  "help": {
+    "at": "2026-10-18T11:39:29.919Z",
+    "articles": 30,
+    "chunks": 178,
+    "changed": 11,
+    "result": {
+      "ok": true,
+      "total": 178,
+      "embedded": 11,
+      "skipped": 167,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    }
+  },
+  "limits": [
+    "Verification used synthetic writes on staged pages and read-only live checks; no real purchases, payments or customer messages were created.",
+    "Email layout was browser-rendered; native Outlook/Gmail and physical devices were not tested.",
+    "Historical migration ledger gaps and the broader qualification verdict remain unchanged."
+  ],
+  "evidence_directory": "docs/production-readiness/evidence/all-changes-gift-deployment-20261018"
+}

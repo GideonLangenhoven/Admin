@@ -1,0 +1,91 @@
+{
+  "at": "2026-10-16T09:45:29.601545+00:00",
+  "deployment": {
+    "id": "dpl_FVwFNaYyVyy9f5kH9g7wx219mNy6",
+    "url": "caepweb-admin-h15ugguut-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 486
+  },
+  "scope": {
+    "baseline": "dpl_4zjZC4HhmazKQJaqfnvRxkknnWgq",
+    "changed": [
+      "app/bookings/page.tsx",
+      "app/dashboard.module.css",
+      "app/page.tsx",
+      "components/PaymentRecoveryPanel.tsx"
+    ],
+    "functions": [],
+    "database_changes": [
+      "20261016123000_payment_recovery_departures"
+    ],
+    "marketing_activation": false
+  },
+  "database": {
+    "at": "2026-10-16T09:42:24.843Z",
+    "version": "20261016123000",
+    "sha256": "d9271f38e2db0758e6d89c858232fb5bc7c3ab90280c78509b4ab8d70863a721",
+    "grants": [
+      {
+        "rolname": "anon",
+        "sel": false,
+        "writes": false
+      },
+      {
+        "rolname": "authenticated",
+        "sel": true,
+        "writes": false
+      },
+      {
+        "rolname": "service_role",
+        "sel": true,
+        "writes": false
+      }
+    ],
+    "unchanged_permissions": true,
+    "invoker_security": true,
+    "postgrest_departure_columns": true,
+    "no_booking_changes": true
+  },
+  "help": {
+    "at": "2026-10-16T09:42:35.173Z",
+    "articles": 30,
+    "chunks": 176,
+    "changed": 4,
+    "result": {
+      "ok": true,
+      "total": 176,
+      "embedded": 4,
+      "skipped": 172,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    }
+  },
+  "checks": {
+    "typescript": "passed",
+    "cloud_production_build": "passed",
+    "local_database_acceptance_groups": 18,
+    "payment_recovery_database_suite": "passed",
+    "focused_unit_tests": 10,
+    "live_browser_cases": 5,
+    "live_http_checks": 10,
+    "uploaded_source_files_matching_workspace": 486
+  },
+  "features": [
+    "Booking history count to the left of returning guest names; details on hover, keyboard focus or tap; no empty-history label",
+    "Manifest and Roll Call immediately below Today\u2019s Pax and Revenue",
+    "Payment recovery immediately before Weather",
+    "Payment recovery ordered by upcoming departure first, then past trips, then missing departure dates",
+    "Collapsible local-date and exact-departure groups; existing pagination and recovery actions retained"
+  ],
+  "browser_verification": "Simulated identities, bookings and email responses; no customer messages or payment actions",
+  "guest_site": {
+    "id": "dpl_DEtYg9jBcEThHpReFGiaJE6dX4qZ",
+    "source_files": 169,
+    "local_matches_live": true
+  },
+  "native_functions_changed": [],
+  "mfa_changes": false,
+  "guide_session_changes": false,
+  "marketing_activation": false
+}

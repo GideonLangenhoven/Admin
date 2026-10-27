@@ -1,0 +1,344 @@
+{
+  "verified_at": "2026-10-01T13:00:18.609043+00:00",
+  "scope": "User-requested Kayak daily demo, repair of the existing Claires daily refresh, and Kayak booking-page polish. Broader production qualification stays paused.",
+  "project_ref": "ukdsrndqhsatjkmxijuj",
+  "tenants": {
+    "kayak": {
+      "id": "44ff11ab-c697-47de-9227-0ffa51db127c",
+      "url": "https://kayak.booking.bookingtours.co.za",
+      "payment_test_mode": true,
+      "refresh_south_africa": "00:07 daily"
+    },
+    "claires_hiking": {
+      "id": "af17838c-fdd6-4b84-97c0-1cea39db7c0a",
+      "url": "https://claires-hiking.booking.bookingtours.co.za",
+      "refresh_south_africa": "00:05 daily"
+    }
+  },
+  "migrations": [
+    {
+      "file": "supabase/migrations/20261001090000_repair_claires_demo_refresh.sql",
+      "sha256": "b9d7f5399c703df1631df7c26570348ddb1330f9f183063db68e560cf08fb84a"
+    },
+    {
+      "file": "supabase/migrations/20261001091000_kayak_daily_demo.sql",
+      "sha256": "2bdf52025fc30c45172b06f9e91e823b96973024f889750f76e89b50c471fb6c"
+    }
+  ],
+  "live_aggregates": {
+    "day": "2026-10-01",
+    "schedules": [
+      {
+        "name": "refresh-claires-hiking-demo-daily",
+        "active": true,
+        "schedule_utc": "5 22 * * *"
+      },
+      {
+        "name": "refresh-kayak-demo-daily",
+        "active": true,
+        "schedule_utc": "7 22 * * *"
+      }
+    ],
+    "kayak_bookings": 129,
+    "kayak_invoices": 129,
+    "kayak_customers": 12,
+    "claire_staged_slots": 0,
+    "kayak_departures_today": 3,
+    "kayak_bookings_created_today": 24,
+    "claire_bookings_created_today": 2,
+    "kayak_seat_or_invoice_mismatches": 0,
+    "kayak_demo_notification_candidates": 0
+  },
+  "transaction_guards": {
+    "original_kayak_bookings_unchanged": true,
+    "staff_access_unchanged": true,
+    "tour_prices_and_capacities_unchanged": true,
+    "paid_booking_usage_unchanged": true,
+    "immediate_retry_new_bookings": 0,
+    "immediate_retry_new_slots": 0
+  },
+  "demo_behavior": {
+    "stable_calendar_date_ids": true,
+    "rolling_slots": "Three departures per day through 30 days ahead; existing operator departures preserved.",
+    "rolling_bookings": "Three synthetic bookings per calendar day through 14 days ahead, with past records and new records created on each daily refresh.",
+    "notifications": "Synthetic guests use anonymized.local email addresses, null phone numbers, no marketing consent, and suppressed booking reminder/thank-you/review flags.",
+    "payments": "Synthetic captured totals and invoices have DEMO metadata, no provider IDs, no holds and no collected payment. Tenant payments remain in test mode.",
+    "claires_uniqueness_fix": "Stage only the 34 canonical demo slots at distinct temporary timestamps within the transaction, then move them to the desired relative dates. The existing unique constraint remains intact.",
+    "first_scheduled_run_after_fix": "Schedules and manual refresh are verified; the next scheduled execution is 2026-10-02 at 00:05/00:07 Africa/Johannesburg."
+  },
+  "verification": {
+    "disposable_postgresql": {
+      "passed": 15,
+      "covers": [
+        "Previously failing Claire departure uniqueness",
+        "Daily, repeated, backward and multi-day advances",
+        "Midnight and concurrent refresh",
+        "Capacity, invoice and arrival consistency",
+        "Existing bookings and cancellations preserved",
+        "Tenant/test-mode guards",
+        "Notifications and marketing suppression",
+        "Role grants and cron commands"
+      ]
+    },
+    "local_browser_fixture": {
+      "passed": 6,
+      "covers": [
+        "Desktop Chrome",
+        "Phone Chrome",
+        "Phone WebKit",
+        "Catalog and photos",
+        "Calendar to guest details",
+        "Local provider-double checkout redirect"
+      ]
+    },
+    "candidate_browser": {
+      "stats": {
+        "startTime": "2026-10-01T12:52:24.311Z",
+        "duration": 42717.862,
+        "expected": 9,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "checks": [
+        {
+          "title": "hosted Kayak storefront has the populated catalog and working photos",
+          "project": "desktop",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 7421
+            }
+          ]
+        },
+        {
+          "title": "calendar reaches guest details while the cookie notice stays clear of the mobile button",
+          "project": "desktop",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 4089
+            }
+          ]
+        },
+        {
+          "title": "Claires retains its own tour catalog and tenant branding",
+          "project": "desktop",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3947
+            }
+          ]
+        },
+        {
+          "title": "hosted Kayak storefront has the populated catalog and working photos",
+          "project": "phone",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 6156
+            }
+          ]
+        },
+        {
+          "title": "calendar reaches guest details while the cookie notice stays clear of the mobile button",
+          "project": "phone",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2122
+            }
+          ]
+        },
+        {
+          "title": "Claires retains its own tour catalog and tenant branding",
+          "project": "phone",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1870
+            }
+          ]
+        },
+        {
+          "title": "hosted Kayak storefront has the populated catalog and working photos",
+          "project": "webkit-phone",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 4523
+            }
+          ]
+        },
+        {
+          "title": "calendar reaches guest details while the cookie notice stays clear of the mobile button",
+          "project": "webkit-phone",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3039
+            }
+          ]
+        },
+        {
+          "title": "Claires retains its own tour catalog and tenant branding",
+          "project": "webkit-phone",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2475
+            }
+          ]
+        }
+      ]
+    },
+    "public_browser": {
+      "stats": {
+        "startTime": "2026-10-01T12:54:49.524Z",
+        "duration": 31587.544,
+        "expected": 9,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "checks": [
+        {
+          "title": "hosted Kayak storefront has the populated catalog and working photos",
+          "project": "desktop",
+          "status": "expected",
+          "runs": [
+            {
+              "status": "passed",
+              "duration_ms": 3236
+            }
+          ]
+        },
+        {
+          "title": "calendar reaches guest details while the cookie notice stays clear of the mobile button",
+          "project": "desktop",
+          "status": "expected",
+          "runs": [
+            {
+              "status": "passed",
+              "duration_ms": 2804
+            }
+          ]
+        },
+        {
+          "title": "Claires retains its own tour catalog and tenant branding",
+          "project": "desktop",
+          "status": "expected",
+          "runs": [
+            {
+              "status": "passed",
+              "duration_ms": 1367
+            }
+          ]
+        },
+        {
+          "title": "hosted Kayak storefront has the populated catalog and working photos",
+          "project": "phone",
+          "status": "expected",
+          "runs": [
+            {
+              "status": "passed",
+              "duration_ms": 3722
+            }
+          ]
+        },
+        {
+          "title": "calendar reaches guest details while the cookie notice stays clear of the mobile button",
+          "project": "phone",
+          "status": "expected",
+          "runs": [
+            {
+              "status": "passed",
+              "duration_ms": 2926
+            }
+          ]
+        },
+        {
+          "title": "Claires retains its own tour catalog and tenant branding",
+          "project": "phone",
+          "status": "expected",
+          "runs": [
+            {
+              "status": "passed",
+              "duration_ms": 2082
+            }
+          ]
+        },
+        {
+          "title": "hosted Kayak storefront has the populated catalog and working photos",
+          "project": "webkit-phone",
+          "status": "expected",
+          "runs": [
+            {
+              "status": "passed",
+              "duration_ms": 4007
+            }
+          ]
+        },
+        {
+          "title": "calendar reaches guest details while the cookie notice stays clear of the mobile button",
+          "project": "webkit-phone",
+          "status": "expected",
+          "runs": [
+            {
+              "status": "passed",
+              "duration_ms": 3611
+            }
+          ]
+        },
+        {
+          "title": "Claires retains its own tour catalog and tenant branding",
+          "project": "webkit-phone",
+          "status": "expected",
+          "runs": [
+            {
+              "status": "passed",
+              "duration_ms": 1386
+            }
+          ]
+        }
+      ]
+    },
+    "typescript": "Booking workspace and isolated Vercel production build passed.",
+    "lint": "Changed files have no lint errors; existing booking/home warnings remain.",
+    "read_only_demo_unit_tests": 9,
+    "public_browser_writes": "GET, HEAD and OPTIONS only; all other methods were blocked. No real checkout or provider operation was invoked."
+  },
+  "deployment": {
+    "id": "dpl_2uYBsfzT5riGCoVo3kkCbcyBeK5A",
+    "url": "https://booking-oi7wiygwy-jerrys-projects-f4e4eaf9.vercel.app",
+    "status": "READY / PROMOTED",
+    "previous_public_deployment": "dpl_GKee8R3EvLK47igcf2qJtSJL36Xp",
+    "manifest": {
+      "base": "87d9907c67f427950c621e7f76f6136a0ffaeea3",
+      "directory": "/private/tmp/capekayak-kayak-release-vekvzpam",
+      "files": {
+        "app/page.tsx": "a6abdb0a203a2112d0bef71c8bf706e052ad336b2e56d75aa8a12eb03956ad03",
+        "app/components/KayakStorefront.tsx": "86a70cd35404a5d25c5b418bd63635bf299cd00568a797e04342527c57b3c148",
+        "app/components/KayakStorefront.module.css": "f62ee8b7ad67ffb8535ddcd0ad6bf01d810f05c225dcc29a49a629d7d3e4dab3",
+        "app/components/CookieBanner.tsx": "35b358bbc5570464fb5b5631c03257957202dce5d6613bb80859d3bfd82c3a03",
+        "app/book/page.tsx": "467d422b5238826a157888d2e9cd52de9894e956276e12728fb00d081c6026d9",
+        "app/components/Header.tsx": "7b89d9c40a8b4c19d938e245afe55acfb7be9e9804ffc717c696bf0d1d08415d"
+      },
+      "preserves_deployment": "dpl_GKee8R3EvLK47igcf2qJtSJL36Xp"
+    },
+    "isolation": "Committed booking baseline plus the five Kayak files and the already deployed Header navigation change. Other active-session changes were excluded."
+  },
+  "private_backup": "/private/tmp/capekayak-daily-demos-FRLQer/before.json (0600; excluded from repository)",
+  "rollback": "The previous public booking deployment is available for Vercel promotion. Private SQL/function/fixture snapshots were retained before the scoped transaction. Rolling back demo data requires an exact, separately reviewed scoped action.",
+  "cleanup": "Disposable PostgreSQL server stopped after local checks."
+}

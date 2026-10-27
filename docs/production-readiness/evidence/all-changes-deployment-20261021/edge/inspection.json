@@ -1,0 +1,25 @@
+[
+  {
+    "slug": "web-chat",
+    "version": 155,
+    "verify_jwt": false,
+    "files": 17,
+    "differences": [
+      "supabase/functions/web-chat/index.ts"
+    ]
+  },
+  {
+    "slug": "wa-webhook",
+    "version": 244,
+    "verify_jwt": false,
+    "files": 17,
+    "differences": []
+  },
+  {
+    "slug": "weather-cancel",
+    "version": 92,
+    "verify_jwt": false,
+    "files": 4,
+    "differences": []
+  }
+]

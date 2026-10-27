@@ -1,0 +1,22 @@
+[
+  {
+    "path": "app/marketing/layout.tsx",
+    "working_before": "775dee17cae24c52699903a21638f18d9db4727cacb31ea87e4da034ca811aaf",
+    "live_base": "1042dcc77e788bdd86ceb69b13f827025e309d11ce38da4740e2c86a2dbe8580"
+  },
+  {
+    "path": "app/marketing/automations/page.tsx",
+    "working_before": "9fea38faddf0c22adf3610439320ee1e2709a84e1e04117f5d2c023e13a7d065",
+    "live_base": "5fe78eb3818e4fec454872d1632d79862d164b92840a2daeadf66c14709e1554"
+  },
+  {
+    "path": "app/marketing/automations/[id]/page.tsx",
+    "working_before": "73060deb06691d420cd143602e057f3cc1ce2e419eb00a779f4fc48ad5f8b662",
+    "live_base": "11f82e63c709ec004171325fe5363a5ef3fbdc9cd2e34141e815c6d3ea94368b"
+  },
+  {
+    "path": "app/lib/marketing-journey.ts",
+    "working_before": "604676ded40e34955f00d3d73ea481730c88979fe3f3fef4f9850ed6d29ceef9",
+    "live_base": "1b95b3868dfcd1fadcbc910225e49ea1e2e9d5413e35278725730ccf0efac7d2"
+  }
+]

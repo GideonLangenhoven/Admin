@@ -1,0 +1,294 @@
+{
+  "authorization": "please deploy allchanges",
+  "verified_at": "2026-10-04T17:55:37.202739+00:00",
+  "status": "application and backend source deployed and verified",
+  "admin": {
+    "deployment": "dpl_EhJYZbZS9hY5sZHKo28sMxq2eXSw",
+    "url": "https://admin.bookingtours.co.za/",
+    "state": "READY",
+    "previous": "dpl_5K9GzkGeVe3ChTZdCZdQWh7acw2n"
+  },
+  "booking": {
+    "deployment": "dpl_E1NoUXrNb99uxSKupRksTbYtbh15",
+    "url": "https://kayak.booking.bookingtours.co.za/",
+    "state": "READY",
+    "previous": "dpl_7CVfGAyig6kjNGGTXf5qaYiX8kDC"
+  },
+  "marketing": {
+    "url": "https://bookingtours.co.za/",
+    "host": "Firebase",
+    "site": "booking123-6106",
+    "version": "projects/1024383377901/sites/booking123-6106/versions/1dc4eb9152d16f13",
+    "live_sitemap_pages": 135,
+    "all_pages_200": true,
+    "canonical_check": "passed; root URLs normalized as the same resource",
+    "schema_and_visible_faq_checks": "passed"
+  },
+  "edge": [
+    {
+      "slug": "wa-webhook",
+      "version": 238,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "create-checkout",
+      "version": 106,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "web-chat",
+      "version": 149,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "admin-help-chat",
+      "version": 19,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    }
+  ],
+  "edge_source": {
+    "web-chat": {
+      "files": 16,
+      "all_match": true,
+      "sha256": {
+        "web-chat/index.ts": "c8e84f7c01237c7720d4c6b9e8179cb9211e69e5b2fd045261c814552fb1b678",
+        "_shared/kb.ts": "5d89feee2c9ef467716d48625b112ecb86b81b84679e48c7a22da42a5f88b68d",
+        "_shared/customer-session.ts": "d0a7724dd8efff914e0040a3571813566a71b0d9ac954ea8debd2aaefc560750",
+        "_shared/sentry.ts": "cf5cad26d7ddb3a103a60d658dab85fa647d98e574d5ddb44ab83700c915bafb",
+        "_shared/pagination.ts": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e",
+        "_shared/bot-guards.ts": "a6b4c6961536772ca33061f581a6660e82bd85f8fea840dd785c630a8ff77937",
+        "_shared/booking-custom-fields.ts": "3ec06c7dceb92fb96c17fce49e87752af04bf62f59c628b4230be6fcfa90e277",
+        "_shared/platform-invariants.ts": "79654892dfbe8e52a93ab7bf7a5d5189ecb74747fe3751470579c77bf47ea22f",
+        "_shared/llm.ts": "e7bed1f1ed96a04d6b326ee3580fc6550c37821b19d2618321f4d4be9b3c85c1",
+        "_shared/duration.ts": "4f6eb2b814536b6066378deb29002e829e4784ff09e26245009ea76aee22626c",
+        "_shared/web-chat-session.ts": "d2b3fe2717fe367bcf307380f5806d44b39ed9c07c7c871d3a0372d7d71c11d2",
+        "_shared/openrouter-provider.ts": "52aa270a8467d6476d17a8881a4fe29ced09b52cdb44b4bec9e05246af202cd8",
+        "_shared/subscription.ts": "6d8af89fb9e7f48e9b06024b3fa4396bca41fa58ea2265753032222c71060e14",
+        "_shared/chat-booking-pricing.ts": "f936f6c6a1c43cd6fe932d02697e04d02575273685886b68dbd646d1b9163d80",
+        "_shared/tenant.ts": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669",
+        "_shared/intent.ts": "7145715b15c90fe49ca1986bda5b1f5806539ee7ca6063cadc029044fbb9f0f4"
+      }
+    },
+    "wa-webhook": {
+      "files": 16,
+      "all_match": true,
+      "sha256": {
+        "wa-webhook/index.ts": "39aa55b071a5d8f9b963baa6f2608e3c848251e9d28ffd401f3ad688ddb2774a",
+        "_shared/kb.ts": "5d89feee2c9ef467716d48625b112ecb86b81b84679e48c7a22da42a5f88b68d",
+        "_shared/vouchers.ts": "246719c3db51bf23646f740ae89ce17faf0a31dce20105a5d386b4305eb07f99",
+        "_shared/pagination.ts": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e",
+        "_shared/waiver.ts": "a1a776879f142297df98366da218a7ccb40e3e37f7b24447709c44f5114807e8",
+        "_shared/bot-gate.ts": "30425c3387f0d75194ec396a5d262fb3f656410fc781f58f2bd15e50a04959e0",
+        "_shared/bot-guards.ts": "a6b4c6961536772ca33061f581a6660e82bd85f8fea840dd785c630a8ff77937",
+        "_shared/platform-invariants.ts": "79654892dfbe8e52a93ab7bf7a5d5189ecb74747fe3751470579c77bf47ea22f",
+        "_shared/llm.ts": "e7bed1f1ed96a04d6b326ee3580fc6550c37821b19d2618321f4d4be9b3c85c1",
+        "_shared/duration.ts": "4f6eb2b814536b6066378deb29002e829e4784ff09e26245009ea76aee22626c",
+        "_shared/openrouter-provider.ts": "52aa270a8467d6476d17a8881a4fe29ced09b52cdb44b4bec9e05246af202cd8",
+        "_shared/bot-prompt.ts": "16adc1057f0ce25a940d75db0eea1a35a39e8a9c4fc38f19a05b982d788bacfa",
+        "_shared/subscription.ts": "6d8af89fb9e7f48e9b06024b3fa4396bca41fa58ea2265753032222c71060e14",
+        "_shared/chat-booking-pricing.ts": "f936f6c6a1c43cd6fe932d02697e04d02575273685886b68dbd646d1b9163d80",
+        "_shared/tenant.ts": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669",
+        "_shared/bot-llm.ts": "3cd079e84ecade8ff0ada2e62b6bd11daf3cb06bc1b90c78a269d74189b983fc"
+      }
+    }
+  },
+  "checks": {
+    "cloud_admin_and_booking_builds": "passed",
+    "marketing_static_build": "passed",
+    "guest_chat_browser_cases": 51,
+    "marketing_browser_routes": 24,
+    "marketing_viewports": [
+      390,
+      768,
+      1440
+    ],
+    "marketing_unit_cases": 10,
+    "guest_types_and_lint": "passed; zero errors, 17 configured warnings",
+    "admin_regression": "Production code matches the earlier 1988-test snapshot; latest focused run: 154 passed and seven opt-in native Auth checks skipped",
+    "native_auth_evidence": "Earlier official local native Auth rehearsal passed seven checks; no hosted consent/provider journey claimed",
+    "production_dependency_audits": {
+      "admin": "zero (existing verified matching lockfile)",
+      "booking": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0,
+        "total": 0
+      },
+      "marketing": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0
+      }
+    },
+    "public_http": {
+      "checkedAt": "2026-10-04T17:41:16.591Z",
+      "rows": [
+        {
+          "url": "https://admin.bookingtours.co.za/",
+          "status": 200,
+          "expected": 200,
+          "cacheControl": "public, max-age=0, must-revalidate",
+          "protectionBypass": false
+        },
+        {
+          "url": "https://kayak.admin.bookingtours.co.za/",
+          "status": 200,
+          "expected": 200,
+          "cacheControl": "public, max-age=0, must-revalidate",
+          "protectionBypass": false
+        },
+        {
+          "url": "https://admin.bookingtours.co.za/api/admin/chat-faq",
+          "status": 401,
+          "expected": 401,
+          "cacheControl": "public, max-age=0, must-revalidate",
+          "protectionBypass": false,
+          "code": "Unauthorized"
+        },
+        {
+          "url": "https://admin.bookingtours.co.za/api/agent/read",
+          "status": 503,
+          "expected": 503,
+          "cacheControl": "no-store",
+          "protectionBypass": false,
+          "code": "INTEGRATION_DISABLED"
+        },
+        {
+          "url": "https://admin.bookingtours.co.za/api/mcp/chatgpt",
+          "status": 503,
+          "expected": 503,
+          "cacheControl": "no-store",
+          "protectionBypass": false,
+          "code": "INTEGRATION_DISABLED"
+        },
+        {
+          "url": "https://admin.bookingtours.co.za/api/mcp/muse",
+          "status": 503,
+          "expected": 503,
+          "cacheControl": "no-store",
+          "protectionBypass": false,
+          "code": "INTEGRATION_DISABLED"
+        },
+        {
+          "url": "https://admin.bookingtours.co.za/.well-known/oauth-authorization-server",
+          "status": 503,
+          "expected": 503,
+          "cacheControl": "no-store",
+          "protectionBypass": false,
+          "code": "INTEGRATION_DISABLED"
+        },
+        {
+          "url": "https://admin.bookingtours.co.za/.well-known/oauth-protected-resource/api/mcp/chatgpt",
+          "status": 503,
+          "expected": 503,
+          "cacheControl": "no-store",
+          "protectionBypass": false,
+          "code": "INTEGRATION_DISABLED"
+        },
+        {
+          "url": "https://kayak.booking.bookingtours.co.za/",
+          "status": 200,
+          "expected": 200,
+          "cacheControl": "private, no-cache, no-store, max-age=0, must-revalidate",
+          "protectionBypass": false
+        },
+        {
+          "url": "https://kayak.booking.bookingtours.co.za/book",
+          "status": 200,
+          "expected": 200,
+          "cacheControl": "private, no-cache, no-store, max-age=0, must-revalidate",
+          "protectionBypass": false
+        },
+        {
+          "url": "https://claires-hiking.booking.bookingtours.co.za/",
+          "status": 200,
+          "expected": 200,
+          "cacheControl": "private, no-cache, no-store, max-age=0, must-revalidate",
+          "protectionBypass": false
+        },
+        {
+          "url": "https://bookingtours.co.za/",
+          "status": 200,
+          "expected": 200,
+          "cacheControl": "no-cache",
+          "protectionBypass": false
+        },
+        {
+          "url": "https://bookingtours.co.za/pricing",
+          "status": 200,
+          "expected": 200,
+          "cacheControl": "no-cache",
+          "protectionBypass": false
+        },
+        {
+          "url": "https://bookingtours.co.za/visibility-audit-missing",
+          "status": 404,
+          "expected": 404,
+          "cacheControl": "no-cache",
+          "protectionBypass": false
+        }
+      ],
+      "passed": true
+    }
+  },
+  "dependency_changes": {
+    "marketing": "Next 16.3.8 and compatible baseline-browser-mapping patch",
+    "booking": "Next/Next ESLint 16.3.8, sharp 0.35.4, DOMPurify 3.4.16 and compatible audit fixes",
+    "remaining_full_audit": "Seven high build-tool findings in each application build chain; no forced major upgrade"
+  },
+  "test_correction": "Browser calculator assertion changed from R24000 to the approved R22000: eight live months at R2500 plus four pause months at R500. Application arithmetic was already correct.",
+  "temporary_check_error": {
+    "issue": "Two candidate probes used the marketing CLI project context; both newly generated temporary bypass tokens were removed; correct-context probes passed",
+    "cleanup": {
+      "project": "prj_UboicRaJerqyfB6lqYejrO0BVLMm",
+      "removed": 2,
+      "unrelatedTokensPreserved": true,
+      "confirmedAt": "2026-10-04T17:51:23.615Z"
+    }
+  },
+  "agent": {
+    "runtime_deployed": true,
+    "access_enabled": false,
+    "chatgpt_and_muse": "503 INTEGRATION_DISABLED with no-store",
+    "new_sql_applied": false,
+    "gateway_credential_configured": false,
+    "staging": "Isolated synthetic staging chosen; project reference and tester still required",
+    "personal_connection_created": false,
+    "directory_submission": false
+  },
+  "boundaries": {
+    "git_commit_or_push": false,
+    "database_migration": false,
+    "customer_booking_payment_or_message_submitted_by_checks": false,
+    "wider_rollout_status": "PAUSED_BY_USER / FAILED_GATE; qualification not resumed"
+  },
+  "evidence_directory": "/private/tmp/bookingtours-all-changes-20261004.kDMc1Z",
+  "source_snapshots": {
+    "admin": {
+      "root": "/Users/gideonlangenhoven/dev/capekayak",
+      "snapshot": "/private/tmp/bookingtours-all-changes-20261004.kDMc1Z/admin",
+      "branch": "feature/simple-view-2026-09-20",
+      "head": "43304b65314c2b9974f939304e7b2ebae0a62c0c"
+    },
+    "booking": {
+      "root": "/Users/gideonlangenhoven/dev/capekayak/booking",
+      "snapshot": "/private/tmp/bookingtours-all-changes-20261004.kDMc1Z/booking",
+      "branch": "scale-security-2026-07-04",
+      "head": "87d9907c67f427950c621e7f76f6136a0ffaeea3"
+    },
+    "marketing": {
+      "root": "/Users/gideonlangenhoven/BookingToursSite",
+      "snapshot": "/private/tmp/bookingtours-all-changes-20261004.kDMc1Z/marketing",
+      "branch": "blog/2026-08-11-isizulu-isixhosa-tour-customer-support",
+      "head": "1f6200a88d651d0e8f7997889fdd3f27f5ef7f75"
+    }
+  }
+}

@@ -3,7 +3,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
-import { MagnifyingGlass, Trash, X, PencilSimple, Check } from "@phosphor-icons/react";
+import { MagnifyingGlass, Trash, X, PencilSimple, Check, CaretDown } from "@phosphor-icons/react";
+import Link from "next/link";
+import SectionTabs from "../../../components/SectionTabs";
 import { readSheet } from "read-excel-file/browser";
 
 interface Contact {
@@ -35,24 +37,21 @@ export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [showAdd, setShowAdd] = useState(false);
+  const [openPanel, setOpenPanel] = useState<"add" | "import" | "validate" | "clean" | null>(null);
   const [addForm, setAddForm] = useState({ email: "", first_name: "", last_name: "", phone: "", tags: "", date_of_birth: "" });
   const [saving, setSaving] = useState(false);
-  const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState("");
   const [importing, setImporting] = useState(false);
   const [csvRows, setCsvRows] = useState<Array<{ data: Record<string, string>; errors: string[] }>>([]);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvMapping, setCsvMapping] = useState<Record<string, string>>({});
   const [csvStep, setCsvStep] = useState<"upload" | "map" | "preview" | "done">("upload");
-  const [showValidate, setShowValidate] = useState(false);
   const [validating, setValidating] = useState(false);
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "unsubscribed" | "bounced" | "inactive">("all");
   const [filterTag, setFilterTag] = useState("");
   const [tagInput, setTagInput] = useState<{ contactId: string; value: string } | null>(null);
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 100;
-  const [showCleanList, setShowCleanList] = useState(false);
   const [staleContacts, setStaleContacts] = useState<Contact[]>([]);
   const [cleaning, setCleaning] = useState(false);
   const [showDeleteAll, setShowDeleteAll] = useState(false);
@@ -167,9 +166,6 @@ export default function ContactsPage() {
 
   async function addContact() {
     if (!addForm.email.trim()) { notify({ message: "Email is required.", tone: "warning" }); return; }
-    if (!addForm.first_name.trim()) { notify({ message: "First name is required.", tone: "warning" }); return; }
-    if (!addForm.last_name.trim()) { notify({ message: "Last name is required.", tone: "warning" }); return; }
-    if (!addForm.phone.trim()) { notify({ message: "Phone number is required.", tone: "warning" }); return; }
     setSaving(true);
     const tags = addForm.tags.split(",").map((t) => t.trim()).filter(Boolean);
     let normalizedPhone = addForm.phone.trim().replace(/\D/g, "");
@@ -177,9 +173,9 @@ export default function ContactsPage() {
     const { data: inserted, error } = await supabase.from("marketing_contacts").insert({
       business_id: businessId,
       email: addForm.email.trim().toLowerCase(),
-      first_name: addForm.first_name.trim(),
-      last_name: addForm.last_name.trim(),
-      phone: normalizedPhone,
+      first_name: addForm.first_name.trim() || null,
+      last_name: addForm.last_name.trim() || null,
+      phone: normalizedPhone || null,
       tags: tags.length > 0 ? tags : [],
       date_of_birth: addForm.date_of_birth || null,
     }).select("id").single();
@@ -195,9 +191,9 @@ export default function ContactsPage() {
     if (inserted) {
       checkAutoEnroll(inserted.id, "contact_added");
     }
-    notify({ message: "Contact added.", tone: "success" });
+    notify({ message: "Contact saved. Verify evidence before recording marketing permission.", tone: "success" });
     setAddForm({ email: "", first_name: "", last_name: "", phone: "", tags: "", date_of_birth: "" });
-    setShowAdd(false);
+    setOpenPanel(null);
     load();
   }
 
@@ -459,8 +455,8 @@ export default function ContactsPage() {
     if (error) { notify({ message: error.message, tone: "error" }); return; }
     const importedCount = imported?.length ?? 0;
     for (const row of (imported || []) as any[]) { checkAutoEnroll(row.id, "contact_added"); }
-    notify({ message: `Imported ${importedCount} contacts (${validRows.length - importedCount} dupes skipped, ${csvRows.length - validRows.length} invalid excluded).`, tone: "success" });
-    setImportText(""); setCsvRows([]); setCsvHeaders([]); setCsvMapping({}); setCsvStep("upload"); setShowImport(false);
+    notify({ message: `Stored ${importedCount} contacts for permission review (${validRows.length - importedCount} dupes skipped, ${csvRows.length - validRows.length} invalid excluded).`, tone: "success" });
+    setImportText(""); setCsvRows([]); setCsvHeaders([]); setCsvMapping({}); setCsvStep("upload"); setOpenPanel(null);
     load();
   }
 
@@ -514,13 +510,17 @@ export default function ContactsPage() {
 
     notify({ message: `Validation complete: ${deactivated} deactivated, ${tagged} contacts tagged for segmentation.`, tone: "success" });
     setValidating(false);
-    setShowValidate(false);
+    setOpenPanel(null);
     load();
   }
 
   async function toggleStatus(contact: Contact) {
-    const newStatus = contact.status === "active" ? "unsubscribed" : "active";
-    await supabase.from("marketing_contacts").update({ status: newStatus }).eq("id", contact.id);
+    if (contact.status !== "active") {
+      notify({ message: "To remove suppression, verify permission. Status changes and reimports cannot remove it.", tone: "warning" }); return;
+    }
+    const newStatus = "unsubscribed";
+    const { error } = await supabase.from("marketing_contacts").update({ status: newStatus }).eq("id", contact.id).eq("business_id", businessId);
+    if (error) { notify({ message: error.message, tone: "error" }); return; }
     setContacts(contacts.map((c) => c.id === contact.id ? { ...c, status: newStatus } : c));
   }
 
@@ -583,7 +583,7 @@ export default function ContactsPage() {
       .gte("total_received", 5)
       .eq("total_opens", 0);
     setStaleContacts((data as Contact[]) || []);
-    setShowCleanList(true);
+    setOpenPanel("clean");
   }
 
   async function deactivateStaleContacts() {
@@ -598,9 +598,47 @@ export default function ContactsPage() {
       return;
     }
     notify({ message: `Deactivated ${ids.length} stale contacts.`, tone: "success" });
-    setShowCleanList(false);
+    setOpenPanel(null);
     load();
   }
+
+  function contactTags(c: Contact) {
+    return (
+      <div className="flex flex-wrap items-center gap-1">
+      {(c.tags || []).map((tag) => (
+        <span key={tag} className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-medium" style={{ background: "var(--ck-ocean-soft)", color: "var(--ck-ocean)" }}>
+          {tag}
+          <button data-demo-action="contact.tag" onClick={() => removeTagFromContact(c.id, tag)} aria-label={`Remove tag ${tag}`} className="ml-0.5 inline-flex min-h-11 min-w-11 items-center justify-center transition-opacity hover:opacity-70 md:min-h-0 md:min-w-0">&times;</button>
+        </span>
+      ))}
+      {tagInput?.contactId === c.id ? (
+        <input
+          autoFocus
+          value={tagInput!.value}
+          onChange={(e) => setTagInput({ ...tagInput!, value: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { addTagToContact(c.id, tagInput!.value); }
+            if (e.key === "Escape") setTagInput(null);
+          }}
+          onBlur={() => { if (tagInput?.value.trim()) addTagToContact(c.id, tagInput.value); else setTagInput(null); }}
+          aria-label="New tag" className="ui-control min-h-11 w-full !text-base md:w-24 md:!text-xs"
+          style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface)", color: "var(--ck-text)" }}
+          placeholder="tag..."
+        />
+      ) : (
+        <button data-demo-action="contact.tag"
+          onClick={() => setTagInput({ contactId: c.id, value: "" })}
+          aria-label="Add tag" className="min-h-11 min-w-11 rounded-lg border px-2 text-sm md:min-h-0 md:min-w-0 md:rounded-full md:px-1.5 md:py-0.5 md:text-xs"
+          style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text-muted)" }}
+          title="Add tag"
+        >
+          +
+        </button>
+      )}
+                    </div>
+    );
+  }
+
 
   // Collect all unique tags for filter
   const allTags = [...new Set(contacts.flatMap((c) => c.tags || []))].sort();
@@ -622,264 +660,50 @@ export default function ContactsPage() {
   const inactiveCount = contacts.filter((c) => c.status === "inactive").length;
 
   if (loading) {
-    return <div className="space-y-4 py-2"><div className="ui-skeleton h-8 w-48" /><div className="ui-skeleton h-[140px] !rounded-2xl" /><div className="ui-skeleton h-[320px] !rounded-2xl" /></div>;
+    return <div className="space-y-4 py-2"><SectionTabs section="marketing" display="mobile" /><div className="ui-skeleton h-8 w-48" /><div className="ui-skeleton h-[140px] !rounded-2xl" /><div className="ui-skeleton h-[320px] !rounded-2xl" /></div>;
   }
 
   return (
     <div className="space-y-4">
       {/* Summary + actions */}
-      <div className="anim-fade-up flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
+      <div className="flex flex-col gap-3">
+        <p className="text-xs md:text-sm" style={{ color: "var(--ck-text-muted)" }}>
           {activeCount} active · {unsubCount} unsubscribed · {bouncedCount} bounced · {inactiveCount} inactive · {contacts.length} total
         </p>
-        <div className="flex flex-wrap gap-2">
-          {contacts.length > 0 && (
-            <button onClick={() => setShowDeleteAll(true)} className="ui-btn ui-btn-danger">
-              Delete All
-            </button>
-          )}
-          <button onClick={() => setShowValidate(true)} className="ui-btn ui-btn-ghost">
-            Validate &amp; Segment
-          </button>
-          <button onClick={previewCleanList} className="ui-btn ui-btn-ghost">
-            Clean List
-          </button>
-          <button onClick={() => { setShowImport(true); setCsvStep("upload"); setCsvRows([]); setImportText(""); }} className="ui-btn ui-btn-ghost">
-            Import CSV
-          </button>
-          <button onClick={() => setShowAdd(true)} className="ui-btn ui-btn-primary">
-            Add Contact
-          </button>
-        </div>
-      </div>
-
-      {/* Search + filter */}
-      <div className="anim-fade-up anim-d1 flex flex-col gap-2 sm:flex-row">
-        <div className="relative flex-1">
-          <MagnifyingGlass size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--ck-text-muted)" }} />
-          <input
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-            placeholder="Search contacts..."
-            className="ui-control w-full pl-9"
-          />
-        </div>
-        <select
-          value={filterStatus}
-          onChange={(e) => { setFilterStatus(e.target.value as any); setPage(0); }}
-          className="ui-control"
-        >
-          <option value="all">All statuses</option>
-          <option value="active">Active</option>
-          <option value="unsubscribed">Unsubscribed</option>
-          <option value="bounced">Bounced</option>
-          <option value="inactive">Inactive</option>
-        </select>
-        {allTags.length > 0 && (
-          <select
-            value={filterTag}
-            onChange={(e) => { setFilterTag(e.target.value); setPage(0); }}
-            className="ui-control"
-          >
-            <option value="">All tags</option>
-            {allTags.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-        )}
-      </div>
-
-      {/* Table */}
-      {filtered.length === 0 ? (
-        <div className="ui-card">
-          <div className="ui-empty">
-            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{contacts.length === 0 ? "No contacts yet" : "No matching contacts"}</p>
-            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>{contacts.length === 0 ? "Add your first contact or import a CSV." : "Try a different search or filter."}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <SectionTabs section="marketing" display="mobile" />
+          <button type="button" aria-expanded={openPanel === "add"} aria-controls="contact-add-panel" onClick={() => setOpenPanel(openPanel === "add" ? null : "add")} className="ui-btn ui-btn-primary ml-auto min-h-11 !px-3 !text-xs md:order-last md:ml-0 md:!text-sm">Add contact</button>
+          <div className={`grid w-full ${contacts.length > 0 ? "grid-cols-4" : "grid-cols-3"} gap-1.5 md:flex md:w-auto md:flex-wrap md:gap-2`}>
+            {contacts.length > 0 && <button type="button" onClick={() => setShowDeleteAll(true)} className="ui-btn ui-btn-danger min-w-0 !px-1 !text-xs md:!px-3 md:!text-sm">Delete all</button>}
+            <button type="button" aria-label="Validate and segment contacts" aria-expanded={openPanel === "validate"} aria-controls="contact-validate-panel" onClick={() => setOpenPanel(openPanel === "validate" ? null : "validate")} className="ui-btn ui-btn-ghost min-w-0 !px-1 !text-xs md:!px-3 md:!text-sm"><span className="md:hidden">Validate</span><span className="hidden md:inline">Validate &amp; segment</span></button>
+            <button type="button" aria-label="Clean contact list" aria-expanded={openPanel === "clean"} aria-controls="contact-clean-panel" onClick={() => { if (openPanel === "clean") setOpenPanel(null); else void previewCleanList(); }} className="ui-btn ui-btn-ghost min-w-0 !px-1 !text-xs md:!px-3 md:!text-sm">Clean list</button>
+            <button type="button" aria-label="Import contacts" aria-expanded={openPanel === "import"} aria-controls="contact-import-panel" onClick={() => { setOpenPanel(openPanel === "import" ? null : "import"); setCsvStep("upload"); setCsvRows([]); setImportText(""); }} className="ui-btn ui-btn-ghost min-w-0 !px-1 !text-xs md:!px-3 md:!text-sm"><span className="md:hidden">Import</span><span className="hidden md:inline">Import CSV</span></button>
           </div>
         </div>
-      ) : (
-        <div className="anim-fade-up anim-d2 ui-card overflow-x-auto">
-          <table className="w-full min-w-[700px] text-sm">
-            <thead>
-              <tr>
-                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Email</th>
-                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Name</th>
-                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Phone</th>
-                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>DOB</th>
-                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Tags</th>
-                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>Engagement</th>
-                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>Status</th>
-                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginated.map((c) => {
-                const isEditing = editingId === c.id;
-                return isEditing ? (
-                  <tr key={c.id} className="border-t" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-sunken)" }}>
-                    <td className="px-4 py-2">
-                      <input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                        className="ui-control w-full !py-1.5" placeholder="Email" />
-                    </td>
-                    <td className="px-4 py-2">
-                      <div className="flex gap-1">
-                        <input value={editForm.first_name} onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
-                          className="ui-control w-1/2 !px-2 !py-1.5" placeholder="First" />
-                        <input value={editForm.last_name} onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
-                          className="ui-control w-1/2 !px-2 !py-1.5" placeholder="Last" />
-                      </div>
-                    </td>
-                    <td className="px-4 py-2">
-                      <input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                        className="ui-control w-full !py-1.5 font-mono text-xs" placeholder="Phone" />
-                    </td>
-                    <td className="px-4 py-2">
-                      <input type="date" value={editForm.date_of_birth} onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })}
-                        className="ui-control w-[120px] !py-1.5 text-xs" />
-                    </td>
-                    <td className="px-4 py-2">
-                      <input value={editForm.tags} onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
-                        className="ui-control w-full !py-1.5 text-xs" placeholder="tag1, tag2" />
-                    </td>
-                    <td className="px-4 py-2 text-center text-xs tabular-nums" style={{ color: "var(--ck-text-muted)" }}>
-                      {c.total_received > 0 ? <span>{c.total_received} / {c.total_opens} / {c.total_clicks}</span> : "—"}
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <button data-demo-action={c.status === "active" ? "contact.unsubscribe" : "contact.activate"} onClick={() => toggleStatus(c)} className={`ui-status ${CONTACT_PILL[c.status] || "ui-pill-neutral"} cursor-pointer`}>{c.status}</button>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button data-demo-action="contact.save" onClick={saveEdit} disabled={editSaving} className="rounded-lg p-1" style={{ color: "var(--ck-success)" }} title="Save">
-                          <Check size={16} weight="bold" />
-                        </button>
-                        <button onClick={() => setEditingId(null)} className="rounded-lg p-1" style={{ color: "var(--ck-text-muted)" }} title="Cancel">
-                          <X size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                <tr key={c.id} className="border-t transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                  <td className="px-4 py-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{c.email}</td>
-                  <td className="px-4 py-3" style={{ color: "var(--ck-text)" }}>
-                    {[c.first_name, c.last_name].filter(Boolean).join(" ") || "—"}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs" style={{ color: "var(--ck-text-muted)" }}>
-                    {c.phone || "—"}
-                  </td>
-                  <td className="px-4 py-3 text-xs" style={{ color: "var(--ck-text)" }}>
-                    {c.date_of_birth || "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap items-center gap-1">
-                      {(c.tags || []).map((tag) => (
-                        <span key={tag} className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-medium" style={{ background: "var(--ck-ocean-soft)", color: "var(--ck-ocean)" }}>
-                          {tag}
-                          <button data-demo-action="contact.tag" onClick={() => removeTagFromContact(c.id, tag)} className="ml-0.5 transition-opacity hover:opacity-70">&times;</button>
-                        </span>
-                      ))}
-                      {tagInput?.contactId === c.id ? (
-                        <input
-                          autoFocus
-                          value={tagInput!.value}
-                          onChange={(e) => setTagInput({ ...tagInput!, value: e.target.value })}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") { addTagToContact(c.id, tagInput!.value); }
-                            if (e.key === "Escape") setTagInput(null);
-                          }}
-                          onBlur={() => { if (tagInput!.value.trim()) addTagToContact(c.id, tagInput!.value); else setTagInput(null); }}
-                          className="w-20 rounded-full border px-2 py-0.5 text-xs"
-                          style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface)", color: "var(--ck-text)" }}
-                          placeholder="tag..."
-                        />
-                      ) : (
-                        <button data-demo-action="contact.tag"
-                          onClick={() => setTagInput({ contactId: c.id, value: "" })}
-                          className="rounded-full border px-1.5 py-0.5 text-xs"
-                          style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text-muted)" }}
-                          title="Add tag"
-                        >
-                          +
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-center text-xs tabular-nums" style={{ color: "var(--ck-text-muted)" }}>
-                    {c.total_received > 0 ? (
-                      <span>{c.total_received} recv · {c.total_opens} opens · {c.total_clicks} clicks</span>
-                    ) : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <button data-demo-action={c.status === "active" ? "contact.unsubscribe" : "contact.activate"} onClick={() => toggleStatus(c)} className={`ui-status ${CONTACT_PILL[c.status] || "ui-pill-neutral"} cursor-pointer`}>
-                      {c.status}
-                    </button>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => startEdit(c)} className="rounded-lg p-1 transition-colors" style={{ color: "var(--ck-text-muted)" }} title="Edit">
-                        <PencilSimple size={14} />
-                      </button>
-                      <button data-demo-action="contact.delete" onClick={() => deleteContact(c.id)} className="rounded-lg p-1 transition-colors" style={{ color: "var(--ck-danger)" }} title="Delete">
-                        <Trash size={14} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="anim-fade-up flex items-center justify-between">
-          <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
-            Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length.toLocaleString()} contacts
-          </p>
-          <div className="flex items-center gap-1">
-            <button onClick={() => setPage(0)} disabled={page === 0} className="ui-btn ui-btn-ghost h-8 px-2.5 text-xs disabled:opacity-30">First</button>
-            <button onClick={() => setPage(page - 1)} disabled={page === 0} className="ui-btn ui-btn-ghost h-8 px-2.5 text-xs disabled:opacity-30">Prev</button>
-            {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
-              let p: number;
-              if (totalPages <= 7) p = i;
-              else if (page < 3) p = i;
-              else if (page > totalPages - 4) p = totalPages - 7 + i;
-              else p = page - 3 + i;
-              return (
-                <button key={p} onClick={() => setPage(p)}
-                  className="rounded-lg px-2.5 py-1.5 text-xs font-medium tabular-nums transition-colors"
-                  style={p === page ? { background: "var(--ck-accent-soft)", color: "var(--ck-accent)", fontWeight: 700 } : { color: "var(--ck-text-muted)" }}
-                >{p + 1}</button>
-              );
-            })}
-            <button onClick={() => setPage(page + 1)} disabled={page >= totalPages - 1} className="ui-btn ui-btn-ghost h-8 px-2.5 text-xs disabled:opacity-30">Next</button>
-            <button onClick={() => setPage(totalPages - 1)} disabled={page >= totalPages - 1} className="ui-btn ui-btn-ghost h-8 px-2.5 text-xs disabled:opacity-30">Last</button>
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* Add contact modal */}
-      {showAdd && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="ui-card w-full max-w-md p-6" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
+      {openPanel === "add" && (
+        <div className="relative md:fixed md:inset-0 md:z-50 md:flex md:items-center md:justify-center md:bg-black/40 md:px-4">
+          <div id="contact-add-panel" className="w-full rounded-xl border bg-[var(--ck-surface)] p-4 md:max-h-[90dvh] md:max-w-md md:overflow-y-auto md:p-6 md:shadow-xl" style={{ borderColor: "var(--ck-border-subtle)" }}>
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-[17px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Add Contact</h3>
-              <button onClick={() => setShowAdd(false)} style={{ color: "var(--ck-text-muted)" }}><X size={18} /></button>
+              <button type="button" aria-label="Close panel" onClick={() => setOpenPanel(null)} style={{ color: "var(--ck-text-muted)" }} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center"><X size={18} aria-hidden="true" /></button>
             </div>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <input placeholder="First name *" value={addForm.first_name} onChange={(e) => setAddForm({ ...addForm, first_name: e.target.value })} className="ui-control w-full" />
-                <input placeholder="Last name *" value={addForm.last_name} onChange={(e) => setAddForm({ ...addForm, last_name: e.target.value })} className="ui-control w-full" />
+                <input aria-label="First name (optional)" placeholder="First name" value={addForm.first_name} onChange={(e) => setAddForm({ ...addForm, first_name: e.target.value })} className="ui-control w-full" />
+                <input aria-label="Last name (optional)" placeholder="Last name" value={addForm.last_name} onChange={(e) => setAddForm({ ...addForm, last_name: e.target.value })} className="ui-control w-full" />
               </div>
-              <input placeholder="Email *" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} className="ui-control w-full" />
-              <input placeholder="Phone number *" value={addForm.phone} onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })} className="ui-control w-full" />
-              <input placeholder="Tags (comma-separated, e.g. vip, customer)" value={addForm.tags} onChange={(e) => setAddForm({ ...addForm, tags: e.target.value })} className="ui-control w-full" />
+              <input aria-label="Email (required)" placeholder="Email *" value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} className="ui-control w-full" />
+              <input aria-label="Phone number (optional)" placeholder="Phone (optional)" value={addForm.phone} onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })} className="ui-control w-full" />
+              <input aria-label="Tags (comma-separated)" placeholder="Tags, separated by commas" value={addForm.tags} onChange={(e) => setAddForm({ ...addForm, tags: e.target.value })} className="ui-control w-full" />
               <div>
                 <label className="mb-1 block text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Date of Birth</label>
                 <input type="date" value={addForm.date_of_birth || ""} onChange={(e) => setAddForm({ ...addForm, date_of_birth: e.target.value })} className="ui-control w-full" />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button onClick={() => setShowAdd(false)} className="ui-btn ui-btn-ghost">Cancel</button>
+                <button onClick={() => setOpenPanel(null)} className="ui-btn ui-btn-ghost">Cancel</button>
                 <button data-demo-action="contact.add" onClick={addContact} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
                   {saving ? "Saving..." : "Add Contact"}
                 </button>
@@ -890,13 +714,13 @@ export default function ContactsPage() {
       )}
 
       {/* Import modal — 3-step: upload → map columns → preview & import */}
-      {showImport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="ui-card flex max-h-[90vh] w-full max-w-3xl flex-col" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
+      {openPanel === "import" && (
+        <div className="relative md:fixed md:inset-0 md:z-50 md:flex md:items-center md:justify-center md:bg-black/40 md:px-4">
+          <div id="contact-import-panel" className="flex w-full flex-col rounded-xl border bg-[var(--ck-surface)] md:max-h-[90dvh] md:max-w-3xl md:shadow-xl" style={{ borderColor: "var(--ck-border-subtle)" }}>
             <div className="flex items-center justify-between border-b px-6 pb-3 pt-5" style={{ borderColor: "var(--ck-border-subtle)" }}>
               <div>
                 <h3 className="text-[17px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Import Contacts</h3>
-                <div className="mt-1 flex items-center gap-4">
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                   {["upload", "map", "preview"].map((s, i) => (
                     <span key={s} className="ui-mono-label !text-[10px]" style={{ color: csvStep === s ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>
                       {i + 1}. {s === "upload" ? "Upload" : s === "map" ? "Map Columns" : "Preview & Import"}
@@ -904,18 +728,18 @@ export default function ContactsPage() {
                   ))}
                 </div>
               </div>
-              <button onClick={() => setShowImport(false)} style={{ color: "var(--ck-text-muted)" }}><X size={18} /></button>
+              <button type="button" aria-label="Close panel" onClick={() => setOpenPanel(null)} style={{ color: "var(--ck-text-muted)" }} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center"><X size={18} aria-hidden="true" /></button>
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-5">
               {/* STEP 1: Upload */}
               {csvStep === "upload" && (
                 <div className="space-y-4">
-                  <div className="rounded-xl border-2 border-dashed p-8 text-center" style={{ borderColor: "var(--ck-border-strong)" }}>
+                  <div className="rounded-xl border-2 border-dashed p-4 text-center md:p-8" style={{ borderColor: "var(--ck-border-strong)" }}>
                     <p className="mb-2 text-sm font-medium" style={{ color: "var(--ck-text)" }}>Upload a CSV, TXT, or tab-separated file</p>
-                    <input type="file" accept=".csv,.txt,.tsv,.xlsx" onChange={(e) => handleCsvFile(e.target.files?.[0] || null)} className="mx-auto block text-sm" />
+                    <input type="file" accept=".csv,.txt,.tsv,.xlsx" onChange={(e) => handleCsvFile(e.target.files?.[0] || null)} className="block w-full min-w-0 text-sm" />
                     <p className="mt-2 text-[10px]" style={{ color: "var(--ck-text-muted)" }}>
-                      Any columns are accepted. You&apos;ll map them in the next step, and gaps in data are fine.
+                      Upload any columns. Map them next; blank cells are allowed.
                     </p>
                   </div>
                   <div className="text-center text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>or paste data</div>
@@ -923,7 +747,7 @@ export default function ContactsPage() {
                     placeholder={"email, first_name, last_name, phone, company, city\njohn@example.com, John, Doe, 0821234567, Acme, Cape Town\njane@example.com, Jane, , , , Johannesburg"}
                     className="ui-control w-full font-mono" />
                   <div className="flex justify-end gap-2">
-                    <button onClick={() => setShowImport(false)} className="ui-btn ui-btn-ghost">Cancel</button>
+                    <button onClick={() => setOpenPanel(null)} className="ui-btn ui-btn-ghost">Cancel</button>
                     <button onClick={handlePasteImport} disabled={!importText.trim()} className="ui-btn ui-btn-primary disabled:opacity-50">Next: Map Columns</button>
                   </div>
                 </div>
@@ -937,12 +761,12 @@ export default function ContactsPage() {
                   </p>
 
                   {/* Sample data preview */}
-                  <div className="overflow-x-auto rounded-lg border" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                    <table className="w-full text-[11px]">
+                  <div className="ui-table-container overflow-x-auto rounded-lg border" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                    <table role="table" className="ui-responsive-table w-full text-[11px]">
                       <thead style={{ background: "var(--ck-surface-sunken)" }}>
                         <tr>
                           {csvHeaders.map((h) => (
-                            <th key={h} className="whitespace-nowrap px-3 py-1.5 text-left font-medium" style={{ color: "var(--ck-text-muted)" }}>{h}</th>
+                            <th scope="col" key={h} className="whitespace-nowrap px-3 py-1.5 text-left font-medium" style={{ color: "var(--ck-text-muted)" }}>{h}</th>
                           ))}
                         </tr>
                       </thead>
@@ -950,7 +774,7 @@ export default function ContactsPage() {
                         {csvRows.slice(0, 3).map((r, i) => (
                           <tr key={i} className="border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
                             {csvHeaders.map((h) => (
-                              <td key={h} className="whitespace-nowrap px-3 py-1" style={{ color: "var(--ck-text)" }}>{r.data[h] || <span style={{ color: "var(--ck-text-muted)" }}>—</span>}</td>
+                              <td data-label={h} key={h} className="whitespace-nowrap px-3 py-1" style={{ color: "var(--ck-text)" }}>{r.data[h] || <span style={{ color: "var(--ck-text-muted)" }}>—</span>}</td>
                             ))}
                           </tr>
                         ))}
@@ -1030,27 +854,27 @@ export default function ContactsPage() {
                   </div>
 
                   <div className="rounded-xl border overflow-hidden" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                    <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
-                      <table className="w-full text-xs">
+                    <div className="ui-table-container overflow-x-auto max-h-[300px] overflow-y-auto">
+                      <table role="table" className="ui-responsive-table w-full text-xs">
                         <thead className="sticky top-0" style={{ background: "var(--ck-bg-subtle)" }}>
                           <tr>
-                            <th className="px-2 py-2 text-left font-medium" style={{ color: "var(--ck-text-muted)" }}>Email</th>
-                            <th className="px-2 py-2 text-left font-medium" style={{ color: "var(--ck-text-muted)" }}>Name</th>
-                            <th className="px-2 py-2 text-left font-medium" style={{ color: "var(--ck-text-muted)" }}>Phone</th>
-                            <th className="px-2 py-2 text-left font-medium" style={{ color: "var(--ck-text-muted)" }}>Tags</th>
-                            <th className="px-2 py-2 text-left font-medium" style={{ color: "var(--ck-text-muted)" }}>Notes</th>
-                            <th className="px-2 py-2 text-left font-medium" style={{ color: "var(--ck-text-muted)" }}>Status</th>
+                            <th scope="col" className="px-2 py-2 text-left font-medium" style={{ color: "var(--ck-text-muted)" }}>Email</th>
+                            <th scope="col" className="px-2 py-2 text-left font-medium" style={{ color: "var(--ck-text-muted)" }}>Name</th>
+                            <th scope="col" className="px-2 py-2 text-left font-medium" style={{ color: "var(--ck-text-muted)" }}>Phone</th>
+                            <th scope="col" className="px-2 py-2 text-left font-medium" style={{ color: "var(--ck-text-muted)" }}>Tags</th>
+                            <th scope="col" className="px-2 py-2 text-left font-medium" style={{ color: "var(--ck-text-muted)" }}>Notes</th>
+                            <th scope="col" className="px-2 py-2 text-left font-medium" style={{ color: "var(--ck-text-muted)" }}>Status</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y" style={{ borderColor: "var(--ck-border-subtle)" }}>
                           {csvRows.slice(0, 100).map((r, i) => (
                             <tr key={i} className={r.errors.length > 0 ? "bg-red-50/50" : ""}>
-                              <td className="px-2 py-1.5 font-mono" style={{ color: "var(--ck-text)" }}>{r.data._email || "—"}</td>
-                              <td className="px-2 py-1.5" style={{ color: "var(--ck-text)" }}>{[r.data._first_name, r.data._last_name].filter(Boolean).join(" ") || "—"}</td>
-                              <td className="px-2 py-1.5 font-mono" style={{ color: "var(--ck-text-muted)" }}>{r.data._phone || "—"}</td>
-                              <td className="px-2 py-1.5" style={{ color: "var(--ck-text-muted)" }}>{r.data._tags || "—"}</td>
-                              <td className="px-2 py-1.5 max-w-[200px] truncate" style={{ color: "var(--ck-text-muted)" }} title={r.data._notes}>{r.data._notes || "—"}</td>
-                              <td className="px-2 py-1.5">{r.errors.length > 0 ? <span className="text-red-500 font-medium">{r.errors.join(", ")}</span> : <span className="text-emerald-600 font-medium">OK</span>}</td>
+                              <td data-label="Email" className="px-2 py-1.5 font-mono" style={{ color: "var(--ck-text)" }}>{r.data._email || "—"}</td>
+                              <td data-label="Name" className="px-2 py-1.5" style={{ color: "var(--ck-text)" }}>{[r.data._first_name, r.data._last_name].filter(Boolean).join(" ") || "—"}</td>
+                              <td data-label="Phone" className="px-2 py-1.5 font-mono" style={{ color: "var(--ck-text-muted)" }}>{r.data._phone || "—"}</td>
+                              <td data-label="Tags" className="px-2 py-1.5" style={{ color: "var(--ck-text-muted)" }}>{r.data._tags || "—"}</td>
+                              <td data-label="Notes" className="px-2 py-1.5 max-w-[200px] truncate" style={{ color: "var(--ck-text-muted)" }} title={r.data._notes}>{r.data._notes || "—"}</td>
+                              <td data-label="Status" className="px-2 py-1.5">{r.errors.length > 0 ? <span className="text-red-500 font-medium">{r.errors.join(", ")}</span> : <span className="text-emerald-600 font-medium">OK</span>}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1064,7 +888,7 @@ export default function ContactsPage() {
                   <div className="flex justify-between gap-2">
                     <button onClick={() => setCsvStep("map")} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text)" }}>Back</button>
                     <div className="flex gap-2">
-                      <button onClick={() => setShowImport(false)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text)" }}>Cancel</button>
+                      <button onClick={() => setOpenPanel(null)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text)" }}>Cancel</button>
                       <button data-demo-action="contact.import" onClick={importContacts} disabled={importing || csvRows.filter((r) => r.errors.length === 0).length === 0} className="rounded-lg px-5 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "var(--ck-accent)" }}>
                         {importing ? "Importing..." : `Import ${csvRows.filter((r) => r.errors.length === 0).length} contacts`}
                       </button>
@@ -1078,12 +902,12 @@ export default function ContactsPage() {
       )}
 
       {/* Validate & Segment modal */}
-      {showValidate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-2xl p-6 shadow-2xl" style={{ background: "var(--ck-surface)" }}>
+      {openPanel === "validate" && (
+        <div className="relative md:fixed md:inset-0 md:z-50 md:flex md:items-center md:justify-center md:bg-black/40 md:px-4">
+          <div id="contact-validate-panel" className="w-full rounded-xl border bg-[var(--ck-surface)] p-4 md:max-h-[90dvh] md:max-w-lg md:overflow-y-auto md:p-6 md:shadow-xl" style={{ borderColor: "var(--ck-border-subtle)" }}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Validate & Segment Contacts</h3>
-              <button onClick={() => setShowValidate(false)}><X size={18} /></button>
+              <button type="button" aria-label="Close panel" onClick={() => setOpenPanel(null)} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center"><X size={18} aria-hidden="true" /></button>
             </div>
             <div className="space-y-3 text-sm" style={{ color: "var(--ck-text)" }}>
               <p style={{ color: "var(--ck-text-muted)" }}>This will scan all {contacts.length} contacts and automatically:</p>
@@ -1106,11 +930,11 @@ export default function ContactsPage() {
                 </div>
               </div>
               <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
-                You can then filter by these tags when sending campaigns to target specific segments.
+                Use these tags to filter campaign recipients.
               </p>
             </div>
             <div className="flex justify-end gap-2 pt-4">
-              <button onClick={() => setShowValidate(false)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text)" }}>Cancel</button>
+              <button onClick={() => setOpenPanel(null)} className="rounded-lg border px-4 py-2 text-sm font-medium" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text)" }}>Cancel</button>
               <button data-demo-action="contact.validate" onClick={runValidation} disabled={validating} className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" style={{ background: "var(--ck-accent)" }}>
                 {validating ? "Validating..." : "Run Validation"}
               </button>
@@ -1120,12 +944,12 @@ export default function ContactsPage() {
       )}
 
       {/* Clean List modal */}
-      {showCleanList && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-2xl p-6 shadow-2xl" style={{ background: "var(--ck-surface)" }}>
+      {openPanel === "clean" && (
+        <div className="relative md:fixed md:inset-0 md:z-50 md:flex md:items-center md:justify-center md:bg-black/40 md:px-4">
+          <div id="contact-clean-panel" className="w-full rounded-xl border bg-[var(--ck-surface)] p-4 md:max-h-[90dvh] md:max-w-lg md:overflow-y-auto md:p-6 md:shadow-xl" style={{ borderColor: "var(--ck-border-subtle)" }}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Clean List</h3>
-              <button onClick={() => setShowCleanList(false)}><X size={18} /></button>
+              <button type="button" aria-label="Close panel" onClick={() => setOpenPanel(null)} className="flex min-h-11 min-w-11 shrink-0 items-center justify-center"><X size={18} aria-hidden="true" /></button>
             </div>
             <p className="text-xs mb-3" style={{ color: "var(--ck-text-muted)" }}>
               Found {staleContacts.length} contacts who received 5+ emails but never opened any.
@@ -1133,32 +957,32 @@ export default function ContactsPage() {
             </p>
             {staleContacts.length === 0 ? (
               <div className="rounded-xl border p-6 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No stale contacts found. Your list is clean!</p>
+                <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No stale contacts.</p>
               </div>
             ) : (
               <>
-                <div className="max-h-60 overflow-y-auto rounded-lg border" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                  <table className="w-full text-xs">
+                <div className="ui-table-container max-h-60 overflow-y-auto rounded-lg border" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                  <table role="table" className="ui-responsive-table w-full text-xs">
                     <thead>
                       <tr style={{ background: "var(--ck-surface)" }}>
-                        <th className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Email</th>
-                        <th className="text-right px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Received</th>
-                        <th className="text-right px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Opens</th>
+                        <th scope="col" className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Email</th>
+                        <th scope="col" className="text-right px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Received</th>
+                        <th scope="col" className="text-right px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Opens</th>
                       </tr>
                     </thead>
                     <tbody>
                       {staleContacts.map((c) => (
                         <tr key={c.id} className="border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                          <td className="px-3 py-2" style={{ color: "var(--ck-text)" }}>{c.email}</td>
-                          <td className="px-3 py-2 text-right" style={{ color: "var(--ck-text-muted)" }}>{c.total_received}</td>
-                          <td className="px-3 py-2 text-right" style={{ color: "var(--ck-text-muted)" }}>0</td>
+                          <td data-label="Email" className="px-3 py-2" style={{ color: "var(--ck-text)" }}>{c.email}</td>
+                          <td data-label="Received" className="px-3 py-2 text-right" style={{ color: "var(--ck-text-muted)" }}>{c.total_received}</td>
+                          <td data-label="Opens" className="px-3 py-2 text-right" style={{ color: "var(--ck-text-muted)" }}>0</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
                 <div className="flex justify-end gap-2 pt-3">
-                  <button onClick={() => setShowCleanList(false)} className="ui-btn ui-btn-ghost">Cancel</button>
+                  <button onClick={() => setOpenPanel(null)} className="ui-btn ui-btn-ghost">Cancel</button>
                   <button data-demo-action="contact.clean" onClick={deactivateStaleContacts} disabled={cleaning} className="ui-btn ui-btn-danger disabled:opacity-50">
                     {cleaning ? "Deactivating..." : `Deactivate ${staleContacts.length} Contacts`}
                   </button>
@@ -1168,10 +992,226 @@ export default function ContactsPage() {
           </div>
         </div>
       )}
+
+      {/* Search + filter */}
+      <div className="grid grid-cols-2 gap-2 md:flex">
+        <div className="relative col-span-2 md:flex-1">
+          <MagnifyingGlass size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--ck-text-muted)" }} />
+          <input
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+            placeholder="Search contacts..."
+            aria-label="Search contacts"
+            className="ui-control w-full pl-9"
+          />
+        </div>
+        <select
+          aria-label="Filter by status"
+          value={filterStatus}
+          onChange={(e) => { setFilterStatus(e.target.value as any); setPage(0); }}
+          className="ui-control w-full md:w-auto"
+        >
+          <option value="all">All statuses</option>
+          <option value="active">Active</option>
+          <option value="unsubscribed">Unsubscribed</option>
+          <option value="bounced">Bounced</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        {allTags.length > 0 && (
+          <select
+            aria-label="Filter by tag"
+            value={filterTag}
+            onChange={(e) => { setFilterTag(e.target.value); setPage(0); }}
+            className="ui-control w-full md:w-auto"
+          >
+            <option value="">All tags</option>
+            {allTags.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+        )}
+      </div>
+
+      {/* Table */}
+      {filtered.length === 0 ? (
+        <div className="ui-card">
+          <div className="ui-empty">
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{contacts.length === 0 ? "No contacts yet" : "No matching contacts"}</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>{contacts.length === 0 ? "Add your first contact or import a CSV." : "Try a different search or filter."}</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="divide-y divide-[var(--ck-border-subtle)] rounded-xl border bg-[var(--ck-surface)] md:hidden" style={{ borderColor: "var(--ck-border-subtle)" }}>
+            {paginated.map(c => <details key={c.id} open={editingId === c.id || undefined} className="group">
+              <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+                <span className="min-w-0 break-words text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{[c.first_name, c.last_name].filter(Boolean).join(" ") || c.email}</span>
+                <CaretDown size={16} aria-hidden="true" className="shrink-0 transition-transform group-open:rotate-180" style={{ color: "var(--ck-text-muted)" }} />
+              </summary>
+              <div className="space-y-4 border-t px-4 py-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                {editingId === c.id ? <div className="grid grid-cols-2 gap-3">
+                  <label className="space-y-1 text-xs">First name<input value={editForm.first_name} onChange={event => setEditForm({ ...editForm, first_name: event.target.value })} className="ui-control w-full" /></label>
+                  <label className="space-y-1 text-xs">Last name<input value={editForm.last_name} onChange={event => setEditForm({ ...editForm, last_name: event.target.value })} className="ui-control w-full" /></label>
+                  <label className="col-span-2 space-y-1 text-xs">Email<input type="email" value={editForm.email} onChange={event => setEditForm({ ...editForm, email: event.target.value })} className="ui-control w-full" /></label>
+                  <label className="col-span-2 space-y-1 text-xs">Phone<input type="tel" value={editForm.phone} onChange={event => setEditForm({ ...editForm, phone: event.target.value })} className="ui-control w-full" /></label>
+                  <label className="col-span-2 space-y-1 text-xs">Date of birth<input type="date" value={editForm.date_of_birth} onChange={event => setEditForm({ ...editForm, date_of_birth: event.target.value })} className="ui-control w-full" /></label>
+                  <label className="col-span-2 space-y-1 text-xs">Tags<input value={editForm.tags} onChange={event => setEditForm({ ...editForm, tags: event.target.value })} className="ui-control w-full" placeholder="Separate tags with commas" /></label>
+                  <div className="col-span-2 flex items-center justify-end gap-2">
+                    <button type="button" onClick={() => setEditingId(null)} className="ui-btn ui-btn-ghost min-h-11">Cancel</button>
+                    <button type="button" data-demo-action="contact.save" onClick={saveEdit} disabled={editSaving} className="ui-btn ui-btn-primary min-h-11 disabled:opacity-50">{editSaving ? "Saving…" : "Save"}</button>
+                  </div>
+                </div> : <>
+                  <dl className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="col-span-2 min-w-0"><dt className="mb-1 text-xs text-[var(--ck-text-muted)]">Email</dt><dd className="break-all"><Link href={`/marketing/contacts/${c.id}`} className="underline underline-offset-2">{c.email}</Link></dd></div>
+                    <div className="min-w-0"><dt className="mb-1 text-xs text-[var(--ck-text-muted)]">Phone</dt><dd className="break-words">{c.phone || "—"}</dd></div>
+                    <div><dt className="mb-1 text-xs text-[var(--ck-text-muted)]">Date of birth</dt><dd>{c.date_of_birth || "—"}</dd></div>
+                    <div className="col-span-2"><dt className="mb-1 text-xs text-[var(--ck-text-muted)]">Email activity</dt><dd className="tabular-nums">{c.total_received} received · {c.total_opens} opens · {c.total_clicks} clicks</dd></div>
+                    <div className="col-span-2"><dt className="mb-1 text-xs text-[var(--ck-text-muted)]">Tags</dt><dd>{contactTags(c)}</dd></div>
+                  </dl>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                    <button type="button" data-demo-action={c.status === "active" ? "contact.unsubscribe" : "contact.activate"} onClick={() => toggleStatus(c)} className={`ui-status min-h-11 px-3 ${CONTACT_PILL[c.status] || "ui-pill-neutral"}`}>{c.status}</button>
+                    <div className="flex gap-1">
+                      <Link href={`/marketing/contacts/${c.id}`} className="ui-btn ui-btn-ghost min-h-11 !px-2 !text-xs">History</Link>
+                      <button type="button" onClick={() => startEdit(c)} aria-label={`Edit ${c.first_name || c.email}`} className="ui-btn ui-btn-ghost min-h-11 min-w-11 !px-2"><PencilSimple size={17} aria-hidden="true" /></button>
+                      <button type="button" data-demo-action="contact.delete" onClick={() => deleteContact(c.id)} aria-label={`Delete ${c.first_name || c.email}`} className="ui-btn ui-btn-ghost min-h-11 min-w-11 !px-2" style={{ color: "var(--ck-danger)" }}><Trash size={17} aria-hidden="true" /></button>
+                    </div>
+                  </div>
+                </>}
+              </div>
+            </details>)}
+          </div>
+        <div className="ui-table-container hidden ui-card overflow-x-auto md:block">
+          <table role="table" className="ui-responsive-table w-full min-w-[700px] text-sm">
+            <thead>
+              <tr>
+                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Email</th>
+                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Name</th>
+                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Phone</th>
+                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>DOB</th>
+                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Tags</th>
+                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>Engagement</th>
+                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>Status</th>
+                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.map((c) => {
+                const isEditing = editingId === c.id;
+                return isEditing ? (
+                  <tr key={c.id} className="border-t" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-sunken)" }}>
+                    <td data-label="Email" className="px-4 py-2">
+                      <input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                        className="ui-control w-full !py-1.5" placeholder="Email" />
+                    </td>
+                    <td data-label="Name" className="px-4 py-2">
+                      <div className="flex gap-1">
+                        <input value={editForm.first_name} onChange={(e) => setEditForm({ ...editForm, first_name: e.target.value })}
+                          className="ui-control w-1/2 !px-2 !py-1.5" placeholder="First" />
+                        <input value={editForm.last_name} onChange={(e) => setEditForm({ ...editForm, last_name: e.target.value })}
+                          className="ui-control w-1/2 !px-2 !py-1.5" placeholder="Last" />
+                      </div>
+                    </td>
+                    <td data-label="Phone" className="px-4 py-2">
+                      <input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                        className="ui-control w-full !py-1.5 font-mono text-xs" placeholder="Phone" />
+                    </td>
+                    <td data-label="DOB" className="px-4 py-2">
+                      <input type="date" value={editForm.date_of_birth} onChange={(e) => setEditForm({ ...editForm, date_of_birth: e.target.value })}
+                        className="ui-control w-[120px] !py-1.5 text-xs" />
+                    </td>
+                    <td data-label="Tags" className="px-4 py-2">
+                      <input value={editForm.tags} onChange={(e) => setEditForm({ ...editForm, tags: e.target.value })}
+                        className="ui-control w-full !py-1.5 text-xs" placeholder="tag1, tag2" />
+                    </td>
+                    <td data-label="Engagement" className="px-4 py-2 text-center text-xs tabular-nums" style={{ color: "var(--ck-text-muted)" }}>
+                      {c.total_received > 0 ? <span>{c.total_received} / {c.total_opens} / {c.total_clicks}</span> : "—"}
+                    </td>
+                    <td data-label="Status" className="px-4 py-2 text-center">
+                      <button data-demo-action={c.status === "active" ? "contact.unsubscribe" : "contact.activate"} onClick={() => toggleStatus(c)} className={`ui-status ${CONTACT_PILL[c.status] || "ui-pill-neutral"} cursor-pointer`}>{c.status}</button>
+                    </td>
+                    <td data-label="Actions" className="px-4 py-2 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <button data-demo-action="contact.save" onClick={saveEdit} disabled={editSaving} className="rounded-lg p-1" style={{ color: "var(--ck-success)" }} title="Save">
+                          <Check size={16} weight="bold" />
+                        </button>
+                        <button onClick={() => setEditingId(null)} className="rounded-lg p-1" style={{ color: "var(--ck-text-muted)" }} title="Cancel">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                <tr key={c.id} className="border-t transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                  <td data-label="Email" className="px-4 py-3 font-medium" style={{ color: "var(--ck-text-strong)" }}><Link className="underline underline-offset-2" href={`/marketing/contacts/${c.id}`} aria-label={`View history for ${c.email}`}>{c.email}</Link></td>
+                  <td data-label="Name" className="px-4 py-3" style={{ color: "var(--ck-text)" }}>
+                    {[c.first_name, c.last_name].filter(Boolean).join(" ") || "—"}
+                  </td>
+                  <td data-label="Phone" className="px-4 py-3 font-mono text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                    {c.phone || "—"}
+                  </td>
+                  <td data-label="DOB" className="px-4 py-3 text-xs" style={{ color: "var(--ck-text)" }}>
+                    {c.date_of_birth || "—"}
+                  </td>
+                  <td data-label="Tags" className="px-4 py-3">{contactTags(c)}</td>
+                  <td data-label="Engagement" className="px-4 py-3 text-center text-xs tabular-nums" style={{ color: "var(--ck-text-muted)" }}>
+                    {c.total_received > 0 ? (
+                      <span>{c.total_received} recv · {c.total_opens} opens · {c.total_clicks} clicks</span>
+                    ) : "—"}
+                  </td>
+                  <td data-label="Status" className="px-4 py-3 text-center">
+                    <button data-demo-action={c.status === "active" ? "contact.unsubscribe" : "contact.activate"} onClick={() => toggleStatus(c)} className={`ui-status ${CONTACT_PILL[c.status] || "ui-pill-neutral"} cursor-pointer`}>
+                      {c.status}
+                    </button>
+                  </td>
+                  <td data-label="Actions" className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => startEdit(c)} className="rounded-lg p-1 transition-colors" style={{ color: "var(--ck-text-muted)" }} title="Edit">
+                        <PencilSimple size={14} />
+                      </button>
+                      <button data-demo-action="contact.delete" onClick={() => deleteContact(c.id)} className="rounded-lg p-1 transition-colors" style={{ color: "var(--ck-danger)" }} title="Delete">
+                        <Trash size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        </>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
+            Showing {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length.toLocaleString()} contacts
+          </p>
+          <div className="flex flex-wrap items-center gap-1">
+            <button onClick={() => setPage(0)} disabled={page === 0} className="ui-btn ui-btn-ghost h-8 px-2.5 text-xs disabled:opacity-30">First</button>
+            <button onClick={() => setPage(page - 1)} disabled={page === 0} className="ui-btn ui-btn-ghost h-8 px-2.5 text-xs disabled:opacity-30">Prev</button>
+            {Array.from({ length: Math.min(7, totalPages) }, (_, i) => {
+              let p: number;
+              if (totalPages <= 7) p = i;
+              else if (page < 3) p = i;
+              else if (page > totalPages - 4) p = totalPages - 7 + i;
+              else p = page - 3 + i;
+              return (
+                <button key={p} onClick={() => setPage(p)}
+                  className="rounded-lg px-2.5 py-1.5 text-xs font-medium tabular-nums transition-colors"
+                  style={p === page ? { background: "var(--ck-accent-soft)", color: "var(--ck-accent)", fontWeight: 700 } : { color: "var(--ck-text-muted)" }}
+                >{p + 1}</button>
+              );
+            })}
+            <button onClick={() => setPage(page + 1)} disabled={page >= totalPages - 1} className="ui-btn ui-btn-ghost h-8 px-2.5 text-xs disabled:opacity-30">Next</button>
+            <button onClick={() => setPage(totalPages - 1)} disabled={page >= totalPages - 1} className="ui-btn ui-btn-ghost h-8 px-2.5 text-xs disabled:opacity-30">Last</button>
+          </div>
+        </div>
+      )}
+
       {/* Delete All Contacts confirmation */}
       {showDeleteAll && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="ui-card w-full max-w-md p-6">
+          <div className="ui-card max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-5 md:p-6">
             <h3 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Delete All Contacts</h3>
             <p className="mt-2 text-sm" style={{ color: "var(--ck-text-muted)" }}>
               This will permanently delete <strong>{contacts.length}</strong> contacts from your marketing list. This action cannot be undone.

@@ -111,7 +111,7 @@ export default function PlatformOperations() {
         </div>
       </details>;
     })}
-    <details className="border-t border-[var(--ck-border-subtle)] pt-3"><summary className="cursor-pointer font-semibold text-sm">Recent audit trail (latest 100 actions)</summary>
+    <details className="border-t border-[var(--ck-border-subtle)] pt-3"><summary className="cursor-pointer font-semibold text-sm">Recent changes (100)</summary>
       <p className="text-xs my-2 text-[var(--ck-text-muted)]">Who changed what, and when. Financial documents and older history are retained in the database.</p>
       <ol className="space-y-2 text-xs max-h-96 overflow-auto">
         {data?.audit.map(event => <li key={event.id} className="border-b border-[var(--ck-border-subtle)] py-2 break-words">

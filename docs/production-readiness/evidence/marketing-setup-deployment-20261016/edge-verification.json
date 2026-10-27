@@ -1,0 +1,36 @@
+{
+  "at": "2026-10-16T05:03:02.040Z",
+  "function": {
+    "id": "0e529b6d-1cd4-41ff-934f-51ae91de2de2",
+    "slug": "marketing-setup-status",
+    "version": 1,
+    "status": "ACTIVE",
+    "verify_jwt": false
+  },
+  "sourceChecks": [
+    {
+      "path": "supabase/functions/marketing-setup-status/index.ts",
+      "sha256": "9a78ea1a4d05a7485e4b9dc6f8e892e62738a7237fb508de5d6c6cb8427c9cce"
+    },
+    {
+      "path": "supabase/functions/_shared/auth.ts",
+      "sha256": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade"
+    },
+    {
+      "path": "supabase/functions/_shared/tenant.ts",
+      "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+    },
+    {
+      "path": "supabase/functions/_shared/pagination.ts",
+      "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+    }
+  ],
+  "internal_probe": {
+    "email_service_configured": true,
+    "email_feedback_configured": false,
+    "operator_status": "policy_approval_pending",
+    "welcome_back_available": false
+  },
+  "anonymous_status": 401,
+  "customer_actions": 0
+}

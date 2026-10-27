@@ -59,28 +59,6 @@ async function verifyAdmin(req: Request, businessId: string, action: string) {
     return { error: "Protected settings require an active business", status: 403 } as const;
   }
 
-  let assurance;
-  try { assurance = await db.auth.mfa.getAuthenticatorAssuranceLevel(jwt); }
-  catch { return { error: "MFA verification unavailable", status: 503 } as const; }
-  if (assurance.error || !assurance.data) return { error: "MFA verification unavailable", status: 503 } as const;
-  const factors = (user.factors || []).filter((factor: any) => factor.status === "verified" && factor.factor_type === "totp");
-
-  const { data: recovery, error: recoveryError } = await db.from("mfa_recovery_state")
-    .select("status, completed_at")
-    .eq("admin_id", row.id)
-    .maybeSingle();
-  if (recoveryError) return { error: "Recovery status unavailable", status: 503 } as const;
-  if (recovery && recovery.status !== "COMPLETED") return { error: "MFA recovery is still in progress", status: 423 } as const;
-  if (recovery?.status === "COMPLETED") {
-    const completedAt = Date.parse(recovery.completed_at || "");
-    const freshFactor = factors.some((factor: any) => Date.parse(factor.updated_at || factor.created_at || "") > completedAt);
-    const freshChallenge = (assurance.data.currentAuthenticationMethods || []).some((method: any) =>
-      typeof method !== "string" && String(method.method).includes("totp") && Number(method.timestamp) * 1000 > completedAt
-    );
-    if (!freshFactor || !freshChallenge) return { error: "Enroll and verify a new authenticator after recovery", status: 403 } as const;
-  }
-  if (!factors.length) return { error: "Set up an authenticator before changing bank details", status: 403 } as const;
-  if (assurance.data.currentLevel !== "aal2") return { error: "Enter a current authenticator code before changing bank details", status: 403 } as const;
   return { user, actor: row, jwt } as const;
 }
 

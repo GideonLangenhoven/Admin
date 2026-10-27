@@ -1,0 +1,20 @@
+[
+  {
+    "slug": "wa-webhook",
+    "version": 237,
+    "status": "ACTIVE",
+    "verify_jwt": false
+  },
+  {
+    "slug": "create-checkout",
+    "version": 106,
+    "status": "ACTIVE",
+    "verify_jwt": false
+  },
+  {
+    "slug": "web-chat",
+    "version": 148,
+    "status": "ACTIVE",
+    "verify_jwt": false
+  }
+]

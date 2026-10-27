@@ -1,23 +1,48 @@
 "use client";
-import { Fragment, useEffect, useMemo, useState, useRef } from "react";
+import { Fragment, useEffect, useId, useMemo, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { confirmCancellation } from "../lib/cancellation-choice";
 import { confirmAction, notify } from "../lib/app-notify";
 import { bookingRealtimeFilter, shouldRefreshBookingsForPayload } from "../lib/bookings-realtime";
 import { getAdminTimezone } from "../lib/admin-timezone";
+import { bookingDateRange, type BookingDateView } from "../lib/booking-date-range";
+import { amountReceived } from "../lib/report-accounting";
+import { addDaysToDateKey, businessDateKey, isDateKey } from "../lib/simple-view";
 import { customerNotesTooltip } from "../lib/customer-notes";
+import { contactPhoneNumber } from "../lib/contact-links";
 import { bookingDemoAction } from "../lib/demo-guide";
 import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
 import { rescheduleUnitPrice } from "../lib/reschedule-price";
-import { PaperPlaneTilt, SpinnerGap, CheckCircle, XCircle, Spinner } from "@phosphor-icons/react";
+import { PaperPlaneTilt, SpinnerGap, CheckCircle, XCircle, Spinner, ArrowLeft, ArrowRight } from "@phosphor-icons/react";
 import { cancelBookingAction, refundBookingAction, markPaidAction, checkInAction, type ActionResult } from "../lib/booking-actions";
 import { DatePicker } from "../../components/DatePicker";
 import { MonthPicker } from "../../components/MonthPicker";
 import BookingsMonthCalendar from "../../components/BookingsMonthCalendar";
+import CopyEmailButton from "../../components/booking/CopyEmailButton";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { fetchAllRows } from "../../supabase/functions/_shared/pagination";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const BOOKING_COLUMNS = "id, created_at, confirmation_sent_at, slot_id, customer_name, phone, email, qty, total_amount, total_captured, voucher_amount_paid, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)";
+
+async function openDeviceWhatsApp(phone: string | null) {
+  const number = contactPhoneNumber(phone);
+  if (!number) return;
+  let copy = Promise.resolve(false);
+  try {
+    copy = navigator.clipboard?.writeText(`+${number}`).then(() => true, () => false) ?? copy;
+  } catch { /* A blocked clipboard must not prevent opening the chat. */ }
+  // Open during the click, before awaiting the clipboard, to preserve user activation.
+  window.open(`https://wa.me/${number}`, "_blank", "noopener,noreferrer");
+  const copied = await copy;
+  notify({
+    title: copied ? "Phone number copied" : "Could not copy phone number",
+    message: copied ? "Write and send your message in WhatsApp." : `You can copy the number manually: +${number}.`,
+    tone: copied ? "success" : "warning",
+  });
+}
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-ZA", {
@@ -70,8 +95,9 @@ function dayRange(dateInput: string) {
   return { startIso: day.toISOString(), endIso: next.toISOString() };
 }
 
-function isPaid(status: string) {
-  return ["PAID", "CONFIRMED", "COMPLETED"].includes(status);
+function isPaid(booking: Pick<Booking, "status" | "total_amount" | "total_captured">) {
+  return ["PAID", "CONFIRMED", "COMPLETED"].includes(booking.status)
+    && amountReceived(booking) + 0.005 >= Number(booking.total_amount || 0);
 }
 
 // A booking's value = cash portion (total_amount, i.e. what's due after any
@@ -79,6 +105,10 @@ function isPaid(status: string) {
 // R0.00 for voucher-paid bookings.
 function bookingValue(b: { total_amount: number; voucher_amount_paid?: number | null }) {
   return Number(b.total_amount || 0) + Number(b.voucher_amount_paid || 0);
+}
+
+function bookingPaidAmount(b: Booking) {
+  return Math.min(Number(b.total_amount || 0), amountReceived(b)) + Number(b.voucher_amount_paid || 0);
 }
 
 type TourRel = { id?: string; name?: string } | null;
@@ -93,6 +123,8 @@ type SlotRel = {
 
 interface Booking {
   id: string;
+  previous_booking_at?: string | null;
+  previous_booking_count?: number;
   confirmation_sent_at?: string | null;
   slot_id: string | null;
   customer_name: string;
@@ -101,6 +133,7 @@ interface Booking {
   qty: number;
   arrived_count: number;
   total_amount: number;
+  total_captured?: number | null;
   voucher_amount_paid: number | null;
   status: string;
   source: string;
@@ -124,6 +157,31 @@ interface Booking {
     diff: number;
     expiresAt: string | null;
   } | null;
+}
+
+function BookingHistoryBadge({ booking }: { booking: Booking }) {
+  const tooltipId = useId();
+  const [showHistory, setShowHistory] = useState(false);
+  if (!booking.previous_booking_count || !booking.previous_booking_at) return null;
+  const date = new Date(booking.previous_booking_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric", timeZone: getAdminTimezone() });
+  const countLabel = `${booking.previous_booking_count} previous paid booking${booking.previous_booking_count === 1 ? "" : "s"}`;
+  return (
+    <span className="relative inline-flex shrink-0" onMouseEnter={() => setShowHistory(true)} onMouseLeave={() => setShowHistory(false)} onBlur={() => setShowHistory(false)}
+      onKeyDown={(event) => { if (event.key === "Escape") { setShowHistory(false); event.stopPropagation(); } }}>
+      <button type="button" aria-label={`${countLabel} for ${booking.customer_name}`} aria-describedby={showHistory ? tooltipId : undefined}
+        onFocus={() => setShowHistory(true)} onClick={(event) => { event.stopPropagation(); setShowHistory(true); }}
+        className="inline-flex min-h-11 min-w-11 cursor-help items-center justify-center rounded-full px-1.5 text-xs font-semibold tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 lg:min-h-6 lg:min-w-6"
+        style={{ background: "var(--ck-surface-sunken)", color: "var(--ck-text-muted)", border: "1px solid var(--ck-border-subtle)" }}>
+        {booking.previous_booking_count}
+      </button>
+      {showHistory && <span id={tooltipId} role="tooltip" className="absolute bottom-full left-0 z-30 w-52 max-w-[calc(100vw-7rem)] pb-2 text-left text-xs font-normal leading-relaxed">
+        <span className="block rounded-lg border p-3 shadow-lg" style={{ background: "var(--ck-surface)", color: "var(--ck-text-strong)", borderColor: "var(--ck-border-subtle)" }}>
+          <span className="block font-semibold">{countLabel}</span>
+          <span className="block">Last booking: {date}</span>
+        </span>
+      </span>}
+    </span>
+  );
 }
 
 interface SlotGroup {
@@ -173,9 +231,8 @@ interface EditForm {
 const STATUS_OPTIONS = ["PENDING", "PENDING PAYMENT", "HELD", "CONFIRMED", "PAID", "COMPLETED", "CANCELLED"];
 
 export default function Bookings() {
-  const { businessId, role } = useBusinessContext();
+  const { businessId, timezone } = useBusinessContext();
   const router = useRouter();
-  const isPrivilegedRole = role === "MAIN_ADMIN" || role === "SUPER_ADMIN";
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const PAGE_SIZE = 50;
@@ -185,17 +242,25 @@ export default function Bookings() {
   const [actionBookingId, setActionBookingId] = useState<string | null>(null);
   const [cancellingWeatherId, setCancellingWeatherId] = useState<string | null>(null);
   const [resendingInvoiceId, setResendingInvoiceId] = useState<string | null>(null);
-  const [rangeStart, setRangeStart] = useState(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  });
-  const [rangeEnd, setRangeEnd] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 30);
-    d.setHours(23, 59, 59, 999);
-    return d;
-  });
+  const [rangeDate, setRangeDate] = useState(() => businessDateKey(timezone));
+  const [rangeView, setRangeView] = useState<BookingDateView>("day");
+  const [createdBooking, setCreatedBooking] = useState<{ id: string; date: string } | null>(null);
+  const focusedBookingRef = useRef<string | null>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const date = params.get("date");
+    if (!isDateKey(date)) return;
+    setRangeDate(date);
+    const id = params.get("booking");
+    if (id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      setCreatedBooking({ id, date });
+    }
+  }, []);
+  const { rangeStart, rangeEnd, firstDate, lastDate } = useMemo(
+    () => bookingDateRange(rangeDate, rangeView, timezone),
+    [rangeDate, rangeView, timezone],
+  );
+  const calendarDate = new Date(rangeDate + "T12:00:00");
   const [expandedSlots, setExpandedSlots] = useState<Set<string>>(new Set());
   const [expandAllDays, setExpandAllDays] = useState<Set<string>>(new Set());
   const [editBooking, setEditBooking] = useState<Booking | null>(null);
@@ -222,7 +287,6 @@ export default function Bookings() {
   const [waDialog, setWaDialog] = useState<{ phone: string; name: string } | null>(null);
   const [waMessage, setWaMessage] = useState("");
   const [waSending, setWaSending] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [quickResendingId, setQuickResendingId] = useState<string | null>(null);
   // Month quick-view calendar (same component as the slots page). Tours are
   // name-ordered like the slots page loads them, so each tour keeps the same
@@ -291,17 +355,21 @@ export default function Bookings() {
 
     try {
       const confirmText: Record<BulkAction, string> = {
-        cancel: "Cancel " + ids.length + " booking(s)? Each paid customer gets an email to choose reschedule, voucher, or refund. Bookings within 24h of the trip are forfeited instead.",
+        cancel: "Cancel " + ids.length + " booking(s) and notify customers?",
         refund: "Submit " + ids.length + " refund(s)? Card refunds may remain pending and bank transfers still require confirmation. Keep this page open while each item is submitted.",
         markpaid: "Mark " + ids.length + " booking(s) as paid (EFT)?",
         checkin: "Check in " + ids.length + " guest(s)?",
       };
-      if (!await confirmAction({ title: "Bulk " + action, message: confirmText[action], tone: "warning", confirmLabel: "Proceed" }) || !isCurrent()) return;
+      if (action !== "cancel" && (!await confirmAction({ title: "Bulk " + action, message: confirmText[action], tone: "warning", confirmLabel: "Proceed" }) || !isCurrent())) return;
 
       let reason = "operator-cancel";
       let weather = false;
+      let offerChoice = true;
       if (action === "cancel") {
-        weather = confirm("Is this a weather cancel? (Weather cancels override the policy and refund 100%.)");
+        weather = confirm("Is this a weather cancellation? Weather cancellations preserve the full paid value regardless of notice period.");
+        const handling = await confirmCancellation("Cancel selected bookings", `Cancel ${ids.length} booking(s) and notify customers?${weather ? " Weather cancellation preserves the full paid value." : " When offering customer options, the existing 24-hour forfeiture policy still applies."}`);
+        if (!handling || !isCurrent()) return;
+        offerChoice = handling.offerChoice;
         const prompted = prompt("Brief reason (visible in audit log):", weather ? "weather" : "operator-cancel");
         reason = prompted || "operator-cancel";
       }
@@ -324,7 +392,7 @@ export default function Bookings() {
         let result: ActionResult;
         try {
           switch (action) {
-            case "cancel":   result = await cancelBookingAction(id, { reason, weather }); break;
+            case "cancel":   result = await cancelBookingAction(id, { reason, weather, offerChoice }); break;
             case "refund":   result = await refundBookingAction(id, { canSubmit: isCurrent }); break;
             case "markpaid": result = await markPaidAction(id); break;
             case "checkin":  result = await checkInAction(id, run.businessId, {
@@ -366,6 +434,7 @@ export default function Bookings() {
             total: ids.length,
             reason: action === "cancel" ? reason : undefined,
             weather: action === "cancel" ? weather : undefined,
+            offer_choice: action === "cancel" ? offerChoice : undefined,
           },
         });
         if (audit.error) throw audit.error;
@@ -399,7 +468,7 @@ export default function Bookings() {
           p_limit: limit,
           p_offset: from,
         })
-          .select("id, created_at, confirmation_sent_at, slot_id, customer_name, phone, email, qty, total_amount, voucher_amount_paid, status, source, external_ref, refund_status, refund_amount, yoco_checkout_id, payment_deadline, payment_url, allow_unpaid, waiver_status, custom_fields, tours(id,name), slots(id,start_time,tour_id,capacity_total,booked,status)")
+          .select(BOOKING_COLUMNS)
           .order("created_at", { ascending: true }).order("id");
         if (error) throw error;
         if (requestId !== loadRequestRef.current) return;
@@ -416,13 +485,28 @@ export default function Bookings() {
         seen.add(b.id);
         return true;
       });
+      const moreAvailable = deduped.length > visibleCount;
+      deduped.splice(visibleCount);
+      // Keep a newly created booking visible even beyond the first page.
+      if (createdBooking?.date === rangeDate && !deduped.some(b => b.id === createdBooking.id)) {
+        const { data: saved, error } = await supabase.from("bookings").select(BOOKING_COLUMNS)
+          .eq("business_id", businessId).eq("id", createdBooking.id).maybeSingle();
+        if (error) throw error;
+        if (requestId !== loadRequestRef.current) return;
+        const slot = Array.isArray(saved?.slots) ? saved.slots[0] : saved?.slots;
+        if (slot?.start_time && businessDateKey(timezone, new Date(slot.start_time)) === rangeDate) deduped.push(saved);
+      }
 
       // Batch related rows without exceeding request/response limits.
       const addOnsByBooking: Record<string, Array<{ name: string; qty: number }>> = {};
       const arrivalsByBooking: Record<string, number> = {};
+      const historyByBooking: Record<string, { previous_booking_at: string | null; previous_booking_count: number }> = {};
       const bookingIds = deduped.map((b: any) => b.id);
       for (let from = 0; from < bookingIds.length; from += 200) {
         const ids = bookingIds.slice(from, from + 200);
+        const history = await supabase.rpc("operator_booking_history", { p_business_id: businessId, p_booking_ids: ids });
+        if (history.error) console.error("Booking history unavailable:", history.error.message);
+        else for (const row of history.data || []) historyByBooking[row.booking_id] = row;
         const { data: arrivalRows, error: arrivalError } = await supabase.from("bookings")
           .select("id, qty, arrived_count, checked_in")
           .eq("business_id", businessId)
@@ -474,6 +558,7 @@ export default function Bookings() {
       const normalized = (deduped as Array<Booking & { tours: unknown; slots: unknown }>)
         .map((b) => ({
           ...b,
+          ...historyByBooking[b.id],
           arrived_count: arrivalsByBooking[b.id] || 0,
           tours: (Array.isArray(b.tours) ? b.tours[0] || null : b.tours) as TourRel,
           slots: (Array.isArray(b.slots) ? b.slots[0] || null : b.slots) as SlotRel,
@@ -482,8 +567,8 @@ export default function Bookings() {
         } as Booking));
 
       if (requestId !== loadRequestRef.current) return;
-      setHasMore(normalized.length > visibleCount);
-      setBookings(normalized.slice(0, visibleCount));
+      setHasMore(moreAvailable);
+      setBookings(normalized);
     } catch (error) {
       if (requestId !== loadRequestRef.current) return;
       console.error("[BOOKINGS] load failed:", error);
@@ -504,7 +589,7 @@ export default function Bookings() {
       loadBookings();
     }, 0);
     return () => { clearTimeout(t); loadRequestRef.current++; };
-  }, [rangeStart, rangeEnd, businessId, page]);
+  }, [rangeStart, rangeEnd, businessId, page, createdBooking]);
 
   // Auto-refresh when a booking status changes (e.g. payment received)
   useEffect(() => {
@@ -531,35 +616,25 @@ export default function Bookings() {
       }
       supabase.removeChannel(channel);
     };
-  }, [businessId, rangeStart, rangeEnd, page]);
+  }, [businessId, rangeStart, rangeEnd, page, createdBooking]);
 
-  const STATUS_FILTER_MAP: Record<string, string[]> = {
-    ALL: [],
-    PENDING: ["PENDING", "PENDING PAYMENT", "HELD"],
-    PAID: ["PAID"],
-    CONFIRMED: ["CONFIRMED"],
-    COMPLETED: ["COMPLETED"],
-    CANCELLED: ["CANCELLED"],
-  };
-
-  const filteredBookings = useMemo(() => {
-    if (statusFilter === "ALL") return bookings;
-    const allowed = STATUS_FILTER_MAP[statusFilter] || [];
-    return bookings.filter((b) => allowed.includes(b.status));
-  }, [bookings, statusFilter]);
-
-  const allVisibleIds = useMemo(() => filteredBookings.map(b => b.id), [filteredBookings]);
+  const allVisibleIds = useMemo(() => bookings.map(b => b.id), [bookings]);
 
   const selectionAllPaid = useMemo(() => {
     if (selected.size === 0) return false;
-    return Array.from(selected).every(id => bookingsById[id] && isPaid(bookingsById[id].status));
+    return Array.from(selected).every(id => bookingsById[id] && isPaid(bookingsById[id]));
   }, [selected, bookingsById]);
+
+  const selectionAllRefundable = useMemo(() => selected.size > 0 && Array.from(selected).every(id => {
+    const booking = bookingsById[id];
+    return booking && booking.status !== "CANCELLED" && bookingPaidAmount(booking) > 0;
+  }), [selected, bookingsById]);
 
   const selectionAllUnpaid = useMemo(() => {
     if (selected.size === 0) return false;
     return Array.from(selected).every(id => {
       const b = bookingsById[id];
-      return b && ["PENDING", "PENDING PAYMENT", "HELD"].includes(b.status);
+      return b && ["PENDING", "PENDING PAYMENT", "HELD", "CONFIRMED"].includes(b.status) && !isPaid(b);
     });
   }, [selected, bookingsById]);
 
@@ -570,7 +645,7 @@ export default function Bookings() {
 
   const dayGroups: DayGroup[] = useMemo(() => {
     const dayMap = new Map<string, Map<string, Booking[]>>();
-    for (const b of filteredBookings) {
+    for (const b of bookings) {
       const startTime = b.slots?.start_time;
       const dk = startTime ? dateKey(startTime) : "9999-99-99";
       const tk = startTime ? fmtTime(startTime) : "Unscheduled";
@@ -592,7 +667,7 @@ export default function Bookings() {
         const activeBks = bks.filter((b) => b.status === "PAID" || b.status === "CONFIRMED" || b.status === "COMPLETED" || b.status === "PENDING" || (b.allow_unpaid && b.status !== "CANCELLED"));
         const totalPax = activeBks.reduce((s, b) => s + Number(b.qty || 0), 0);
         const totalPrice = activeBks.reduce((s, b) => s + bookingValue(b), 0);
-        const totalPaid = activeBks.reduce((s, b) => s + (isPaid(b.status) ? bookingValue(b) : Number(b.voucher_amount_paid || 0)), 0);
+        const totalPaid = activeBks.reduce((s, b) => s + bookingPaidAmount(b), 0);
         // Unpaid reschedule-upgrade fees are outstanding funds too
         const rescheduleDue = activeBks.reduce((s, b) => s + Math.max(0, Number(b.pending_reschedule?.diff || 0)), 0);
         slots.push({
@@ -609,7 +684,7 @@ export default function Bookings() {
       const totalPax = slots.reduce((s, sl) => s + sl.totalPax, 0);
       const totalPrice = slots.reduce((s, sl) => s + sl.totalPrice, 0);
       const totalPaid = slots.reduce((s, sl) => s + sl.totalPaid, 0);
-      const first = filteredBookings.find((b) => b.slots?.start_time && dateKey(b.slots.start_time) === dk);
+      const first = bookings.find((b) => b.slots?.start_time && dateKey(b.slots.start_time) === dk);
       days.push({
         dateLabel: first?.slots?.start_time ? fmtDate(first.slots.start_time) : dk,
         sortKey: dk,
@@ -622,7 +697,28 @@ export default function Bookings() {
     }
     days.sort((a, b) => a.sortKey.localeCompare(b.sortKey));
     return days;
-  }, [filteredBookings]);
+  }, [bookings]);
+
+  useEffect(() => {
+    if (loading || !createdBooking || focusedBookingRef.current === createdBooking.id) return;
+    for (const day of dayGroups) {
+      const index = day.slots.findIndex(slot => slot.bookings.some(b => b.id === createdBooking.id));
+      if (index < 0) continue;
+      const key = `${day.sortKey}-${index}`;
+      if (!expandedSlots.has(key)) {
+        setExpandedSlots(previous => new Set(previous).add(key));
+        return;
+      }
+      const row = Array.from(document.querySelectorAll<HTMLElement>(`[data-booking-id="${createdBooking.id}"]`))
+        .find(element => element.getClientRects().length > 0);
+      if (row) {
+        row.focus({ preventScroll: true });
+        row.scrollIntoView({ block: "center" });
+        focusedBookingRef.current = createdBooking.id;
+      }
+      return;
+    }
+  }, [createdBooking, dayGroups, expandedSlots, loading]);
 
   function toggleSlot(key: string) {
     setExpandedSlots((prev) => {
@@ -655,33 +751,20 @@ export default function Bookings() {
     });
   }
 
-  function shiftRange(days: number) {
-    setRangeStart((prev) => {
-      const d = new Date(prev);
-      d.setDate(d.getDate() + days);
-      return d;
-    });
-    setRangeEnd((prev) => {
-      const d = new Date(prev);
-      d.setDate(d.getDate() + days);
-      return d;
-    });
+  function shiftRange(direction: number) {
+    if (rangeView === "month") {
+      const month = new Date(firstDate + "T12:00:00Z");
+      month.setUTCMonth(month.getUTCMonth() + direction);
+      setRangeDate(month.toISOString().slice(0, 10));
+    } else {
+      setRangeDate((date) => addDaysToDateKey(date, direction * (rangeView === "week" ? 7 : 1)));
+    }
   }
 
   function handleMonthChange(value: string) {
     if (!value) return;
-    console.log("[BOOKINGS] handleMonthChange", { value });
-    const [year, month] = value.split("-");
-
-    // Set to 1st of the selected month
-    const start = new Date(Number(year), Number(month) - 1, 1);
-    start.setHours(0, 0, 0, 0);
-    setRangeStart(start);
-
-    // Set to last millisecond of the selected month
-    const end = new Date(Number(year), Number(month), 0);
-    end.setHours(23, 59, 59, 999);
-    setRangeEnd(end);
+    setRangeDate(value + "-01");
+    setRangeView("month");
   }
 
   async function resendInvoiceForBooking(bookingId: string) {
@@ -719,7 +802,7 @@ export default function Bookings() {
         .limit(1)
         .maybeSingle();
 
-      let invoiceDate = existingInv?.created_at || (isPaid(b.status) && b.confirmation_sent_at) || new Date().toISOString();
+      let invoiceDate = existingInv?.created_at || (isPaid(b) && b.confirmation_sent_at) || new Date().toISOString();
       if (existingInv?.invoice_number) {
         invoiceNumber = padInv(existingInv.invoice_number);
       } else {
@@ -742,7 +825,7 @@ export default function Bookings() {
             unit_price: Number(unitPrice),
             subtotal: total,
             total_amount: total,
-            payment_method: isPaid(b.status) ? paidMethod : "Pending",
+            payment_method: isPaid(b) ? paidMethod : "Pending",
           }).select("id, created_at").single();
 
           if (invError || !invData) throw new Error(invError?.message || "Invoice was not saved");
@@ -773,8 +856,8 @@ export default function Bookings() {
             unit_price: unitPrice,
             subtotal: total.toFixed(2),
             total_amount: total.toFixed(2),
-            amount_paid: isPaid(b.status) ? total.toFixed(2) : voucherPaid.toFixed(2),
-            payment_method: isPaid(b.status) ? paidMethod : "Pending",
+            amount_paid: bookingPaidAmount(b).toFixed(2),
+            payment_method: isPaid(b) ? paidMethod : "Pending",
             payment_reference: ref,
           },
         },
@@ -806,10 +889,10 @@ export default function Bookings() {
     const total = Number(editForm.total_amount) || 0;
     // Guest-count changes on a paid booking move money (refund/voucher credit)
     // and seats — this raw update handles neither. Route through the proper flows.
-    if (isPaid(editBooking.status) && qty !== editBooking.qty) {
+    if ((["PAID", "CONFIRMED", "COMPLETED"].includes(editBooking.status) || bookingPaidAmount(editBooking) > 0) && qty !== editBooking.qty) {
       notify({
         title: "Guest count locked on paid bookings",
-        message: "Open the booking and use Reduce guests / Add guests — those handle the refund or voucher credit and release the seats.",
+        message: "Use Reduce guests / Add guests in the booking to adjust seats and refund or voucher credit.",
         tone: "warning",
         duration: 8000,
       });
@@ -928,7 +1011,7 @@ export default function Bookings() {
       // The old checkout link will simply expire or fail if the customer tries to use it.
       notify({
         title: "Payment link invalidated",
-        message: "Previous payment link has been invalidated because the price or guest count changed. Send a new payment link.",
+        message: "Price or guest count changed. Send a new payment link; the old one is invalid.",
         tone: "warning",
       });
     }
@@ -943,7 +1026,7 @@ export default function Bookings() {
         } else if (res.data?.error) {
           notify({ title: "Marked update partially failed", message: "Booking updated, but mark paid failed: " + res.data.error, tone: "warning" });
         } else {
-          notify({ title: "Booking updated", message: "Booking details and paid status were updated successfully.", tone: "success" });
+          notify({ title: "Booking updated", message: "Booking and payment status saved.", tone: "success" });
         }
       } catch (err: unknown) {
         notify({ title: "Mark paid failed", message: err instanceof Error ? err.message : String(err), tone: "error" });
@@ -989,7 +1072,7 @@ export default function Bookings() {
       } else if (res.data?.ok === false) {
         notify({ title: "Reminder failed", message: res.data.error || "Unknown error", tone: "error" });
       } else {
-        notify({ title: "Payment reminder sent", message: "A friendly payment reminder with the link was sent to " + (b.customer_name || "the guest") + ".", tone: "success" });
+        notify({ title: "Payment reminder sent", message: "Payment reminder sent to " + (b.customer_name || "the guest") + ".", tone: "success" });
       }
     } catch (err: unknown) {
       notify({ title: "Reminder failed", message: err instanceof Error ? err.message : String(err), tone: "error" });
@@ -1024,39 +1107,47 @@ export default function Bookings() {
     // Exception: within 24h of the trip start the booking is forfeited by
     // default — the admin may explicitly grant the choice anyway.
     let allowLateChoice = false;
+    let offerChoice = true;
     if (isCardPaid) {
       const startIso = b.slots?.start_time;
       const isLate = !!startIso && new Date(startIso).getTime() - Date.now() < 24 * 60 * 60 * 1000;
       if (isLate) {
         const choice = await confirmAction({
           title: "Cancel booking",
-          message: `Cancel booking ${ref}? The trip starts within 24 hours, so the customer forfeits the booking (no refund options). You can still choose to offer them reschedule / voucher / refund.`,
+          message: `Cancel booking ${ref}? The trip starts within 24 hours, so the default is to forfeit the booking. Choose cancellation follow-up to offer customer options or notify only while you handle the paid value.`,
           tone: "warning",
           confirmLabel: "Cancel and forfeit",
-          altLabel: "Cancel but offer options anyway",
+          altLabel: "Choose cancellation follow-up",
           cancelLabel: "Keep booking",
         });
         if (!choice) return;
-        if (choice === "alt") allowLateChoice = true;
+        if (choice === "alt") {
+          const handling = await confirmCancellation("Cancel booking", `Cancel booking ${ref} and notify the customer? The paid value will remain available for follow-up.`);
+          if (!handling) return;
+          allowLateChoice = true;
+          offerChoice = handling.offerChoice;
+        }
       } else {
-        if (!await confirmAction({
-          title: "Cancel booking",
-          message: `Cancel booking ${ref}? The customer will receive an email to choose how to handle it: reschedule, voucher, or refund.`,
-          tone: "warning",
-          confirmLabel: "Cancel booking",
-          cancelLabel: "Keep booking",
-        })) return;
+        const handling = await confirmCancellation("Cancel booking", `Cancel booking ${ref} and notify the customer?`);
+        if (!handling) return;
+        offerChoice = handling.offerChoice;
       }
     } else {
       const msg = isVoucherPaid
         ? `Cancel booking ${ref}? A new voucher will be issued for the full amount.`
         : `Cancel booking ${ref}? The customer will be notified via email and WhatsApp.`;
-      if (!await confirmAction({ title: "Cancel booking", message: msg, tone: "warning", confirmLabel: "Cancel booking" })) return;
+      const choice = await confirmAction({
+        title: "Cancel booking", message: msg + (isVoucherPaid ? " Choose notify only to handle follow-up yourself without issuing a voucher." : ""),
+        tone: "warning", confirmLabel: isVoucherPaid ? "Cancel & issue voucher" : "Cancel booking",
+        altLabel: isVoucherPaid ? "Cancel & notify only" : undefined, cancelLabel: "Keep booking",
+      });
+      if (!choice) return;
+      offerChoice = choice !== "alt";
     }
     setActionBookingId(b.id);
 
     // For voucher-paid bookings, use rebook-booking CANCEL_VOUCHER to issue a voucher instead of Yoco refund.
-    if (isVoucherPaid && ["PAID", "CONFIRMED", "COMPLETED"].includes(b.status)) {
+    if (isVoucherPaid && offerChoice && ["PAID", "CONFIRMED", "COMPLETED"].includes(b.status)) {
       try {
         // rebook-booking authorizes the caller: admins must send their session
         // JWT (the anon key gets 401 and the voucher is never issued).
@@ -1108,7 +1199,7 @@ export default function Bookings() {
           "Content-Type": "application/json",
           Authorization: "Bearer " + session.access_token,
         },
-        body: JSON.stringify({ booking_id: b.id, reason: "Cancelled by admin", allow_late_choice: allowLateChoice }),
+        body: JSON.stringify({ booking_id: b.id, reason: "Cancelled by admin", allow_late_choice: allowLateChoice, offer_choice: offerChoice }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.error) {
@@ -1141,19 +1232,15 @@ export default function Bookings() {
     const slotId = group.bookings[0]?.slot_id;
     if (!slotId) return;
 
-    if (!await confirmAction({
-      title: "Cancel slot due to weather",
-      message: `Cancel "${group.timeLabel}" due to weather? This closes the slot, cancels all bookings on it, and notifies customers with reschedule, voucher, or refund options.`,
-      tone: "warning",
-      confirmLabel: "Cancel slot",
-    })) return;
+    const handling = await confirmCancellation("Cancel slot due to weather", `Cancel "${group.timeLabel}" due to weather? This closes the slot, cancels all bookings and notifies customers.`);
+    if (!handling) return;
 
     setCancellingWeatherId(slotId);
     try {
       // Delegate to weather-cancel edge function — atomic per-slot capacity, customer notifications,
       // and self-service compensation links. Replaces the previous N+1 read-then-write loop.
       const { data, error } = await supabase.functions.invoke("weather-cancel", {
-        body: { slot_ids: [slotId], business_id: businessId, reason: "weather conditions" },
+        body: { slot_ids: [slotId], business_id: businessId, reason: "weather conditions", offer_choice: handling.offerChoice },
       });
       if (error) throw error;
       const cancelled = (data as any)?.bookings_cancelled ?? activeBks.length;
@@ -1176,7 +1263,7 @@ export default function Bookings() {
     const hour = 60 * 60 * 1000;
     const log: number[] = JSON.parse(localStorage.getItem(key) || "[]").filter((t: number) => now - t < hour);
     if (log.length >= 10) {
-      notify({ title: "Refund limit reached", message: "Maximum 10 refunds per hour for security. Please wait before processing more.", tone: "warning" });
+      notify({ title: "Refund limit reached", message: "Limit: 10 refunds per hour. Wait before processing more.", tone: "warning" });
       return false;
     }
     log.push(now);
@@ -1255,7 +1342,7 @@ export default function Bookings() {
   async function sendPaymentLink(b: Booking) {
     console.log("[BOOKINGS] sendPaymentLink", { bookingId: b.id, email: b.email, amount: b.total_amount });
     if (!b.email) {
-      notify({ title: "Missing email", message: "No email address on this booking. Please edit the booking to add an email first.", tone: "warning" });
+      notify({ title: "Missing email", message: "Add an email to the booking first.", tone: "warning" });
       return;
     }
     setPaymentLinkBookingId(b.id);
@@ -1507,7 +1594,7 @@ export default function Bookings() {
       const channel = res.data?.channel;
       notify({
         title: channel === "email" ? "Sent by email instead" : channel === "reopener" ? "Queued for WhatsApp" : "WhatsApp sent",
-        message: res.data?.message || "The message was sent and the conversation was opened in Inbox.",
+        message: res.data?.message || "Message sent. Conversation opened in Inbox.",
         tone: channel === "email" || channel === "reopener" ? "warning" : "success",
       });
       router.push("/inbox?phone=" + encodeURIComponent(phone));
@@ -1518,60 +1605,6 @@ export default function Bookings() {
     }
   }
 
-  function escapeCsvField(val: string) {
-    if (!val) return "";
-    if (val.includes(",") || val.includes('"') || val.includes("\n")) {
-      return '"' + val.replace(/"/g, '""') + '"';
-    }
-    return val;
-  }
-
-  function exportCsv(includeSensitive: boolean) {
-    const tz = getAdminTimezone();
-    const headers = ["Ref", "Customer", "Phone", "Email", "Tour", "Date", "Time", "Guests", "Total", "Status", "Source", "Waiver", "Special Requests"];
-    const rows = filteredBookings.map((b) => {
-      const specialRequests = b.custom_fields?.special_requests || "";
-      const maskedRequests = includeSensitive ? specialRequests : (specialRequests ? "[Protected - View in Dashboard]" : "");
-      return [
-        b.id.substring(0, 8).toUpperCase(),
-        b.customer_name || "",
-        b.phone || "",
-        b.email || "",
-        b.tours?.name || "",
-        b.slots?.start_time ? fmtDate(b.slots.start_time) : "",
-        b.slots?.start_time ? fmtTime(b.slots.start_time) : "",
-        String(b.qty || 0),
-        String(b.total_amount || 0),
-        b.status || "",
-        b.source || "",
-        b.waiver_status || "",
-        maskedRequests,
-      ].map(escapeCsvField).join(",");
-    });
-
-    const csv = [headers.join(","), ...rows].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "bookings-" + new Date().toISOString().split("T")[0] + (includeSensitive ? "-sensitive" : "") + ".csv";
-    a.click();
-    URL.revokeObjectURL(url);
-
-    // Log audit entry when sensitive data is exported
-    if (includeSensitive) {
-      supabase.from("logs").insert({
-        business_id: businessId,
-        event: "sensitive_csv_export",
-        payload: {
-          exported_by_role: role,
-          booking_count: filteredBookings.length,
-          exported_at: new Date().toISOString(),
-        },
-      }).then(() => {});
-    }
-  }
-
   return (
     <div className="space-y-4">
       <div className="anim-fade-up flex flex-wrap items-center justify-between gap-4">
@@ -1579,21 +1612,6 @@ export default function Bookings() {
           <p className="ui-mono-label mb-2">Operations</p>
           <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Bookings</h2>
         </div>
-        <details className="group relative">
-          <summary className="ui-btn ui-btn-ghost min-h-11 cursor-pointer list-none px-4 text-sm">Export</summary>
-          <div className="absolute right-0 top-full z-30 mt-2 w-64 overflow-hidden rounded-xl border py-1 shadow-lg" style={{ background: "var(--ck-surface-elevated)", borderColor: "var(--ck-border-strong)" }}>
-            <button data-demo-action="booking.export" onClick={() => exportCsv(false)} className="min-h-12 w-full px-4 py-2 text-left text-sm font-medium hover:bg-[var(--ck-surface-sunken)]">
-              Export masked CSV
-              <span className="mt-0.5 block text-xs font-normal" style={{ color: "var(--ck-text-muted)" }}>Special requests stay protected.</span>
-            </button>
-            {isPrivilegedRole && (
-              <button data-demo-action="booking.export-sensitive" onClick={() => exportCsv(true)} className="min-h-12 w-full px-4 py-2 text-left text-sm font-medium hover:bg-[var(--ck-surface-sunken)]" style={{ color: "var(--ck-amber)" }}>
-                Export sensitive CSV
-                <span className="mt-0.5 block text-xs font-normal">Includes unmasked special requests.</span>
-              </button>
-            )}
-          </div>
-        </details>
       </div>
 
       {/* WhatsApp compose dialog */}
@@ -1624,7 +1642,7 @@ export default function Bookings() {
                 disabled={waSending || !waMessage.trim()}
                 className="ui-btn ui-btn-primary disabled:opacity-50"
               >
-                {waSending ? "Sending…" : "Send & Open Inbox"}
+                {waSending ? "Sending…" : "Send message"}
               </button>
             </div>
           </div>
@@ -1655,7 +1673,7 @@ export default function Bookings() {
                 Cancel
               </button>
               <button data-demo-action="booking.refund" onClick={processRefund} disabled={refunding || !refundDialog.amount} className="ui-btn ui-btn-danger disabled:opacity-50">
-                {refunding ? "Processing…" : "Refund & Cancel Booking"}
+                {refunding ? "Processing…" : "Refund & cancel"}
               </button>
             </div>
           </div>
@@ -1663,40 +1681,64 @@ export default function Bookings() {
       )}
 
       <div className="anim-fade-up anim-d1 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <button onClick={() => shiftRange(-7)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-[12.5px]">
-          ← Prev Week
-        </button>
-        <span className="text-sm font-medium tabular-nums" style={{ color: "var(--ck-text)" }}>
-          {rangeStart.toLocaleDateString("en-ZA", { day: "numeric", month: "short" })} to{" "}
-          {rangeEnd.toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
-        </span>
-        <button onClick={() => shiftRange(7)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-[12.5px]">
-          Next Week →
-        </button>
-        <button
-          onClick={() => {
-            const d = new Date();
-            d.setHours(0, 0, 0, 0);
-            setRangeStart(d);
-            const e = new Date();
-            e.setDate(e.getDate() + 7);
-            e.setHours(23, 59, 59, 999);
-            setRangeEnd(e);
-          }}
-          className="ui-btn ui-btn-primary !h-8 !px-3 !text-[12.5px]"
-        >
-          Today
-        </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-start">
+          <div className="flex items-center gap-1 sm:gap-1.5">
+            <button
+              type="button"
+              onClick={() => shiftRange(-1)}
+              aria-label={`Previous ${rangeView}`}
+              className="ui-btn ui-btn-ghost !h-8 !w-8 !p-0 sm:!w-auto sm:!px-3 !text-[12.5px] shrink-0"
+            >
+              <ArrowLeft size={18} aria-hidden="true" />
+            </button>
+            <span className="text-xs sm:text-sm font-medium tabular-nums text-center whitespace-nowrap px-1" style={{ color: "var(--ck-text)" }}>
+              {new Date(firstDate + "T12:00:00").toLocaleDateString("en-ZA", { day: "numeric", month: "short", ...(rangeView === "day" ? { year: "numeric" } : {}) })}
+              {firstDate !== lastDate && <> to {new Date(lastDate + "T12:00:00").toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}</>}
+            </span>
+            <button
+              type="button"
+              onClick={() => shiftRange(1)}
+              aria-label={`Next ${rangeView}`}
+              className="ui-btn ui-btn-ghost !h-8 !w-8 !p-0 sm:!w-auto sm:!px-3 !text-[12.5px] shrink-0"
+            >
+              <ArrowRight size={18} aria-hidden="true" />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setRangeDate(businessDateKey(timezone));
+              setRangeView("day");
+            }}
+            className="ui-btn ui-btn-primary !h-8 !px-3 !text-[12.5px] shrink-0"
+          >
+            Today
+          </button>
+          <div role="group" aria-label="Booking date view" className="flex items-center gap-1">
+            {(["day", "week"] as const).map((view) => (
+              <button
+                key={view}
+                type="button"
+                aria-pressed={rangeView === view}
+                onClick={() => setRangeView(view)}
+                className={`ui-btn !h-8 !px-3 !text-[12.5px] shrink-0 ${rangeView === view ? "ui-btn-primary" : "ui-btn-ghost"}`}
+              >
+                {view === "day" ? "Day" : "Week"}
+              </button>
+            ))}
+          </div>
+        </div>
 
-        <div className="flex w-full items-center gap-2 pt-1 sm:ml-auto sm:w-auto sm:border-l sm:border-gray-300 sm:pl-4 sm:pt-0">
-          <label className="text-sm font-medium text-gray-600">Filter Month:</label>
+        <div className="flex w-full items-center gap-2 pt-1 sm:ml-auto sm:w-auto sm:border-l sm:border-[var(--ck-border-subtle)] sm:pl-4 sm:pt-0">
+          <label className="text-sm font-medium shrink-0" style={{ color: "var(--ck-text-muted)" }}>Filter Month:</label>
           <div className="min-w-0 flex-1 sm:flex-none">
             <MonthPicker
               onChange={(v) => { handleMonthChange(v); setMonthCalOpen(true); }}
-              value={`${rangeStart.getFullYear()}-${String(rangeStart.getMonth() + 1).padStart(2, "0")}`}
+              value={rangeDate.slice(0, 7)}
             />
           </div>
           <button
+            type="button"
             onClick={() => setMonthCalOpen((v) => !v)}
             className={`ui-btn !h-8 !px-3 !text-[12.5px] shrink-0 ${monthCalOpen ? "ui-btn-primary" : "ui-btn-ghost"}`}
           >
@@ -1709,48 +1751,15 @@ export default function Bookings() {
         <BookingsMonthCalendar
           businessId={businessId}
           tours={calTours}
-          selectedDate={rangeStart}
+          selectedDate={calendarDate}
           onSelectDate={(d) => {
-            // A day picked on the calendar narrows the list to that day.
-            const s = new Date(d); s.setHours(0, 0, 0, 0);
-            const e = new Date(d); e.setHours(23, 59, 59, 999);
-            setRangeStart(s);
-            setRangeEnd(e);
+            setRangeDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+            setRangeView("day");
           }}
           onMonthChange={(m) => handleMonthChange(`${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, "0")}`)}
           onClose={() => setMonthCalOpen(false)}
         />
       )}
-
-      {/* Status filter tabs */}
-      <div className="anim-fade-up anim-d2 overflow-x-auto no-scrollbar">
-        <div className="ui-seg w-max">
-          {[
-            { key: "ALL", label: "All" },
-            { key: "PENDING", label: "Pending" },
-            { key: "PAID", label: "Paid" },
-            { key: "CONFIRMED", label: "Confirmed" },
-            { key: "COMPLETED", label: "Completed" },
-            { key: "CANCELLED", label: "Cancelled" },
-          ].map((tab) => {
-            const isActive = statusFilter === tab.key;
-            const count = tab.key === "ALL"
-              ? bookings.length
-              : bookings.filter((b) => (STATUS_FILTER_MAP[tab.key] || []).includes(b.status)).length;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setStatusFilter(tab.key)}
-                data-active={isActive}
-                className="ui-seg-item !px-3 whitespace-nowrap"
-              >
-                {tab.label}
-                <span className="font-display tabular-nums text-[11px] opacity-70">{count}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
 
       {loading ? (
         <div className="anim-fade-up anim-d3 space-y-6">
@@ -1768,7 +1777,7 @@ export default function Bookings() {
           <div className="ui-empty">
             <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No bookings found</p>
             <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>
-              {statusFilter !== "ALL" ? `No ${statusFilter.toLowerCase()} bookings in this date range.` : "No bookings in this date range."}
+              No bookings in this date range.
             </p>
           </div>
         </div>
@@ -1795,7 +1804,7 @@ export default function Bookings() {
                 Cancel
               </button>
             )}
-            {selectionAllPaid && (
+            {selectionAllRefundable && (
               <button data-demo-action="booking.refund" onClick={() => runBulk("refund")} disabled={!!bulkActionInFlight} className="ui-btn ui-btn-danger !h-8 !px-3 !text-xs disabled:opacity-40">
                 Refund
               </button>
@@ -1825,9 +1834,9 @@ export default function Bookings() {
                   </label>
                 </div>
 
-                <div className="ui-card max-w-full overflow-x-auto no-scrollbar 2xl:overflow-visible">
+                <div className="ui-card max-w-full overflow-x-auto no-scrollbar lg:overflow-visible">
                   <table className="w-full table-fixed text-sm">
-                    <thead className="hidden 2xl:table-header-group">
+                    <thead className="hidden lg:table-header-group">
                       <tr className="border-b" style={{ background: "var(--ck-surface-sunken)" }}>
                         <th className="w-8 p-1.5 lg:p-3 text-center">
                           <input type="checkbox"
@@ -1836,7 +1845,7 @@ export default function Bookings() {
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                             aria-label="Select all visible bookings" />
                         </th>
-                        <th className="w-24 lg:w-36 p-1.5 lg:p-3 text-left font-semibold text-gray-600 text-[11px] lg:text-sm">Time</th>
+                        <th className="w-24 lg:w-36 xl:w-48 p-1.5 lg:p-3 text-left font-semibold text-gray-600 text-[11px] lg:text-sm">Time</th>
                         <th className="w-10 lg:w-16 p-1.5 lg:p-3 text-left font-semibold text-gray-600 text-[11px] lg:text-sm">Pax</th>
                         <th className="hidden p-3 text-left font-semibold text-gray-600 md:table-cell">Details</th>
                         <th className="hidden p-3 text-left font-semibold text-gray-600 md:table-cell">Service</th>
@@ -1871,19 +1880,20 @@ export default function Bookings() {
                             onPaymentReminder={sendPaymentReminder}
                             onToggleAllowUnpaid={toggleAllowUnpaid}
                             onWhatsApp={openWhatsApp}
-                            onView={(b) => router.push(`/bookings/${b.id}`)}
+                            onView={(b) => router.push(`/bookings/${b.id}${window.location.pathname.startsWith("/simple") ? "?returnTo=%2Fsimple%2Fbookings" : ""}`)}
                             onCancelSlot={cancelSlotWeather}
                             cancellingWeatherId={cancellingWeatherId}
                             quickResendingId={quickResendingId}
                             onQuickResend={quickResendPaymentLink}
                             onSendRescheduleLink={sendRescheduleLink}
                             selected={selected}
+                            highlightedBookingId={createdBooking?.id || null}
                             onToggleSelect={toggleSelect}
                           />
                         );
                       })}
 
-                      <tr className="hidden border-t-2 font-semibold text-gray-700 2xl:table-row" style={{ background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-strong)" }}>
+                      <tr className="hidden border-t-2 font-semibold text-gray-700 lg:table-row" style={{ background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-strong)" }}>
                         <td className="p-3"></td>
                         <td className="p-3"><span className="ui-mono-label">Totals</span></td>
                         <td className="p-3 font-display tabular-nums">{day.totalPax}</td>
@@ -2124,7 +2134,7 @@ export default function Bookings() {
                       <span className="text-gray-600">Total due ({rebookBooking.qty} pax)</span>
                       <span className="font-semibold tabular-nums">{fmtCurrency(newUnitPrice * rebookBooking.qty)}</span>
                     </div>
-                    <p className="mt-2 text-xs text-gray-500">This booking was cancelled and its refund/voucher already issued, so no credit remains. The customer pays the full price.</p>
+                    <p className="mt-2 text-xs text-gray-500">Refund or voucher already issued. No credit remains; the customer pays the full price.</p>
                   </div>
                 );
               }
@@ -2165,7 +2175,7 @@ export default function Bookings() {
               return (
                 <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                   <p className="font-semibold">{noCredit ? "Customer will be charged the full price" : "Customer will be charged the difference"}</p>
-                  <p className="mt-1 text-xs text-amber-800">A payment link for <strong>{fmtCurrency(totalDiff)}</strong> will be sent to {rebookBooking.email || rebookBooking.phone || "the customer"}. {noCredit ? "The booking is confirmed once the payment lands." : "The original slot is released only after the new payment lands."}</p>
+                  <p className="mt-1 text-xs text-amber-800">A payment link for <strong>{fmtCurrency(totalDiff)}</strong> will be sent to {rebookBooking.email || rebookBooking.phone || "the customer"}. {noCredit ? "Booking confirms after payment." : "Original places stay reserved until payment."}</p>
                 </div>
               );
             })()}
@@ -2180,7 +2190,7 @@ export default function Bookings() {
               if (!isDowngrade) return null;
               return (
                 <label className="mt-3 block text-sm text-gray-600">
-                  If the new slot costs less, how should we handle the leftover credit?
+                  Return leftover credit as:
                   <select
                     value={rebookExcessAction}
                     onChange={(e) => setRebookExcessAction(e.target.value as "REFUND" | "VOUCHER")}
@@ -2214,7 +2224,7 @@ export default function Bookings() {
             <h3 className="mb-1 text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Payment Link Sent</h3>
             <p className="mb-4 text-xs" style={{ color: "var(--ck-text-muted)" }}>Booking ref: {paymentLinkRef}</p>
             <div className="mb-3 rounded-lg border px-4 py-3 text-sm" style={{ background: "var(--ck-success-soft)", borderColor: "color-mix(in srgb, var(--ck-success) 28%, transparent)", color: "var(--ck-success)" }}>
-              Payment link has been emailed to the customer.
+              Payment link emailed.
             </div>
             <div className="rounded-lg border p-3" style={{ background: "var(--ck-surface-sunken)" }}>
               <p className="mb-2 text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>You can also copy the link:</p>
@@ -2237,7 +2247,7 @@ export default function Bookings() {
               </div>
             </div>
             <p className="mt-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>
-              Once the customer pays, the booking will automatically update to PAID on this page.
+              Status updates to Paid after payment.
             </p>
             <div className="mt-4 grid grid-cols-1 sm:flex sm:justify-end">
               <button
@@ -2290,6 +2300,7 @@ function SlotRows({
   onQuickResend,
   onSendRescheduleLink,
   selected,
+  highlightedBookingId,
   onToggleSelect,
 }: {
   slot: SlotGroup;
@@ -2316,15 +2327,19 @@ function SlotRows({
   onQuickResend: (b: Booking) => void;
   onSendRescheduleLink: (b: Booking) => void;
   selected: Set<string>;
+  highlightedBookingId: string | null;
   onToggleSelect: (id: string) => void;
 }) {
   const [openActions, setOpenActions] = useState<string | null>(null);
   useEffect(() => {
     if (!openActions) return;
+    const desktop = window.matchMedia("(min-width: 1024px)");
     function handleClick() { setOpenActions(null); }
+    desktop.addEventListener("change", handleClick);
     document.addEventListener("click", handleClick);
     window.addEventListener("ck:demo-explanation-open", handleClick);
     return () => {
+      desktop.removeEventListener("change", handleClick);
       document.removeEventListener("click", handleClick);
       window.removeEventListener("ck:demo-explanation-open", handleClick);
     };
@@ -2332,7 +2347,7 @@ function SlotRows({
 
   return (
     <>
-      <tr className="border-t border-gray-100 2xl:hidden">
+      <tr className="border-t border-gray-100 lg:hidden">
         <td colSpan={9} className="p-0">
           <div className="px-4 py-4">
             <div className="flex items-start justify-between gap-4">
@@ -2352,7 +2367,7 @@ function SlotRows({
               <button type="button" onClick={onToggle} aria-expanded={isOpen} className="ui-btn ui-btn-ghost min-h-11 w-full">
                 {isOpen ? "Hide guests" : "View guests"}
               </button>
-              <button type="button" onClick={() => setOpenActions(openActions === "departure" ? null : "departure")} aria-expanded={openActions === "departure"} className="ui-btn ui-btn-ghost min-h-11 w-full">
+              <button type="button" onClick={(event) => { event.stopPropagation(); setOpenActions(openActions === "departure" ? null : "departure"); }} aria-expanded={openActions === "departure"} className="ui-btn ui-btn-ghost min-h-11 w-full">
                 Departure actions
               </button>
             </div>
@@ -2362,7 +2377,7 @@ function SlotRows({
               <ActionButton
                 label={cancellingWeatherId === slot.bookings[0]?.slot_id ? "Cancelling…" : "Weather-cancel departure"}
                 demoAction="booking.weather"
-                description="Close this departure and notify every affected guest."
+                description="Close departure and notify guests."
                 onClick={() => { onCancelSlot(slot); setOpenActions(null); }}
                 disabled={cancellingWeatherId === slot.bookings[0]?.slot_id}
                 tone="red"
@@ -2371,7 +2386,7 @@ function SlotRows({
           )}
         </td>
       </tr>
-      <tr className="hidden cursor-pointer border-t border-gray-100 transition-colors hover:bg-[var(--ck-surface-sunken)] 2xl:table-row" onClick={onToggle}>
+      <tr className="hidden cursor-pointer border-t border-gray-100 transition-colors hover:bg-[var(--ck-surface-sunken)] lg:table-row" onClick={onToggle}>
         <td className="w-8 p-1.5 lg:p-3 text-center" onClick={e => e.stopPropagation()}></td>
         <td className="p-1.5 lg:p-3 font-medium text-[12px] lg:text-sm" style={{ color: "var(--ck-ocean)" }}>
           <span className="mr-0.5 inline-block w-3 text-gray-400 transition-transform" style={{ transform: isOpen ? "rotate(90deg)" : "none" }}>
@@ -2401,7 +2416,7 @@ function SlotRows({
       {isOpen &&
         slot.bookings.map((b) => {
           const refundAmt = b.status === "CANCELLED" && b.refund_amount ? Number(b.refund_amount) : 0;
-          const paid = isPaid(b.status) ? bookingValue(b) : Number(b.voucher_amount_paid || 0);
+          const paid = bookingPaidAmount(b);
           const rescheduleDue = Math.max(0, Number(b.pending_reschedule?.diff || 0));
           const due = (refundAmt > 0 ? refundAmt : bookingValue(b) - paid) + rescheduleDue;
           const isLoading = actionBookingId === b.id;
@@ -2412,38 +2427,42 @@ function SlotRows({
             { label: "View", mobileLabel: "View booking", description: "Open the complete booking record.", run: () => onView(b), tone: "blue" },
             { label: "Edit", mobileLabel: "Edit booking", description: "Correct guest and reservation details.", run: () => onEdit(b), disabled: isLoading },
             { label: "WhatsApp", description: "Start a message in the guest conversation.", run: () => onWhatsApp(b), disabled: !b.phone, tone: "green" },
+            { label: "WhatsApp on device", description: "Open this number in WhatsApp.", run: () => { void openDeviceWhatsApp(b.phone); }, disabled: !contactPhoneNumber(b.phone), title: !contactPhoneNumber(b.phone) ? "Add a valid phone number first." : undefined, tone: "green" },
             { label: "Rebook", description: "Move this party to another available departure.", run: () => onRebook(b), disabled: isLoading },
-            { label: "Mark Paid", description: "Record money received outside online checkout.", run: () => onMarkPaid(b), disabled: isLoading || isPaid(b.status), tone: "green" },
-            { label: isGeneratingLink ? "Generating…" : "Payment Link", demoAction: "booking.payment", description: "Create and send checkout for the amount due.", run: () => onSendPaymentLink(b), disabled: isGeneratingLink || isPaid(b.status) || b.status === "CANCELLED", tone: "blue" },
-            { label: "Payment Reminder", description: "Resend the booking’s existing checkout link.", run: () => onPaymentReminder(b), disabled: isLoading || isPaid(b.status) || b.status === "CANCELLED" || !b.payment_url, title: !b.payment_url ? "Send a payment link first." : undefined, tone: "amber" },
-            { label: b.allow_unpaid ? "Require Payment" : "Allow Without Payment", description: b.allow_unpaid ? "Restore reminders and the payment deadline." : "Keep the reservation valid for pay on arrival.", run: () => onToggleAllowUnpaid(b), disabled: isLoading || isPaid(b.status) || b.status === "CANCELLED" },
-            ...(b.pending_reschedule ? [{ label: "Reschedule Payment Link", demoAction: "booking.reschedule-link", description: "Collect the extra cost of the proposed move.", run: () => onSendRescheduleLink(b), disabled: quickResendingId === b.id, tone: "blue" as const }] : []),
-            { label: "Refund", demoAction: "booking.refund", description: "Review the eligible refund before submitting it.", run: () => onRefund(b), disabled: isLoading || !isPaid(b.status), title: !isPaid(b.status) ? "Nothing to refund: no payment received." : undefined, tone: "amber" },
-            { label: isResending ? "Resending…" : "Resend Invoice", demoAction: "booking.invoice", description: "Send the latest paid invoice again.", run: () => onResendInvoice(b.id), disabled: isResending || !isPaid(b.status), title: !isPaid(b.status) ? "Payment still outstanding. Send a payment link instead." : undefined, tone: "blue" },
-            { label: "Cancel", description: "Cancel only this party and release its places.", run: () => onCancel(b), disabled: isLoading || b.status === "CANCELLED", tone: "red" },
+            { label: "Mark Paid", description: "Record money received outside online checkout.", run: () => onMarkPaid(b), disabled: isLoading || isPaid(b), tone: "green" },
+            { label: isGeneratingLink ? "Generating…" : "Payment Link", demoAction: "booking.payment", description: "Send a link for the balance due.", run: () => onSendPaymentLink(b), disabled: isGeneratingLink || isPaid(b) || b.status === "CANCELLED", tone: "blue" },
+            { label: "Payment Reminder", description: "Resend the booking’s existing checkout link.", run: () => onPaymentReminder(b), disabled: isLoading || isPaid(b) || b.status === "CANCELLED" || !b.payment_url, title: !b.payment_url ? "Send a payment link first." : undefined, tone: "amber" },
+            { label: b.allow_unpaid ? "Require Payment" : "Allow Without Payment", description: b.allow_unpaid ? "Restore reminders and the payment deadline." : "Keep places for pay on arrival.", run: () => onToggleAllowUnpaid(b), disabled: isLoading || isPaid(b) || b.status === "CANCELLED" },
+            ...(b.pending_reschedule ? [{ label: "Reschedule Payment Link", demoAction: "booking.reschedule-link", description: "Request the reschedule balance.", run: () => onSendRescheduleLink(b), disabled: quickResendingId === b.id, tone: "blue" as const }] : []),
+            { label: "Refund", demoAction: "booking.refund", description: "Review the eligible refund before submitting it.", run: () => onRefund(b), disabled: isLoading || paid <= 0 || b.status === "CANCELLED", title: paid <= 0 ? "Nothing to refund: no payment received." : undefined, tone: "amber" },
+            { label: isResending ? "Resending…" : "Resend Invoice", demoAction: "booking.invoice", description: "Send the latest booking invoice again.", run: () => onResendInvoice(b.id), disabled: isResending || !["PAID", "CONFIRMED", "COMPLETED"].includes(b.status), title: !["PAID", "CONFIRMED", "COMPLETED"].includes(b.status) ? "Confirm the booking before resending its invoice." : undefined, tone: "blue" },
+            { label: "Cancel", description: "Cancel this booking and release places.", run: () => onCancel(b), disabled: isLoading || b.status === "CANCELLED", tone: "red" },
           ];
           return (
             <Fragment key={b.id}>
-            <tr className={"border-t border-gray-100 text-gray-600 2xl:hidden " + (selected.has(b.id) ? "bg-[var(--ck-ocean-soft)]" : "bg-[var(--ck-surface-sunken)]")}>
+            <tr data-booking-id={b.id} tabIndex={-1} className={"border-t border-gray-100 text-gray-600 lg:hidden " + (selected.has(b.id) || highlightedBookingId === b.id ? "bg-[var(--ck-ocean-soft)]" : "bg-[var(--ck-surface-sunken)]")}>
               <td colSpan={9} className="p-0">
                 <div className="px-4 py-4">
                   <div className="flex items-start gap-3">
-                    <label className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-xl">
-                      <input type="checkbox" checked={selected.has(b.id)} onChange={() => onToggleSelect(b.id)}
-                        className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        aria-label={`Select ${b.customer_name}`} />
-                    </label>
+                    <div className="flex w-11 shrink-0 flex-col items-start gap-1">
+                      <BookingHistoryBadge booking={b} />
+                      <label className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl">
+                        <input type="checkbox" checked={selected.has(b.id)} onChange={() => onToggleSelect(b.id)}
+                          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          aria-label={`Select ${b.customer_name}`} />
+                      </label>
+                    </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <p className="text-base font-semibold leading-snug [overflow-wrap:anywhere]" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</p>
+                      <p className="text-base font-semibold leading-snug whitespace-normal [overflow-wrap:anywhere]" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
                         <StatusBadge status={b.status} />
+                        <RefundBadge status={b.refund_status} />
                       </div>
                       <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>{b.qty} {b.qty === 1 ? "guest" : "guests"} · Due {fmtCurrency(due)}</p>
                       <p className="mt-1 text-sm [overflow-wrap:anywhere]" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "No mobile number"} · {b.waiver_status === "SIGNED" ? "Waiver signed" : "Waiver outstanding"}</p>
-                      <div className="mt-2 flex flex-wrap gap-1.5"><SourceBadge source={b.source} /><RefundBadge status={b.refund_status} /></div>
                     </div>
                   </div>
-                  <button type="button" onClick={() => setOpenActions(actionsOpen ? null : b.id)} aria-expanded={actionsOpen} className="ui-btn ui-btn-ghost mt-3 min-h-11 w-full">
+                  <button type="button" onClick={(event) => { event.stopPropagation(); setOpenActions(actionsOpen ? null : b.id); }} aria-expanded={actionsOpen} className="ui-btn ui-btn-ghost mt-3 min-h-11 w-full">
                     Guest actions
                   </button>
                 </div>
@@ -2456,19 +2475,22 @@ function SlotRows({
                 )}
               </td>
             </tr>
-            <tr className={"hidden border-t border-gray-100 text-xs text-gray-600 2xl:table-row " + (selected.has(b.id) ? "bg-[var(--ck-ocean-soft)]" : "bg-gray-50/60")}>
+            <tr data-booking-id={b.id} tabIndex={-1} className={"hidden border-t border-gray-100 text-xs text-gray-600 lg:table-row " + (selected.has(b.id) || highlightedBookingId === b.id ? "bg-[var(--ck-ocean-soft)]" : "bg-gray-50/60")}>
               <td className="w-8 p-1.5 lg:p-3 text-center align-top" onClick={e => e.stopPropagation()}>
                 <input type="checkbox" checked={selected.has(b.id)} onChange={() => onToggleSelect(b.id)}
                   className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                   aria-label={"Select " + b.customer_name} />
               </td>
-              <td className="p-1.5 lg:p-3 pl-2 lg:pl-10 text-gray-400" colSpan={1}>
+              <td className="p-1.5 lg:p-3 pl-2 text-gray-400" colSpan={1}>
                 <div className="flex flex-col gap-0.5">
                   <div className="flex flex-wrap items-center gap-1 text-left">
-                    <span
-                      title={customerNotesTooltip(b.custom_fields)}
-                      className={"max-w-full truncate font-medium text-gray-700 lg:pointer-events-auto" + (customerNotesTooltip(b.custom_fields) ? " cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2" : "")}
-                    >{b.customer_name}</span>
+                    <span className="inline-flex min-w-0 max-w-full items-start gap-1">
+                      <BookingHistoryBadge booking={b} />
+                      <span
+                        title={customerNotesTooltip(b.custom_fields)}
+                        className={"min-w-0 whitespace-normal font-medium text-gray-700 [overflow-wrap:anywhere] lg:pointer-events-auto" + (customerNotesTooltip(b.custom_fields) ? " cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2" : "")}
+                      >{b.customer_name}</span>
+                    </span>
                     {customerNotesTooltip(b.custom_fields) && (
                       <span title={customerNotesTooltip(b.custom_fields)} className="shrink-0 text-[11px] cursor-help lg:pointer-events-auto" aria-label="Customer added notes">📝</span>
                     )}
@@ -2489,7 +2511,6 @@ function SlotRows({
                           : <PaperPlaneTilt className="h-3 w-3" />}
                       </button>
                     )}
-                    <SourceBadge source={b.source} />
                   </div>
                   {b.add_ons && b.add_ons.length > 0 && (
                     <div className="flex flex-wrap gap-1 pl-[18px] lg:pl-0">
@@ -2516,7 +2537,7 @@ function SlotRows({
                         </span>
                         <button data-demo-action="booking.reschedule-link"
                           type="button"
-                          title="Send a fresh payment link for the reschedule difference (email + WhatsApp)"
+                          title="Resend the reschedule payment link by email and WhatsApp"
                           disabled={quickResendingId === b.id}
                           onClick={(e) => { e.stopPropagation(); onSendRescheduleLink(b); }}
                           className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition-colors"
@@ -2527,15 +2548,10 @@ function SlotRows({
                       </span>
                     );
                   })()}
-                  {b.external_ref && (
-                    <span className="text-[10px] text-gray-400 font-mono [overflow-wrap:anywhere] lg:pl-0 pl-[18px]">
-                      Ref: {b.external_ref}
-                    </span>
-                  )}
                   <span className="text-[10px] text-gray-500 lg:hidden pl-[10px]">
                     {b.tours?.name || "—"} · {b.phone || "No mobile"}
                   </span>
-                  {b.payment_deadline && !isPaid(b.status) && b.status !== "CANCELLED" && (
+                  {b.payment_deadline && !isPaid(b) && b.status !== "CANCELLED" && (
                     <PaymentExpiryBadge deadline={b.payment_deadline} />
                   )}
                 </div>
@@ -2544,7 +2560,10 @@ function SlotRows({
               <td className="hidden p-3 align-top md:table-cell text-[11px] text-gray-500 [overflow-wrap:anywhere]">
                 <div className="flex flex-col mt-0.5">
                   <span>{b.phone || "No mobile"}</span>
-                  <span>{b.email || "No email"}</span>
+                  <span className="flex items-center gap-1">
+                    <span className="min-w-0">{b.email || "No email"}</span>
+                    <CopyEmailButton email={b.email} />
+                  </span>
                 </div>
               </td>
               <td className="hidden p-3 align-top md:table-cell [overflow-wrap:anywhere]">{b.tours?.name || "—"}</td>
@@ -2586,7 +2605,10 @@ function MobileActionSheet({ title, onClose, children }: { title: string; onClos
   const closeRef = useRef(onClose);
   useEffect(() => { closeRef.current = onClose; }, [onClose]);
   useEffect(() => {
+    if (window.matchMedia("(min-width: 1024px)").matches) return;
     const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     panelRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -2604,20 +2626,23 @@ function MobileActionSheet({ title, onClose, children }: { title: string; onClos
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
       previousFocus?.focus();
     };
   }, []);
-  return (
-    <div className="fixed inset-0 z-50 2xl:hidden" onClick={(event) => event.stopPropagation()}>
-      <button type="button" aria-label="Close actions" onClick={onClose} className="absolute inset-0 h-full w-full bg-slate-950/45" />
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={`Actions for ${title}`} data-mobile-action-sheet className="absolute inset-x-0 bottom-0 max-h-[min(80dvh,42rem)] overflow-y-auto rounded-t-2xl border-t px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl" style={{ background: "var(--ck-surface-elevated)", borderColor: "var(--ck-border-strong)" }}>
+  // Keep the sheet outside the animated table, retaining simple-view theme tokens.
+  return createPortal(
+    <div className="fixed inset-0 z-50 lg:hidden" onClick={(event) => event.stopPropagation()}>
+      <button type="button" aria-label="Close actions" onClick={onClose} className="absolute inset-0 h-full w-full touch-none bg-slate-950/45" />
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={`Actions for ${title}`} data-mobile-action-sheet className="absolute inset-x-0 bottom-0 max-h-[min(80dvh,42rem)] overflow-y-auto overscroll-contain rounded-t-2xl border-t px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl" style={{ background: "var(--ck-surface-elevated)", borderColor: "var(--ck-border-strong)" }}>
         <div className="mb-2 flex min-h-12 items-center justify-between gap-4 border-b pb-2" style={{ borderColor: "var(--ck-border-subtle)" }}>
           <div className="min-w-0"><p className="ui-mono-label mb-1">Available actions</p><h3 className="text-base font-semibold leading-snug [overflow-wrap:anywhere]" style={{ color: "var(--ck-text-strong)" }}>{title}</h3></div>
           <button type="button" onClick={onClose} aria-label="Close actions" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl" style={{ color: "var(--ck-text-muted)" }}>×</button>
         </div>
         <div className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>{children}</div>
       </div>
-    </div>
+    </div>,
+    document.querySelector(".simple-view") || document.body,
   );
 }
 
@@ -2689,21 +2714,6 @@ function RefundBadge({ status }: { status: string | null }) {
     TRANSFERRED: "ui-pill-success",
   };
   return <span className={`ui-status ${tones[status] || "ui-pill-neutral"}`}>Refund {status}</span>;
-}
-
-function SourceBadge({ source }: { source: string }) {
-  if (!source || source === "WEB") return null;
-  const tones: Record<string, string> = {
-    VIATOR: "ui-pill-ocean",
-    GETYOURGUIDE: "ui-pill-amber",
-    WHATSAPP: "ui-pill-success",
-    ADMIN: "ui-pill-accent",
-  };
-  return (
-    <span className={`ui-status ${tones[source] || "ui-pill-neutral"}`}>
-      {source}
-    </span>
-  );
 }
 
 function ActionMenuItem({

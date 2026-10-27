@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { BOOKING_PALETTES } from "../../app/lib/booking-palettes";
 import {
   hexToRgb, rgbToHex, luminance, contrast, over,
   solveSurface, solveButtonInk, computeTheme,
@@ -17,6 +18,13 @@ describe("vendored admin copy", () => {
     const vendored = readFileSync(resolve(__dirname, "../../app/lib/theme-engine.ts"), "utf8");
     const stripped = vendored.split("\n").filter((l) => !l.startsWith("// VENDORED") && !l.startsWith("// The admin app cannot") && !l.startsWith("// (Vercel doesn't") && !l.startsWith("// copy is byte-identical")).join("\n");
     expect(stripped).toBe(canonical);
+  });
+
+  it("the preview uses the same catalogue markup and styles as the public page", () => {
+    for (const file of ["Catalogue.tsx", "catalogue.css"]) {
+      expect(readFileSync(resolve(__dirname, "../../components/booking", file), "utf8"))
+        .toBe(readFileSync(resolve(__dirname, "../../booking/app/components", file), "utf8"));
+    }
   });
 });
 
@@ -184,21 +192,25 @@ describe("computeTheme (full palettes)", () => {
     });
   }
 
-  // Acceptance §9.1 — the full 10-theme palette matrix: 7 admin presets +
-  // platform default + two adversarial configs. Every elevation must have an
-  // AA ink at its solved alpha, and CTA/main button inks must be AA.
+  // Exercise the actual admin presets, plus the default and adversarial configs.
   const MATRIX: Array<[string, Record<string, string>]> = [
-    ["Gentle Sea Breeze", { main: "#1F7A8C", secondary: "#022B3A", cta: "#1F7A8C", bg: "#E1E5F2", nav: "#FFFFFF", hover: "#BFDBF7" }],
-    ["Earthy Green", { main: "#52796F", secondary: "#2F3E46", cta: "#52796F", bg: "#CAD2C5", nav: "#F2F4F0", hover: "#84A98C" }],
-    ["Cherry Blossom", { main: "#BD632F", secondary: "#273E47", cta: "#A4243B", bg: "#D8C99B", nav: "#F8F5EE", hover: "#D8973C" }],
-    ["Soft Sand", { main: "#D5BDAF", secondary: "#4A4036", cta: "#D5BDAF", bg: "#F5EBE0", nav: "#FFFFFF", hover: "#D6CCC2" }],
-    ["Golden Summer Fields", { main: "#D4A373", secondary: "#3D4A27", cta: "#D4A373", bg: "#FEFAE0", nav: "#FFFFFF", hover: "#E9EDC9" }],
-    ["Pastel Dreams", { main: "#FF99C8", secondary: "#2D3748", cta: "#FF99C8", bg: "#FCF6BD", nav: "#FFFFFF", hover: "#D0F4DE" }],
-    ["Purple Haze", { main: "#A167A5", secondary: "#0E273C", cta: "#A167A5", bg: "#E8D7F1", nav: "#F8F4FA", hover: "#D3BCCC" }],
+    ...Object.entries(BOOKING_PALETTES).map(([name, colors]): [string, Record<string, string>] => [name, {
+      main: colors.color_main, secondary: colors.color_secondary, cta: colors.color_cta,
+      bg: colors.color_bg, nav: colors.color_nav, hover: colors.color_hover,
+    }]),
     ["Platform default", { main: "#0f5dd7", secondary: "#101828", cta: "#0c8a59", bg: "#f5f5f5", nav: "#ffffff", hover: "#48cfad" }],
     ["All-white adversarial", { main: "#ffffff", secondary: "#ffffff", cta: "#ffffff", bg: "#ffffff", nav: "#ffffff", hover: "#ffffff" }],
     ["All-black adversarial", { main: "#000000", secondary: "#000000", cta: "#000000", bg: "#000000", nav: "#000000", hover: "#000000" }],
   ];
+
+  for (const [name, colors] of Object.entries(BOOKING_PALETTES).slice(7)) {
+    it(`${name}: focus colour is visible on white forms, the page and navigation`, () => {
+      const focus = hexToRgb(colors.color_main)!;
+      for (const surface of [WHITE, hexToRgb(colors.color_bg)!, hexToRgb(colors.color_nav)!]) {
+        expect(contrast(focus, surface)).toBeGreaterThanOrEqual(3);
+      }
+    });
+  }
 
   for (const [name, p] of MATRIX) {
     it(`matrix — ${name}: all elevations + buttons AA`, () => {
@@ -238,6 +250,25 @@ describe("computeTheme (full palettes)", () => {
     expect(t.vars["--cfg-bg"]).toBe("#f5f5f5");
     expect(t.vars["--cta"]).toBe("#0c8a59");
   });
+
+  for (const [name, p] of [...MATRIX, ["Mid-tone grey", { bg: "#767676", nav: "#808080" }]] as Array<[string, Record<string, string>]>) {
+    it(`catalogue — ${name}: solid surfaces, supporting text and navigation pass AA`, () => {
+      const v = computeTheme(p).vars;
+      const surface = hexToRgb(v["--catalogue-surface"])!;
+      expect(surface).toEqual(WHITE);
+      expect(v["--booking-surface"]).toBe("#ffffff");
+      expect(v["--booking-ink"]).toBe(v["--catalogue-ink"]);
+      expect(contrast(surface, hexToRgb(v["--booking-accent-text"])!)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(surface, hexToRgb(v["--booking-control-border"])!)).toBeGreaterThanOrEqual(3);
+      const ink = hexToRgb(v["--catalogue-ink"])!;
+      const muted = v["--catalogue-muted"].match(/rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/)!;
+      expect(contrast(surface, ink)).toBeGreaterThanOrEqual(4.49);
+      expect(contrast(surface, over([+muted[1], +muted[2], +muted[3]], +muted[4], surface))).toBeGreaterThanOrEqual(4.49);
+      expect(contrast(hexToRgb(v["--catalogue-nav-surface"])!, hexToRgb(v["--catalogue-nav-ink"])!)).toBeGreaterThanOrEqual(4.49);
+      expect(v["--cfg-bg"]).toBe(rgbToHex(hexToRgb(p.bg)!));
+      expect(v["--cfg-nav"]).toBe(rgbToHex(hexToRgb(p.nav)!));
+    });
+  }
 
   it("hero-average backdrop participates in worst-case", () => {
     const heroAvg: RGB = [128, 128, 128];

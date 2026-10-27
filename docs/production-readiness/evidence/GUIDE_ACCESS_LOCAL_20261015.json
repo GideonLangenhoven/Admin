@@ -1,0 +1,35 @@
+{
+  "date": "2026-10-15",
+  "status": "implemented_and_verified_locally_not_deployed",
+  "request": "One shared guide login per operator, restricted to Simple View passenger counts and trip photos",
+  "setup": "Settings > Admin Users > Guide login > Create guide login. Owner shares the private one-use, 48-hour setup link. Guide chooses a shared password and signs straight into Simple View.",
+  "username": "guide@<operator-subdomain>",
+  "migration": "supabase/migrations/20261015190000_shared_guide_access.sql",
+  "access_model": "Separate guide_accounts identity; no admin_users row or office tenant grants. Dedicated tenant-bound RPCs expose passenger totals and photos. Photo uploads use the verified guide identity and the existing operator Drive connection.",
+  "validation": {
+    "typescript": "passed",
+    "new_feature_lint": "passed",
+    "full_unit_suite": {
+      "files_passed": 143,
+      "files_skipped": 2,
+      "tests_passed": 2338,
+      "tests_skipped": 58
+    },
+    "browser": {
+      "passed": 4,
+      "scope": "Synthetic isolated preview: guide sign-in, office-route blocking including forged role cookie, trip-photo viewing/upload, password setup and owner setup-link creation"
+    },
+    "database": "Passed in disposable local PostgreSQL: own-tenant scope, zero office booking grants, operator-timezone aggregation, cancelled booking exclusion, private token columns, denied direct storage writes, identity separation, one-use setup claim, invalid identity and replay rejection, suspension and subscription enforcement",
+    "visual": "Reviewed 390px mobile Simple View screenshot; sign-out and primary navigation remain readable with touch-sized controls",
+    "diff_check": "passed for tracked task files",
+    "broader_changed_file_lint": "One existing operator Simple View Date.now render purity error at app/simple/page.tsx:31, plus existing warnings. Guide-specific branch and new feature files pass lint. Existing operator code was not changed to address this unrelated issue."
+  },
+  "local_logs": ".vercel/guide-access/",
+  "not_exercised": [
+    "Production migration/deployment",
+    "Real Supabase Auth password setup",
+    "Real Google Drive upload"
+  ],
+  "external_changes": "None for guide access. No real guide users, passwords, customer emails, provider uploads or hosted database changes were created.",
+  "deployment_followup": "GUIDE_ACCESS_DEPLOYMENT_20261015.json"
+}

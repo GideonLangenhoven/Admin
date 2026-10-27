@@ -1,0 +1,14 @@
+{
+  "baseline": "dpl_749ZGg63mBwEQ4zfdG8bdWUPEuCZ",
+  "baseline_files": 478,
+  "changed": [
+    "app/marketing/layout.tsx",
+    "app/marketing/automations/[id]/page.tsx",
+    "app/api/marketing/setup/route.ts",
+    "app/lib/marketing-setup.ts",
+    "components/marketing/MarketingSetupNotice.tsx",
+    "supabase/functions/marketing-setup-status/index.ts",
+    "supabase/config.toml"
+  ],
+  "no_sending_activation": true
+}

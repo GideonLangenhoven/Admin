@@ -1,0 +1,26 @@
+{
+  "at": "2026-10-20T08:11:06.657Z",
+  "checks": [
+    {
+      "slug": "auto-messages",
+      "source_files_verified": 6
+    },
+    {
+      "slug": "manual-mark-paid",
+      "source_files_verified": 5
+    },
+    {
+      "slug": "marketing-setup-status",
+      "source_files_verified": 4
+    },
+    {
+      "slug": "resend-webhook",
+      "source_files_verified": 3
+    },
+    {
+      "slug": "wa-webhook",
+      "source_files_verified": 17
+    }
+  ],
+  "verified": true
+}

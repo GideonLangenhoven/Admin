@@ -22,8 +22,8 @@ export function isDemoPathVisible(href: string) {
 }
 
 export const DEMO_ACTIONS: Record<string, DemoActionExplanation> = {
-  "dashboard.checkin": action("/", "Mark this booking as arrived", "Adds a check-in timestamp to this booking on the departure manifest.", "The team can see who has arrived. No payment or guest message is triggered."),
-  "dashboard.uncheck": action("/", "Undo this guest check-in", "Clears the booking’s check-in flag and arrival timestamp.", "Use this to correct an accidental check-in. The reservation remains unchanged."),
+  "dashboard.checkin": action("/", "Mark this booking as arrived", "Records the eligible group as arrived on the departure manifest, subject to payment and signed-waiver checks.", "The team sees how many guests are present. Use Simple View Check-ins for a partial group; this does not collect payment."),
+  "dashboard.uncheck": action("/", "Undo this guest check-in", "Resets this fully arrived booking’s arrival count and check-in timestamp.", "Use Simple View Check-ins to correct a partial count. The reservation remains unchanged."),
   "weather.add": action("/", "Save a weather-monitoring location", "Adds the entered coordinates and optional Windguru spot to the dashboard’s locations.", "Your team can compare departure conditions; this does not change any meeting point sent to guests."),
   "weather.remove": action("/", "Remove this weather location", "Removes this saved location from the dashboard’s weather selector.", "It does not remove a tour, cancel a departure or change a guest booking."),
   "weather.default": action("/", "Set the default weather location", "Saves the selected location as the dashboard’s initial weather view.", "Staff start with the relevant forecast. Guest booking details are unaffected."),

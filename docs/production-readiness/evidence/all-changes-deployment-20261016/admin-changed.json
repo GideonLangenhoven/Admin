@@ -1,0 +1,17 @@
+[
+  "app/api/mfa/recovery/route.ts",
+  "app/lib/mfa-sensitive.ts",
+  "app/marketing/automations/page.tsx",
+  "app/marketing/page.tsx",
+  "app/settings/page.tsx",
+  "app/super-admin/sensitive-actions/page.tsx",
+  "app/vouchers/page.tsx",
+  "components/MfaSensitiveActionPanel.tsx",
+  "components/marketing/BookingDiscountSettings.tsx",
+  "playwright.marketing-safety.config.ts",
+  "supabase/config.toml",
+  "supabase/functions/admin-help-chat/index.ts",
+  "supabase/functions/bank-details/index.ts",
+  "supabase/functions/onboarding-wizard/index.ts",
+  "supabase/functions/web-chat/index.ts"
+]

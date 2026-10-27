@@ -48,7 +48,7 @@ describe("rollout pagination and operator state", () => {
       return { data: (own ? businesses.filter(b => b.id === own[2]) : businesses).slice(from, to + 1), error: null };
     });
     const load = sourceFunction("components/AuthGate.tsx", "loadBusinessContext", {
-      supabase, fetchAllRows, localStorage: { getItem: () => "2000" }, window: { location: { hostname: "test.invalid" } },
+      supabase, fetchAllRows, authStorage: { getItem: () => "2000" }, window: { location: { hostname: "test.invalid" } },
     });
     expect(await load("SUPER_ADMIN", "0")).toMatchObject({ businessId: "2000", operators: businesses.map(b => expect.objectContaining({ id: b.id })) });
     expect(supabase.requests).toHaveLength(3);
@@ -91,6 +91,11 @@ describe("rollout pagination and operator state", () => {
         expect(q.args.p_limit).toBeLessThanOrEqual(1000);
         return { data: rows.slice(q.args.p_offset, q.args.p_offset + q.args.p_limit), error: null };
       }
+      if (q.table === "operator_booking_history") {
+        expect(q.args.p_business_id).toBe("a");
+        expect(q.args.p_booking_ids.length).toBeLessThanOrEqual(200);
+        return { data: q.args.p_booking_ids.map((id: string) => ({ booking_id: id, previous_booking_count: 0, previous_booking_at: null })), error: null };
+      }
       const ids = q.calls.find((c: any[]) => c[0] === "in")[2];
       expect(ids.length).toBeLessThanOrEqual(200);
       if (q.table === "pending_reschedules") expect(q.calls).toContainEqual(["eq", "business_id", "a"]);
@@ -99,6 +104,7 @@ describe("rollout pagination and operator state", () => {
     const state: any = {};
     const bindings = {
       supabase, fetchAllRows, businessId: "a", PAGE_SIZE: 50, loadRequestRef: { current: 0 },
+      BOOKING_COLUMNS: "id, tours(name), slots(id)", createdBooking: null, rangeDate: "2026-09-01",
       rangeStart: new Date("2026-09-01Z"), rangeEnd: new Date("2026-09-30Z"),
       setBookings: (value: any) => { state.bookings = value; },
       setHasMore: (value: any) => { state.hasMore = value; }, setLoading: vi.fn(), notify: vi.fn(),

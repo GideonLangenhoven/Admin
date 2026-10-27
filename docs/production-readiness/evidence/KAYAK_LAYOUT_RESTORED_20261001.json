@@ -1,0 +1,129 @@
+{
+  "verified_at": "2026-10-01T13:20:05.643395+00:00",
+  "request": "Restore the original Kayak layout; preserve the daily demo data.",
+  "public_url": "https://kayak.booking.bookingtours.co.za",
+  "deployment": {
+    "id": "dpl_B1WFFDH2F7gjzY628cc2KVsrZ1Jo",
+    "url": "https://booking-ol85c819v-jerrys-projects-f4e4eaf9.vercel.app",
+    "ready_state": "READY",
+    "promotion": "Published and public-domain deployment ID verified",
+    "manifest": {
+      "directory": "/private/tmp/capekayak-kayak-layout-restore-s8ppf8m2",
+      "base_revision": "87d9907c67f427950c621e7f76f6136a0ffaeea3",
+      "original_layout_deployment": "dpl_GKee8R3EvLK47igcf2qJtSJL36Xp",
+      "changed_from_original_layout": [
+        "app/components/CookieBanner.tsx"
+      ],
+      "files": {
+        "app/page.tsx": "bdbf7e340cd02d0eac840efc373bffeb7e490e59e42addc166edbd6e4d008c6d",
+        "app/book/page.tsx": "3f8cd3ca4147993620ab463f606b5f96e1899c2ceb059dd0b122d51a3a601827",
+        "app/components/Header.tsx": "7b89d9c40a8b4c19d938e245afe55acfb7be9e9804ffc717c696bf0d1d08415d",
+        "app/components/CookieBanner.tsx": "35b358bbc5570464fb5b5631c03257957202dce5d6613bb80859d3bfd82c3a03"
+      }
+    }
+  },
+  "restored": [
+    "Original home tour-card layout",
+    "Original booking calendar without the added Kayak tour banner",
+    "Previous hero, background and footer settings from the pre-demo snapshot"
+  ],
+  "retained": [
+    "129 demo bookings and matching invoices",
+    "Tour details and packing instructions",
+    "Daily Kayak and Claires refresh jobs",
+    "Existing navigation update",
+    "Mobile cookie notice placement above the booking button",
+    "Unrelated active-session working changes"
+  ],
+  "data_guard": "Transaction hashes verified bookings, slots, customers, invoices, staff, refresh functions and the two jobs unchanged.",
+  "migration": {
+    "file": "supabase/migrations/20261001131000_restore_kayak_storefront_layout.sql",
+    "sha256": "35f0a1874d97a7f05b9817666e6d3ed5bab412e360860ffbcc4638d4cf8d0f13"
+  },
+  "live_verification": {
+    "jobs": [
+      {
+        "name": "refresh-claires-hiking-demo-daily",
+        "active": true,
+        "schedule": "5 22 * * *"
+      },
+      {
+        "name": "refresh-kayak-demo-daily",
+        "active": true,
+        "schedule": "7 22 * * *"
+      }
+    ],
+    "branding": {
+      "color_bg": "#e1e5f2",
+      "hero_image": null,
+      "hero_title": null,
+      "hero_eyebrow": null,
+      "hero_subtitle": null,
+      "footer_line_one": null,
+      "footer_line_two": null
+    },
+    "kayak_bookings": 129,
+    "kayak_invoices": 129
+  },
+  "browser": {
+    "stats": {
+      "startTime": "2026-10-01T13:18:57.436Z",
+      "duration": 67197.099,
+      "expected": 9,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "checks": [
+      {
+        "name": "Kayak retains the original tour-card layout with populated tours and working photos",
+        "project": "desktop",
+        "status": "expected"
+      },
+      {
+        "name": "calendar reaches guest details while the cookie notice stays clear of the mobile button",
+        "project": "desktop",
+        "status": "expected"
+      },
+      {
+        "name": "Claires retains its own tour catalog and tenant branding",
+        "project": "desktop",
+        "status": "expected"
+      },
+      {
+        "name": "Kayak retains the original tour-card layout with populated tours and working photos",
+        "project": "phone",
+        "status": "expected"
+      },
+      {
+        "name": "calendar reaches guest details while the cookie notice stays clear of the mobile button",
+        "project": "phone",
+        "status": "expected"
+      },
+      {
+        "name": "Claires retains its own tour catalog and tenant branding",
+        "project": "phone",
+        "status": "expected"
+      },
+      {
+        "name": "Kayak retains the original tour-card layout with populated tours and working photos",
+        "project": "webkit-phone",
+        "status": "expected"
+      },
+      {
+        "name": "calendar reaches guest details while the cookie notice stays clear of the mobile button",
+        "project": "webkit-phone",
+        "status": "expected"
+      },
+      {
+        "name": "Claires retains its own tour catalog and tenant branding",
+        "project": "webkit-phone",
+        "status": "expected"
+      }
+    ],
+    "writes": "All requests other than GET, HEAD and OPTIONS blocked; no real checkout or provider operation."
+  },
+  "build": "Vercel production build and TypeScript passed.",
+  "workspace": "Booking TypeScript and git diff --check passed; deleted only the introduced Kayak layout components and their callers.",
+  "rollout": "Scoped demo restoration only; broader production qualification remains paused."
+}

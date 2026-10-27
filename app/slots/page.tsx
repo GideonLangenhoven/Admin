@@ -1,8 +1,11 @@
 "use client";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { List } from "@phosphor-icons/react";
 import { useSearchParams } from "next/navigation";
+import { confirmCancellation } from "../lib/cancellation-choice";
 import { confirmAction, notify } from "../lib/app-notify";
 import { getAdminTimezone, zonedToUtc, utcToLocalParts, changeLocalTime, normalize24HourTime } from "../lib/admin-timezone";
+import { businessDateKey, businessDayRange, isDateKey } from "../lib/simple-view";
 import { supabase } from "../lib/supabase";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
@@ -56,6 +59,25 @@ function Slots() {
   const [filterTourId, setFilterTourId] = useState<string | null>(() => searchParams.get("tour"));
   const [showClosedSlots, setShowClosedSlots] = useState(false);
   const [monthViewOpen, setMonthViewOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    function closeMenu(event: PointerEvent | KeyboardEvent) {
+      const menu = mobileMenuRef.current;
+      if (!menu?.open) return;
+      if (event instanceof KeyboardEvent) {
+        if (event.key !== "Escape") return;
+        menu.querySelector("summary")?.focus();
+      } else if (menu.contains(event.target as Node)) return;
+      menu.open = false;
+    }
+    document.addEventListener("pointerdown", closeMenu);
+    document.addEventListener("keydown", closeMenu);
+    return () => {
+      document.removeEventListener("pointerdown", closeMenu);
+      document.removeEventListener("keydown", closeMenu);
+    };
+  }, []);
 
   // Individual Edit State
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
@@ -67,7 +89,7 @@ function Slots() {
   const [bulkForm, setBulkForm] = useState({
     startDate: "",
     endDate: "",
-    tourId: "ALL",
+    tourId: searchParams.get("tour") || "ALL",
     capacity: "",
     price: "",
     newTime: "",
@@ -123,25 +145,21 @@ function Slots() {
       weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone(),
     }) + ": " + (slot.tours?.name || "Tour");
 
-    if (!await confirmAction({
-      title: "Cancel slot due to weather",
-      message: `Cancel "${slotLabel}" due to weather? This closes the slot, cancels all bookings on it, and notifies customers with self-service options.`,
-      tone: "warning",
-      confirmLabel: "Cancel slot",
-    })) return;
+    const handling = await confirmCancellation("Cancel slot due to weather", `Cancel "${slotLabel}" due to weather? This closes the slot, cancels all bookings and notifies customers.`);
+    if (!handling) return;
 
     setCancellingWeather(true);
     try {
       // Delegate to weather-cancel edge function — single source of truth, atomic per-slot capacity
       // releases, customer notifications, and self-service compensation links. Avoids N+1 reads.
       const { data, error } = await supabase.functions.invoke("weather-cancel", {
-        body: { slot_ids: [slot.id], business_id: businessId, reason: "weather conditions" },
+        body: { slot_ids: [slot.id], business_id: businessId, reason: "weather conditions", offer_choice: handling.offerChoice },
       });
       if (error) throw error;
       const cancelled = (data as any)?.bookings_cancelled ?? 0;
       notify({
         title: "Weather cancellation complete",
-        message: `${cancelled} booking(s) were cancelled and notified with self-service follow-up links.`,
+        message: `${cancelled} booking(s) cancelled and customers notified.${handling.offerChoice ? " Customer options enabled." : " Follow-up remains with you."}`,
         tone: "success",
       });
       setSelectedSlot(null);
@@ -211,24 +229,21 @@ function Slots() {
     const slotLabel = new Date(slot.start_time).toLocaleString("en-ZA", {
       weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: getAdminTimezone(),
     }) + ": " + (slot.tours?.name || "Tour");
-    if (!await confirmAction({
-      title: isWeather ? "Weather-cancel this trip?" : "Cancel this trip for all guests?",
-      message: bookedSeats > 0
-        ? `This CANCELS "${slotLabel}" for all ${bookedSeats} booked seat(s) and notifies every customer${isWeather ? " (weather framing)" : ""}. Each guest then chooses a full refund, a voucher, or a new date on their My Bookings page. This can't be undone. To simply stop new bookings without affecting anyone, use "Close" instead.`
-        : `This will close "${slotLabel}" and mark it cancelled. There are no bookings to cancel.`,
-      tone: "warning",
-      confirmLabel: isWeather ? "Weather cancel" : "Cancel & notify",
-    })) return;
+    const handling = await confirmCancellation(
+      isWeather ? "Weather-cancel this trip?" : "Cancel this trip for all guests?",
+      bookedSeats > 0
+        ? `Cancel "${slotLabel}" for ${bookedSeats} booked seat(s)? This closes the slot and notifies customers. Use Close to stop new bookings only.`
+        : `Close "${slotLabel}"? There are no bookings to cancel.`,
+    );
+    if (!handling) return;
     setCancellingSlot(true);
     try {
       const { data, error } = await supabase.functions.invoke("weather-cancel", {
-        body: isWeather
-          ? { slot_ids: [slot.id], business_id: businessId, reason: "weather conditions" }
-          : { slot_ids: [slot.id], business_id: businessId, reason: "operator cancellation", is_weather: false },
+        body: { slot_ids: [slot.id], business_id: businessId, reason: isWeather ? "weather conditions" : "operator cancellation", is_weather: isWeather, offer_choice: handling.offerChoice },
       });
       if (error) throw error;
       const cancelled = (data as any)?.bookings_cancelled ?? 0;
-      notify({ title: "Trip cancelled", message: `${cancelled} booking(s) cancelled and customers notified with self-service refund options.`, tone: "success" });
+      notify({ title: "Trip cancelled", message: `${cancelled} booking(s) cancelled and customers notified.${handling.offerChoice ? " Customer options enabled." : " Follow-up remains with you."}`, tone: "success" });
       setSelectedSlot(null);
       load();
     } catch (err) {
@@ -239,12 +254,8 @@ function Slots() {
 
   async function handleCancelDay() {
     if (selectedCancelDates.length === 0) return;
-    if (!await confirmAction({
-      title: "Cancel selected days",
-      message: `Cancel all slots for ${selectedCancelDates.length} selected day(s) due to weather? This closes the slots, cancels active bookings, and notifies customers.`,
-      tone: "warning",
-      confirmLabel: "Cancel selected days",
-    })) return;
+    const handling = await confirmCancellation("Cancel selected days", `Cancel all slots for ${selectedCancelDates.length} selected day(s) due to weather? This closes the slots, cancels active bookings and notifies customers.`);
+    if (!handling) return;
 
     setCancellingWeather(true);
     try {
@@ -269,14 +280,14 @@ function Slots() {
       }
 
       if (allSlotIds.length === 0) {
-        notify({ title: "No slots found", message: "No slots were found for the selected dates.", tone: "warning" });
+        notify({ title: "No slots found", message: "No slots for these dates.", tone: "warning" });
         setCancellingWeather(false);
         return;
       }
 
       // Delegate to weather-cancel edge function (atomic per-slot capacity, customer notifications)
       const { data, error } = await supabase.functions.invoke("weather-cancel", {
-        body: { slot_ids: allSlotIds, business_id: businessId, reason: "weather conditions" },
+        body: { slot_ids: allSlotIds, business_id: businessId, reason: "weather conditions", offer_choice: handling.offerChoice },
       });
       if (error) throw error;
       const cancelled = (data as any)?.bookings_cancelled ?? 0;
@@ -329,7 +340,7 @@ function Slots() {
       }
 
       if (allSlotIds.length === 0) {
-        notify({ title: "Nothing to reopen", message: "No closed slots were found for the selected dates.", tone: "warning" });
+        notify({ title: "Nothing to reopen", message: "No closed slots for these dates.", tone: "warning" });
         setReopeningDay(false);
         return;
       }
@@ -551,7 +562,7 @@ function Slots() {
     } catch (err: any) {
       const msg = (err.message || "").includes("duplicate key")
         ? "A slot already exists at that time for this tour. Pick a different time or delete the existing one first."
-        : "Something went wrong saving this slot. Please try again.";
+        : "Slot could not be saved. Try again.";
       notify({ title: "Slot update failed", message: msg, tone: "error" });
     } finally {
       setSaving(false);
@@ -565,7 +576,7 @@ function Slots() {
     }
 
     if (bulkForm.capacity === "" && bulkForm.price === "" && bulkForm.newTime === "") {
-      notify({ title: "No changes provided", message: "Please enter a new capacity, price, or time to apply.", tone: "warning" });
+      notify({ title: "No changes provided", message: "Enter a capacity, price or time.", tone: "warning" });
       return;
     }
 
@@ -632,6 +643,57 @@ function Slots() {
       load();
     } catch (err: any) {
       notify({ title: "Bulk update failed", message: "Error applying bulk update: " + err.message, tone: "error" });
+    } finally {
+      setSavingBulk(false);
+    }
+  }
+
+  async function closeWeekdaySlots() {
+    if (!isDateKey(bulkForm.startDate) || !isDateKey(bulkForm.endDate) || bulkForm.startDate > bulkForm.endDate) {
+      notify({ title: "Date range required", message: "Choose a valid start date and an end date on or after it.", tone: "warning" });
+      return;
+    }
+    setSavingBulk(true);
+    let closed = 0;
+    try {
+      const timezone = getAdminTimezone();
+      const start = new Date(Math.max(Date.now(), Date.parse(businessDayRange(bulkForm.startDate, timezone).startIso))).toISOString();
+      const end = businessDayRange(bulkForm.endDate, timezone).endIso;
+      const weekdays: Array<{ id: string; start_time: string }> = [];
+      for (let offset = 0; ; offset += 500) {
+        let query = supabase.from("slots").select("id, start_time").eq("business_id", businessId)
+          .eq("status", "OPEN").gte("start_time", start).lt("start_time", end)
+          .order("start_time").order("id").range(offset, offset + 499);
+        if (bulkForm.tourId !== "ALL") query = query.eq("tour_id", bulkForm.tourId);
+        const { data, error } = await query;
+        if (error) throw error;
+        for (const slot of data || []) {
+          const day = new Date(businessDateKey(timezone, new Date(slot.start_time)) + "T00:00:00Z").getUTCDay();
+          if (day >= 1 && day <= 5) weekdays.push(slot);
+        }
+        if (!data || data.length < 500) break;
+      }
+      if (weekdays.length === 0) {
+        notify({ title: "No open weekday slots", message: "There are no future Monday–Friday slots to close for this selection.", tone: "info" });
+        return;
+      }
+      const tourName = tours.find(tour => tour.id === bulkForm.tourId)?.name || "all tours";
+      if (!await confirmAction({ title: "Close weekday slots?", message: `Close ${weekdays.length} Monday–Friday slot(s) for ${tourName} from ${bulkForm.startDate} to ${bulkForm.endDate} (${timezone})? Saturday and Sunday slots stay unchanged. Existing bookings and holds remain; no cancellation, refund or guest message is sent.`, tone: "warning", confirmLabel: "Close weekday slots" })) return;
+      for (let offset = 0; offset < weekdays.length; offset += 50) {
+        const batch = weekdays.slice(offset, offset + 50);
+        const { data, error } = await supabase.from("slots").update({ status: "CLOSED" })
+          .eq("business_id", businessId).eq("status", "OPEN").in("id", batch.map(slot => slot.id))
+          .in("start_time", batch.map(slot => slot.start_time)).select("id");
+        if (error) throw error;
+        closed += data?.length || 0;
+        if (!data || data.length !== Math.min(50, weekdays.length - offset)) throw new Error("Some slots could not be confirmed. Refresh and try again.");
+      }
+      notify({ title: "Weekday slots closed", message: `${closed} slots are closed to new bookings. Weekend slots and existing bookings are unchanged.`, tone: "success" });
+      setShowBulkEdit(false);
+      load();
+    } catch (error) {
+      notify({ title: "Weekday closure incomplete", message: `${closed} slots closed. ${error instanceof Error ? error.message : "Could not close the remaining slots. Refresh and try again."}`, tone: "error" });
+      load();
     } finally {
       setSavingBulk(false);
     }
@@ -708,6 +770,20 @@ function Slots() {
     }
   }
 
+  function openDayAction(action: "cancel" | "reopen") {
+    if (selectedCancelDates.length === 0) {
+      notify({ title: "Select dates first", message: `Select calendar date headings to ${action} days.`, tone: "warning" });
+      return;
+    }
+    if (action === "cancel") setShowCancelDay(true);
+    else setShowReopenDay(true);
+  }
+
+  function openAddSlot() {
+    if (tours.length > 0) setAddForm(f => ({ ...f, tourId: f.tourId || tours[0].id }));
+    setShowAddSlot(true);
+  }
+
   // By default hide slots that have been zeroed-out (CLOSED status or capacity = 0)
   // so the table doesn't show orphan rows like "04:00 — 0 OPEN" for tours that
   // never actually ran at that time. Toggle to show them when managing closed slots.
@@ -717,11 +793,10 @@ function Slots() {
 
   return (
     <div className="space-y-4">
-      <div className="anim-fade-up flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <div className="flex items-start justify-between gap-3 md:flex-wrap md:items-center">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
           <div>
-            <p className="ui-mono-label mb-1.5">Operations</p>
-            <h2 className="font-display text-[24px] sm:text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Slot Management</h2>
+            <h2 className="font-display text-[24px] md:text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}><span className="md:hidden">Slots</span><span className="hidden md:inline">Slot Management</span></h2>
           </div>
           {filterTourName && (
             <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}>
@@ -729,7 +804,7 @@ function Slots() {
               <button onClick={() => setFilterTourId(null)} className="ml-0.5 font-bold" style={{ color: "var(--ck-accent)" }}>×</button>
             </span>
           )}
-          <label className="ml-2 inline-flex items-center gap-1.5 text-xs font-medium cursor-pointer select-none" style={{ color: "var(--ck-text)" }}>
+          <label className="ml-2 hidden items-center gap-1.5 text-xs font-medium cursor-pointer select-none md:inline-flex" style={{ color: "var(--ck-text)" }}>
             <input
               type="checkbox"
               checked={showClosedSlots}
@@ -739,41 +814,41 @@ function Slots() {
             Show closed / 0-capacity
           </label>
         </div>
-        <div className="grid w-full grid-cols-1 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
+        <details ref={mobileMenuRef} className="relative shrink-0 md:hidden">
+          <summary aria-label="Slot management options" className="ui-btn ui-btn-ghost min-h-11 min-w-11 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+            <List size={22} aria-hidden="true" />
+          </summary>
+          <div className="absolute right-0 z-40 mt-2 max-h-[60dvh] w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border p-1.5 shadow-lg" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" }} onClick={event => {
+            if (!(event.target as HTMLElement).closest("button")) return;
+            mobileMenuRef.current?.removeAttribute("open");
+            mobileMenuRef.current?.querySelector("summary")?.focus();
+          }}>
+            <button type="button" onClick={openAddSlot} className="ui-btn ui-btn-ghost min-h-11 w-full !justify-start">Add slot</button>
+            <button type="button" onClick={() => setBulkGenOpen(true)} className="ui-btn ui-btn-ghost min-h-11 w-full !justify-start">Generate slots</button>
+            <button type="button" onClick={() => setShowBulkEdit(true)} className="ui-btn ui-btn-ghost min-h-11 w-full !justify-start">Bulk edit</button>
+            <button type="button" onClick={() => openDayAction("cancel")} className="ui-btn ui-btn-ghost min-h-11 w-full !justify-start" style={{ color: "var(--ck-danger)" }}>Cancel days{selectedCancelDates.length > 0 ? ` (${selectedCancelDates.length})` : ""}</button>
+            <button type="button" onClick={() => openDayAction("reopen")} className="ui-btn ui-btn-ghost min-h-11 w-full !justify-start">Reopen days{selectedCancelDates.length > 0 ? ` (${selectedCancelDates.length})` : ""}</button>
+            <label className="mt-1 flex min-h-11 cursor-pointer items-center gap-3 border-t px-3 py-2 text-sm" style={{ borderColor: "var(--ck-border-subtle)" }}>
+              <input type="checkbox" checked={showClosedSlots} onChange={event => setShowClosedSlots(event.target.checked)} className="h-4 w-4 accent-[var(--ck-accent)]" />
+              Show closed / 0-capacity
+            </label>
+          </div>
+        </details>
+        <div className="hidden gap-2 md:flex md:w-auto md:flex-wrap md:justify-end">
           <button
-            onClick={() => {
-              if (selectedCancelDates.length === 0) {
-                notify({
-                  title: "Select dates first",
-                  message: "Click the date headers on the calendar before cancelling days.",
-                  tone: "warning",
-                });
-                return;
-              }
-              setShowCancelDay(true);
-            }}
+            onClick={() => openDayAction("cancel")}
             className={`ui-btn ${selectedCancelDates.length > 0 ? "ui-btn-danger" : "ui-btn-ghost"}`}
           >
             Cancel Day(s) {selectedCancelDates.length > 0 ? `(${selectedCancelDates.length})` : ""}
           </button>
           <button
-            onClick={() => {
-              if (selectedCancelDates.length === 0) {
-                notify({
-                  title: "Select dates first",
-                  message: "Click the date headers on the calendar before reopening days.",
-                  tone: "warning",
-                });
-                return;
-              }
-              setShowReopenDay(true);
-            }}
+            onClick={() => openDayAction("reopen")}
             className={`ui-btn ${selectedCancelDates.length > 0 ? "ui-btn-soft" : "ui-btn-ghost"}`}
           >
             Reopen Day(s) {selectedCancelDates.length > 0 ? `(${selectedCancelDates.length})` : ""}
           </button>
           <button
-            onClick={() => { if (tours.length > 0) setAddForm(f => ({ ...f, tourId: f.tourId || tours[0].id })); setShowAddSlot(true); }}
+            onClick={openAddSlot}
             className="ui-btn ui-btn-primary"
           >
             Add Slot
@@ -948,10 +1023,10 @@ function Slots() {
       {/* BULK EDIT MODAL */}
       {showBulkEdit && (
         <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ background: "rgba(10,18,13,0.55)", backdropFilter: "blur(2px)" }}>
-          <div className="ui-card w-full max-h-[90vh] overflow-visible p-6 sm:max-w-md !rounded-t-2xl sm:!rounded-2xl">
+          <div className="ui-card w-full max-h-[90vh] overflow-y-auto p-6 sm:max-w-md !rounded-t-2xl sm:!rounded-2xl" role="dialog" aria-modal="true" aria-label="Bulk Edit Slots">
             <h3 className="mb-1 text-xl font-bold" style={{ color: "var(--ck-text-strong)" }}>Bulk Edit Slots</h3>
             <p className="mb-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>
-              Apply new capacities or base amounts to multiple slots at once.
+              Update departures for this tour and date range.
             </p>
 
             <div className="space-y-4">
@@ -986,7 +1061,7 @@ function Slots() {
 
               <label className="block text-sm text-gray-600">
                 New Time
-                <span className="block text-xs text-gray-400 mb-1">Leave blank to keep existing times. Use 24-hour time, for example 14:00.</span>
+                <span className="block text-xs text-gray-400 mb-1">Blank keeps current times. Use 24-hour time, e.g. 14:00.</span>
                 <TimeInput
                   name="bulk_new_time"
                   value={bulkForm.newTime}
@@ -1010,7 +1085,7 @@ function Slots() {
 
               <label className="block text-sm text-gray-600">
                 New Base Price (ZAR)
-                <span className="block text-xs text-gray-400 mb-1">Leave blank to keep existing prices. Type "NULL" to reset to default base amount.</span>
+                <span className="block text-xs text-gray-400 mb-1">Blank keeps current prices. Enter NULL for the base rate.</span>
                 <input
                   name="bulk_price"
                   type="text"
@@ -1021,6 +1096,12 @@ function Slots() {
                 />
               </label>
             </div>
+
+            <section className="mt-5 space-y-2 border-t border-[var(--ck-border-subtle)] pt-4" aria-label="Weekend-only availability">
+              <h4 className="font-semibold text-[var(--ck-text-strong)]">Make existing slots weekends only</h4>
+              <p className="text-sm text-[var(--ck-text-muted)]">Close future weekdays in this range. Weekends, bookings and holds stay as they are. Ignores capacity, price and time fields.</p>
+              <button type="button" data-demo-action="slot.close-weekdays" onClick={closeWeekdaySlots} disabled={savingBulk || !bulkForm.startDate || !bulkForm.endDate} className="ui-btn ui-btn-ghost w-full disabled:opacity-50">{savingBulk ? "Please wait..." : "Close weekday slots"}</button>
+            </section>
 
             <div className="mt-6 grid grid-cols-1 gap-2 sm:flex sm:justify-end">
               <button
@@ -1048,7 +1129,7 @@ function Slots() {
           <div className="ui-card w-full max-h-[90vh] overflow-visible p-6 sm:max-w-md !rounded-t-2xl sm:!rounded-2xl">
             <h3 className="mb-1 text-xl font-bold" style={{ color: "var(--ck-text-strong)" }}>Add New Slots</h3>
             <p className="mb-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>
-              Create slots for a time across a date range.
+              Create departures across a date range.
             </p>
 
             <div className="space-y-4">
@@ -1106,7 +1187,7 @@ function Slots() {
                   onClick={() => setAddForm({ ...addForm, ranges: [...addForm.ranges, { start: "", end: "" }] })}
                   className="ui-btn !py-1.5 text-[12px]"
                 >
-                  + Add another date range
+                  Add date range
                 </button>
               </div>
 
@@ -1124,7 +1205,7 @@ function Slots() {
 
               <label className="block text-sm text-gray-600">
                 Price Override (ZAR)
-                <span className="block text-xs text-gray-400 mb-1">Leave blank to use the tour&apos;s default price.</span>
+                <span className="block text-xs text-gray-400 mb-1">Blank uses the tour&apos;s base price.</span>
                 <input
                   name="slot_price"
                   type="number"
@@ -1164,7 +1245,7 @@ function Slots() {
           <div className="ui-card w-full max-w-sm overflow-visible p-6">
             <h3 className="mb-1 text-xl font-bold" style={{ color: "var(--ck-danger)" }}>Cancel ({selectedCancelDates.length}) Day(s)</h3>
             <p className="mb-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>
-              You are about to close all slots and cancel active bookings due to weather for the following days:
+              Close departures and cancel active bookings for bad weather on:
             </p>
 
             <div className="mb-4 max-h-[30vh] space-y-2 overflow-y-auto rounded-lg p-3" style={{ background: "var(--ck-surface-sunken)", border: "1px solid var(--ck-border-subtle)" }}>
@@ -1203,7 +1284,7 @@ function Slots() {
           <div className="ui-card w-full max-w-sm overflow-visible p-6">
             <h3 className="mb-1 text-xl font-bold" style={{ color: "var(--ck-accent)" }}>Reopen ({selectedCancelDates.length}) Day(s)</h3>
             <p className="mb-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>
-              You are about to reopen all closed slots for the following days. Bookings will be enabled again.
+              Reopen closed departures for bookings on:
             </p>
 
             <div className="mb-4 max-h-[30vh] space-y-2 overflow-y-auto rounded-lg p-3" style={{ background: "var(--ck-surface-sunken)", border: "1px solid var(--ck-border-subtle)" }}>

@@ -1,0 +1,6 @@
+{
+  "agent_connection_grants": [
+    "id", "business_id", "user_id", "client_id", "provider", "role_at_consent",
+    "scopes", "enabled", "expires_at", "disconnected_at", "created_at"
+  ]
+}

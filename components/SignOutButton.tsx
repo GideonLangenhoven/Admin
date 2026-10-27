@@ -1,10 +1,11 @@
 "use client";
 
+import { guideSession } from "../app/lib/browser-session";
 import { useState } from "react";
 
 const PROTECTED_SIGN_OUT_EVENT = "bookingtours:protected-sign-out";
 
-export default function SignOutButton({ variant = "sidebar" }: { variant?: "sidebar" | "header" }) {
+export default function SignOutButton({ variant = "sidebar" }: { variant?: "sidebar" | "header" | "simple" }) {
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState("");
 
@@ -21,26 +22,26 @@ export default function SignOutButton({ variant = "sidebar" }: { variant?: "side
       // Stop device alerts after this account signs out. The server discards
       // the now-invalid endpoint when its push provider reports 404/410.
       try {
-        const registration = await navigator.serviceWorker?.getRegistration("/");
+        const registration = !guideSession ? await navigator.serviceWorker?.getRegistration("/") : undefined;
         const subscription = await registration?.pushManager.getSubscription();
         await subscription?.unsubscribe();
       } catch { /* Sign out must still finish if the browser push service fails. */ }
-      window.location.reload();
+      window.location.replace(guideSession ? "/simpleguide" : "/");
       return;
     }
     setError("Sign out could not be completed safely. Please try again.");
     setSigningOut(false);
   }
 
-  if (variant === "header") {
+  if (variant === "header" || variant === "simple") {
     return (
       <div className="flex items-center gap-2">
         {error && <span role="alert" className="text-xs" style={{ color: "var(--ck-danger)" }}>{error}</span>}
         <button
           onClick={logout}
           disabled={signingOut}
-          className="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors disabled:opacity-50"
-          style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-strong)" }}
+          className={(variant === "simple" ? "min-h-11 " : "") + "px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors disabled:opacity-50"}
+          style={variant === "simple" ? { color: "var(--sv-shell-text)", borderColor: "var(--sv-shell-muted)" } : { color: "var(--ck-text-muted)", borderColor: "var(--ck-border-strong)" }}
         >
           {signingOut ? "Signing Out..." : "Sign Out"}
         </button>

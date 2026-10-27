@@ -1,0 +1,103 @@
+{
+  "date": "2026-10-20",
+  "status": "deployed_and_verified",
+  "deployed": true,
+  "scope": "Restore the original dashboard tile order and show all tiles using the existing main/super-admin editor and Save layout.",
+  "checks": {
+    "browser": "8 passed, including new reset/cancel/save failure/persistence tests for main and super admins, mobile and 320px sizing",
+    "unit": "12 dashboard layout API/helper tests passed",
+    "typecheck": "Application and components passed",
+    "lint": "Changed component and browser test passed",
+    "design_detector": [],
+    "production_build": "Passed: Next.js production compilation and TypeScript"
+  },
+  "files": {
+    "components/DashboardTiles.tsx": "e449201ada6300527e8cc036feb115e3976b679905428c6cd4c1ac0787b90e34",
+    "tests/e2e/dashboard-layout.spec.ts": "073c7653b3b7429317726a587e4126abca3fdc7d462278b3877a34f54ce4f418",
+    "docs/admin-help/dashboard.md": "735fb1757e9eee2e13d8ba44ecf06edc6c7811bb76b14c9e628daefb8105b500"
+  },
+  "database_migration_required": false,
+  "visual_review": {
+    "disposition": "ship",
+    "scope": "Restore-default control at 1440px, 390px and 320px; no material fixes"
+  },
+  "documentation_review": "Passed; incumbent visual system preserved and functional help updated.",
+  "deployment": {
+    "id": "dpl_FAraNc3RmSccZUWc1dYpuKf9gGKy",
+    "url": "caepweb-admin-n6p7115ep-jerrys-projects-f4e4eaf9.vercel.app",
+    "source_files_verified": 503,
+    "at": "2026-10-20T06:02:00.397Z"
+  },
+  "url": "https://kayak.admin.bookingtours.co.za/",
+  "source": {
+    "changed": [
+      "components/DashboardTiles.tsx"
+    ],
+    "hashes": {
+      "components/DashboardTiles.tsx": "e449201ada6300527e8cc036feb115e3976b679905428c6cd4c1ac0787b90e34"
+    },
+    "preserved_files": 502
+  },
+  "live_checks": [
+    {
+      "name": "Main admin can preview default restoration and cancel without saving",
+      "status": "PASS"
+    },
+    {
+      "name": "Read-only operator cannot access default restoration",
+      "status": "PASS"
+    },
+    {
+      "name": "Desktop reset previews original order and all tiles without saving",
+      "status": "PASS"
+    },
+    {
+      "name": "Cancel preserves the saved custom operator layout",
+      "status": "PASS"
+    },
+    {
+      "name": "Mobile restore and Save layout persist the default arrangement for the operator",
+      "status": "PASS"
+    },
+    {
+      "name": "Restoring one operator does not change another operator layout",
+      "status": "PASS"
+    },
+    {
+      "name": "Temporary verification layout restored to its original state",
+      "status": "PASS"
+    },
+    {
+      "path": "/",
+      "status": 200
+    },
+    {
+      "path": "/api/dashboard-layout",
+      "status": 401
+    }
+  ],
+  "live_check_count": 9,
+  "help": {
+    "at": "2026-10-20T06:04:29.847Z",
+    "changed": [
+      "help:dashboard:9"
+    ],
+    "result": {
+      "ok": true,
+      "total": 179,
+      "embedded": 1,
+      "skipped": 178,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    },
+    "unrelated_help_preserved": true
+  },
+  "original_test_layout_restored": true,
+  "real_emails_sent": 0,
+  "real_payments": 0,
+  "live_screenshots": [
+    "docs/production-readiness/evidence/dashboard-reset-deployment-20261020/editor-1440.png",
+    "docs/production-readiness/evidence/dashboard-reset-deployment-20261020/editor-390.png"
+  ]
+}

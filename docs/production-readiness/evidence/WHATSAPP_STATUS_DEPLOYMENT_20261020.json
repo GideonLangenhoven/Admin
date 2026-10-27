@@ -1,0 +1,50 @@
+{
+  "change": "Remove Bot is replying now text and its badge from WhatsApp Bot Mode",
+  "source": {
+    "id": "dpl_2aTTrT9YspEMCmtbDppMCqtwsMHi",
+    "url": "caepweb-admin-fy2q4jppy-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 503,
+    "preserved_files": 502,
+    "changed": [
+      "app/settings/components/LiveStatusBadge.tsx"
+    ]
+  },
+  "live": {
+    "at": "2026-10-20T13:08:33.888Z",
+    "id": "dpl_2aTTrT9YspEMCmtbDppMCqtwsMHi",
+    "url": "https://admin.bookingtours.co.za",
+    "checks": [
+      {
+        "path": "/settings",
+        "status": 200
+      }
+    ],
+    "no_customer_actions": true
+  },
+  "validation": {
+    "production_build": "passed",
+    "eslint": "passed",
+    "browser": {
+      "startTime": "2026-10-20T12:59:22.685Z",
+      "duration": 12437.916000000001,
+      "expected": 1,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "viewports": [
+      320,
+      390,
+      1440
+    ],
+    "modes_checked": [
+      "ALWAYS_ON",
+      "OUTSIDE_HOURS active",
+      "OUTSIDE_HOURS inactive",
+      "OFF"
+    ],
+    "physical_devices_tested": false
+  },
+  "bot_settings_or_customer_data_changed": false
+}

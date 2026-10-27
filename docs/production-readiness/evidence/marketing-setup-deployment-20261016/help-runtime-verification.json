@@ -1,0 +1,61 @@
+{
+  "at": "2026-10-16T05:10:26.841Z",
+  "function": {
+    "slug": "admin-help-chat",
+    "version": 23,
+    "status": "ACTIVE"
+  },
+  "sourceChecks": [
+    {
+      "path": "supabase/functions/admin-help-chat/index.ts",
+      "sha256": "06b6d1966b40ddaf6ca5684b4b5aad3f873bfc779a088dea1b34aa9bdd2bb7e2"
+    },
+    {
+      "path": "supabase/functions/_shared/tenant.ts",
+      "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+    },
+    {
+      "path": "supabase/functions/_shared/pagination.ts",
+      "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+    },
+    {
+      "path": "supabase/functions/_shared/auth.ts",
+      "sha256": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade"
+    },
+    {
+      "path": "supabase/functions/_shared/llm.ts",
+      "sha256": "e7bed1f1ed96a04d6b326ee3580fc6550c37821b19d2618321f4d4be9b3c85c1"
+    },
+    {
+      "path": "supabase/functions/_shared/openrouter-provider.ts",
+      "sha256": "52aa270a8467d6476d17a8881a4fe29ced09b52cdb44b4bec9e05246af202cd8"
+    },
+    {
+      "path": "supabase/functions/_shared/kb.ts",
+      "sha256": "5d89feee2c9ef467716d48625b112ecb86b81b84679e48c7a22da42a5f88b68d"
+    },
+    {
+      "path": "supabase/functions/_shared/demo-guide.ts",
+      "sha256": "f9d714820fd3340ad1dc00a680be2e7207f9feeb0d44f98cd9344b954d666c49"
+    }
+  ],
+  "internal_probe": {
+    "ok": true,
+    "answer": "“**Marketing emails need setup**” means BookingTours has listed work remaining for the selected operator, such as:\n\n- Connecting the email service\n- Connecting bounced-email and spam reports\n- Adding the operator’s local time zone, if missing\n- Enabling the operator’s sending policy\n\nOn [Marketing](/marketing), **Email BookingTours** opens a support email containing the operator name, ID, and current setup steps. Review it and send it yourself. It does not enable email sending.\n\nNo. **Automatic welcome-back emails are not sending now.** Their delivery remains held until the booking-based delivery work is completed, even if email settings appear configured. You can save and preview the draft under [Marketing Automations](/marketing/automations), but it cannot be activated yet.",
+    "sources": [
+      {
+        "title": "Marketing",
+        "route": "/marketing"
+      },
+      {
+        "title": "WhatsApp and automatic messages",
+        "route": "/inbox"
+      },
+      {
+        "title": "Bookings",
+        "route": "/bookings"
+      }
+    ]
+  },
+  "no_customer_actions": true
+}

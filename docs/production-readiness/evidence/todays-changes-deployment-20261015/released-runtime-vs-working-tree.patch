@@ -1,0 +1,2849 @@
+--- a/app/lib/agent-db.ts
++++ b/app/lib/agent-db.ts
+@@ -11,8 +11,7 @@
+   if (!pool) {
+     const url = new URL(process.env.AGENT_DATABASE_URL || "");
+     if (!["postgres:", "postgresql:"].includes(url.protocol) || url.searchParams.has("sslmode") || url.searchParams.has("ssl")) throw new AgentHttpError("INTEGRATION_DISABLED", 503);
+-    pool = new Pool({ connectionString: url.href, ssl: { rejectUnauthorized: true,
+-      ...(process.env.AGENT_DATABASE_CA ? { ca: process.env.AGENT_DATABASE_CA.replace(/\\n/g, "\n") } : {}) }, max: 5,
++    pool = new Pool({ connectionString: url.href, ssl: { rejectUnauthorized: true }, max: 5,
+       connectionTimeoutMillis: 5_000, statement_timeout: 5_000, query_timeout: 5_500,
+       idleTimeoutMillis: 10_000, allowExitOnIdle: true });
+     pool.on("error", () => { /* Never log raw pg errors/connection strings. */ });
+--- a/app/lib/agent-oauth.ts
++++ b/app/lib/agent-oauth.ts
+@@ -97,7 +97,7 @@
+   requireSameOrigin(request,config,action === "consent");
+   const base = { provider: config.provider,resource: config.resource };
+   if (action === "authorize" && request.method === "GET") {
+-    const params = uniqueParams(new URL(request.url).searchParams,["client_id","redirect_uri","response_type","scope","state","code_challenge","code_challenge_method","resource","ui_locales"]);
++    const params = uniqueParams(new URL(request.url).searchParams,["client_id","redirect_uri","response_type","scope","state","code_challenge","code_challenge_method","resource"]);
+     if (params.response_type !== "code" || params.resource !== config.resource || params.code_challenge_method !== "S256"
+       || !/^[A-Za-z0-9_-]{43}$/.test(params.code_challenge || "") || !params.state || params.state.length > 512) throw new AgentHttpError("INVALID_INPUT",400);
+     SCOPES(params.scope || "");
+--- a/app/lib/marketing-journey.ts
++++ b/app/lib/marketing-journey.ts
+@@ -24,11 +24,11 @@
+     version: MARKETING_CONTRACT_VERSION,
+     trigger: triggerSentence(automation),
+     eligibility: "Verified permission for this operator, email channel and promotional purpose; active contact; no suppression.",
+-    goal: automation.trigger_type === "contact_added" ? "Stop on any non-cancelled reservation, including unpaid."
++    goal: automation.trigger_type === "contact_added" ? "First-booking rule approval is unverified. This promotional path is held."
+       : automation.trigger_type === "booking_inactive" ? "Stop on rebooking or an upcoming reservation."
+       : "Complete the listed steps while still eligible. Review completion is unavailable.",
+-    timing: `Elapsed delays, checked by the dispatcher. Quiet hours: 20:00–08:00, ${timezone}.`,
+-    frequency: "At most one marketing email per contact per 24 hours across campaigns and journeys. Uncertain sends also reserve the slot.",
++    timing: `Elapsed delays, checked by the dispatcher. Sending window pending approval. Test fixture: 08:00–20:00, ${timezone}.`,
++    frequency: "Frequency policy pending approval. Test fixture: one marketing email per 24 hours across campaigns and journeys. Uncertain sends reserve the slot.",
+     reentry: automation.trigger_type === "date_field" ? "At most once per calendar year."
+       : automation.trigger_type === "booking_inactive" ? "Once per last-paid-booking date."
+       : "Automatic enrollment is unique per contact and journey. Manual re-entry needs an explicit decision.",
+@@ -44,7 +44,7 @@
+ export type MarketingGoal = "reviews" | "welcome" | "winback" | "vouchers";
+ export const marketingGoals: { key: MarketingGoal; title: string; recipe: string; why: string; prerequisite: string }[] = [
+   { key: "reviews", title: "Get reviews", recipe: "post-tour-review", why: "Invite guests after their tour, with one bounded reminder.", prerequisite: "A trustworthy completed-tour tag and review links. Review-completion detection is unavailable." },
+-  { key: "welcome", title: "Welcome enquiries", recipe: "welcome-series", why: "Help permitted prospects find a suitable tour.", prerequisite: "Verified permission and no non-cancelled reservation. First-booking offers require approved issuance limits." },
++  { key: "welcome", title: "Welcome enquiries", recipe: "welcome-series", why: "Help permitted prospects find a suitable tour.", prerequisite: "Verified permission. First-booking exclusion policy is pending approval; offers and delivery are held." },
+   { key: "winback", title: "Bring guests back", recipe: "win-back", why: "Follow up after the configured time since a paid booking.", prerequisite: "Booking history and no rebooking or upcoming reservation. Offers need approved limits." },
+   { key: "vouchers", title: "Recover expiring voucher value", recipe: "voucher-expiry", why: "Help holders use a valid voucher before expiry.", prerequisite: "A verified contact-to-voucher mapping, balance and expiry checks. This guided goal is held until that binding is available." },
+ ];
+--- a/app/marketing/automations/[id]/page.tsx
++++ b/app/marketing/automations/[id]/page.tsx
+@@ -609,6 +609,7 @@
+       </div>}
+       <section className="ui-card p-5 space-y-2" aria-labelledby="journey-contract-title">
+         <h2 id="journey-contract-title" className="font-semibold">Journey contract, version 1</h2>
++        <p className="text-sm" role="status">This describes your current edits, including unsaved steps. Audience, overlap, timing and send-volume estimates are unavailable for this edited journey. No delivery is guaranteed.</p>
+         {Object.entries(journeyContract(automation, steps, timezone)).filter(([key]) => !["version", "steps"].includes(key)).map(([key,value]) => <p key={key} className="text-sm"><strong className="capitalize">{key}:</strong> {String(value)}</p>)}
+       </section>
+       {/* Automation metadata */}
+@@ -738,7 +739,8 @@
+           {automation.status !== "archived" && (
+             <button data-demo-action={automation.status === "active" ? "automation.pause" : "automation.activate"}
+               onClick={toggleAutomationStatus}
+-              disabled={(cacheConflict && automation.status !== "active") || activating || saving || readOnly || !["MAIN_ADMIN", "SUPER_ADMIN"].includes(role)}
++              disabled={automation.status !== "active" || activating || saving || readOnly || !["MAIN_ADMIN", "SUPER_ADMIN"].includes(role)}
++              title={automation.status === "active" ? "Pause promotional delivery" : "Activation unavailable pending policy approval and safety verification"}
+               className={`ui-btn ${automation.status === "active" ? "ui-btn-danger" : "ui-btn-soft"} disabled:opacity-50`}
+             >
+               {activating ? "Checking…" : automation.status === "active" ? "Pause" : "Activate"}
+@@ -822,7 +824,7 @@
+               Before you activate
+             </h2>
+             <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
+-              Review each email and confirm the trigger, then activate when you're ready.
++              Review and save your draft. Activation remains unavailable pending policy approval and safety verification.
+             </p>
+           </div>
+           <div className="space-y-2">
+@@ -863,7 +865,8 @@
+           </div>
+           <button data-demo-action="automation.activate"
+             onClick={toggleAutomationStatus}
+-            disabled={cacheConflict || activating || saving || readOnly || !["MAIN_ADMIN", "SUPER_ADMIN"].includes(role)}
++            disabled
++            title="Activation unavailable pending policy approval and safety verification"
+             className="ui-btn ui-btn-primary disabled:opacity-50"
+           >
+             {activating ? "Checking…" : "Activate"}
+--- a/app/marketing/automations/page.tsx
++++ b/app/marketing/automations/page.tsx
+@@ -497,6 +497,7 @@
+                 </span>
+               </div>
+               <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>{t.description}</p>
++              <p className="text-sm mt-2" role="status">Unavailable for delivery. This draft recipe has unverified policy, event or offer prerequisites. Example offers and dates are illustrative and are not approved commercial terms.</p>
+             </div>
+           </div>
+           <div className="mt-4 flex gap-3">
+@@ -583,7 +584,7 @@
+             {t.exampleEmail}
+           </div>
+           <p className="text-xs mt-2" style={{ color: "var(--ck-text-muted)" }}>
+-            This is a sample. You'll customise the actual email in your template editor after creating the automation.
++            Illustrative content only. Verify every claim, link, offer and date before review. The saved draft may differ; this is not its audience or delivery estimate.
+           </p>
+         </div>
+ 
+@@ -617,7 +618,7 @@
+             <p className="ui-mono-label mb-2">Growth · Templates</p>
+             <h1 className="font-display text-[26px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Automation Templates</h1>
+             <p className="text-sm mt-1.5" style={{ color: "var(--ck-text-muted)" }}>
+-              Industry-proven workflows designed for tour &amp; activity businesses. Choose a template to get started in seconds.
++              Ten draft recipes for review. Promotional delivery is unavailable until each recipe’s prerequisites and business policies are approved.
+             </p>
+           </div>
+           <button
+@@ -655,6 +656,7 @@
+                             <h3 className="text-sm font-semibold truncate" style={{ color: "var(--ck-text-strong)" }}>
+                               {t.name}
+                             </h3>
++                            <span className="ui-status ui-pill-neutral">Delivery unavailable</span>
+                           </div>
+                           <p className="text-xs line-clamp-2 mb-2" style={{ color: "var(--ck-text-muted)" }}>
+                             {t.description}
+@@ -708,7 +710,7 @@
+           <div className="flex items-start gap-3">
+             <div className="min-w-0">
+               <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--ck-text-strong)" }}>
+-                Your automations run 24/7 in the background
++                Promotional delivery is held for safety review
+               </h3>
+               <p className="text-xs leading-relaxed mb-2" style={{ color: "var(--ck-text-muted)" }}>
+                 Tags are automatically applied to your contacts based on their booking behaviour, like <strong>completed-tour</strong>, <strong>lapsed-90-days</strong>, or <strong>vip</strong>. When a tag is added, any matching automation triggers instantly. No manual work needed.
+@@ -818,7 +820,7 @@
+                   <span className="text-xs font-semibold" style={{ color: "var(--ck-text-strong)" }}>Results Grow</span>
+                 </div>
+                 <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
+-                  More reviews, more rebookings, more referrals, and recovered revenue, all while you focus on running great tours.
++                  Delivery and revenue outcomes are unavailable until dispatch, booking and payment linkage is verified.
+                 </p>
+               </div>
+             </div>
+@@ -908,9 +910,10 @@
+                         {a.status !== "archived" && (
+                           <button data-demo-action={a.status === "active" ? "automation.pause" : "automation.activate"}
+                             onClick={() => toggleStatus(a)}
++                            disabled={a.status !== "active"}
+                             className="inline-flex items-center justify-center rounded-lg border p-1.5 transition-colors hover:bg-[var(--ck-surface-sunken)]"
+                             style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)" }}
+-                            title={a.status === "active" ? "Pause" : "Activate"}
++                            title={a.status === "active" ? "Pause" : "Activation unavailable pending policy approval and safety verification"}
+                           >
+                             {a.status === "active" ? <Pause size={13} /> : <Play size={13} />}
+                           </button>
+--- a/app/marketing/layout.tsx
++++ b/app/marketing/layout.tsx
+@@ -11,6 +11,9 @@
+       </div>
+ 
+       <SectionTabs section="marketing" />
++      <p role="status" className="ui-card p-4 text-sm">
++        Promotional delivery is unavailable pending policy approval and safety verification. Drafts and previews remain available. Booking messages continue separately.
++      </p>
+ 
+       {children}
+     </div>
+--- a/app/new-booking/page.tsx
++++ b/app/new-booking/page.tsx
+@@ -864,7 +864,7 @@
+   if (receipt) return <section className="ui-card p-5 max-w-3xl" aria-labelledby="booking-receipt">
+     <h1 id="booking-receipt" tabIndex={-1} className="text-2xl font-semibold">Booking saved · {String(receipt.id).slice(0,8).toUpperCase()}</h1>
+     <p className="mt-3">{selectedTour?.name} · {new Intl.DateTimeFormat("en-ZA", {dateStyle:"full",timeStyle:"short",timeZone:timezone}).format(new Date(receipt.start_time))} · {timezone}</p>
+-    <p className="mt-2">{receipt.qty} guests · {({PENDING:"Awaiting payment",HELD:"Places held",CONFIRMED:"Confirmed",PAID:"Payment recorded"} as Record<string,string>)[String(receipt.status)] || "Check booking status"} · Total {fmtCurrency(Number(receipt.total_amount))} · Paid {fmtCurrency(Number(receipt.total_captured||0))} · Due {fmtCurrency(Math.max(0,Number(receipt.total_amount)-Number(receipt.total_captured||0)))}</p>
++    <p className="mt-2">{receipt.qty} guests · {receipt.status} · Total {fmtCurrency(Number(receipt.total_amount))} · Paid {fmtCurrency(Number(receipt.total_captured||0))} · Due {fmtCurrency(Math.max(0,Number(receipt.total_amount)-Number(receipt.total_captured||0)))}</p>
+     <p className="mt-3" role="status">{receipt.notification_result}</p>
+     <div className="mt-5 flex flex-wrap gap-2"><Link className="ui-btn ui-btn-primary" href={`/bookings/${receipt.id}?returnTo=${encodeURIComponent(returnTo)}`}>Open booking and waiver</Link><Link className="ui-btn ui-btn-soft" href={returnTo}>Return to daily work</Link></div>
+   </section>;
+@@ -1313,7 +1313,7 @@
+       {reviewing && <section ref={reviewFocusRef} tabIndex={-1} className="ui-card p-5 space-y-3" aria-label="Review booking">
+         <h3 className="text-xl font-semibold">4. Review before creating</h3>
+         <p>{selectedTour?.name} · {selectedSlot ? new Intl.DateTimeFormat("en-ZA",{dateStyle:"full",timeStyle:"short",timeZone:timezone}).format(new Date(selectedSlot.start_time)) : "Choose a valid departure"} · {timezone}</p>
+-        <p>{customerName} · {qty} guests ({adults || 0} {Number(adults)===1?"adult":"adults"}, {children || 0} {Number(children)===1?"child":"children"})</p>
++        <p>{customerName} · {qty} guests ({adults || 0} adults, {children || 0} children)</p>
+         <p>Activity {fmtCurrency(baseTotal)} + extras {fmtCurrency(addOnsTotal)} · Final total <strong>{fmtCurrency(totalAmount)}</strong></p>
+         <p>{status === "PAID" ? `Record ${fmtCurrency(totalAmount)} already received. This does not charge a card.` : status === "CONFIRMED" ? `Confirm ${qty} places with ${fmtCurrency(totalAmount)} still due. Arrival needs payment or an account/reseller approval, plus a signed waiver.` : `Hold ${qty} places for up to ${holdHours} hours, subject to the existing server deadline. ${fmtCurrency(totalAmount)} remains due.`}</p>
+         {customFieldDefinitions.length>0 && <details><summary className="cursor-pointer font-medium">Safety and participant details</summary><dl className="mt-2 space-y-2 text-sm">{bookingCustomFieldEntries(captureQuestionFields(customFieldDefinitions,validateQuestionAnswers(customFieldDefinitions,customFieldValues,qty).answers,businessId,selectedTourId)).map(field=><div key={field.key}><dt className="font-medium">{field.label}</dt><dd className="whitespace-pre-wrap break-words">{field.value}</dd></div>)}</dl></details>}
+--- a/app/simple/help/page.tsx
++++ b/app/simple/help/page.tsx
+@@ -1,6 +1,6 @@
+ import Link from "next/link";
+-export default function SimpleHelp(){return <div className="sv-page space-y-5"><header className="ui-card p-5"><h1 className="sv-title">Daily work help</h1><p className="mt-2">Choose the task you need. Advanced controls remain in the full dashboard.</p></header>
+- <ul className="ui-card p-5 space-y-3"><li><Link className="underline" href="/simple">Find departures and record arrivals</Link></li><li><Link className="underline" href="/simple/bookings">Find a booking by reference or guest details</Link></li><li><Link className="underline" href="/slots">Configure a future departure in Slots</Link></li><li><Link className="underline" href="/inbox">Open guest conversations in Inbox</Link></li></ul>
++export default function SimpleHelp(){return <div className="sv-page space-y-5"><header><h1 className="sv-title">Daily work help</h1><p className="mt-2">Choose the task you need. Advanced controls remain in the full dashboard.</p></header>
++ <ul className="space-y-3"><li><Link className="underline" href="/simple">Find departures and record arrivals</Link></li><li><Link className="underline" href="/simple/bookings">Find a booking by reference or guest details</Link></li><li><Link className="underline" href="/slots">Configure a future departure in Slots</Link></li><li><Link className="underline" href="/inbox">Open guest conversations in Inbox</Link></li></ul>
+  <details className="ui-card p-4" open><summary className="font-semibold cursor-pointer">Booking and payment glossary</summary><dl className="mt-3 space-y-3"><div><dt className="font-semibold">Confirmed</dt><dd>A reservation has been confirmed. Money may still be due.</dd></div><div><dt className="font-semibold">Paid / received</dt><dd>Money recorded as received. Record payment does not charge a card.</dd></div><div><dt className="font-semibold">Held</dt><dd>Places temporarily reserved until the payment deadline. Availability can change when a hold expires.</dd></div><div><dt className="font-semibold">Arrived</dt><dd>The recorded number of guests present, separate from payment and waiver status.</dd></div><div><dt className="font-semibold">Signed waiver</dt><dd>The current product records a booking-level signature. Check its signer and participant details against your requirements.</dd></div></dl></details>
+- <p className="ui-card p-5">For an exception, open the booking and ask your main admin for help. Include the booking reference and the task you were completing.</p>
++ <p>For an exception, open the exact booking and review its history with your main admin. No support hours or response time are promised here.</p>
+  </div>}
+--- a/supabase/functions/_shared/getyourguide.ts
++++ b/supabase/functions/_shared/getyourguide.ts
+@@ -1,358 +1,82 @@
+-import {
+-  categoryPrices,
+-  equalSecret,
+-  fingerprint,
+-  type Inventory,
+-  json,
+-  localDateTime,
+-  minorUnits,
+-  offsetDateTime,
+-  type Operation,
+-  positive,
+-  type SupplierBackend,
+-  SupplierError,
+-  text,
+-  vacancies,
+-} from "./ota-supplier.ts";
+-// HTTP Basic is required in both directions. Credentials cover the whole API,
+-// rather than being per-operator; product ownership comes from exact mappings.
+-export function createGygSupplierHandler(
+-  backend: SupplierBackend,
+-  credentials: { username: string; password: string },
+-) {
+-  return async (req: Request): Promise<Response> => {
+-    try {
+-      if (
+-        !equalSecret(
+-          req.headers.get("authorization") || "",
+-          "Basic " + btoa(credentials.username + ":" + credentials.password),
+-        ) || !credentials.username || !credentials.password
+-      ) {
+-        throw new SupplierError("AUTHORIZATION_FAILURE");
+-      }
+-      const path = new URL(req.url).pathname;
+-      if (path.endsWith("/1/get-availabilities/")) {
+-        if (req.method !== "GET") {
+-          throw new SupplierError("VALIDATION_FAILURE", "GET required");
+-        }
+-        const q = new URL(req.url).searchParams;
+-        const from = Date.parse(offsetDateTime(q.get("fromDateTime")));
+-        const to = Date.parse(offsetDateTime(q.get("toDateTime")));
+-        if (to < from || to - from > 366 * 86400000) {
+-          throw new SupplierError(
+-            "VALIDATION_FAILURE",
+-            "Availability range must be at most 366 days",
+-          );
+-        }
+-        const inventory = await backend.inventory(
+-          text(q.get("productId"), "productId"),
+-          "",
+-          undefined,
+-          {
+-            from: new Date(from).toISOString(),
+-            to: new Date(to).toISOString(),
+-          },
+-        );
+-        const availabilities = inventory.slots.filter((s) =>
+-          Date.parse(s.start) >= from && Date.parse(s.start) <= to
+-        ).map((slot) => ({
+-          dateTime: localDateTime(slot.start, inventory.timezone),
+-          productId: inventory.product,
+-          vacancies: vacancies(slot),
+-          currency: inventory.currency,
+-          pricesByCategory: {
+-            retailPrices: categoryPrices(inventory, slot).map((p) => ({
+-              category: p.category,
+-              price: minorUnits(p.price, inventory.currency),
+-            })),
+-          },
+-        }));
+-        return json({ data: { availabilities } });
+-      }
+-      if (req.method !== "POST") {
+-        throw new SupplierError("VALIDATION_FAILURE", "POST required");
+-      }
+-      let body;
+-      try {
+-        body = await req.json();
+-      } catch {
+-        throw new SupplierError("VALIDATION_FAILURE", "Malformed JSON");
+-      }
+-      const d = body?.data;
+-      if (!d || typeof d !== "object" || Array.isArray(d)) {
+-        throw new SupplierError("VALIDATION_FAILURE", "data is required");
+-      }
+-      const providerReference = text(
+-        d.gygBookingReference,
+-        "gygBookingReference",
+-      );
+-      if (path.endsWith("/1/cancel-reservation/")) {
+-        const reference = text(d.reservationReference, "reservationReference");
+-        const held = await backend.reservation(reference);
+-        if (held.provider_reference !== providerReference) {
+-          throw new SupplierError("INVALID_RESERVATION");
+-        }
+-        await backend.apply("cancel-reservation:" + reference, {
+-          operation: "cancel-reservation",
+-          reference: providerReference,
+-          provider_reference: providerReference,
+-          reservation_reference: reference,
+-        });
+-        return json({ data: {} });
+-      }
+-      if (path.endsWith("/1/cancel-booking/")) {
+-        const reference = text(d.bookingReference, "bookingReference");
+-        await backend.apply("cancel:" + reference, {
+-          operation: "cancel",
+-          reference: text(
+-            d.reservationReference || reference,
+-            "booking reference",
+-          ),
+-          supplier_reference: reference,
+-          provider_reference: providerReference,
+-          product: text(d.productId, "productId"),
+-        });
+-        return json({ data: {} });
+-      }
+-      const isReserve = path.endsWith("/1/reserve/");
+-      const isBook = path.endsWith("/1/book/");
+-      if (!isReserve && !isBook) {
+-        throw new SupplierError(
+-          "VALIDATION_FAILURE",
+-          "Unsupported supplier operation",
+-        );
+-      }
+-      const product = text(d.productId, "productId");
+-      let operation: Operation;
+-      let event: string;
+-      if (isBook) {
+-        const reference = text(d.reservationReference, "reservationReference");
+-        const providerPayload: Record<string, unknown> = {
+-          ...d,
+-          bookingItems: Array.isArray(d.bookingItems)
+-            ? d.bookingItems.map((item: Record<string, unknown>) =>
+-              Object.fromEntries(
+-                Object.entries(item).filter(([key]) => key !== "retailPrice"),
+-              )
+-            )
+-            : d.bookingItems,
+-        };
+-        delete providerPayload.currency;
+-        const completed = await backend.replay(
+-          "book:" + reference,
+-          providerPayload,
+-        );
+-        if (completed) {
+-          return json({
+-            data: {
+-              bookingReference: completed.supplier_reference,
+-              tickets: [{
+-                category: "COLLECTIVE",
+-                ticketCode: completed.booking_id,
+-                ticketCodeType: "TEXT",
+-              }],
+-            },
+-          });
+-        }
+-        const held = await backend.reservation(reference);
+-        const datetime = offsetDateTime(d.dateTime);
+-        const heldCategories = Object.fromEntries(
+-          (held.items as { category: string }[]).map(
+-            (item) => [item.category, 0],
+-          ),
+-        );
+-        const items = bookingItems(
+-          d.bookingItems,
+-          { categories: heldCategories } as Inventory,
+-        );
+-        if (
+-          held.product !== product ||
+-          held.provider_reference !== providerReference ||
+-          held.date_time !== datetime ||
+-          await fingerprint(held.items) !== await fingerprint(items)
+-        ) throw new SupplierError("INVALID_RESERVATION");
+-        if (
+-          !Array.isArray(d.travelers) || !d.travelers.length ||
+-          typeof d.comment !== "string"
+-        ) {
+-          throw new SupplierError(
+-            "VALIDATION_FAILURE",
+-            "travelers and comment are required",
+-          );
+-        }
+-        const lead = d.travelers[0];
+-        operation = {
+-          ...held,
+-          operation: "book",
+-          reference,
+-          reservation_reference: reference,
+-          provider_payload: providerPayload,
+-          customer_name:
+-            [lead.firstName, lead.lastName].filter(Boolean).join(" ") ||
+-            "GetYourGuide Guest",
+-          email: lead.email || "",
+-          phone: lead.phoneNumber || "",
+-        };
+-        event = "book:" + reference;
+-      } else {
+-        const requestedDateTime = offsetDateTime(d.dateTime);
+-        const rawItems = bookingItems(
+-          d.bookingItems,
+-          {
+-            categories: Object.fromEntries(
+-              [
+-                "ADULT",
+-                "CHILD",
+-                "YOUTH",
+-                "INFANT",
+-                "SENIOR",
+-                "STUDENT",
+-                "EU_CITIZEN",
+-                "MILITARY",
+-                "EU_CITIZEN_STUDENT",
+-              ].map((c) => [c, 0]),
+-            ),
+-          } as Inventory,
+-        );
+-        const providerPayload = {
+-          productId: product,
+-          dateTime: requestedDateTime,
+-          gygBookingReference: providerReference,
+-          bookingItems: rawItems,
+-          ...(d.gygActivityReference
+-            ? { gygActivityReference: d.gygActivityReference }
+-            : {}),
+-        };
+-        const reserveEvent = "reserve:" + await fingerprint(providerPayload);
+-        const completed = await backend.replay(reserveEvent, providerPayload);
+-        if (completed) {
+-          return json({
+-            data: {
+-              reservationReference: completed.reservation_id,
+-              reservationExpiration: completed.expires_at?.replace(
+-                "Z",
+-                "+00:00",
+-              ),
+-            },
+-          });
+-        }
+-        const inventory = await backend.inventory(product, "", undefined, {
+-          from: requestedDateTime,
+-          to: requestedDateTime,
+-        });
+-        const datetime = offsetDateTime(d.dateTime, inventory.timezone);
+-        const slot = inventory.slots.find((s) =>
+-          localDateTime(s.start, inventory.timezone) === datetime
+-        );
+-        if (!slot) throw new SupplierError("NO_AVAILABILITY");
+-        const items = bookingItems(d.bookingItems, inventory);
+-        const quantity = items.reduce((sum, item) => sum + item.count, 0);
+-        positive(quantity);
+-        const amount = items.reduce(
+-          (sum, item) =>
+-            sum +
+-            item.count * categoryPrices(inventory, slot).find((p) =>
+-                p.category === item.category
+-              )!.price,
+-          0,
+-        );
+-        operation = {
+-          operation: "reserve",
+-          reference: providerReference,
+-          provider_reference: providerReference,
+-          product,
+-          option: "",
+-          date_time: datetime,
+-          quantity,
+-          amount,
+-          currency: inventory.currency,
+-          items,
+-          provider_payload: providerPayload,
+-        };
+-        event = reserveEvent;
+-      }
+-      const result = await backend.apply(event, operation);
+-      if (isReserve) {
+-        return json({
+-          data: {
+-            reservationReference: result.reservation_id,
+-            reservationExpiration: result.expires_at?.replace("Z", "+00:00"),
+-          },
+-        });
+-      }
+-      return json({
+-        data: {
+-          bookingReference: result.supplier_reference,
+-          tickets: [{
+-            category: "COLLECTIVE",
+-            ticketCode: result.booking_id,
+-            ticketCodeType: "TEXT",
+-          }],
+-        },
+-      });
+-    } catch (error) {
+-      const e = error instanceof SupplierError
+-        ? error
+-        : new SupplierError("INTERNAL_SYSTEM_FAILURE");
+-      // All expected GYG errors, including authentication, use HTTP 200.
+-      const code = ["IDEMPOTENCY_CONFLICT", "OTA_NOT_READY"].includes(e.code)
+-        ? "INTERNAL_SYSTEM_FAILURE"
+-        : e.code;
+-      return json({ errorCode: code, errorMessage: e.message, ...e.details });
+-    }
+-  };
+-}
+-// Only individual/time-point products are supported by this local candidate.
+-// GROUP needs separate group inventory; it must never consume per-person seats.
+-function bookingItems(
+-  value: unknown,
+-  inventory: Inventory,
+-): { category: string; count: number }[] {
+-  if (!Array.isArray(value) || !value.length) {
+-    throw new SupplierError("VALIDATION_FAILURE", "bookingItems required");
++// GetYourGuide Supplier API client — OAuth2 client-credentials flow
++// Sandbox: https://supplier-api.sandbox.getyourguide.com
++// Production: https://supplier-api.getyourguide.com
++
++const PROD_BASE = "https://supplier-api.getyourguide.com";
++const SANDBOX_BASE = "https://supplier-api.sandbox.getyourguide.com";
++
++const tokenCache: Map<string, { token: string; expires: number }> = new Map();
++
++export type GygClient = {
++  fetch: (path: string, init?: RequestInit) => Promise<Response>;
++  baseUrl: string;
++  testMode: boolean;
++};
++
++async function getAccessToken(baseUrl: string, clientId: string, clientSecret: string): Promise<string> {
++  const cached = tokenCache.get(clientId);
++  if (cached && cached.expires > Date.now()) return cached.token;
++
++  const resp = await fetch(baseUrl + "/oauth2/token", {
++    method: "POST",
++    headers: { "Content-Type": "application/x-www-form-urlencoded" },
++    body: new URLSearchParams({
++      grant_type: "client_credentials",
++      client_id: clientId,
++      client_secret: clientSecret,
++    }),
++    signal: AbortSignal.timeout(10_000),
++  });
++  if (!resp.ok) {
++    const errBody = await resp.text().catch(() => "");
++    throw new Error("GYG OAuth2 token failed: " + resp.status + " " + errBody);
+   }
+-  const totals = new Map<string, number>();
+-  for (const item of value) {
+-    const category = text(item?.category, "category");
+-    if (
+-      category === "GROUP" || category === "COLLECTIVE" ||
+-      !Object.hasOwn(inventory.categories, category)
+-    ) {
+-      throw new SupplierError(
+-        "INVALID_TICKET_CATEGORY",
+-        "Category is not configured for individual inventory",
+-        { ticketCategory: category },
+-      );
+-    }
+-    totals.set(category, (totals.get(category) || 0) + positive(item.count));
+-  }
+-  return Array.from(totals, ([category, count]) => ({ category, count })).sort((
+-    a,
+-    b,
+-  ) => a.category.localeCompare(b.category));
++  const data = await resp.json();
++  const expiresIn = (data.expires_in || 3600) - 60;
++  tokenCache.set(clientId, { token: data.access_token, expires: Date.now() + expiresIn * 1000 });
++  return data.access_token;
+ }
+-// Exact documented notification path. Host and credentials must be issued by GYG;
+-// no guessed sandbox domain or OAuth client is retained.
+-export async function gygNotifyAvailability(
+-  baseUrl: string,
+-  credentials: { username: string; password: string },
+-  payload: unknown,
+-  fetcher: typeof fetch = fetch,
+-): Promise<void> {
+-  const url = new URL("/1/notify-availability-update", baseUrl);
+-  if (url.protocol !== "https:") throw new Error("HTTPS provider URL required");
+-  const response = await fetcher(url, {
+-    method: "POST",
+-    headers: {
++
++export function createGygClient(opts: {
++  clientId: string;
++  clientSecret: string;
++  testMode: boolean;
++}): GygClient {
++  const baseUrl = opts.testMode ? SANDBOX_BASE : PROD_BASE;
++
++  const fetchFn = async (path: string, init: RequestInit = {}): Promise<Response> => {
++    const token = await getAccessToken(baseUrl, opts.clientId, opts.clientSecret);
++    const url = baseUrl + path;
++    const headers: Record<string, string> = {
++      "Accept": "application/json",
+       "Content-Type": "application/json",
+-      Authorization: "Basic " +
+-        btoa(credentials.username + ":" + credentials.password),
+-    },
++      "Authorization": "Bearer " + token,
++      ...(init.headers as Record<string, string> || {}),
++    };
++    return await fetch(url, { ...init, headers, signal: AbortSignal.timeout(20_000) });
++  };
++
++  return { fetch: fetchFn, baseUrl, testMode: opts.testMode };
++}
++
++export async function gygPushAvailability(client: GygClient, payload: any): Promise<any> {
++  const r = await client.fetch("/supplier/availability", {
++    method: "PUT",
+     body: JSON.stringify(payload),
+-    signal: AbortSignal.timeout(10000),
+   });
+-  const body = await response.json();
+-  if (!response.ok || body.errorCode || !body.data) {
+-    throw new Error("GYG availability notification failed");
++  if (!r.ok) {
++    const body = await r.text().catch(() => "");
++    throw new Error("GYG availability push: " + r.status + " " + body);
+   }
++  return r.json();
+ }
++
++export async function gygFetchBookings(client: GygClient, modifiedSince: string): Promise<any[]> {
++  const r = await client.fetch("/supplier/bookings?modified_since=" + encodeURIComponent(modifiedSince));
++  if (!r.ok) {
++    const body = await r.text().catch(() => "");
++    throw new Error("GYG fetch bookings: " + r.status + " " + body);
++  }
++  const data = await r.json();
++  return data?.bookings || data?.data || [];
++}
+--- a/supabase/functions/_shared/marketing-batch.ts
++++ b/supabase/functions/_shared/marketing-batch.ts
+@@ -26,7 +26,8 @@
+     data?: Array<{ id?: unknown }>;
+     errors?: Array<{ index?: unknown; message?: unknown }>;
+   };
+-  if (!Array.isArray(response.data)) return null;
++  if (!Array.isArray(response.data) || response.data.some(item => typeof item?.id !== "string" || !item.id.trim()) ||
++    new Set(response.data.map(item => item.id)).size !== response.data.length) return null;
+ 
+   // Strict-mode success has no errors array and one ID per input. Permissive
+   // mode compacts successful IDs and identifies failures by original index.
+--- a/supabase/functions/_shared/marketing-outbox.ts
++++ b/supabase/functions/_shared/marketing-outbox.ts
+@@ -0,0 +1,10 @@
++// Legacy outbox bodies have no reliable promotional purpose or permission evidence.
++// Only a cancellation generated for this tenant and booking can continue here.
++export function operationalCancellationFollowup(
++  businessId: string,
++  message: { message_type?: string; booking_id?: string },
++  booking: { id?: string; business_id?: string; status?: string } | null,
++): boolean {
++  return message.message_type === "CANCEL_FOLLOWUP" && !!message.booking_id &&
++    booking?.id === message.booking_id && booking.business_id === businessId && booking.status === "CANCELLED";
++}
+--- a/supabase/functions/_shared/viator.ts
++++ b/supabase/functions/_shared/viator.ts
+@@ -1,553 +1,46 @@
+-import {
+-  categoryPrices,
+-  date,
+-  equalSecret,
+-  type Inventory,
+-  json,
+-  localDateTime,
+-  type Operation,
+-  positive,
+-  price,
+-  type SupplierBackend,
+-  SupplierError,
+-  text,
+-  time,
+-  vacancies,
+-} from "./ota-supplier.ts";
+-// Reservation-system hosted supplier API, not the affiliate/reseller Partner API.
+-export function createViatorSupplierHandler(
+-  backend: SupplierBackend,
+-  credentials: { apiKey: string; supplierId: number },
+-) {
+-  return async (req: Request): Promise<Response> => {
+-    let envelope: Record<string, unknown> = {};
+-    let responseType = "";
+-    let reserveRequest = false;
+-    try {
+-      if (req.method !== "POST") return json({ error: "POST required" }, 405);
+-      let body;
+-      try {
+-        body = await req.json();
+-      } catch {
+-        throw new SupplierError("VALIDATION_FAILURE", "Malformed JSON");
+-      }
+-      const path = new URL(req.url).pathname;
+-      const v2 = path.includes("/v2/");
+-      reserveRequest = path.endsWith("/v2/reserve");
+-      const d = v2 ? body : body?.data;
+-      if (!d || typeof d !== "object" || Array.isArray(d)) {
+-        throw new SupplierError("VALIDATION_FAILURE");
+-      }
+-      if (
+-        !equalSecret(
+-          req.headers.get("x-api-key") || (v2 ? "" : d.ApiKey) || "",
+-          credentials.apiKey,
+-        )
+-      ) return json({ error: "Unauthorized" }, 401);
+-      if ((v2 ? d.supplierId : d.SupplierId) !== credentials.supplierId) {
+-        return json({ error: "INVALID_SUPPLIER" }, 422);
+-      }
+-      if (!v2) {
+-        if (
+-          typeof d.ResellerId !== "string" ||
+-          !Number.isFinite(Date.parse(d.Timestamp))
+-        ) throw new SupplierError("VALIDATION_FAILURE");
+-        envelope = {
+-          ApiKey: credentials.apiKey,
+-          ResellerId: d.ResellerId,
+-          SupplierId: d.SupplierId,
+-          Timestamp: d.Timestamp,
+-          ...(d.ExternalReference
+-            ? { ExternalReference: d.ExternalReference }
+-            : {}),
+-        };
+-        responseType = String(body.requestType || "").replace(
+-          /Request$/,
+-          "Response",
+-        );
+-      }
+-      if (path.endsWith("/tourlist")) {
+-        if (body.requestType !== "TourListRequest") {
+-          throw new SupplierError("VALIDATION_FAILURE");
+-        }
+-        const products = await backend.catalog();
+-        const tours: Record<string, unknown>[] = [];
+-        for (const p of products) {
+-          if (!p.catalog || !p.supplierOptionId) {
+-            throw new SupplierError(
+-              "INTERNAL_SYSTEM_FAILURE",
+-              "Supplier catalog metadata and option identifiers must be configured",
+-            );
+-          }
+-          const existing = tours.find((t) =>
+-            t.SupplierProductCode === p.product
+-          );
+-          if (existing) {
+-            (existing.TourOption as unknown[]).push({
+-              productOptionId: p.supplierOptionId,
+-              SupplierOptionCode: p.option,
+-            });
+-            continue;
+-          }
+-          tours.push({
+-            SupplierProductCode: p.product,
+-            SupplierProductName: text(p.catalog.name, "product name"),
+-            CountryCode: p.catalog.countryCode,
+-            DestinationCode: p.catalog.destinationCode,
+-            DestinationName: p.catalog.destinationName,
+-            TourDescription: p.catalog.description,
+-            TourOption: [{
+-              productOptionId: p.supplierOptionId,
+-              SupplierOptionCode: p.option,
+-            }],
+-          });
+-        }
+-        return json({
+-          responseType,
+-          data: {
+-            ...envelope,
+-            RequestStatus: { Status: "SUCCESS" },
+-            Tour: tours,
+-          },
+-        });
+-      }
+-      if (
+-        path.endsWith("/v2/availability/calendar") ||
+-        path.endsWith("/v2/availability/check")
+-      ) {
+-        const calendar = path.endsWith("/calendar");
+-        const from = date(calendar ? d.startDate : d.travelDate);
+-        const to = date(calendar ? d.endDate : d.travelDate);
+-        if (to < from || Date.parse(to) - Date.parse(from) > 366 * 86400000) {
+-          throw new SupplierError("VALIDATION_FAILURE");
+-        }
+-        const options = calendar
+-          ? d.productOptionIds?.map((id: string) => ({ productOptionId: id }))
+-          : d.productOptions;
+-        if (
+-          !Array.isArray(options) || !options.length || options.length > 100
+-        ) throw new SupplierError("VALIDATION_FAILURE");
+-        const productOptions = [];
+-        for (const option of options) {
+-          let inventory: Inventory;
+-          try {
+-            inventory = await backend.inventory(
+-              "",
+-              "",
+-              text(option.productOptionId, "productOptionId"),
+-              { from: from + "T00:00:00+14:00", to: to + "T23:59:59-14:00" },
+-            );
+-          } catch (e) {
+-            if (e instanceof SupplierError && e.code === "INVALID_PRODUCT") {
+-              continue;
+-            }
+-            throw e;
+-          }
+-          if (!calendar) ticketQuantity(d.tickets, inventory, d.totalTravelers);
+-          const requested = option.startTimes?.map((t: string) =>
+-            time(t).slice(0, 5)
+-          );
+-          const slots = inventory.slots.filter((s) => {
+-            const local = localDateTime(s.start, inventory.timezone);
+-            return local.slice(0, 10) >= from && local.slice(0, 10) <= to &&
+-              (!requested || requested.includes(local.slice(11, 16)));
+-          });
+-          const events = slots.filter((s) => s.status === "OPEN").map((slot) =>
+-            viatorEvent(inventory, slot)
+-          );
+-          if (calendar) {
+-            const dates = Array.from(
+-              new Set(
+-                slots.filter((s) => s.status === "OPEN").map((s) =>
+-                  localDateTime(s.start, inventory.timezone).slice(0, 10)
+-                ),
+-              ),
+-            ).map((travelDate) => ({
+-              travelDate,
+-              events: events.filter((e) => e.localDate === travelDate).map(
+-                (event) =>
+-                  Object.fromEntries(
+-                    Object.entries(event).filter(([key]) =>
+-                      key !== "localDate"
+-                    ),
+-                  ),
+-              ),
+-            }));
+-            productOptions.push({
+-              productOptionId: option.productOptionId,
+-              currency: inventory.currency,
+-              dates,
+-            });
+-          } else {productOptions.push({
+-              productOptionId: option.productOptionId,
+-              currency: inventory.currency,
+-              events: events.map((event) =>
+-                Object.fromEntries(
+-                  Object.entries(event).filter(([key]) => key !== "localDate"),
+-                )
+-              ),
+-            });}
+-        }
+-        return json({ productOptions });
+-      }
+-      if (path.endsWith("/v2/reserve")) {
+-        const requestedDate = date(d.travelDate);
+-        const inventory = await backend.inventory(
+-          "",
+-          "",
+-          text(d.productOptionId, "productOptionId"),
+-          {
+-            from: requestedDate + "T00:00:00+14:00",
+-            to: requestedDate + "T23:59:59-14:00",
+-          },
+-        );
+-        const quantity = ticketQuantity(d.tickets, inventory, d.totalTravelers);
+-        const localDate = date(d.travelDate);
+-        const localTime = time(d.startTime);
+-        const slot = inventory.slots.find((s) =>
+-          localDateTime(s.start, inventory.timezone).slice(0, 19) ===
+-            localDate + "T" + localTime
+-        );
+-        if (!slot || slot.status !== "OPEN") {
+-          return json({ status: "NOT_RESERVED", reason: "NO_EVENT" });
+-        }
+-        if (Date.parse(slot.start) <= Date.now()) {
+-          return json({
+-            status: "NOT_RESERVED",
+-            reason: "PAST_BOOKING_CUTOFF",
+-          });
+-        }
+-        if (vacancies(slot) < quantity) {
+-          return json({
+-            status: "NOT_RESERVED",
+-            reason: vacancies(slot) === 0 ? "SOLD_OUT" : "LIMITED_AVAILABILITY",
+-          });
+-        }
+-        const amount = d.tickets.reduce(
+-          (sum: number, item: { type: string; quantity: number }) =>
+-            sum +
+-            item.quantity * categoryPrices(inventory, slot).find((p) =>
+-                p.category === item.type
+-              )!.price,
+-          0,
+-        );
+-        const operation: Operation = {
+-          operation: "reserve",
+-          reference: crypto.randomUUID(),
+-          product: inventory.product,
+-          option: inventory.option,
+-          supplier_option_id: inventory.supplierOptionId,
+-          date: localDate,
+-          time: localTime,
+-          quantity,
+-          amount,
+-          currency: inventory.currency,
+-          items: normalizedTickets(d.tickets),
+-        };
+-        const result = await backend.apply(
+-          "reserve:" + operation.reference,
+-          operation,
+-        );
+-        return json({
+-          status: "RESERVED",
+-          expiration: result.expires_at,
+-          reference: result.reservation_id,
+-          currency: inventory.currency,
+-          price: viatorEvent(inventory, slot).price,
+-        });
+-      }
+-      const operations: Record<string, { request: string; operation: string }> =
+-        {
+-          "/booking": { request: "BookingRequest", operation: "book" },
+-          "/booking-amendment": {
+-            request: "BookingAmendmentRequest",
+-            operation: "amend",
+-          },
+-          "/booking-cancellation": {
+-            request: "BookingCancellationRequest",
+-            operation: "cancel",
+-          },
+-        };
+-      const selected = Object.entries(operations).find(([suffix]) =>
+-        path.endsWith(suffix)
+-      )?.[1];
+-      if (!selected || body.requestType !== selected.request) {
+-        throw new SupplierError(
+-          "VALIDATION_FAILURE",
+-          "Unsupported supplier operation",
+-        );
+-      }
+-      const reference = text(d.BookingReference, "BookingReference");
+-      // A booking/cancellation can safely use its stable reference. Amendments
+-      // require the documented unique ExternalReference; content hashes or
+-      // changing timestamps cannot distinguish an old retry from a later change.
+-      if (selected.operation === "amend" && !d.ExternalReference) {
+-        throw new SupplierError(
+-          "VALIDATION_FAILURE",
+-          "Amendments require a stable ExternalReference",
+-        );
+-      }
+-      const event = d.ExternalReference
+-        ? text(d.ExternalReference, "ExternalReference")
+-        : selected.operation + ":" + reference;
+-      const providerPayload = Object.fromEntries(
+-        Object.entries(d).filter(([key]) =>
+-          !["ApiKey", "Retry", "Timestamp", "ExternalReference"].includes(key)
+-        ),
+-      );
+-      const completed = await backend.replay(event, providerPayload);
+-      if (completed) {
+-        return json({
+-          responseType,
+-          data: {
+-            ...envelope,
+-            RequestStatus: { Status: "SUCCESS" },
+-            BookingReference: reference,
+-            SupplierConfirmationNumber: completed.booking_id,
+-            ...(selected.operation === "cancel"
+-              ? { SupplierCancellationNumber: completed.booking_id + "-cancel" }
+-              : {}),
+-            TransactionStatus: { Status: "CONFIRMED" },
+-          },
+-        });
+-      }
+-      let operation: Operation = {
+-        operation: selected.operation,
+-        reference,
+-        provider_payload: providerPayload,
+-      };
+-      if (selected.operation !== "book") {
+-        operation.supplier_reference = text(
+-          d.SupplierConfirmationNumber,
+-          "SupplierConfirmationNumber",
+-        );
+-      }
+-      if (selected.operation !== "cancel") {
+-        const requestedDate = date(d.TravelDate);
+-        const inventory = await backend.inventory(
+-          text(d.SupplierProductCode, "SupplierProductCode"),
+-          d.TourOptions?.SupplierOptionCode || "",
+-          undefined,
+-          {
+-            from: requestedDate + "T00:00:00+14:00",
+-            to: requestedDate + "T23:59:59-14:00",
+-          },
+-        );
+-        const localDate = date(d.TravelDate);
+-        const candidates = inventory.slots.filter((s) =>
+-          localDateTime(s.start, inventory.timezone).slice(0, 10) === localDate
+-        );
+-        if (!candidates.length) throw new SupplierError("NO_AVAILABILITY");
+-        if (!d.TourOptions?.TourDepartureTime && candidates.length !== 1) {
+-          throw new SupplierError(
+-            "VALIDATION_FAILURE",
+-            "Departure time is required when the local date has multiple departures",
+-          );
+-        }
+-        const localTime = d.TourOptions?.TourDepartureTime
+-          ? time(d.TourOptions.TourDepartureTime)
+-          : localDateTime(candidates[0].start, inventory.timezone).slice(
+-            11,
+-            19,
+-          );
+-        if (!Array.isArray(d.Traveller) || !d.Traveller.length) {
+-          throw new SupplierError("VALIDATION_FAILURE", "Traveller required");
+-        }
+-        const counts = new Map<string, number>();
+-        for (const traveler of d.Traveller) {
+-          text(traveler.TravellerIdentifier, "TravellerIdentifier");
+-          text(traveler.GivenName, "GivenName");
+-          text(traveler.Surname, "Surname");
+-          const category = text(traveler.AgeBand, "AgeBand").toUpperCase();
+-          if (!Object.hasOwn(inventory.categories, category)) {
+-            throw new SupplierError("INVALID_TICKET_CATEGORY");
+-          }
+-          counts.set(category, (counts.get(category) || 0) + 1);
+-        }
+-        const lead = d.Traveller.find((t: { LeadTraveller?: boolean }) =>
+-          t.LeadTraveller
+-        ) || d.Traveller[0];
+-        operation = {
+-          ...operation,
+-          product: inventory.product,
+-          option: inventory.option,
+-          supplier_option_id: inventory.supplierOptionId,
+-          date: localDate,
+-          time: localTime,
+-          quantity: d.Traveller.length,
+-          amount: d.Amount === undefined
+-            ? d.Traveller.reduce((sum: number, t: { AgeBand: string }) =>
+-              sum + categoryPrices(
+-                inventory,
+-                candidates.find((s) =>
+-                  localDateTime(s.start, inventory.timezone).slice(11, 19) ===
+-                    localTime
+-                ) || candidates[0],
+-              ).find((p) =>
+-                p.category === t.AgeBand.toUpperCase()
+-              )!.price, 0)
+-            : price(d.Amount),
+-          net_amount: d.Amount === undefined ? null : price(d.Amount),
+-          currency: d.CurrencyCode === undefined
+-            ? inventory.currency
+-            : text(d.CurrencyCode, "CurrencyCode"),
+-          items: normalizedTickets(
+-            Array.from(counts, ([type, quantity]) => ({ type, quantity })),
+-          ),
+-          customer_name: lead.GivenName + " " + lead.Surname,
+-          email: d.ContactEmail || "",
+-          phone: d.ContactDetail?.ContactValue || "",
+-        };
+-        if (d.AvailabilityHoldReference) {
+-          operation.reservation_reference = text(
+-            d.AvailabilityHoldReference,
+-            "AvailabilityHoldReference",
+-          );
+-        }
+-      } else {
+-        date(d.CancelDate);
+-        text(d.Author, "Author");
+-        text(d.Reason, "Reason");
+-      }
+-      const result = await backend.apply(event, operation);
+-      return json({
+-        responseType,
+-        data: {
+-          ...envelope,
+-          RequestStatus: { Status: "SUCCESS" },
+-          BookingReference: reference,
+-          SupplierConfirmationNumber: result.booking_id,
+-          ...(selected.operation === "cancel"
+-            ? { SupplierCancellationNumber: result.booking_id + "-cancel" }
+-            : {}),
+-          TransactionStatus: { Status: "CONFIRMED" },
+-        },
+-      });
+-    } catch (error) {
+-      const e = error instanceof SupplierError
+-        ? error
+-        : new SupplierError("INTERNAL_SYSTEM_FAILURE");
+-      if (!responseType) {
+-        if (reserveRequest && e.code === "NO_AVAILABILITY") {
+-          return json({
+-            status: "NOT_RESERVED",
+-            reason: "LIMITED_AVAILABILITY",
+-          });
+-        }
+-        if (reserveRequest && e.code === "INVALID_TICKET_CATEGORY") {
+-          return json({
+-            status: "NOT_RESERVED",
+-            reason: "UNSUPPORTED_TICKET_COMBINATION",
+-          });
+-        }
+-        if (e.code === "INVALID_PRODUCT") {
+-          return json({ error: "INVALID_PRODUCT_OPTION" }, 422);
+-        }
+-        if (e.code === "VALIDATION_FAILURE") {
+-          return json({ error: "VALIDATION_FAILURE", message: e.message }, 400);
+-        }
+-        return json({ error: "INTERNAL_ERROR" }, 500);
+-      }
+-      return json({
+-        responseType,
+-        data: {
+-          ...envelope,
+-          RequestStatus: {
+-            Status: "ERROR",
+-            Error: { ErrorCode: e.code, ErrorMessage: e.message },
+-          },
+-        },
+-      });
+-    }
++// Viator Partner API client — supplier-side integration
++// Auth: exp-api-key header per https://docs.viator.com/partner-api/technical/#section/Authentication
++// Sandbox: https://api.sandbox.viator.com/partner
++// Production: https://api.viator.com/partner
++
++const PROD_BASE = "https://api.viator.com/partner";
++const SANDBOX_BASE = "https://api.sandbox.viator.com/partner";
++
++export type ViatorClient = {
++  fetch: (path: string, init?: RequestInit) => Promise<Response>;
++  baseUrl: string;
++  testMode: boolean;
++};
++
++export function createViatorClient(opts: {
++  apiKey: string;
++  testMode: boolean;
++}): ViatorClient {
++  const baseUrl = opts.testMode ? SANDBOX_BASE : PROD_BASE;
++
++  const fetchFn = async (path: string, init: RequestInit = {}): Promise<Response> => {
++    const url = baseUrl + path;
++    const headers: Record<string, string> = {
++      "Accept": "application/json;version=2.0",
++      "Accept-Language": "en-US",
++      "Content-Type": "application/json",
++      "exp-api-key": opts.apiKey,
++      ...(init.headers as Record<string, string> || {}),
++    };
++    return await fetch(url, { ...init, headers, signal: AbortSignal.timeout(20_000) });
+   };
++
++  return { fetch: fetchFn, baseUrl, testMode: opts.testMode };
+ }
+-function normalizedTickets(tickets: { type: string; quantity: number }[]) {
+-  return tickets.map((t) => ({ type: t.type, quantity: t.quantity })).sort((
+-    a,
+-    b,
+-  ) => a.type.localeCompare(b.type));
+-}
+-function ticketQuantity(
+-  tickets: unknown,
+-  inventory: Inventory,
+-  total: unknown,
+-): number {
+-  if (!Array.isArray(tickets) || !tickets.length) {
+-    throw new SupplierError("VALIDATION_FAILURE", "tickets required");
+-  }
+-  const qty = tickets.reduce((sum, t) => {
+-    if (!Object.hasOwn(inventory.categories, t.type)) {
+-      throw new SupplierError("INVALID_TICKET_CATEGORY");
+-    }
+-    return sum + positive(t.quantity);
+-  }, 0);
+-  if (positive(total) !== qty) {
+-    throw new SupplierError(
+-      "VALIDATION_FAILURE",
+-      "totalTravelers disagrees with tickets",
+-    );
+-  }
+-  return qty;
+-}
+-function viatorEvent(inventory: Inventory, slot: Inventory["slots"][number]) {
+-  const remaining = vacancies(slot);
+-  const local = localDateTime(slot.start, inventory.timezone);
+-  return {
+-    localDate: local.slice(0, 10),
+-    startTime: local.slice(11, 16),
+-    status: remaining > 0 ? "AVAILABLE" : "UNAVAILABLE",
+-    ...(remaining > 0 ? {} : {
+-      unavailableReason: Date.parse(slot.start) <= Date.now()
+-        ? "PAST_BOOKING_CUTOFF"
+-        : "SOLD_OUT",
+-    }),
+-    bookingCutoff: new Date(slot.start).toISOString(),
+-    capacity: {
+-      type: "LIMITED",
+-      original: slot.capacity,
+-      remaining,
+-      vacancies: [{
+-        types: Object.keys(inventory.categories),
+-        quantity: remaining,
+-        quantityType: "SHARED",
+-      }],
+-    },
+-    price: {
+-      type: "PER_PERSON_PRICE",
+-      prices: categoryPrices(inventory, slot).map((p) => ({
+-        types: [p.category],
+-        retailPrice: p.price,
+-      })),
+-    },
+-  };
+-}
+-export async function viatorNotifyEvents(
+-  baseUrl: string,
+-  apiKey: string,
+-  payload: unknown,
+-  fetcher: typeof fetch = fetch,
+-): Promise<void> {
+-  const url = new URL("/v2/notification/events", baseUrl);
+-  if (url.protocol !== "https:") throw new Error("HTTPS provider URL required");
+-  const response = await fetcher(url, {
++
++export async function viatorPushAvailability(client: ViatorClient, payload: any): Promise<any> {
++  const r = await client.fetch("/availability/schedules", {
+     method: "POST",
+-    headers: { "Content-Type": "application/json", "X-Api-Key": apiKey },
+     body: JSON.stringify(payload),
+-    signal: AbortSignal.timeout(10000),
+   });
+-  if (response.status === 204) return;
+-  if (response.status === 207) {
+-    const body = await response.json();
+-    const ids = (payload as { productOptionIds?: string[] }).productOptionIds ||
+-      [];
+-    if (
+-      Array.isArray(body.results) && ids.length > 0 &&
+-      ids.every((id) =>
+-        body.results.some((r: { productOptionId: string; status: number }) =>
+-          r.productOptionId === id && r.status === 200
+-        )
+-      )
+-    ) return;
++  if (!r.ok) {
++    const body = await r.text().catch(() => "");
++    throw new Error("viator availability push: " + r.status + " " + body);
+   }
+-  throw new Error("Viator event notification failed or partially rejected");
++  return r.json();
+ }
+--- a/supabase/functions/auto-messages/index.ts
++++ b/supabase/functions/auto-messages/index.ts
+@@ -288,6 +288,9 @@
+ }
+ 
+ async function sendReviewRequestsForBusiness(businessId: string) {
++  // Promotional WhatsApp has no channel-evidence gate or durable outcome recovery.
++  return 0;
++
+   const tenant = await getTenantByBusinessId(db, businessId);
+   const brandName = getBusinessDisplayName(tenant.business);
+   const now = Date.now();
+@@ -350,6 +353,9 @@
+ }
+ 
+ async function sendReviewRemindersForBusiness(businessId: string) {
++  // Promotional WhatsApp has no channel-evidence gate or durable outcome recovery.
++  return 0;
++
+   const tenant = await getTenantByBusinessId(db, businessId);
+   const brandName = getBusinessDisplayName(tenant.business);
+   const now = new Date();
+@@ -541,22 +547,7 @@
+     // Release held capacity
+     await db.from("holds").update({ status: "EXPIRED" }).eq("booking_id", booking.id).eq("status", "ACTIVE");
+ 
+-    // No email on auto-expire — only send a friendly WhatsApp nudge if they have a phone
+-    if (booking.phone && bookingSiteUrl) {
+-      try {
+-        const firstName = (booking.customer_name || "").split(" ")[0] || "Hi";
+-        await sendWhatsappTextForTenant(
+-          tenant,
+-          booking.phone,
+-          firstName + ", looks like you didn't finish booking your " +
+-            (booking?.tours?.name || "trip") + ". No worries, spots are still available!\n\n" +
+-            "Book again here: " + bookingSiteUrl,
+-          undefined,
+-        );
+-      } catch (error) {
+-        console.error("AUTO_EXPIRE_WA_ERR", businessId, booking.id, error);
+-      }
+-    }
++    // An expired checkout is not marketing permission. Rebooking nudges remain held.
+ 
+     await logSent(businessId, booking.id, booking.phone || "", "AUTO_CANCEL");
+     cancelled++;
+--- a/supabase/functions/broadcast/index.ts
++++ b/supabase/functions/broadcast/index.ts
+@@ -48,6 +48,10 @@
+     }
+ 
+     if (send_whatsapp) return new Response(JSON.stringify({ error: "WhatsApp broadcasts require verified channel permission. No messages sent." }), { status: 409, headers: getCors(req) });
++    // Free-form promotion has no durable queue identity, frequency reservation or safe recovery.
++    // Keep it unavailable until routed through the shared promotional delivery gate.
++    return new Response(JSON.stringify({ error: "Promotional broadcasts unavailable: shared delivery gate required. No messages sent." }),
++      { status: 409, headers: getCors(req) });
+     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+ 
+     // Default limit
+--- a/supabase/functions/cron-tasks/index.ts
++++ b/supabase/functions/cron-tasks/index.ts
+@@ -638,15 +638,6 @@
+   }
+ 
+   try {
+-    const otaExpiry = await supabase.rpc("ota_expire_reservations");
+-    if (otaExpiry.error) throw otaExpiry.error;
+-    results.ota_hold_cleanup = Number(otaExpiry.data || 0);
+-  } catch (error) {
+-    console.error("OTA_HOLD_CLEANUP_ERR", error);
+-    results.errors.push(error instanceof Error ? error.message : String(error));
+-  }
+-
+-  try {
+     const manualCleanup = await cleanupExpiredManualBookings();
+     results.expired_manual = manualCleanup.expired_manual;
+   } catch (error) {
+--- a/supabase/functions/getyourguide-availability-sync/index.ts
++++ b/supabase/functions/getyourguide-availability-sync/index.ts
+@@ -1,16 +1,109 @@
+ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
++import { createServiceClient, fetchAllRows } from "../_shared/tenant.ts";
+ import { withSentry } from "../_shared/sentry.ts";
+-import {
+-  OTA_DIRECT_CONNECTIONS_AVAILABLE,
+-  otaUnavailableResponse,
+-} from "../_shared/ota-readiness.ts";
++import { OTA_DIRECT_CONNECTIONS_AVAILABLE, otaUnavailableResponse } from "../_shared/ota-readiness.ts";
++import { createGygClient, gygPushAvailability } from "../_shared/getyourguide.ts";
+ 
+-import { handleAvailabilitySyncRequest } from "../_shared/ota-runtime.ts";
++const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
++const db = createServiceClient();
+ 
+-// Public connectivity remains blocked. Contract-shaped supplier handlers live in
+-// _shared/viator.ts and _shared/getyourguide.ts for isolated sandbox verification.
+-// Activation requires a reviewed certified deployment, never a runtime toggle.
+-Deno.serve(withSentry("getyourguide-availability-sync", async (req) => {
++function headers() {
++  return { "Content-Type": "application/json" };
++}
++
++Deno.serve(withSentry("getyourguide-availability-sync", async () => {
+   if (!OTA_DIRECT_CONNECTIONS_AVAILABLE) return otaUnavailableResponse();
+-  return handleAvailabilitySyncRequest(req, "GETYOURGUIDE");
++  if (!SETTINGS_ENCRYPTION_KEY) {
++    return new Response(JSON.stringify({ ok: false, error: "SETTINGS_ENCRYPTION_KEY not set" }), { status: 503, headers: headers() });
++  }
++
++  const integrations = await fetchAllRows<any>((from, to) =>
++    db.from("ota_integrations")
++      .select("business_id, test_mode, api_key_encrypted")
++      .eq("channel", "GETYOURGUIDE")
++      .eq("enabled", true)
++      .range(from, to)
++  );
++
++  const results: any[] = [];
++  const now = new Date();
++  const ninetyDaysOut = new Date(now.getTime() + 90 * 24 * 60 * 60_000).toISOString();
++
++  for (let i = 0; i < integrations.length; i++) {
++    const integ: any = integrations[i];
++    try {
++      const { data: creds } = await db.rpc("get_ota_credentials", {
++        p_business_id: integ.business_id,
++        p_key: SETTINGS_ENCRYPTION_KEY,
++        p_channel: "GETYOURGUIDE",
++      });
++      const credRow = Array.isArray(creds) ? creds[0] : creds;
++      if (!credRow?.api_key || !credRow?.api_secret) {
++        console.warn("GYG_SYNC: no credentials for biz=" + integ.business_id);
++        continue;
++      }
++
++      const client = createGygClient({ clientId: credRow.api_key, clientSecret: credRow.api_secret, testMode: !!integ.test_mode });
++
++      const { data: mappings } = await db.from("ota_product_mappings")
++        .select("external_product_code, external_option_code, tour_id, default_markup_pct")
++        .eq("business_id", integ.business_id)
++        .eq("channel", "GETYOURGUIDE")
++        .eq("enabled", true);
++
++      for (let j = 0; j < (mappings || []).length; j++) {
++        const m: any = mappings![j];
++        const { data: slots } = await db.from("slots")
++          .select("start_time, capacity_total, booked, held, price_per_person_override, status, tours(base_price_per_person)")
++          .eq("business_id", integ.business_id)
++          .eq("tour_id", m.tour_id)
++          .gte("start_time", now.toISOString())
++          .lte("start_time", ninetyDaysOut)
++          .eq("status", "OPEN");
++
++        const availabilities = (slots || []).map((s: any) => {
++          const available = Math.max(0, (s.capacity_total || 0) - (s.booked || 0) - (s.held || 0));
++          // slots has no base_price: the per-slot override wins, otherwise the
++          // tour price. Selecting base_price failed the whole query, so every
++          // availability push silently sent nothing.
++          const basePrice = Number(s.price_per_person_override ?? s.tours?.base_price_per_person ?? 0);
++          const markupPct = Number(m.default_markup_pct || 0);
++          const listingPrice = basePrice * (1 + markupPct / 100);
++          return {
++            date: new Date(s.start_time).toISOString().slice(0, 10),
++            start_time: new Date(s.start_time).toISOString().slice(11, 16),
++            vacancies: available,
++            retail_price: { amount: Math.round(listingPrice * 100) / 100, currency: "ZAR" },
++          };
++        });
++
++        if (availabilities.length === 0) continue;
++
++        const payload: any = {
++          product_id: m.external_product_code,
++          availabilities,
++        };
++        if (m.external_option_code) payload.option_id = m.external_option_code;
++
++        await gygPushAvailability(client, payload);
++        results.push({ business_id: integ.business_id, product_id: m.external_product_code, slots: availabilities.length });
++      }
++
++      await db.from("ota_integrations").update({
++        last_sync_at: now.toISOString(),
++        last_sync_status: "ok",
++        last_sync_error: null,
++      }).eq("business_id", integ.business_id).eq("channel", "GETYOURGUIDE");
++
++    } catch (err: any) {
++      console.error("GYG_SYNC_ERR biz=" + integ.business_id, err?.message || err);
++      await db.from("ota_integrations").update({
++        last_sync_status: "error",
++        last_sync_error: err instanceof Error ? err.message : String(err),
++      }).eq("business_id", integ.business_id).eq("channel", "GETYOURGUIDE");
++      results.push({ business_id: integ.business_id, error: err?.message || String(err) });
++    }
++  }
++
++  return new Response(JSON.stringify({ ok: true, results }), { status: 200, headers: headers() });
+ }));
+--- a/supabase/functions/getyourguide-webhook/index.ts
++++ b/supabase/functions/getyourguide-webhook/index.ts
+@@ -1,16 +1,322 @@
+ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
++import { createServiceClient } from "../_shared/tenant.ts";
+ import { withSentry } from "../_shared/sentry.ts";
+-import {
+-  OTA_DIRECT_CONNECTIONS_AVAILABLE,
+-  otaUnavailableResponse,
+-} from "../_shared/ota-readiness.ts";
++import { OTA_DIRECT_CONNECTIONS_AVAILABLE, otaUnavailableResponse } from "../_shared/ota-readiness.ts";
+ 
+-import { handleSupplierRequest } from "../_shared/ota-runtime.ts";
++const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
++const db = createServiceClient();
+ 
+-// Public connectivity remains blocked. Contract-shaped supplier handlers live in
+-// _shared/viator.ts and _shared/getyourguide.ts for isolated sandbox verification.
+-// Activation requires a reviewed certified deployment, never a runtime toggle.
++function headers(origin?: string | null) {
++  return {
++    "Access-Control-Allow-Origin": origin || "*",
++    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
++    "Content-Type": "application/json",
++  };
++}
++
++function respond(status: number, body: any, origin?: string | null) {
++  return new Response(JSON.stringify(body), { status, headers: headers(origin) });
++}
++
++async function verifyHmacSha256(rawBody: string, signatureHeader: string, secret: string): Promise<boolean> {
++  if (!secret || !signatureHeader) return false;
++  const key = new TextEncoder().encode(secret);
++  const data = new TextEncoder().encode(rawBody);
++  const cryptoKey = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
++  const sig = await crypto.subtle.sign("HMAC", cryptoKey, data);
++  const expectedHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
++  const receivedHex = signatureHeader.toLowerCase().replace(/^sha256=/, "");
++  if (receivedHex.length !== expectedHex.length) return false;
++  let mismatch = 0;
++  for (let i = 0; i < receivedHex.length; i++) mismatch |= receivedHex.charCodeAt(i) ^ expectedHex.charCodeAt(i);
++  return mismatch === 0;
++}
++
+ Deno.serve(withSentry("getyourguide-webhook", async (req) => {
+-  if (!OTA_DIRECT_CONNECTIONS_AVAILABLE) return otaUnavailableResponse();
+-  return handleSupplierRequest(req, "GETYOURGUIDE");
++  const origin = req.headers.get("origin");
++  if (req.method === "OPTIONS") return new Response("ok", { headers: headers(origin) });
++  if (req.method !== "POST") return respond(405, { error: "Method not allowed" }, origin);
++  if (!OTA_DIRECT_CONNECTIONS_AVAILABLE) return otaUnavailableResponse(headers(origin));
++
++  const rawBody = await req.text();
++  let event: any;
++  try { event = JSON.parse(rawBody); } catch { return respond(400, { error: "Invalid JSON" }, origin); }
++
++  const url = new URL(req.url);
++  const businessId = url.searchParams.get("b");
++  if (!businessId) return respond(400, { error: "Missing business_id (?b= param)" }, origin);
++
++  const { data: integration } = await db
++    .from("ota_integrations")
++    .select("id, enabled, test_mode, webhook_secret_encrypted")
++    .eq("business_id", businessId)
++    .eq("channel", "GETYOURGUIDE")
++    .maybeSingle();
++
++  if (!integration) return respond(401, { error: "No GYG integration for this business" }, origin);
++  if (!integration.enabled) return respond(200, { ok: true, skipped: "integration disabled" }, origin);
++
++  // HMAC signature verification — REQUIRED. A missing secret must REJECT, not
++  // bypass: otherwise anyone who knows ?b=<businessId> can inject fake bookings
++  // (S6 stress-test finding). Fail closed.
++  if (!integration.webhook_secret_encrypted || !SETTINGS_ENCRYPTION_KEY) {
++    console.error("GYG_WEBHOOK_NO_SECRET business=" + businessId);
++    return respond(401, { error: "Webhook secret not configured — signed webhooks required" }, origin);
++  }
++  {
++    const { data: creds } = await db.rpc("get_ota_credentials", {
++      p_business_id: businessId,
++      p_key: SETTINGS_ENCRYPTION_KEY,
++      p_channel: "GETYOURGUIDE",
++    });
++    const credRow = Array.isArray(creds) ? creds[0] : creds;
++    const webhookSecret = credRow?.webhook_secret || "";
++    if (!webhookSecret) {
++      console.error("GYG_WEBHOOK_NO_SECRET business=" + businessId);
++      return respond(401, { error: "Webhook secret not configured — signed webhooks required" }, origin);
++    }
++    const sigHeader = req.headers.get("x-gyg-signature") || req.headers.get("gyg-signature") || "";
++    const sigValid = await verifyHmacSha256(rawBody, sigHeader, webhookSecret);
++    if (!sigValid) {
++      console.error("GYG_WEBHOOK_SIG_INVALID business=" + businessId);
++      return respond(401, { error: "Invalid signature" }, origin);
++    }
++  }
++
++  const eventType = String(event?.event_type || event?.type || event?.data?.type || "booking.confirmed").toUpperCase();
++  const d = event?.data || event;
++  const externalRef = String(d?.booking_reference || d?.booking_id || event?.booking_reference || event?.id || "");
++  console.log("GYG_WEBHOOK event=" + eventType + " ref=" + externalRef + " biz=" + businessId);
++
++  if (externalRef) {
++    const idemInsert = await db.from("idempotency_keys").insert({ key: "gyg:" + eventType + ":" + externalRef }).select("id").maybeSingle();
++    if (idemInsert.error && idemInsert.error.code === "23505") {
++      return respond(200, { ok: true, replay: true }, origin);
++    }
++  }
++
++  if (eventType.includes("CANCEL")) {
++    return await handleCancelled(businessId, event, externalRef, origin);
++  }
++  if (eventType.includes("AMEND") || eventType.includes("MODIF") || eventType.includes("UPDATE")) {
++    return await handleAmended(businessId, event, externalRef, origin);
++  }
++  if (eventType.includes("CONFIRM") || eventType.includes("CREAT") || eventType.includes("BOOKING")) {
++    return await handleBookingCreated(businessId, event, externalRef, origin);
++  }
++
++  return respond(200, { ok: true, ignored: eventType }, origin);
+ }));
++
++async function handleBookingCreated(businessId: string, event: any, externalRef: string, origin: string | null): Promise<Response> {
++  const d = event?.data || event;
++  const productCode = String(d?.product_id || d?.product?.id || "");
++  const optionCode = d?.option_id || d?.option?.id || null;
++  const startDateTime = d?.datetime || d?.start_datetime || d?.date || d?.activity?.datetime;
++  const participants = d?.participants || d?.travelers || [];
++  const pax = participants.reduce((s: number, p: any) => s + (Number(p?.count || p?.quantity || p?.numberOfTravelers) || 0), 0) || d?.traveler_count || 1;
++  const qty = Number(pax);
++  const grossAmount = Number(d?.price?.retail?.amount || d?.retail_price?.amount || d?.total_retail_price || 0);
++  const netAmount = Number(d?.price?.net?.amount || d?.net_price?.amount || d?.total_net_price || grossAmount);
++
++  const traveler = d?.traveler || d?.lead_traveler || d?.booker || {};
++  const customerName = String(traveler?.name || ((traveler?.first_name || "") + " " + (traveler?.last_name || "")).trim() || d?.customer_name || "GYG Guest");
++  const customerEmail = String(traveler?.email || d?.email || "");
++  const customerPhone = String(traveler?.phone || d?.phone_number || "");
++
++  if (!productCode) {
++    console.error("GYG_WEBHOOK: no product_id in payload business=" + businessId);
++    return respond(200, { ok: false, reason: "no product_id" }, origin);
++  }
++
++  const { data: mapping } = await db.from("ota_product_mappings")
++    .select("tour_id, default_markup_pct")
++    .eq("business_id", businessId)
++    .eq("channel", "GETYOURGUIDE")
++    .eq("external_product_code", productCode)
++    .eq("enabled", true)
++    .maybeSingle();
++
++  if (!mapping?.tour_id) {
++    console.error("GYG_WEBHOOK: no mapping for product=" + productCode + " biz=" + businessId);
++    await db.from("logs").insert({
++      business_id: businessId,
++      event: "gyg_unmapped_product",
++      payload: { productCode, optionCode, externalRef, event_type: "BOOKING_CONFIRMED" },
++    });
++    return respond(200, { ok: false, reason: "no mapping for product_id", productCode }, origin);
++  }
++
++  const slotStart = new Date(startDateTime);
++  if (isNaN(slotStart.getTime())) {
++    console.error("GYG_WEBHOOK: invalid startDateTime=" + startDateTime);
++    return respond(200, { ok: false, reason: "invalid startDateTime" }, origin);
++  }
++
++  const { data: slot } = await db.from("slots")
++    .select("id, capacity_total, booked, held, tour_id")
++    .eq("business_id", businessId)
++    .eq("tour_id", mapping.tour_id)
++    .gte("start_time", new Date(slotStart.getTime() - 30 * 60_000).toISOString())
++    .lte("start_time", new Date(slotStart.getTime() + 30 * 60_000).toISOString())
++    .eq("status", "OPEN")
++    .limit(1)
++    .maybeSingle();
++
++  if (!slot) {
++    console.error("GYG_WEBHOOK: no slot found for product=" + productCode + " start=" + startDateTime + " biz=" + businessId);
++    await db.from("logs").insert({
++      business_id: businessId,
++      event: "gyg_no_slot",
++      payload: { productCode, startDateTime, externalRef, tour_id: mapping.tour_id },
++    });
++    return respond(200, { ok: false, reason: "no matching slot" }, origin);
++  }
++
++  const available = (slot.capacity_total || 0) - (slot.booked || 0) - (slot.held || 0);
++  if (available < qty) {
++    console.warn("GYG_WEBHOOK: oversold — slot=" + slot.id + " available=" + available + " requested=" + qty);
++    await db.from("logs").insert({
++      business_id: businessId,
++      event: "gyg_oversold",
++      payload: { slot_id: slot.id, available, qty, externalRef },
++    });
++  }
++
++  let customerId: string | null = null;
++  if (customerEmail) {
++    const { data: cid } = await db.rpc("upsert_customer", {
++      p_business_id: businessId,
++      p_email: customerEmail,
++      p_name: customerName || null,
++      p_phone: customerPhone || null,
++      p_marketing_consent: false,
++    });
++    customerId = cid as string;
++  }
++
++  const { data: booking, error: insertErr } = await db.from("bookings").insert({
++    business_id: businessId,
++    tour_id: mapping.tour_id,
++    slot_id: slot.id,
++    customer_id: customerId,
++    customer_name: customerName,
++    email: customerEmail || "",
++    phone: customerPhone || "",
++    qty,
++    unit_price: netAmount / Math.max(1, qty),
++    total_amount: netAmount,
++    status: "PAID",
++    source: "OTA_GETYOURGUIDE",
++    ota_channel: "GETYOURGUIDE",
++    ota_external_booking_id: externalRef || null,
++    ota_net_amount: netAmount,
++    ota_gross_amount: grossAmount,
++    ota_metadata: event,
++  }).select("id").single();
++
++  if (insertErr) {
++    console.error("GYG_WEBHOOK: booking insert failed code=" + insertErr.code + " msg=" + insertErr.message);
++    return respond(500, { ok: false, error: "DB insert failed: " + insertErr.message, code: insertErr.code }, origin);
++  }
++
++  // S7: atomic booked increment (OTA always lands; no capacity gate, but no lost update)
++  await db.rpc("adjust_slot_capacity", { p_slot_id: slot.id, p_business_id: businessId, p_booked_delta: Number(qty), p_held_delta: 0 });
++
++  // Refresh customer lifetime stats now that the PAID booking is linked
++  if (customerId) {
++    await db.rpc("recompute_customer_stats", { p_customer_id: customerId });
++  }
++
++  await db.from("logs").insert({
++    business_id: businessId,
++    booking_id: booking.id,
++    event: "gyg_booking_created",
++    payload: { external_ref: externalRef, productCode, qty, net: netAmount, gross: grossAmount },
++  });
++
++  console.log("GYG_WEBHOOK: booking created id=" + booking.id + " ref=" + externalRef + " qty=" + qty);
++  return respond(200, { ok: true, booking_id: booking.id }, origin);
++}
++
++async function handleAmended(businessId: string, event: any, externalRef: string, origin: string | null): Promise<Response> {
++  const ref = externalRef || String(event?.data?.booking_reference || event?.booking_reference || "");
++  if (!ref) return respond(200, { ok: false, reason: "no booking ref" }, origin);
++
++  const { data: existing } = await db.from("bookings")
++    .select("id, slot_id, qty, tour_id, status")
++    .eq("business_id", businessId)
++    .eq("ota_external_booking_id", ref)
++    .eq("ota_channel", "GETYOURGUIDE")
++    .maybeSingle();
++
++  if (!existing) return respond(200, { ok: false, reason: "unknown booking for ref " + ref }, origin);
++  if (existing.status === "CANCELLED") return respond(200, { ok: false, reason: "booking already cancelled" }, origin);
++
++  const d = event?.data || event;
++  const participants = d?.participants || d?.travelers || [];
++  const newQty = participants.reduce((s: number, p: any) => s + (Number(p?.count || p?.quantity) || 0), 0) || d?.traveler_count || existing.qty;
++  const newGross = Number(d?.price?.retail?.amount || d?.retail_price?.amount || 0);
++  const newNet = Number(d?.price?.net?.amount || d?.net_price?.amount || newGross);
++  const qtyDiff = Number(newQty) - (existing.qty || 0);
++
++  await db.from("bookings").update({
++    qty: newQty,
++    unit_price: newNet / Math.max(1, Number(newQty)),
++    total_amount: newNet,
++    ota_net_amount: newNet,
++    ota_gross_amount: newGross,
++    ota_metadata: event,
++  }).eq("id", existing.id);
++
++  if (qtyDiff !== 0 && existing.slot_id) {
++    // S7: atomic booked adjustment
++    await db.rpc("adjust_slot_capacity", { p_slot_id: existing.slot_id, p_business_id: businessId, p_booked_delta: Number(qtyDiff), p_held_delta: 0 });
++  }
++
++  await db.from("logs").insert({
++    business_id: businessId,
++    booking_id: existing.id,
++    event: "gyg_booking_amended",
++    payload: { external_ref: ref, old_qty: existing.qty, new_qty: newQty, qty_diff: qtyDiff, net: newNet, gross: newGross },
++  });
++
++  console.log("GYG_WEBHOOK: booking amended id=" + existing.id + " ref=" + ref + " qtyDiff=" + qtyDiff);
++  return respond(200, { ok: true, amended: existing.id }, origin);
++}
++
++async function handleCancelled(businessId: string, event: any, externalRef: string, origin: string | null): Promise<Response> {
++  const ref = externalRef || String(event?.data?.booking_reference || event?.booking_reference || "");
++  if (!ref) return respond(200, { ok: false, reason: "no booking ref" }, origin);
++
++  const { data: bk } = await db.from("bookings")
++    .select("id, slot_id, qty, status")
++    .eq("business_id", businessId)
++    .eq("ota_external_booking_id", ref)
++    .eq("ota_channel", "GETYOURGUIDE")
++    .maybeSingle();
++
++  if (!bk) return respond(200, { ok: false, reason: "unknown booking for ref " + ref }, origin);
++  if (bk.status === "CANCELLED") return respond(200, { ok: true, already: "cancelled" }, origin);
++
++  await db.from("bookings").update({
++    status: "CANCELLED",
++    cancellation_reason: "Cancelled via GetYourGuide",
++    cancelled_at: new Date().toISOString(),
++  }).eq("id", bk.id);
++
++  if (bk.slot_id) {
++    // S7: atomic booked release
++    await db.rpc("adjust_slot_capacity", { p_slot_id: bk.slot_id, p_business_id: businessId, p_booked_delta: -Number(bk.qty || 0), p_held_delta: 0 });
++  }
++
++  await db.from("logs").insert({
++    business_id: businessId,
++    booking_id: bk.id,
++    event: "gyg_booking_cancelled",
++    payload: { external_ref: ref },
++  });
++
++  console.log("GYG_WEBHOOK: booking cancelled id=" + bk.id + " ref=" + ref);
++  return respond(200, { ok: true, cancelled: bk.id }, origin);
++}
+--- a/supabase/functions/marketing-automation-dispatch/index.ts
++++ b/supabase/functions/marketing-automation-dispatch/index.ts
+@@ -262,6 +262,10 @@
+           p_business_id: enrollment.business_id, p_contact_id: contact.id, p_enrollment_id: enrollment.id,
+         });
+         if (eligibility.error) throw new Error("Marketing eligibility unavailable");
++        if (["first_booking_policy_pending", "offer_issuance_unavailable", "domain_event_binding_unavailable"].includes(eligibility.data)) {
++          results.delayed++;
++          continue;
++        }
+         if (eligibility.data !== "eligible") {
+           await supabase.from("marketing_automation_enrollments").update({ status: "exited", updated_at: new Date().toISOString() })
+             .eq("id", enrollment.id).eq("business_id", enrollment.business_id);
+--- a/supabase/functions/marketing-dispatch/index.ts
++++ b/supabase/functions/marketing-dispatch/index.ts
+@@ -338,7 +338,7 @@
+         if (delivery.reason === "reserved") {
+           deliveryByQueue.set(payload.queueId, delivery.id!);
+           reservedPayloads.push(payload);
+-        } else if (["quiet_hours", "frequency_24h", "campaign_paused", "operator_paused"].includes(delivery.reason)) {
++        } else if (["quiet_hours", "frequency_24h", "frequency_policy", "policy_approval_pending", "campaign_paused", "operator_paused"].includes(delivery.reason)) {
+           await supabase.from("marketing_queue").update({ status: "pending", next_retry_at: new Date(Date.now() + 3600000).toISOString(), error_message: delivery.reason })
+             .eq("id", payload.queueId).eq("business_id", payload.businessId);
+         } else {
+--- a/supabase/functions/ota-reconcile/index.ts
++++ b/supabase/functions/ota-reconcile/index.ts
+@@ -1,8 +1,200 @@
+ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
++import { createServiceClient, fetchAllRows } from "../_shared/tenant.ts";
+ import { withSentry } from "../_shared/sentry.ts";
+-import { otaUnavailableResponse } from "../_shared/ota-readiness.ts";
++import { OTA_DIRECT_CONNECTIONS_AVAILABLE, otaUnavailableResponse } from "../_shared/ota-readiness.ts";
++import { createViatorClient } from "../_shared/viator.ts";
++import { createGygClient, gygFetchBookings } from "../_shared/getyourguide.ts";
+ 
+-// Public connectivity remains blocked. Contract-shaped supplier handlers live in
+-// _shared/viator.ts and _shared/getyourguide.ts for isolated sandbox verification.
+-// Activation requires a reviewed certified deployment, never a runtime toggle.
+-Deno.serve(withSentry("ota-reconcile", async () => otaUnavailableResponse()));
++const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
++const db = createServiceClient();
++
++function headers() {
++  return { "Content-Type": "application/json" };
++}
++
++type Drift = {
++  type: "missing_locally" | "missing_on_ota" | "amount_mismatch" | "status_mismatch";
++  external_ref: string;
++  detail: string;
++  our_booking_id?: string;
++};
++
++Deno.serve(withSentry("ota-reconcile", async () => {
++  if (!OTA_DIRECT_CONNECTIONS_AVAILABLE) return otaUnavailableResponse();
++  if (!SETTINGS_ENCRYPTION_KEY) {
++    return new Response(JSON.stringify({ ok: false, error: "SETTINGS_ENCRYPTION_KEY not set" }), { status: 503, headers: headers() });
++  }
++
++  const integrations = await fetchAllRows<any>((from, to) =>
++    db.from("ota_integrations")
++      .select("business_id, channel, test_mode")
++      .eq("enabled", true)
++      .range(from, to)
++  );
++
++  const now = new Date();
++  const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60_000);
++  const results: any[] = [];
++
++  for (let i = 0; i < integrations.length; i++) {
++    const integ: any = integrations[i];
++    try {
++      const { data: creds } = await db.rpc("get_ota_credentials", {
++        p_business_id: integ.business_id,
++        p_key: SETTINGS_ENCRYPTION_KEY,
++        p_channel: integ.channel,
++      });
++      const credRow = Array.isArray(creds) ? creds[0] : creds;
++      if (!credRow?.api_key) continue;
++
++      let otaBookings: any[] = [];
++      try {
++        otaBookings = await fetchOtaBookings(integ.channel, credRow, integ.test_mode, fortyEightHoursAgo.toISOString());
++      } catch (fetchErr: any) {
++        console.warn("OTA_RECONCILE: failed to fetch from " + integ.channel + " biz=" + integ.business_id + ": " + fetchErr?.message);
++        await db.from("ota_reconciliation_runs").insert({
++          business_id: integ.business_id,
++          channel: integ.channel,
++          period_start: fortyEightHoursAgo.toISOString(),
++          period_end: now.toISOString(),
++          status: "fetch_error",
++          drifts: [{ type: "missing_locally", external_ref: "", detail: "Failed to fetch OTA bookings: " + (fetchErr?.message || String(fetchErr)) }],
++        });
++        results.push({ business_id: integ.business_id, channel: integ.channel, status: "fetch_error" });
++        continue;
++      }
++
++      const { data: ourBookings } = await db.from("bookings")
++        .select("id, ota_external_booking_id, ota_net_amount, ota_gross_amount, status, qty")
++        .eq("business_id", integ.business_id)
++        .eq("ota_channel", integ.channel)
++        .gte("created_at", fortyEightHoursAgo.toISOString())
++        .not("ota_external_booking_id", "is", null);
++
++      const ourMap = new Map<string, any>();
++      (ourBookings || []).forEach((b: any) => { if (b.ota_external_booking_id) ourMap.set(b.ota_external_booking_id, b); });
++
++      const otaMap = new Map<string, any>();
++      otaBookings.forEach((b: any) => {
++        const ref = extractOtaRef(integ.channel, b);
++        if (ref) otaMap.set(ref, b);
++      });
++
++      const drifts: Drift[] = [];
++      let matched = 0;
++
++      otaMap.forEach((otaB, ref) => {
++        const ours = ourMap.get(ref);
++        if (!ours) {
++          drifts.push({ type: "missing_locally", external_ref: ref, detail: "Booking exists on " + integ.channel + " but not in our DB" });
++          return;
++        }
++        matched++;
++        const otaNet = extractOtaNetAmount(integ.channel, otaB);
++        if (otaNet !== null && Math.abs(otaNet - Number(ours.ota_net_amount || 0)) > 0.01) {
++          drifts.push({
++            type: "amount_mismatch", external_ref: ref, our_booking_id: ours.id,
++            detail: "Net amount: ours=" + ours.ota_net_amount + " OTA=" + otaNet,
++          });
++        }
++        const otaStatus = extractOtaStatus(integ.channel, otaB);
++        const ourStatus = ours.status;
++        if (otaStatus === "CANCELLED" && ourStatus !== "CANCELLED") {
++          drifts.push({
++            type: "status_mismatch", external_ref: ref, our_booking_id: ours.id,
++            detail: "OTA says cancelled, we say " + ourStatus,
++          });
++        } else if (otaStatus !== "CANCELLED" && ourStatus === "CANCELLED") {
++          drifts.push({
++            type: "status_mismatch", external_ref: ref, our_booking_id: ours.id,
++            detail: "We say cancelled, OTA says " + otaStatus,
++          });
++        }
++      });
++
++      ourMap.forEach((ours, ref) => {
++        if (!otaMap.has(ref) && ours.status !== "CANCELLED") {
++          drifts.push({ type: "missing_on_ota", external_ref: ref, our_booking_id: ours.id, detail: "Booking in our DB but not found on " + integ.channel });
++        }
++      });
++
++      const run = {
++        business_id: integ.business_id,
++        channel: integ.channel,
++        period_start: fortyEightHoursAgo.toISOString(),
++        period_end: now.toISOString(),
++        our_count: ourMap.size,
++        ota_count: otaMap.size,
++        matched,
++        missing_locally: drifts.filter(d => d.type === "missing_locally").length,
++        missing_on_ota: drifts.filter(d => d.type === "missing_on_ota").length,
++        amount_mismatches: drifts.filter(d => d.type === "amount_mismatch").length,
++        status_mismatches: drifts.filter(d => d.type === "status_mismatch").length,
++        drifts: JSON.stringify(drifts),
++        status: drifts.length > 0 ? "drift" : "ok",
++      };
++
++      await db.from("ota_reconciliation_runs").insert(run);
++      results.push({ business_id: integ.business_id, channel: integ.channel, status: run.status, drifts: drifts.length });
++
++      if (drifts.length > 0) {
++        await db.from("logs").insert({
++          business_id: integ.business_id,
++          event: "ota_reconcile_drift",
++          payload: { channel: integ.channel, drifts: drifts.length, run_status: run.status },
++        });
++      }
++
++    } catch (err: any) {
++      console.error("OTA_RECONCILE_ERR biz=" + integ.business_id + " ch=" + integ.channel, err?.message || err);
++      results.push({ business_id: integ.business_id, channel: integ.channel, error: err?.message || String(err) });
++    }
++  }
++
++  return new Response(JSON.stringify({ ok: true, results }), { status: 200, headers: headers() });
++}));
++
++async function fetchOtaBookings(channel: string, creds: any, testMode: boolean, since: string): Promise<any[]> {
++  if (channel === "VIATOR") {
++    const client = createViatorClient({ apiKey: creds.api_key, testMode: !!testMode });
++    const r = await client.fetch("/bookings?modifiedSince=" + encodeURIComponent(since));
++    if (!r.ok) {
++      const body = await r.text().catch(() => "");
++      throw new Error("Viator bookings fetch: " + r.status + " " + body);
++    }
++    const data = await r.json();
++    return data?.bookings || data?.data || [];
++  }
++  if (channel === "GETYOURGUIDE") {
++    const gygClient = createGygClient({ clientId: creds.api_key, clientSecret: creds.api_secret, testMode: !!testMode });
++    return await gygFetchBookings(gygClient, since);
++  }
++  return [];
++}
++
++function extractOtaRef(channel: string, booking: any): string {
++  if (channel === "VIATOR") return String(booking?.bookingRef || booking?.bookingReference || booking?.data?.bookingRef || "");
++  if (channel === "GETYOURGUIDE") return String(booking?.booking_reference || booking?.booking_id || "");
++  return "";
++}
++
++function extractOtaNetAmount(channel: string, booking: any): number | null {
++  if (channel === "VIATOR") {
++    const v = booking?.totalNetPrice?.amount || booking?.netRate?.amount || booking?.supplierPrice;
++    return v != null ? Number(v) : null;
++  }
++  if (channel === "GETYOURGUIDE") {
++    const g = booking?.price?.net?.amount || booking?.net_price?.amount;
++    return g != null ? Number(g) : null;
++  }
++  return null;
++}
++
++function extractOtaStatus(channel: string, booking: any): string {
++  let status = "";
++  if (channel === "VIATOR") status = String(booking?.status || booking?.bookingStatus || "").toUpperCase();
++  if (channel === "GETYOURGUIDE") status = String(booking?.status || booking?.booking_status || "").toUpperCase();
++  if (status.includes("CANCEL")) return "CANCELLED";
++  if (status.includes("CONFIRM") || status.includes("ACCEPT")) return "CONFIRMED";
++  return status;
++}
+--- a/supabase/functions/viator-availability-sync/index.ts
++++ b/supabase/functions/viator-availability-sync/index.ts
+@@ -1,16 +1,109 @@
+ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
++import { createServiceClient, fetchAllRows } from "../_shared/tenant.ts";
+ import { withSentry } from "../_shared/sentry.ts";
+-import {
+-  OTA_DIRECT_CONNECTIONS_AVAILABLE,
+-  otaUnavailableResponse,
+-} from "../_shared/ota-readiness.ts";
++import { OTA_DIRECT_CONNECTIONS_AVAILABLE, otaUnavailableResponse } from "../_shared/ota-readiness.ts";
++import { createViatorClient, viatorPushAvailability } from "../_shared/viator.ts";
+ 
+-import { handleAvailabilitySyncRequest } from "../_shared/ota-runtime.ts";
++const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
++const db = createServiceClient();
+ 
+-// Public connectivity remains blocked. Contract-shaped supplier handlers live in
+-// _shared/viator.ts and _shared/getyourguide.ts for isolated sandbox verification.
+-// Activation requires a reviewed certified deployment, never a runtime toggle.
+-Deno.serve(withSentry("viator-availability-sync", async (req) => {
++function headers() {
++  return { "Content-Type": "application/json" };
++}
++
++Deno.serve(withSentry("viator-availability-sync", async () => {
+   if (!OTA_DIRECT_CONNECTIONS_AVAILABLE) return otaUnavailableResponse();
+-  return handleAvailabilitySyncRequest(req, "VIATOR");
++  if (!SETTINGS_ENCRYPTION_KEY) {
++    return new Response(JSON.stringify({ ok: false, error: "SETTINGS_ENCRYPTION_KEY not set" }), { status: 503, headers: headers() });
++  }
++
++  const integrations = await fetchAllRows<any>((from, to) =>
++    db.from("ota_integrations")
++      .select("business_id, test_mode, api_key_encrypted")
++      .eq("channel", "VIATOR")
++      .eq("enabled", true)
++      .range(from, to)
++  );
++
++  const results: any[] = [];
++  const now = new Date();
++  const ninetyDaysOut = new Date(now.getTime() + 90 * 24 * 60 * 60_000).toISOString();
++
++  for (let i = 0; i < integrations.length; i++) {
++    const integ: any = integrations[i];
++    try {
++      const { data: creds } = await db.rpc("get_ota_credentials", {
++        p_business_id: integ.business_id,
++        p_key: SETTINGS_ENCRYPTION_KEY,
++        p_channel: "VIATOR",
++      });
++      const credRow = Array.isArray(creds) ? creds[0] : creds;
++      if (!credRow?.api_key) {
++        console.warn("VIATOR_SYNC: no api_key for biz=" + integ.business_id);
++        continue;
++      }
++
++      const client = createViatorClient({ apiKey: credRow.api_key, testMode: !!integ.test_mode });
++
++      const { data: mappings } = await db.from("ota_product_mappings")
++        .select("external_product_code, external_option_code, tour_id, default_markup_pct")
++        .eq("business_id", integ.business_id)
++        .eq("channel", "VIATOR")
++        .eq("enabled", true);
++
++      for (let j = 0; j < (mappings || []).length; j++) {
++        const m: any = mappings![j];
++        const { data: slots } = await db.from("slots")
++          .select("start_time, capacity_total, booked, held, price_per_person_override, status, tours(base_price_per_person)")
++          .eq("business_id", integ.business_id)
++          .eq("tour_id", m.tour_id)
++          .gte("start_time", now.toISOString())
++          .lte("start_time", ninetyDaysOut)
++          .eq("status", "OPEN");
++
++        const schedules = (slots || []).map((s: any) => {
++          const available = Math.max(0, (s.capacity_total || 0) - (s.booked || 0) - (s.held || 0));
++          // slots has no base_price: the per-slot override wins, otherwise the
++          // tour price. Selecting base_price failed the whole query, so every
++          // availability push silently sent nothing.
++          const basePrice = Number(s.price_per_person_override ?? s.tours?.base_price_per_person ?? 0);
++          const markupPct = Number(m.default_markup_pct || 0);
++          const listingPrice = basePrice * (1 + markupPct / 100);
++          return {
++            date: new Date(s.start_time).toISOString().slice(0, 10),
++            startTime: new Date(s.start_time).toISOString().slice(11, 16),
++            available,
++            price: { amount: Math.round(listingPrice * 100) / 100, currency: "ZAR" },
++          };
++        });
++
++        if (schedules.length === 0) continue;
++
++        const payload: any = {
++          productCode: m.external_product_code,
++          schedules,
++        };
++        if (m.external_option_code) payload.productOptionCode = m.external_option_code;
++
++        await viatorPushAvailability(client, payload);
++        results.push({ business_id: integ.business_id, productCode: m.external_product_code, slots: schedules.length });
++      }
++
++      await db.from("ota_integrations").update({
++        last_sync_at: now.toISOString(),
++        last_sync_status: "ok",
++        last_sync_error: null,
++      }).eq("business_id", integ.business_id).eq("channel", "VIATOR");
++
++    } catch (err: any) {
++      console.error("VIATOR_SYNC_ERR biz=" + integ.business_id, err?.message || err);
++      await db.from("ota_integrations").update({
++        last_sync_status: "error",
++        last_sync_error: err instanceof Error ? err.message : String(err),
++      }).eq("business_id", integ.business_id).eq("channel", "VIATOR");
++      results.push({ business_id: integ.business_id, error: err?.message || String(err) });
++    }
++  }
++
++  return new Response(JSON.stringify({ ok: true, results }), { status: 200, headers: headers() });
+ }));
+--- a/supabase/functions/viator-webhook/index.ts
++++ b/supabase/functions/viator-webhook/index.ts
+@@ -1,16 +1,332 @@
+ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
++import { createServiceClient } from "../_shared/tenant.ts";
+ import { withSentry } from "../_shared/sentry.ts";
+-import {
+-  OTA_DIRECT_CONNECTIONS_AVAILABLE,
+-  otaUnavailableResponse,
+-} from "../_shared/ota-readiness.ts";
++import { OTA_DIRECT_CONNECTIONS_AVAILABLE, otaUnavailableResponse } from "../_shared/ota-readiness.ts";
+ 
+-import { handleSupplierRequest } from "../_shared/ota-runtime.ts";
++const SETTINGS_ENCRYPTION_KEY = Deno.env.get("SETTINGS_ENCRYPTION_KEY") || "";
++const db = createServiceClient();
+ 
+-// Public connectivity remains blocked. Contract-shaped supplier handlers live in
+-// _shared/viator.ts and _shared/getyourguide.ts for isolated sandbox verification.
+-// Activation requires a reviewed certified deployment, never a runtime toggle.
++function headers(origin?: string | null) {
++  return {
++    "Access-Control-Allow-Origin": origin || "*",
++    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
++    "Content-Type": "application/json",
++  };
++}
++
++function respond(status: number, body: any, origin?: string | null) {
++  return new Response(JSON.stringify(body), { status, headers: headers(origin) });
++}
++
++async function verifyHmacSha256(rawBody: string, signatureHeader: string, secret: string): Promise<boolean> {
++  if (!secret || !signatureHeader) return false;
++  const key = new TextEncoder().encode(secret);
++  const data = new TextEncoder().encode(rawBody);
++  const cryptoKey = await crypto.subtle.importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
++  const sig = await crypto.subtle.sign("HMAC", cryptoKey, data);
++  const expectedHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
++  const receivedHex = signatureHeader.toLowerCase().replace(/^sha256=/, "");
++  if (receivedHex.length !== expectedHex.length) return false;
++  let mismatch = 0;
++  for (let i = 0; i < receivedHex.length; i++) mismatch |= receivedHex.charCodeAt(i) ^ expectedHex.charCodeAt(i);
++  return mismatch === 0;
++}
++
+ Deno.serve(withSentry("viator-webhook", async (req) => {
+-  if (!OTA_DIRECT_CONNECTIONS_AVAILABLE) return otaUnavailableResponse();
+-  return handleSupplierRequest(req, "VIATOR");
++  const origin = req.headers.get("origin");
++  if (req.method === "OPTIONS") return new Response("ok", { headers: headers(origin) });
++  if (req.method !== "POST") return respond(405, { error: "Method not allowed" }, origin);
++  if (!OTA_DIRECT_CONNECTIONS_AVAILABLE) return otaUnavailableResponse(headers(origin));
++
++  const rawBody = await req.text();
++  let event: any;
++  try { event = JSON.parse(rawBody); } catch { return respond(401, { error: "Unauthorized" }, origin); }
++
++  // AN5: every rejected request returns the same 401 + body so an attacker
++  // can't probe which businesses are mapped / enabled / signed by looking at
++  // response codes or messages. The actual reason is logged server-side.
++  const url = new URL(req.url);
++  const businessId = url.searchParams.get("b");
++  const sigHeader = req.headers.get("x-viator-signature") || req.headers.get("viator-signature") || "";
++  const denied = respond(401, { error: "Unauthorized" }, origin);
++
++  if (!businessId || !sigHeader || !SETTINGS_ENCRYPTION_KEY) {
++    console.error("VIATOR_WEBHOOK_REJECT reason=missing_inputs businessId=" + !!businessId + " sig=" + !!sigHeader + " key=" + !!SETTINGS_ENCRYPTION_KEY);
++    return denied;
++  }
++
++  // Always perform integration lookup + HMAC compute so a missing/disabled
++  // integration looks the same as a bad signature on the wire (equalised
++  // timing + uniform rejection body).
++  const { data: integration } = await db
++    .from("ota_integrations")
++    .select("id, enabled, test_mode, webhook_secret_encrypted")
++    .eq("business_id", businessId)
++    .eq("channel", "VIATOR")
++    .maybeSingle();
++
++  let webhookSecret = "";
++  if (integration?.enabled && integration.webhook_secret_encrypted) {
++    const { data: creds } = await db.rpc("get_ota_credentials", {
++      p_business_id: businessId,
++      p_key: SETTINGS_ENCRYPTION_KEY,
++      p_channel: "VIATOR",
++    });
++    const credRow = Array.isArray(creds) ? creds[0] : creds;
++    webhookSecret = credRow?.webhook_secret || "";
++  }
++
++  // Use a fixed dummy secret on miss so the HMAC computation still runs and
++  // costs the same as the success path. The result will never match a
++  // legitimate signature so this stays fail-closed.
++  const sigValid = await verifyHmacSha256(rawBody, sigHeader, webhookSecret || "viator-webhook-no-secret-placeholder");
++  if (!integration || !integration.enabled || !webhookSecret || !sigValid) {
++    console.error("VIATOR_WEBHOOK_REJECT business=" + businessId + " hasIntegration=" + !!integration + " enabled=" + (integration?.enabled ?? false) + " hasSecret=" + !!webhookSecret + " sigValid=" + sigValid);
++    return denied;
++  }
++
++  const externalRef = String(event?.bookingRef || event?.bookingReference || event?.data?.bookingRef || event?.id || "");
++  const eventType = String(event?.type || event?.notificationType || event?.data?.type || "BOOKING_CONFIRMED").toUpperCase();
++  console.log("VIATOR_WEBHOOK event=" + eventType + " ref=" + externalRef + " biz=" + businessId);
++
++  // Idempotency — key includes event type so create + cancel on same ref are distinct
++  if (externalRef) {
++    const idemInsert = await db.from("idempotency_keys").insert({ key: "viator:" + eventType + ":" + externalRef }).select("id").maybeSingle();
++    if (idemInsert.error && idemInsert.error.code === "23505") {
++      return respond(200, { ok: true, replay: true }, origin);
++    }
++  }
++
++  if (eventType.includes("CANCEL")) {
++    return await handleCancelled(businessId, event, externalRef, origin);
++  }
++  if (eventType.includes("AMEND") || eventType.includes("MODIF") || eventType.includes("UPDATE")) {
++    return await handleBookingAmended(businessId, event, externalRef, origin);
++  }
++  if (eventType.includes("CONFIRM") || eventType.includes("CREAT") || eventType.includes("BOOKING")) {
++    return await handleBookingCreated(businessId, event, externalRef, origin);
++  }
++
++  // Unknown event type — ack to prevent retries
++  return respond(200, { ok: true, ignored: eventType }, origin);
+ }));
++
++async function handleBookingCreated(businessId: string, event: any, externalRef: string, origin: string | null): Promise<Response> {
++  // Extract fields — Viator's webhook payload structure
++  // Top-level or nested under event.data depending on webhook version
++  const d = event?.data || event;
++  const productCode = String(d?.productCode || d?.product?.productCode || "");
++  const optionCode = d?.productOptionCode || d?.product?.productOptionCode || null;
++  const startDateTime = d?.travelDate || d?.startDate || d?.startDateTime || d?.activity?.startDate;
++  const pax = d?.travelerCount || d?.paxMix?.reduce((s: number, p: any) => s + (p?.numberOfTravelers || 0), 0) || d?.numTravelers || 1;
++  const qty = Number(pax);
++  const grossAmount = Number(d?.totalPrice?.amount || d?.price?.total?.amount || d?.totalRetailPrice || 0);
++  const netAmount = Number(d?.totalNetPrice?.amount || d?.netRate?.amount || d?.supplierPrice || grossAmount);
++
++  // Traveler info
++  const leadTraveler = d?.leadTraveler || d?.booker || {};
++  const customerName = String(leadTraveler?.name || ((leadTraveler?.firstName || "") + " " + (leadTraveler?.lastName || "")).trim() || d?.customerName || "Viator Guest");
++  const customerEmail = String(leadTraveler?.email || d?.email || "");
++  const customerPhone = String(leadTraveler?.phone || d?.phone || "");
++
++  if (!productCode) {
++    console.error("VIATOR_WEBHOOK: no productCode in payload business=" + businessId);
++    return respond(200, { ok: false, reason: "no productCode" }, origin);
++  }
++
++  // Resolve tour from mapping
++  const { data: mapping } = await db.from("ota_product_mappings")
++    .select("tour_id, default_markup_pct")
++    .eq("business_id", businessId)
++    .eq("channel", "VIATOR")
++    .eq("external_product_code", productCode)
++    .eq("enabled", true)
++    .maybeSingle();
++
++  if (!mapping?.tour_id) {
++    console.error("VIATOR_WEBHOOK: no mapping for product=" + productCode + " biz=" + businessId);
++    await db.from("logs").insert({
++      business_id: businessId,
++      event: "viator_unmapped_product",
++      payload: { productCode, optionCode, externalRef, event_type: "BOOKING_CONFIRMED" },
++    });
++    return respond(200, { ok: false, reason: "no mapping for productCode", productCode }, origin);
++  }
++
++  // Find matching slot (±30 min tolerance)
++  const slotStart = new Date(startDateTime);
++  if (isNaN(slotStart.getTime())) {
++    console.error("VIATOR_WEBHOOK: invalid startDateTime=" + startDateTime);
++    return respond(200, { ok: false, reason: "invalid startDateTime" }, origin);
++  }
++
++  const { data: slot } = await db.from("slots")
++    .select("id, capacity_total, booked, held, tour_id")
++    .eq("business_id", businessId)
++    .eq("tour_id", mapping.tour_id)
++    .gte("start_time", new Date(slotStart.getTime() - 30 * 60_000).toISOString())
++    .lte("start_time", new Date(slotStart.getTime() + 30 * 60_000).toISOString())
++    .eq("status", "OPEN")
++    .limit(1)
++    .maybeSingle();
++
++  if (!slot) {
++    console.error("VIATOR_WEBHOOK: no slot found for product=" + productCode + " start=" + startDateTime + " biz=" + businessId);
++    await db.from("logs").insert({
++      business_id: businessId,
++      event: "viator_no_slot",
++      payload: { productCode, startDateTime, externalRef, tour_id: mapping.tour_id },
++    });
++    return respond(200, { ok: false, reason: "no matching slot" }, origin);
++  }
++
++  const available = (slot.capacity_total || 0) - (slot.booked || 0) - (slot.held || 0);
++  if (available < qty) {
++    console.warn("VIATOR_WEBHOOK: oversold — slot=" + slot.id + " available=" + available + " requested=" + qty);
++    await db.from("logs").insert({
++      business_id: businessId,
++      event: "viator_oversold",
++      payload: { slot_id: slot.id, available, qty, externalRef },
++    });
++  }
++
++  // Upsert customer
++  let customerId: string | null = null;
++  if (customerEmail) {
++    const { data: cid } = await db.rpc("upsert_customer", {
++      p_business_id: businessId,
++      p_email: customerEmail,
++      p_name: customerName || null,
++      p_phone: customerPhone || null,
++      p_marketing_consent: false,
++    });
++    customerId = cid as string;
++  }
++
++  // Create booking — status PAID since Viator collects payment
++  const { data: booking, error: insertErr } = await db.from("bookings").insert({
++    business_id: businessId,
++    tour_id: mapping.tour_id,
++    slot_id: slot.id,
++    customer_id: customerId,
++    customer_name: customerName,
++    email: customerEmail || "",
++    phone: customerPhone || "",
++    qty,
++    unit_price: netAmount / Math.max(1, qty),
++    total_amount: netAmount,
++    status: "PAID",
++    source: "OTA_VIATOR",
++    ota_channel: "VIATOR",
++    ota_external_booking_id: externalRef || null,
++    ota_net_amount: netAmount,
++    ota_gross_amount: grossAmount,
++    ota_metadata: event,
++  }).select("id").single();
++
++  if (insertErr) {
++    console.error("VIATOR_WEBHOOK: booking insert failed code=" + insertErr.code + " msg=" + insertErr.message);
++    return respond(500, { ok: false, error: "DB insert failed: " + insertErr.message, code: insertErr.code }, origin);
++  }
++
++  // Increment slot booked count
++  await db.rpc("adjust_slot_capacity", { p_slot_id: slot.id, p_business_id: businessId, p_booked_delta: Number(qty), p_held_delta: 0 }); // S7: atomic
++
++  // Refresh customer lifetime stats now that the PAID booking is linked
++  if (customerId) {
++    await db.rpc("recompute_customer_stats", { p_customer_id: customerId });
++  }
++
++  // Audit log
++  await db.from("logs").insert({
++    business_id: businessId,
++    booking_id: booking.id,
++    event: "viator_booking_created",
++    payload: { external_ref: externalRef, productCode, qty, net: netAmount, gross: grossAmount },
++  });
++
++  console.log("VIATOR_WEBHOOK: booking created id=" + booking.id + " ref=" + externalRef + " qty=" + qty);
++  return respond(200, { ok: true, booking_id: booking.id }, origin);
++}
++
++async function handleBookingAmended(businessId: string, event: any, externalRef: string, origin: string | null): Promise<Response> {
++  const ref = externalRef || String(event?.data?.bookingRef || event?.bookingReference || "");
++  if (!ref) return respond(200, { ok: false, reason: "no booking ref" }, origin);
++
++  const { data: existing } = await db.from("bookings")
++    .select("id, slot_id, qty, tour_id, status")
++    .eq("business_id", businessId)
++    .eq("ota_external_booking_id", ref)
++    .eq("ota_channel", "VIATOR")
++    .maybeSingle();
++
++  if (!existing) return respond(200, { ok: false, reason: "unknown booking for ref " + ref }, origin);
++  if (existing.status === "CANCELLED") return respond(200, { ok: false, reason: "booking already cancelled" }, origin);
++
++  const d = event?.data || event;
++  const newQty = d?.travelerCount || d?.paxMix?.reduce((s: number, p: any) => s + (p?.numberOfTravelers || 0), 0) || d?.numTravelers || existing.qty;
++  const newGross = Number(d?.totalPrice?.amount || d?.price?.total?.amount || d?.totalRetailPrice || 0);
++  const newNet = Number(d?.totalNetPrice?.amount || d?.netRate?.amount || d?.supplierPrice || newGross);
++  const qtyDiff = Number(newQty) - (existing.qty || 0);
++
++  await db.from("bookings").update({
++    qty: newQty,
++    unit_price: newNet / Math.max(1, Number(newQty)),
++    total_amount: newNet,
++    ota_net_amount: newNet,
++    ota_gross_amount: newGross,
++    ota_metadata: event,
++  }).eq("id", existing.id);
++
++  if (qtyDiff !== 0 && existing.slot_id) {
++    // S7: atomic booked adjustment
++    await db.rpc("adjust_slot_capacity", { p_slot_id: existing.slot_id, p_business_id: businessId, p_booked_delta: Number(qtyDiff), p_held_delta: 0 });
++  }
++
++  await db.from("logs").insert({
++    business_id: businessId,
++    booking_id: existing.id,
++    event: "viator_booking_amended",
++    payload: { external_ref: ref, old_qty: existing.qty, new_qty: newQty, qty_diff: qtyDiff, net: newNet, gross: newGross },
++  });
++
++  console.log("VIATOR_WEBHOOK: booking amended id=" + existing.id + " ref=" + ref + " qtyDiff=" + qtyDiff);
++  return respond(200, { ok: true, amended: existing.id }, origin);
++}
++
++async function handleCancelled(businessId: string, event: any, externalRef: string, origin: string | null): Promise<Response> {
++  const ref = externalRef || String(event?.data?.bookingRef || event?.bookingReference || "");
++  if (!ref) return respond(200, { ok: false, reason: "no booking ref" }, origin);
++
++  const { data: bk } = await db.from("bookings")
++    .select("id, slot_id, qty, status")
++    .eq("business_id", businessId)
++    .eq("ota_external_booking_id", ref)
++    .eq("ota_channel", "VIATOR")
++    .maybeSingle();
++
++  if (!bk) return respond(200, { ok: false, reason: "unknown booking for ref " + ref }, origin);
++  if (bk.status === "CANCELLED") return respond(200, { ok: true, already: "cancelled" }, origin);
++
++  await db.from("bookings").update({
++    status: "CANCELLED",
++    cancellation_reason: "Cancelled via Viator",
++    cancelled_at: new Date().toISOString(),
++  }).eq("id", bk.id);
++
++  // Release slot capacity
++  if (bk.slot_id) {
++    // S7: atomic booked release
++    await db.rpc("adjust_slot_capacity", { p_slot_id: bk.slot_id, p_business_id: businessId, p_booked_delta: -Number(bk.qty || 0), p_held_delta: 0 });
++  }
++
++  await db.from("logs").insert({
++    business_id: businessId,
++    booking_id: bk.id,
++    event: "viator_booking_cancelled",
++    payload: { external_ref: ref },
++  });
++
++  console.log("VIATOR_WEBHOOK: booking cancelled id=" + bk.id + " ref=" + ref);
++  return respond(200, { ok: true, cancelled: bk.id }, origin);
++}
+--- a/supabase/functions/wa-webhook/index.ts
++++ b/supabase/functions/wa-webhook/index.ts
+@@ -1,3 +1,4 @@
++import { operationalCancellationFollowup } from "../_shared/marketing-outbox.ts";
+ // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
+ // Every query against a tenant-owned table MUST include .eq("business_id", X).
+ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+@@ -1005,11 +1006,16 @@
+     try {
+       const { data: queuedMsgs } = await supabase
+         .from("outbox")
+-        .select("id, message_body")
++        .select("id, message_body, message_type, booking_id")
+         .eq("status", "WAITING_WINDOW")
+         .eq("business_id", tenant.business.id)
+         .eq("phone", phone);
+       for (const qm of (queuedMsgs || [])) {
++        // Old broadcasts and unknown free-form retries remain held, even on a new inbound reply.
++        if ((qm as any).message_type !== "CANCEL_FOLLOWUP" || !(qm as any).booking_id) continue;
++        const { data: followupBooking, error: followupError } = await supabase.from("bookings")
++          .select("id, business_id, status").eq("id", (qm as any).booking_id).eq("business_id", tenant.business.id).maybeSingle();
++        if (followupError || !operationalCancellationFollowup(tenant.business.id, qm as any, followupBooking)) continue;
+         try {
+           const drainRes = await sendWhatsappFreeformOrSignal(tenant, phone, (qm as any).message_body);
+           if (drainRes.ok) {
+--- a/supabase/functions/web-chat/index.ts
++++ b/supabase/functions/web-chat/index.ts
+@@ -16,8 +16,7 @@
+ import { classifyIntent, priorityForIntent, findFaqMatch, loadFaqCandidates } from "../_shared/intent.ts";
+ import { getSubscriptionState } from "../_shared/subscription.ts";
+ import { applicableBookingQuestions, captureQuestionFields, validateQuestionAnswers } from "../_shared/booking-custom-fields.ts";
+-import { calculateChatBookingPricing, verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
+-import { parseChatContact, validateChatContact } from "../_shared/chat-contact.ts";
++import { verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
+ import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
+ import { llmText, llmAvailable } from "../_shared/llm.ts";
+ import { retrieveKbContext } from "../_shared/kb.ts";
+@@ -166,11 +165,12 @@
+ }
+ function promptForCustomField(field) {
+   if (!field) return "Please share the next booking detail.";
+-  return field.label + (field.required ? " (required)" : " (optional — say skip)") + (field.placeholder ? "\n" + field.placeholder : "");
++  return field.label + (field.required ? " *" : " (optional — say skip)") + (field.placeholder ? "\n" + field.placeholder : "");
+ }
+ function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
++function normP(p) { if (!p) return ""; let c = String(p).replace(/[^\d]/g, ""); if (c.startsWith("00")) c = c.substring(2); else if (c.startsWith("0")) c = "27" + c.substring(1); if (c.startsWith("270") && c.length > 11) c = "27" + c.substring(3); return c ? "+" + c : ""; }
+ function parseChatTime(text: string): string | null {
+-  const value = text.trim().toLowerCase().replace(/[’‘]/g, "'").replace(/\b(?:not|except|other than|avoid|don't want|do not want)\s+(?:at\s+|the\s+|a\s+)?\d{1,2}(?:[:.]\d{2})?\s*(?:am|pm)?\b/g, "");
++  const value = text.trim().toLowerCase().replace(/\b(?:not|except|other than|avoid)\s+(?:at\s+|the\s+)?\d{1,2}(?:[:.]\d{2})?\s*(?:am|pm)?\b/g, "");
+   const clocks = [...value.matchAll(/\b\d{1,2}(?:[:.]\d{2}(?:\s*(?:am|pm))?|\s*(?:am|pm))\b/g)];
+   if (clocks.length > 1) return null;
+   const input = clocks.length ? clocks[0][0] : value;
+@@ -202,24 +202,13 @@
+ }
+ // Parse common dates locally so basic conversation survives a model outage.
+ function parseChatDate(text: string, today: string): string | null {
+-  const value = text.toLowerCase().replace(/[’‘]/g, "'").replace(/\b(?:except|not|other than|avoid|don't want|do not want)\s+(?:on\s+|the\s+)?(?:(?:this|next)\s+(?:week\s+)?)?(?:day after tomorrow|today|tomorrow|sunday|monday|tuesday|wednesday|thursday|friday|saturday|\d{4}-\d{2}-\d{2}|\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?[a-z]+(?:\s+\d{4})?)\b/g, "");
++  const value = text.toLowerCase().replace(/\b(?:except|not|other than|avoid)\s+(?:on\s+|the\s+)?(?:(?:this|next)\s+(?:week\s+)?)?(?:day after tomorrow|today|tomorrow|sunday|monday|tuesday|wednesday|thursday|friday|saturday|\d{4}-\d{2}-\d{2}|\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?[a-z]+(?:\s+\d{4})?)\b/g, "");
+   const valid = (date: string) => /^\d{4}-\d{2}-\d{2}$/.test(date) && !isNaN(Date.parse(date)) && new Date(date + "T12:00:00Z").toISOString().slice(0, 10) === date;
+   const iso = value.match(/\b\d{4}-\d{2}-\d{2}\b/);
+   if (iso) return valid(iso[0]) ? iso[0] : null;
+   const offset = /\bday after tomorrow\b/.test(value) ? 2 : /\btomorrow\b/.test(value) ? 1 : /\btoday\b/.test(value) ? 0 : null;
+   const base = new Date(today + "T12:00:00Z");
+   if (offset !== null) { base.setUTCDate(base.getUTCDate() + offset); return base.toISOString().slice(0, 10); }
+-  const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+-  const named = value.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([a-z]+)(?:\s+(\d{4}))?\b/);
+-  if (named) {
+-    const month = months.findIndex(m => m === named[2] || m.slice(0, 3) === named[2]);
+-    if (month >= 0) {
+-      let year = Number(named[3] || today.slice(0, 4));
+-      let date = year + "-" + String(month + 1).padStart(2, "0") + "-" + named[1].padStart(2, "0");
+-      if (!named[3] && date < today) date = (++year) + date.slice(4);
+-      return valid(date) ? date : null;
+-    }
+-  }
+   const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+   const mentioned = weekdays.filter(day => new RegExp("\\b" + day + "\\b").test(value));
+   if (mentioned.length > 1) return null;
+@@ -231,23 +220,28 @@
+     else if (!days) days = 7;
+     base.setUTCDate(base.getUTCDate() + days); return base.toISOString().slice(0, 10);
+   }
+-  return null;
+-}
+-function matchingToursFromText(tours: any[], text: string): any[] {
+-  const normalize = (v: string) => v.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+-  let value = " " + normalize(text) + " ";
+-  for (const tour of tours) value = value.replace(new RegExp(" (?:not|except|avoid|rather than|instead of|from|don t want|do not want) (?:the )?" + normalize(tour.name) + "(?= )", "g"), " ");
+-  const exact = tours.filter(t => value.includes(" " + normalize(t.name) + " "));
+-  if (exact.length) return exact;
+-  const words = tours.filter(t => normalize(t.name).split(" ").some(w => w.length > 3 && !["tour", "tours", "adventure", "experience"].includes(w) && value.includes(" " + w + " ")));
+-  return words;
++  const months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
++  const named = value.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?([a-z]+)(?:\s+(\d{4}))?\b/);
++  if (named) {
++    const month = months.findIndex(m => m === named[2] || m.slice(0, 3) === named[2]);
++    if (month >= 0) {
++      let year = Number(named[3] || today.slice(0, 4));
++      let date = year + "-" + String(month + 1).padStart(2, "0") + "-" + named[1].padStart(2, "0");
++      if (!named[3] && date < today) date = (++year) + date.slice(4);
++      return valid(date) ? date : null;
++    }
++  }
++  return null;
+ }
+ function selectedTourFromText(tours: any[], text: string): any | null {
+-  const matches = matchingToursFromText(tours, text);
+-  return matches.length === 1 ? matches[0] : null;
++  const normalize = (v: string) => v.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
++  const value = " " + normalize(text) + " ";
++  const exact = tours.filter(t => value.includes(" " + normalize(t.name) + " "));
++  if (exact.length === 1) return exact[0];
++  const words = tours.filter(t => normalize(t.name).split(" ").some(w => w.length > 3 && !["tour", "paddle", "kayak", "adventure", "experience"].includes(w) && value.includes(" " + w + " ")));
++  return words.length === 1 ? words[0] : null;
+ }
+ function requestedPartySize(text: string): number | null {
+-  if (/\b(?:or|maybe|about|around)\b|(?:^|\s)-\d|\d+\.\d+/.test(text)) return null;
+   const groups = text.match(/\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:adults?|children|child|kids?|people|guests?|persons?|pax)\b/gi);
+   if (groups) return parseChatQuantity(groups.join(" and "));
+   const count = text.match(/\b(?:for|party of|group of|family of)\s+(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/i);
+@@ -694,32 +688,12 @@
+           new Date(date + "T12:00:00Z").getUTCDay() === new Date(previous + "T12:00:00Z").getUTCDay()) return previous;
+       return date;
+     }
+-    function timeForBookingDate(date: string | null, explicitTime: string | null) {
+-      const previousDate = ns.pendingDate || ns.selectedDate;
+-      return explicitTime || (date && (!previousDate || date === previousDate) ? ns.pendingTime || null : null);
+-    }
+-    function clearBookingQuote() {
+-      for (const key of ["vid", "vcode", "vded", "vtype", "vpaxlimit", "vpurchasevalue", "total", "baseTotal", "discount"]) delete ns[key];
+-    }
+-    function tourSelectionState() {
+-      const contact = validateChatContact(ns).contact;
+-      const qty = Number(ns.requestedQty ?? ns.qty);
+-      return { step: "PICK_TOUR", ...contact, requestedQty: Number.isSafeInteger(qty) && qty > 0 ? qty : undefined };
+-    }
+-    async function selectBookingTour(picked, date: string | null, time: string | null, qty) {
+-      // Only contact details and an unconfirmed group size survive a tour
+-      // switch. Slots, quotes, vouchers, extras and trip questions do not.
+-      ns = { ...tourSelectionState(), step: "PICK_DATE", checkout_attempt: crypto.randomUUID(), tid: picked.id, tname: picked.name, tprice: picked.base_price_per_person, bid: requestedBusinessId, requestedQty: qty };
+-      return await bookingScheduleResponse(date, time);
+-    }
+     // Every way of choosing or correcting a departure uses the same live
+     // inventory. Keep preferences separate from a slot the guest has selected.
+     async function bookingScheduleResponse(requestedDate: string | null, requestedTime: string | null, selectedSlotId: string | null = null) {
+       const choices = await getSlots(requestedBusinessId, ns.tid, now);
+-      clearBookingQuote();
+-      if (ns.qty) ns.requestedQty = ns.requestedQty ?? ns.qty;
+       ns = { ...ns, step: "PICK_DATE", pendingDate: requestedDate, pendingTime: requestedTime };
+-      for (const key of ["selectedDate", "slotId", "slotTime", "qty"]) delete ns[key];
++      for (const key of ["selectedDate", "slotId", "slotTime"]) delete ns[key];
+       buttons = null; calendar = null;
+       if (!choices.length) {
+         const alternatives = await bookableTours(ns.tid);
+@@ -736,7 +710,7 @@
+           const priceNote = unitPrice !== basePrice ? " (peak rate R" + unitPrice + " per person)" : "";
+           const partySize = Number(ns.requestedQty ?? ns.qty);
+           if (Number.isSafeInteger(partySize) && partySize > 0) {
+-            reply = ns.tname + " on " + fmt(chosen.start_time) + priceNote + ". You mentioned " + partySize + " " + pl(partySize, "person", "people") + ". Continue with that group size, or tell me a different number.";
++            reply = fmt(chosen.start_time) + priceNote + ". You mentioned " + partySize + " " + pl(partySize, "person", "people") + ". Continue with that group size, or tell me a different number.";
+             buttons = [{ label: "Continue with " + partySize + " " + pl(partySize, "person", "people"), value: "qty:" + partySize }];
+           } else reply = ns.tname + " on " + fmt(chosen.start_time) + priceNote + ". How many people will be joining?";
+         } else if (day.length) {
+@@ -756,7 +730,7 @@
+       }
+       return new Response(JSON.stringify({ reply, state: ns, buttons, calendar }), { status: 200, headers: gCors(req) });
+     }
+-    const lo = msg.toLowerCase().replace(/[’‘]/g, "'").trim(); const step = state.step || "IDLE";
++    const lo = msg.toLowerCase().replace(/[’‘]/g, "'").trim(); let step = state.step || "IDLE";
+     const isBtnClick = lo.startsWith("btn:"); const btnVal = isBtnClick ? lo.replace("btn:", "") : "";
+ 
+     // A restart is available at every step, including after human handoff.
+@@ -994,24 +968,12 @@
+       const correctedDate = requestedBookingDate(lo);
+       const correctedTime = parseChatTime(lo);
+       const correction = /\b(?:i (?:asked|said|wanted|meant)|actually|instead|change|switch|wrong|incorrect)\b/.test(lo);
+-      const contactLabel = /^(?:(?:my|full)\s+)?(?:name|e-?mail|phone|cell|mobile|telephone|tel)\b/.test(lo);
+-      const explicitCorrection = /^(?:(?:please|can we|can i|could we|could i)\s+)?(?:change|switch|swap|choose|pick|make it|i (?:asked|said|wanted|meant))\s+/.test(lo);
+-      const contactAnswer = step === "ASK_DETAILS" && (contactLabel || !explicitCorrection && (lo.includes("@") || /^(?:\+|00)[\d\s().-]+$/.test(lo)));
+-      const scheduleAnswer = !contactAnswer && (!isChatQuestion(lo) || correction);
++      const scheduleAnswer = !isChatQuestion(lo) || correction;
+       const hasClock = /\b\d{1,2}(?:[:.]\d{2}|\s*(?:am|pm))\b/.test(lo);
+-      const rejectedDate = /\b(?:not|except|other than|avoid|don't want|do not want)\s+(?:on\s+|the\s+)?(?:(?:this|next)\s+)?(?:today|tomorrow|sunday|monday|tuesday|wednesday|thursday|friday|saturday|\d{4}-\d{2}-\d{2})\b/.test(lo);
+-      const rejectedTime = /\b(?:not|except|other than|avoid|don't want|do not want)\s+(?:at\s+|the\s+|a\s+)?\d{1,2}(?:[:.]\d{2}|\s*(?:am|pm))\b/.test(lo);
+-      const changeDate = !contactAnswer && (/^(?:change|switch)(?: (?:my|the|a|to|another|different))* (?:date|day|time)\b/.test(edit) || scheduleAnswer && (!!correctedDate || hasClock && !!correctedTime || rejectedDate || rejectedTime));
+-      const changeQuantity = /^\d+\s+(?:people|guests|persons?)[.!?]*$/.test(edit) || /\b(?:change|update|adjust)\b.{0,35}\b(?:number of (?:people|guests)|(?:group|party) size|quantity|count)\b|^(?:make it|we will be|we are now)\s+|\b(?:change|update)\b.{0,20}\b\d+ (?:people|guests)\b/.test(edit);
+-      const changeContact = !changeQuantity && /^(?:change|update|correct|edit|wrong|incorrect)(?: (?:my|the))? (?:email|phone|number|name|contact details)\b/.test(edit);
+-      const tourMatches = matchingToursFromText(tours, lo);
+-      const tourPreference = /\b(?:change|switch|swap|choose|pick|instead|rather|actually|prefer|want|would like|another|different)\b/.test(lo) && !/\b(?:know|learn|information|details|tell|explain)\b/.test(lo);
+-      const unnamedTourChange = !changeDate && !changeQuantity && !changeContact && !lo.includes("@") && /\b(?:change|switch|swap)\s+(?:(?:me|us)\s+)?to\s+\p{L}/u.test(lo);
+-      const changeTour = !contactLabel && !changeContact && (
+-        unnamedTourChange ||
+-        tourPreference && (tourMatches.length > 0 || tours.some(tour => lo.includes(tour.name.toLowerCase())) || /\b(?:tours?|experiences?|activities?)\b/.test(lo)) ||
+-        tours.some(tour => lo.replace(/[.!?]+$/, "").trim() === tour.name.toLowerCase())
+-      );
++      const changeTour = /^(?:change|switch|choose|pick)(?: (?:my|the|a|to|another|different))* tour[.!?]*$/.test(edit);
++      const changeDate = /^(?:change|switch)(?: (?:my|the|a|to|another|different))* (?:date|day|time)\b/.test(edit) || scheduleAnswer && (!!correctedDate || hasClock && !!correctedTime);
++      const changeQuantity = /^(?:change|update) (?:the |my )?(?:number of (?:people|guests)|group size|quantity)|^(?:make it|we will be|we are now)\s+/.test(edit);
++      const changeContact = /^(?:change|update|correct|edit|wrong|incorrect)(?: (?:my|the))? (?:email|phone|number|name|contact details)\b/.test(edit);
+       if (changeTour || changeDate || changeQuantity || changeContact) {
+         ns = { ...ns, checkout_attempt: crypto.randomUUID() };
+         delete ns.offered_handoff;
+@@ -1019,30 +981,21 @@
+           ns.step = "ASK_DETAILS";
+           return new Response(JSON.stringify({ reply: "Please send the corrected name, email address, or phone number. You can change one detail at a time.", state: ns }), { status: 200, headers: gCors(req) });
+         }
+-        clearBookingQuote();
++        for (const key of ["vid", "vcode", "vded", "total", "baseTotal", "discount"]) delete ns[key];
+         if (changeTour) {
+-          const qty = requestedPartySize(lo) ?? ns.requestedQty ?? ns.qty;
+-          if (tourMatches.length === 1) return await selectBookingTour(tourMatches[0], correctedDate, correctedTime, qty);
+-          ns = tourSelectionState();
+-          const options = tourMatches.length > 1 ? tourMatches : await bookableTours();
+-          return new Response(JSON.stringify({ reply: "Which tour would you like instead?" + (tourMatches.length > 1 ? " Please choose one of these tours." : ""), state: ns, buttons: options.map(tourBtn) }), { status: 200, headers: gCors(req) });
++          ns = { step: "PICK_TOUR" };
++          return new Response(JSON.stringify({ reply: "Which tour would you like instead?", state: ns, buttons: (await bookableTours()).map(tourBtn) }), { status: 200, headers: gCors(req) });
+         }
+         if (changeDate) {
+-          const date = correctedDate || (!rejectedDate && hasClock ? ns.selectedDate || ns.pendingDate : null);
+-          const time = hasClock ? correctedTime : timeForBookingDate(date || null, null);
++          const date = correctedDate || (hasClock ? ns.selectedDate || ns.pendingDate : null);
++          const time = hasClock ? correctedTime : ns.pendingTime;
+           const partySize = requestedPartySize(lo);
+           if (partySize) ns.requestedQty = partySize;
+           return await bookingScheduleResponse(date || null, time || null);
+         }
+         if (changeQuantity) {
+           ns.step = "ASK_QTY";
+-          const countText = edit.replace(/^.*?\b(?:make it|we will be|we are now|number of (?:people|guests)|(?:group|party) size|quantity|count)\s*(?:to|is|of|:)?\s*/, "");
+-          const count = requestedPartySize(lo) ?? parseChatQuantity(countText.replace(/[.!?]+$/, ""));
+-          if (!ns.slotId) {
+-            if (count) ns.requestedQty = count;
+-            return await bookingScheduleResponse(ns.selectedDate || ns.pendingDate || null, ns.pendingTime || null);
+-          }
+-          return await bookingQuantityResponse(count, true);
++          return new Response(JSON.stringify({ reply: "How many people should the booking be for?", state: ns }), { status: 200, headers: gCors(req) });
+         }
+       }
+     }
+@@ -1177,7 +1130,8 @@
+         const date = !isBtnClick && requestedBookingDate(lo) || state.pendingDate || null;
+         const time = !isBtnClick && parseChatTime(lo) || state.pendingTime || null;
+         const qty = !isBtnClick && requestedPartySize(lo) || state.requestedQty;
+-        return await selectBookingTour(picked, date, time, qty);
++        ns = { step: "PICK_DATE", checkout_attempt: crypto.randomUUID(), tid: picked.id, tname: picked.name, tprice: picked.base_price_per_person, bid: picked.business_id, requestedQty: qty };
++        return await bookingScheduleResponse(date, time);
+       } else {
+         const ptTours = await bookableTours();
+         if (ptTours.length === 0) { reply = NO_AVAILABILITY_REPLY; ns = { step: "IDLE" }; buttons = NO_AVAILABILITY_BUTTONS; }
+@@ -1195,7 +1149,7 @@
+         } catch { /* Keep the date picker and the selected tour when the model is unavailable. */ }
+       }
+ 
+-      return await bookingScheduleResponse(pdSelectedDate || null, timeForBookingDate(pdSelectedDate || null, isBtnClick ? null : parseChatTime(msg)));
++      return await bookingScheduleResponse(pdSelectedDate || null, !isBtnClick && parseChatTime(msg) || ns.pendingTime || null);
+     }
+     // ===== PICK_TIME =====
+     async function chatBookingQuestions() {
+@@ -1218,21 +1172,16 @@
+       return await bookingScheduleResponse(ns.selectedDate || ns.pendingDate || null, isBtnClick ? null : parseChatTime(msg), isBtnClick ? btnVal : null);
+     }
+     // ===== ASK_QTY =====
+-    async function bookingQuantityResponse(n: number | null, refreshPrice = false) {
+-      const liveSlots = refreshPrice ? await getSlots(requestedBusinessId, ns.tid, now) : null;
+-      const liveSlot = liveSlots?.find(slot => slot.id === ns.slotId);
+-      const { data: sc, error: capacityError } = await db.rpc("slot_available_capacity", { p_slot_id: ns.slotId });
+-      if (capacityError) throw new Error("Capacity could not be checked. Please try again.");
+-      const mx = refreshPrice && !liveSlot ? 0 : Math.max(0, Number(sc ?? 0));
+-      if (liveSlot) ns.tprice = Number(liveSlot.price_per_person_override ?? tours.find(tour => tour.id === ns.tid)?.base_price_per_person);
++    if (step === "ASK_QTY") {
++      const n = parseChatQuantity(isBtnClick && /^qty:\d+$/.test(btnVal) ? btnVal.slice(4) : msg);
++      const { data: sc } = await db.rpc("slot_available_capacity", { p_slot_id: ns.slotId });
++      const mx = Math.max(0, Number(sc ?? 0));
+       if (mx === 0) {
+-        const choices = (liveSlots || await getSlots(requestedBusinessId, ns.tid, now)).filter(slot => slot.id !== ns.slotId);
+-        clearBookingQuote();
++        const choices = await getSlots(requestedBusinessId, ns.tid, now);
+         if (choices.length) {
+           const days = {};
+           for (const slot of choices) { const key = dateKey(slot.start_time); if (!days[key]) days[key] = { date: key, label: fmtDate(slot.start_time), slots: [] }; days[key].slots.push({ id: slot.id, time: slot.start_time, avail: slot.available_capacity }); }
+-          ns = { ...ns, step: "PICK_DATE", requestedQty: n || ns.requestedQty || ns.qty };
+-          for (const key of ["selectedDate", "pendingDate", "pendingTime", "slotId", "slotTime", "qty"]) delete ns[key];
++          ns = { ...ns, step: "PICK_DATE", slotId: null, slotTime: null };
+           calendar = Object.values(days);
+           reply = "That time no longer has space. Please choose another date or time.";
+         } else {
+@@ -1241,31 +1190,48 @@
+           buttons = NO_AVAILABILITY_BUTTONS;
+         }
+         return new Response(JSON.stringify({ reply, state: ns, calendar, buttons }), { status: 200, headers: gCors(req) });
+-      } else if (!n || !Number.isSafeInteger(n) || n < 1) {
++      } else if (!(n > 0)) {
+         reply = "How many people will be joining? (Up to " + mx + " on this slot.)";
+       } else if (n > mx) {
+         // Over capacity — always give feedback (previously any number >30 silently
+         // re-asked with no explanation, a confusing dead-end for e.g. "500").
+         reply = "This slot only has " + mx + " spot" + (mx === 1 ? "" : "s") + " left, so " + n + " won't fit. Could you do " + mx + " or fewer? For a bigger group, ask us about a private tour.";
+       } else {
+-        const pricing = calculateChatBookingPricing({ qty: n, unitPrice: Number(ns.tprice) });
+-        ns = { ...ns, step: "ASK_DETAILS", qty: n, requestedQty: n, total: pricing.total, baseTotal: pricing.baseTotal, discount: pricing.discount };
+-        reply = n + " " + pl(n, "person", "people") + ". Total: R" + pricing.total + (pricing.discount > 0 ? " (5% group discount, R" + pricing.discount + " saved)" : "") + ".\n\nPlease send your full name, email address and phone number with country code (for example +44 7700 900123). Send them all in one message or one at a time.";
++        let tot = Math.round(n * ns.tprice * 100) / 100; let disc = 0; if (n >= 6) { disc = Math.round(tot * 0.05 * 100) / 100; tot = Math.round((tot - disc) * 100) / 100; } ns = { ...ns, step: "ASK_DETAILS", qty: n, requestedQty: n, total: tot, baseTotal: Math.round(n * ns.tprice * 100) / 100, discount: disc };
++        if (disc > 0) reply = n + " people. Nice group! You get 5% off (R" + disc + " saved). Total: R" + tot + ".\n\nTo lock this in, please send your:\n- Full Name\n- Email Address\n- Cell Number (including international code, e.g. +27)\n\n*(All in one message or one at a time, whatever works!)*";
++        else reply = pick([n + " people, awesome!\n\nTo lock this in, please send your:\n- Full Name\n- Email Address\n- Cell Number (including international code, e.g. +27)\n\n*(All in one message or one at a time, whatever works!)*"]);
+       }
+       return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
+     }
+-    if (step === "ASK_QTY") {
+-      return await bookingQuantityResponse(parseChatQuantity(isBtnClick && /^qty:\d+$/.test(btnVal) ? btnVal.slice(4) : msg));
+-    }
+     // ===== ASK_NAME =====
+     if (step === "ASK_DETAILS") {
+-      const details = parseChatContact(msg, ns);
+-      const { name: dName, email: dEmail, phone: dPhone } = details.contact;
++      const dParts = msg.split(/[,;\n]+/).map(function (p) { return p.trim(); }).filter(function (p) { return p.length > 0; });
++      // Accept separate fields or one sentence, and let corrections replace
++      // previously entered details instead of trapping the guest with a typo.
++      let dName = ns.name || ""; let dEmail = ns.email || ""; let dPhone = ns.phone || "";
++      for (const dp of dParts) {
++        const explicitName = /^(?:(?:my|full)\s+)?name\s*(?::|is\b|-)/i.test(dp);
++        let rest = dp;
++        const emailMatch = rest.match(/[\p{L}\p{N}.!#$%&'*+/=?^_`{|}~-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+/u);
++        if (emailMatch) {
++          dEmail = emailMatch[0].toLowerCase();
++          rest = rest.replace(emailMatch[0], " ");
++        }
++        const phoneMatch = rest.match(/(?:\+|00)?\d[\d\s().-]{5,}\d/);
++        if (phoneMatch && /^\+?[1-9]\d{6,14}$/.test(normP(phoneMatch[0]))) {
++          dPhone = normP(phoneMatch[0]);
++          rest = rest.replace(phoneMatch[0], " ");
++        }
++        rest = rest.replace(/\b(?:(?:my|full)\s+)?(?:name|email(?: address)?|phone(?: number)?|tel|mobile|cell(?: number)?|number)\b\s*(?::|is\b|-)?/gi, " ")
++          .replace(/[<>()\[\]"',;:]/g, " ").replace(/\s+/g, " ").trim();
++        if ((!dName || explicitName || (!emailMatch && !phoneMatch)) && rest.length >= 2 &&
++            /^[\p{L}\p{M}\s.'’\-]+$/u.test(rest) && rest.split(/\s+/).length <= 6) dName = rest;
++      }
+       ns = { ...ns, name: dName, email: dEmail, phone: dPhone };
+-      if (Object.keys(details.errors).length || details.missing.length) {
+-        const labels = { name: "full name", email: "email address", phone: "phone number with country code" };
+-        reply = Object.values(details.errors).join("\n") || "I still need your " + details.missing.map(field => labels[field]).join(" and ") + ". You can send one detail at a time.";
+-        return new Response(JSON.stringify({ reply, state: ns, validationErrors: details.errors }), { status: 200, headers: gCors(req) });
++      if (!dName || !dEmail || !dPhone) {
++        const dMiss = []; if (!dName) dMiss.push("full name"); if (!dEmail) dMiss.push("email address"); if (!dPhone) dMiss.push("phone number (with country code, e.g. +27)");
++        reply = (dName || dEmail || dPhone ? "Thanks! " : "") + "I still just need your " + dMiss.join(" and ") + ". Send it whenever you're ready.";
++        return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
+       }
+       const customDefs = await chatBookingQuestions();
+       if (requiresQuestionForm(customDefs)) return questionFormResponse();
+@@ -1358,11 +1324,9 @@
+           if (response) return response;
+         }
+         let ft = Number(ns.total || 0);
+-        const checkedContact = validateChatContact(ns);
+-        if (Object.keys(checkedContact.errors).length) {
+-          return new Response(JSON.stringify({ reply: Object.values(checkedContact.errors).join("\n"), state: { ...ns, ...checkedContact.contact, step: "ASK_DETAILS" }, validationErrors: checkedContact.errors }), { status: 200, headers: gCors(req) });
++        if (String(ns.name || "").trim().length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(ns.email || "")) || !/^\+?\d{7,15}$/.test(String(ns.phone || "").replace(/[\s()-]/g, ""))) {
++          return new Response(JSON.stringify({ reply: "Please check your full name, email address, and phone number before confirming.", state: { ...ns, step: "ASK_DETAILS", name: "", email: "", phone: "" } }), { status: 200, headers: gCors(req) });
+         }
+-        Object.assign(ns, checkedContact.contact);
+         // SECURITY: always use the Origin/subdomain-validated requestedBusinessId,
+         // never ns.bid — ns is the conversation state object round-tripped
+         // verbatim from the client every turn and isn't server-signed, so a

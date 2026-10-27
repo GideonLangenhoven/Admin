@@ -84,6 +84,10 @@ Deno.serve(async (req: any) => {
   try {
     const body = await req.json().catch(() => ({}));
     const { booking_id, reason, allow_late_choice } = body as { booking_id?: string; reason?: string; allow_late_choice?: boolean };
+    if (body.offer_choice !== undefined && typeof body.offer_choice !== "boolean") {
+      return new Response(JSON.stringify({ error: "offer_choice must be a boolean" }), { status: 400, headers: getCors(req) });
+    }
+    const notificationOnly = body.offer_choice === false;
 
     if (!booking_id) {
       return new Response(JSON.stringify({ error: "booking_id required" }), { status: 400, headers: getCors(req) });
@@ -115,7 +119,7 @@ Deno.serve(async (req: any) => {
     const manageBookingUrl = resolveManageBookingsUrl(tenant.business);
     const cancelled = await supabase.rpc("cancel_booking_transaction", {
       p_booking_id: booking_id, p_business_id: booking.business_id, p_reason: cancelReason,
-      p_allow_late_choice: allow_late_choice === true, p_weather: false,
+      p_allow_late_choice: allow_late_choice === true, p_weather: false, p_offer_choice: !notificationOnly,
     });
     if (cancelled.error || !cancelled.data?.ok) return new Response(JSON.stringify({ error: cancelled.data?.error || "Could not cancel booking" }), { status: 409, headers: getCors(req) });
     if (cancelled.data.already_cancelled) return new Response(JSON.stringify(cancelled.data), { headers: getCors(req) });
@@ -136,7 +140,11 @@ Deno.serve(async (req: any) => {
     if (booking.phone) {
       try {
         const firstName = String(booking.customer_name || "").split(" ")[0] || "there";
-        const waMessage = offerChoice
+        const waMessage = notificationOnly
+          ? "Booking Cancelled\n\nHi " + firstName + ", your " + tourName + (startTime ? " on " + startTime : "") +
+            " has been cancelled.\n\nReason: " + cancelReason + "\nRef: " + ref +
+            "\n\nIf you have any questions, please contact us directly.\n\n" + brandName
+          : offerChoice
           ? "Booking Cancelled\n\n" +
             "Hi " + firstName + ", your " + tourName + (startTime ? " on " + startTime : "") +
             " has been cancelled.\n\n" +
@@ -194,6 +202,7 @@ Deno.serve(async (req: any) => {
               is_forfeit: isForfeit,
               // Only the offer-choice cancel re-offers reschedule/voucher/refund.
               offer_choice: offerChoice,
+              notification_only: notificationOnly,
             },
           }),
         });
@@ -218,6 +227,7 @@ Deno.serve(async (req: any) => {
         refund_amount_action_required: offerChoice ? refundAmount : 0,
         late_forfeit: isForfeit,
         allow_late_choice: allow_late_choice === true,
+        notification_only: notificationOnly,
       },
     });
     if (logErr) console.error("LOG_ERR:", logErr.message);
@@ -226,8 +236,9 @@ Deno.serve(async (req: any) => {
       ok: true,
       booking_id,
       refund_action_required: offerChoice,
-      refund_amount: offerChoice ? refundAmount : 0,
+      refund_amount: refundAmount,
       late_forfeit: isForfeit,
+      notification_only: notificationOnly,
     }), { status: 200, headers: getCors(req) });
 
   } catch (err: any) {

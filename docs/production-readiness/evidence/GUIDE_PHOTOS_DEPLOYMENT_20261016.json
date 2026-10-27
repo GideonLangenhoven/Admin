@@ -1,0 +1,94 @@
+{
+  "date": "2026-10-16",
+  "verified_at": "2026-10-16T05:50:45.590469+00:00",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "admin": {
+    "id": "dpl_HCaW5dys6U1GsJ9ueSpEZY6hQ3qQ",
+    "url": "caepweb-admin-i8lvsuqhc-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 486,
+    "production_url": "https://admin.bookingtours.co.za"
+  },
+  "scope": [
+    "One shared Photos workspace powers /photos and guide departure photos inside Simple View.",
+    "Recent trip selection, preselected guide departure, image/video uploads, manual and bulk links, saved photo history, retries and partial outcomes.",
+    "Primary button says Send photos and thank you email in both views.",
+    "Guides can confirm photo/thank-you delivery through the existing TRIP_PHOTOS email and WhatsApp templates to eligible lead bookers of their own operator only.",
+    "Guide Drive access uses signed operator/trip/folder capabilities and single-file resumable upload URLs; the Google access token stays on the server.",
+    "Trip switching clears prior editable links; older or future explicitly selected departures remain accessible to their authorized operator.",
+    "Guide and Photos help, a scoped Settings paragraph and native chatbot instructions reflect the allowed sending flow and correct /simpleguide entry point."
+  ],
+  "baseline_before_photo_changes": "dpl_3ELT2erzNJAya63VE6U35WhbH125",
+  "final_visual_follow_up_of": "dpl_8HkAM5XjaP6XkNHiMMEFRd9bCVgB",
+  "preserved_concurrent_changes": [
+    "components/AuthGate.tsx",
+    "components/SignOutButton.tsx"
+  ],
+  "database_changes": false,
+  "native_chatbot": {
+    "version": 26,
+    "status": "ACTIVE",
+    "source_files_verified": 8,
+    "internal_answer_verified": true
+  },
+  "knowledge": {
+    "at": "2026-10-16T05:40:42.968Z",
+    "articles": [
+      "guide",
+      "photos",
+      "simple-view"
+    ],
+    "chunks": 16,
+    "result": {
+      "ok": true,
+      "total": 176,
+      "embedded": 1,
+      "skipped": 175,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    },
+    "unrelated_articles_unchanged": true
+  },
+  "validation": {
+    "unit_full_suite": {
+      "passed": 2390,
+      "skipped": 58,
+      "files_passed": 144,
+      "files_skipped": 2,
+      "scope": "Working tree full suite, before final presentation-only changes."
+    },
+    "focused_unit_tests_after_functional_changes": 50,
+    "final_local_photo_browser_cases": 5,
+    "final_live_photo_browser_cases": 5,
+    "final_live_browser_seconds": 17.5,
+    "typescript": "PASS",
+    "production_build": "PASS",
+    "eslint_errors": 0,
+    "hosted_schema_reads_with_zero_rows": 3,
+    "live_http_and_anonymous_access_checks": 7,
+    "native_help_files_verified": 8,
+    "uploaded_source_files_verified": 486,
+    "preserved_guide_login_source_hashes": {
+      "components/AuthGate.tsx": "2783a3fb2bc243b21cd7a1763d1ac73355500cad978c88ae1f20e895d9169645",
+      "components/SignOutButton.tsx": "212ac7c49abd943f26331ae7f086c30b305b96233df078039884361ac12707e0"
+    },
+    "visual_review": "PASS phone guide header and contrast, shared trip/upload/link/history tools and visible send action.",
+    "provider_delivery_scope": "Customer/auth/provider requests in browser tests are synthetic intercepted fixtures. Hosted Drive status probe used a nonexistent operator; no upload or guest message. Real provider delivery was not exercised."
+  },
+  "release_corrections": [
+    "An early package assertion correctly found unrelated pending chatbot edits, but subsequent upload commands were started before checking that assertion result. This briefly deployed the older chatbot file. The current verified source was restored with the photo instructions, then the guide help route was corrected; final version 26 is downloaded, source matched and live-answer checked.",
+    "The incomplete first package lacked the explicit caepweb-admin project link, producing a failed build under project admin. Only that failed deployment dpl_TJEhaptuF8h7BUs9EQjuvyGJ7sBT was removed. The healthy custom dashboard domain was not assigned to it.",
+    "Another session published the guide login fix during release preparation. Its two exact source hashes were preserved, and the photo package was rebuilt on that baseline.",
+    "Live visual review caught low title contrast on the Simple View shell. The final follow-up uses the existing guide intro styling and a contrasting card for the send action."
+  ],
+  "limitations": [
+    "Uploads still require the operator's existing connected Google Drive. Guides can use pasted links when it is disconnected.",
+    "Email/WhatsApp provider delivery was mocked; no real guest was contacted and no real file uploaded during verification.",
+    "Existing service-window, contact, template and delivery rules still apply; a saved photo link is not proof of message delivery.",
+    "Automated marketing/welcome-back activation, provider settings, commercial permissions and the broader paused rollout remain unchanged.",
+    "Unrelated pending chat-discount, Settings-placement and MFA product-note edits were preserved in the working tree and excluded from this scoped native help deployment."
+  ],
+  "evidence_directory": "guide-photos-deployment-20261016",
+  "rollback": "The UI/API may roll back to the preserved pre-photo deployment dpl_3ELT2erzNJAya63VE6U35WhbH125 without a database migration. Retain unrelated marketing protections and current guide account data."
+}

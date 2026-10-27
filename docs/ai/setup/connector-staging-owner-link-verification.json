@@ -1,0 +1,14 @@
+{
+  "verified_at": "2026-10-08T11:10:55.294Z",
+  "target_project": "gwwnkihblioayklptdab",
+  "sql_sha256": "f74d9d851cf8ab9f83d4a02a8926bd1db9e79cc072c358cb5368c3c573026771",
+  "checks": 7,
+  "report": {
+    "email": "connector-owner@example.invalid",
+    "role": "MAIN_ADMIN",
+    "business_name": "BookingTours Connector Test",
+    "auth_user_linked": true,
+    "enabled_connectors": "0"
+  },
+  "boundary": "Local PostgreSQL 17 with synthetic Auth rows. Does not create a hosted user or prove real password sign-in. Linking leaves providers disabled and stores no password."
+}

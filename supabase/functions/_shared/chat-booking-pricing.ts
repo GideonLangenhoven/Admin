@@ -26,7 +26,7 @@ export function calculateChatBookingPricing(input: ChatBookingPricingInput): Cha
   const qty = Number(input.qty);
   const unitPrice = Number(input.unitPrice);
 
-  if (!Number.isFinite(qty) || qty < 1) {
+  if (!Number.isSafeInteger(qty) || qty < 1) {
     throw new Error("INVALID_QTY");
   }
 
@@ -41,7 +41,9 @@ export function calculateChatBookingPricing(input: ChatBookingPricingInput): Cha
     ? money(baseTotal * (groupPercent / 100))
     : 0;
   const subtotal = money(baseTotal - discount);
-  const requestedVoucherDeduction = Math.max(0, Number(input.voucherDeduction || 0));
+  const voucherValue = Number(input.voucherDeduction ?? 0);
+  if (!Number.isFinite(voucherValue)) throw new Error("INVALID_PRICE");
+  const requestedVoucherDeduction = Math.max(0, voucherValue);
   const voucherDeduction = money(Math.min(requestedVoucherDeduction, subtotal));
 
   return {

@@ -1,0 +1,185 @@
+{
+  "at": "2026-10-18T12:05:22.865Z",
+  "project": "ukdsrndqhsatjkmxijuj",
+  "functions": [
+    {
+      "slug": "yoco-webhook",
+      "version": 135,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    },
+    {
+      "slug": "send-email",
+      "version": 190,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    },
+    {
+      "slug": "confirm-booking",
+      "version": 81,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    }
+  ],
+  "source_files": [
+    {
+      "slug": "confirm-booking",
+      "path": "supabase/functions/confirm-booking/index.ts",
+      "sha256": "be11d63794cda1a3542e65fa925de16e39195c9a15cae9871bbed506581ba466"
+    },
+    {
+      "slug": "confirm-booking",
+      "path": "supabase/functions/_shared/tenant.ts",
+      "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+    },
+    {
+      "slug": "confirm-booking",
+      "path": "supabase/functions/_shared/pagination.ts",
+      "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+    },
+    {
+      "slug": "confirm-booking",
+      "path": "supabase/functions/_shared/waiver.ts",
+      "sha256": "8a81bc17ec5a1106629301c77e2d479b7b7ba6fc66a8927534fb70b7311829d7"
+    },
+    {
+      "slug": "confirm-booking",
+      "path": "supabase/functions/_shared/voucher-balances.ts",
+      "sha256": "81cfd970364a2c9958d30d3a262cad0eb2b759d83c9f722a706a94c5993c2252"
+    },
+    {
+      "slug": "yoco-webhook",
+      "path": "supabase/functions/yoco-webhook/index.ts",
+      "sha256": "1410bbd0f2c9cef3b84dddab7d9677ad926bd746be173f92351f4aafe51363a2"
+    },
+    {
+      "slug": "yoco-webhook",
+      "path": "supabase/functions/_shared/voucher-balances.ts",
+      "sha256": "81cfd970364a2c9958d30d3a262cad0eb2b759d83c9f722a706a94c5993c2252"
+    },
+    {
+      "slug": "yoco-webhook",
+      "path": "supabase/functions/_shared/tenant.ts",
+      "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+    },
+    {
+      "slug": "yoco-webhook",
+      "path": "supabase/functions/_shared/pagination.ts",
+      "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+    },
+    {
+      "slug": "yoco-webhook",
+      "path": "supabase/functions/_shared/waiver.ts",
+      "sha256": "8a81bc17ec5a1106629301c77e2d479b7b7ba6fc66a8927534fb70b7311829d7"
+    },
+    {
+      "slug": "yoco-webhook",
+      "path": "supabase/functions/_shared/combo.ts",
+      "sha256": "9d9194012b9ae8b16188845bf9fd814987835654245d174b69126dc6e4dd0a6b"
+    },
+    {
+      "slug": "yoco-webhook",
+      "path": "supabase/functions/_shared/sentry.ts",
+      "sha256": "cf5cad26d7ddb3a103a60d658dab85fa647d98e574d5ddb44ab83700c915bafb"
+    },
+    {
+      "slug": "send-email",
+      "path": "supabase/functions/send-email/index.ts",
+      "sha256": "278728e2607015e80aabc389751526c587dc0286ed9617f209b30b998f5de716"
+    },
+    {
+      "slug": "send-email",
+      "path": "supabase/functions/_shared/gift-voucher-face.ts",
+      "sha256": "65fdcaac91278e5757d25497eaa204996f034e3bc87f5491cf1a5102971352ec"
+    },
+    {
+      "slug": "send-email",
+      "path": "supabase/functions/_shared/sentry.ts",
+      "sha256": "cf5cad26d7ddb3a103a60d658dab85fa647d98e574d5ddb44ab83700c915bafb"
+    },
+    {
+      "slug": "send-email",
+      "path": "supabase/functions/_shared/waiver.ts",
+      "sha256": "8a81bc17ec5a1106629301c77e2d479b7b7ba6fc66a8927534fb70b7311829d7"
+    },
+    {
+      "slug": "send-email",
+      "path": "supabase/functions/_shared/tenant.ts",
+      "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+    },
+    {
+      "slug": "send-email",
+      "path": "supabase/functions/_shared/pagination.ts",
+      "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+    },
+    {
+      "slug": "send-email",
+      "path": "supabase/functions/_shared/duration.ts",
+      "sha256": "4f6eb2b814536b6066378deb29002e829e4784ff09e26245009ea76aee22626c"
+    },
+    {
+      "slug": "send-email",
+      "path": "supabase/functions/_shared/marketing-tokens.ts",
+      "sha256": "ac28048ac64a3e0bca6d84db933d91aa2f33479804e457e2922f595b3934ab12"
+    },
+    {
+      "slug": "send-email",
+      "path": "supabase/functions/_shared/marketing-email-html.ts",
+      "sha256": "fa51d920412113136b15c3bf90b694cf5bfc33caec1588357bb64b5bc9c29b42"
+    },
+    {
+      "slug": "send-email",
+      "path": "supabase/functions/_shared/auth.ts",
+      "sha256": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade"
+    },
+    {
+      "slug": "send-email",
+      "path": "supabase/functions/_shared/payment-deadline.ts",
+      "sha256": "afb8e3a68337c44ddd81d5f2c90a5f1504f89530ee2077b109ce9e57388bb3a7"
+    }
+  ],
+  "probes": [
+    {
+      "slug": "confirm-booking",
+      "status": 400
+    },
+    {
+      "slug": "yoco-webhook",
+      "status": 200
+    },
+    {
+      "slug": "send-email",
+      "status": 401
+    }
+  ],
+  "worker": [
+    {
+      "status": "succeeded",
+      "start_time": "2026-10-18 12:05:00.885209+00",
+      "end_time": "2026-10-18 12:05:00.946598+00"
+    },
+    {
+      "status": "succeeded",
+      "start_time": "2026-10-18 12:04:00.081219+00",
+      "end_time": "2026-10-18 12:04:00.104841+00"
+    },
+    {
+      "status": "succeeded",
+      "start_time": "2026-10-18 12:03:00.062207+00",
+      "end_time": "2026-10-18 12:03:00.066389+00"
+    }
+  ],
+  "unrelated_functions_unchanged": true,
+  "customer_messages_sent": 0,
+  "status": "DEPLOYED_AND_VERIFIED",
+  "scope": "Automatic booking confirmations queue for five minutes, refresh saved waiver status at send time, and omit the waiver section when signed.",
+  "validation": {
+    "unique_tests_passed": 204,
+    "edge_typecheck": "passed",
+    "live_source_files_verified": 23
+  },
+  "limits": [
+    "No real customer emails or payments were created during deployment verification.",
+    "Delivery is eligible after five minutes and is picked up by the existing minute worker."
+  ]
+}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCallerGuide } from "@/app/lib/guide-api-auth";
 import { getCallerAdmin } from "@/app/lib/api-auth";
 import { createClient } from "@supabase/supabase-js";
 
@@ -10,13 +11,15 @@ function adminClient() {
 }
 
 export async function POST(req: NextRequest) {
-  const caller = await getCallerAdmin(req);
+  const caller = await getCallerAdmin(req) || await getCallerGuide(req);
   if (!caller) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const form = await req.formData();
   const slotId = String(form.get("slot_id") || "");
   const file = form.get("file") as File | null;
   if (!slotId || !file) return NextResponse.json({ error: "slot_id and file required" }, { status: 400 });
+
+  if (!(file instanceof File) || !file.type.startsWith("image/") || file.size > 20 * 1024 * 1024) return NextResponse.json({ error: "Choose an image smaller than 20 MB" }, { status: 400 });
 
   const db = adminClient();
 
@@ -98,7 +101,7 @@ export async function POST(req: NextRequest) {
     photo_url: thumbnailUrl,
     gdrive_file_id: driveFile.id,
     gdrive_view_url: viewUrl,
-    uploaded_by_admin_id: caller.id,
+    ...(caller.role === "GUIDE" ? { uploaded_by_guide_id: caller.id } : { uploaded_by_admin_id: caller.id }),
     uploaded_at: new Date().toISOString(),
   });
 

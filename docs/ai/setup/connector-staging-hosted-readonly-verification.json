@@ -1,0 +1,31 @@
+{
+  "verified_at": "2026-10-08T14:06:00.448Z",
+  "target_project": "gwwnkihblioayklptdab",
+  "pooler_host": "aws-0-eu-west-2.pooler.supabase.com",
+  "pooler_port": "6543",
+  "database_role": "bookingtours_agent_gateway",
+  "result": "PASS",
+  "checks": [
+    "saved test endpoints and disabled application gates",
+    "verified TLS, restricted password login and actual runtime permission gate",
+    "both database provider readiness checks remain closed",
+    "gateway direct tour, Auth and private-status reads are denied",
+    "publishable API key accepted and native email sign-in enabled",
+    "anonymous tour reads are denied",
+    "server API key accepted and sample MAIN_ADMIN membership linked",
+    "synthetic sample counts match the staging installation"
+  ],
+  "synthetic_counts": {
+    "tours": 2,
+    "slots": 4,
+    "bookings": 3
+  },
+  "source_sha256": {
+    "agent-db": "6e538ddfcc5a1849fb40dc8a07471ca24aabd89e5a6af6aebb279354b3694c84",
+    "agent-config": "63187af9c017e7a7617ce5d8539bf19491e2a437c9fc13d3343e20f5a9ae1e93"
+  },
+  "restricted_tls_login_tested": true,
+  "native_password_sign_in_tested": false,
+  "provider_link_tested": false,
+  "boundary": "Read-only SELECT/readiness calls to the explicitly identified staging database and Supabase APIs. No providers enabled, grants issued, Auth users changed, passwords printed or application deployed."
+}

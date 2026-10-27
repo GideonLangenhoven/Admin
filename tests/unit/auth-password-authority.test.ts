@@ -1,3 +1,4 @@
+import { guideAuthEmail } from "../../app/lib/guide-access";
 import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
@@ -54,6 +55,7 @@ function loginFixture(user: Record<string, unknown>) {
   };
   const handler = sourceHandler("app/api/admin/login/route.ts", {
     "@supabase/supabase-js": { createClient: () => db },
+    "../../../lib/guide-access": { guideAuthEmail },
     "../../../lib/admin-password": {
       setAdminAuthPassword: async () => { authWrites.push("migrate"); return "auth-new"; },
     },
@@ -142,6 +144,7 @@ function setupFixture(options: { authFails?: boolean; completeFails?: boolean } 
   });
   const handler = sourceHandler("app/api/admin/setup-link/route.ts", {
     "@supabase/supabase-js": { createClient: () => db },
+    "../../../lib/guide-access": { guideAuthEmail },
     "../../../lib/api-auth": {},
     "../../../lib/admin-password": { setAdminAuthPassword: setPassword },
   });

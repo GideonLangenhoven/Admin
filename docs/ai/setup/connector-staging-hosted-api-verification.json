@@ -1,0 +1,13 @@
+{
+  "result": "FAIL",
+  "phase": "server_api_key",
+  "code": "SERVER_KEY_TEST_BUSINESS_LOOKUP_FAILED",
+  "completed_checks": [
+    "saved test endpoints and disabled application gates",
+    "publishable API key accepted and native email sign-in enabled",
+    "anonymous tour reads are denied"
+  ],
+  "credentials_printed": false,
+  "verified_at": "2026-10-08T13:47:57.119Z",
+  "target_project": "gwwnkihblioayklptdab"
+}

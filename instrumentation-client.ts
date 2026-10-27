@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
+import { isAgentTelemetry } from "./app/lib/agent-telemetry";
 
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
 
@@ -14,7 +15,10 @@ Sentry.init({
     "Non-Error promise rejection captured",
     /^ResizeObserver loop/,
   ],
+  beforeSendTransaction: event => isAgentTelemetry(event) ? null : event,
+  beforeBreadcrumb: breadcrumb => isAgentTelemetry(breadcrumb) ? null : breadcrumb,
   beforeSend(event) {
+    if (isAgentTelemetry(event)) return null;
     if (event.request) {
       delete event.request.cookies;
       delete event.request.data;

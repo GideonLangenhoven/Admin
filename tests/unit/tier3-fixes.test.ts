@@ -69,7 +69,7 @@ describe("item 20 — Close vs Cancel are distinct slot actions", () => {
   });
   it("close is status-only; cancel goes through the notify+refund backend", () => {
     expect(slots).toContain('.update({ status: "CLOSED" })');
-    expect(slots).toContain("is_weather: false");
+    expect(slots).toContain("is_weather: isWeather");
   });
   it("weather-cancel supports a non-weather operator cancellation", () => {
     expect(weather).toContain("isWeather");

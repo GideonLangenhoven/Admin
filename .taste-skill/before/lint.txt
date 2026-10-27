@@ -1,0 +1,95 @@
+TASTESKILL · LINT   102 file(s)
+
+FAIL
+  [gradient] Gradient fill. Use a flat colour or a real image (a neutral scrim over a photo is the one exception).  (29×)
+      app/globals.css:186  radial-gradient(
+      app/globals.css:187  radial-gradient(
+      app/globals.css:200  radial-gradient(
+      app/globals.css:201  radial-gradient(
+      app/globals.css:358  linear-gradient(
+      app/globals.css:550  linear-gradient(
+      … 23 more
+  [purple] Indigo / violet — the generated-page accent.  (2×)
+      app/globals.css:924  text-indigo-600
+      app/globals.css:1378  text-indigo-600
+  [emoji] Emoji used as UI.  (17×)
+      components/BookingsMonthCalendar.tsx:208  ✕
+      components/BookingsMonthCalendar.tsx:272  ✕
+      components/ExternalBookingSettings.tsx:31  ✓
+      components/PlatformOperations.tsx:96  ✓
+      components/photos/TripPhotosWorkspace.tsx:345  📸
+      components/photos/TripPhotosWorkspace.tsx:402  ✓
+      … 11 more
+  [micro-label] Tiny uppercase letter-spaced label.  (2×)
+      components/DemoActionGuide.tsx:128  text-xs font-semibold uppercase tracking-wide
+      components/DemoActionGuide.tsx:130  text-xs font-semibold uppercase tracking-wide
+  [placeholder-data] Placeholder data. Use believable names, amounts that add up and real units for this product.  (4×)
+      app/settings/page.tsx:1801  example.com
+      app/settings/page.tsx:2227  John Doe
+      app/settings/page.tsx:2930  example.com
+      app/marketing/contacts/page.tsx:747  example.com
+
+WARN
+  [shadow] Shadow. Elements at rest carry none; only real overlays (menu, dialog, sticky bar) may.  (68×)
+      app/globals.css:90  shadow
+      app/globals.css:324  box-shadow:
+      app/globals.css:331  box-shadow:
+      app/globals.css:339  box-shadow:
+      app/globals.css:347  box-shadow:
+      app/globals.css:359  box-shadow:
+      … 62 more
+  [mono] Monospace type. Only literal code may be monospace.  (50×)
+      app/globals.css:252  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, mo
+      app/globals.css:258  font-mono
+      app/globals.css:385  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, mo
+      app/globals.css:392  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, mo
+      app/globals.css:469  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, mo
+      app/globals.css:487  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Co
+      … 44 more
+  [glass] Backdrop blur. One sticky bar at most; glass cards are a tell.  (9×)
+      app/globals.css:377  backdrop-filter:
+      app/globals.css:378  backdrop-filter:
+      components/booking/catalogue.css:127  backdrop-filter:
+      components/booking/catalogue.css:128  backdrop-filter:
+      components/booking/catalogue.css:149  backdrop-filter:
+      components/booking/catalogue.css:150  backdrop-filter:
+      … 3 more
+  [framework-colour] A framework default colour (Tailwind blue, green, red, amber). Take the accent and status colours from the dealt style.  (1×)
+      app/globals.css:1445  #f59e0b
+  [bounce] Looping attention animation (bounce / ping / pulse dot).  (9×)
+      components/AppShell.tsx:382  animate-pulse
+      components/AuthGate.tsx:689  animate-pulse
+      components/AuthGate.tsx:692  animate-pulse
+      components/AuthGate.tsx:712  animate-pulse
+      components/AuthGate.tsx:727  animate-pulse
+      components/HelpChat.tsx:392  animate-bounce
+      … 3 more
+  [numbering] Zero-padding in script. Fine for a clock, a date or a price; if it builds 01 / 02 / 03 labels, remove it.  (9×)
+      components/CalendarHeader.tsx:41  padStart(2, "0")
+      components/DayView.tsx:45  padStart(2, '0')
+      components/ExternalBookingSettings.tsx:96  padStart(2, "0")
+      components/ExternalBookingSettings.tsx:101  padStart(2, "0")
+      components/MonthPicker.tsx:105  padStart(2, "0")
+      components/WeekView.tsx:54  padStart(2, '0')
+      … 3 more
+  [transition-all] transition: all. Name the properties (transform, opacity).  (12×)
+      components/WelcomeChecklist.tsx:297  transition-all
+      components/marketing/blocks/block-editors.tsx:363  transition-all
+      components/marketing/blocks/block-editors.tsx:569  transition-all
+      components/photos/TripPhotosWorkspace.tsx:398  transition-all
+      app/page.tsx:767  transition-all
+      app/page.tsx:810  transition-all
+      … 6 more
+  [eyebrow] Eyebrow / kicker label above a heading.  (8×)
+      components/booking/BookingSitePreview.tsx:69  className="glass-eyebrow
+      components/booking/Catalogue.tsx:55  className="eyebrow
+      components/booking/catalogue.css:59  .eyebrow {
+      components/booking/catalogue.css:246  .eyebrow {
+      components/guide/GuideDay.tsx:37  className="sv-eyebrow
+      app/simple/calendar/page.tsx:36  className="sv-eyebrow
+      … 2 more
+  [em-dash] Em-dash habit. Use a full stop or a comma; keep at most one or two on a page.  (1×)
+      (all files):0  87 em dashes
+
+RESULT: 54 FAIL, 167 WARN — fix the FAILs before rendering.
+Interface fragments marked data-ui keep their own borders and shadows. Any other line that must keep a flagged pattern for a real reason can carry the comment taste-skill-ignore.

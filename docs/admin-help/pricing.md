@@ -21,3 +21,7 @@ Slots you've manually re-priced, and slots that already have paid or confirmed b
 ## Removing a peak period
 
 Remove a rule from the **Peak Period Rules** list; affected slots revert to the base price (with the same grandfathering protections).
+
+## Last-minute pricing
+
+Time-limited last-minute deals are configured under [Settings → Tours & Activities](/settings#tours), by a main admin or staff granted Tours access. Set a deal price and its hours-before-departure window. These deals apply to eligible unsold departures; existing paid bookings do not automatically get a discount or refund by rescheduling into the deal.

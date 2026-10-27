@@ -1,0 +1,366 @@
+{
+  "recorded_at": "2026-10-01T05:41:39.199207+00:00",
+  "status": "ISOLATED_QA_PASSED_LIVE_SERVICE_CHECKS_DEFERRED",
+  "scope": "Web chat handler and compiled booking-site chat widget. No deployment performed.",
+  "repositories": {
+    "admin_head": "43304b65314c2b9974f939304e7b2ebae0a62c0c",
+    "booking_head": "87d9907c67f427950c621e7f76f6136a0ffaeea3"
+  },
+  "source_sha256": {
+    "supabase/functions/web-chat/index.ts": "60bacc25279e713b82a3c8c04e50666fe4718f0a0ce049083369cd087ffbefc3",
+    "supabase/functions/_shared/chat-booking-pricing.ts": "f936f6c6a1c43cd6fe932d02697e04d02575273685886b68dbd646d1b9163d80",
+    "supabase/functions/_shared/intent.ts": "f4bc05d64c25343bd17b5460d3cb495079d28a08c077128da786b8149f0a7bd0",
+    "booking/app/components/ChatWidget.tsx": "2436c6b3c13e9bcf8405f1776b4678cb9bcac1b07b0589b37b6148fdb96cd128",
+    "booking/app/components/ChatCalendar.tsx": "a5cfd9a4228496367a12936e7c3e5b6e747177cc7ea1c0c8867cd870515ce2dc"
+  },
+  "verification": {
+    "chat_unit": {
+      "total": 156,
+      "passed": 156,
+      "failed": 0,
+      "command": "./node_modules/.bin/vitest run tests/unit/web-chat-production.test.ts tests/unit/web-chat-identity.test.ts tests/unit/chat-booking-pricing.test.ts --maxWorkers=2 --testTimeout=15000"
+    },
+    "production_browser": {
+      "passed": 27,
+      "failed": 0,
+      "flaky": 0,
+      "duration_ms": 299880,
+      "command": "npx playwright test -c playwright.web-chat.config.ts",
+      "scenarios": [
+        {
+          "scenario": "first message survives opening the chat",
+          "projects": [
+            {
+              "project": "chrome-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "booking questions preserve the current choice and retire stale buttons",
+          "projects": [
+            {
+              "project": "chrome-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "books through the displayed calendar, contact fields, and payment link",
+          "projects": [
+            {
+              "project": "chrome-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "human reply arrives once and a new chat resets the server handoff",
+          "projects": [
+            {
+              "project": "chrome-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "network and expired-session failures leave the chat usable",
+          "projects": [
+            {
+              "project": "chrome-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "ending human help collects a rating and returns to the bot",
+          "projects": [
+            {
+              "project": "chrome-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "slow agent polls cannot duplicate replies or revive a restarted chat",
+          "projects": [
+            {
+              "project": "chrome-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "a pending reply finishes before a new chat can clear its transcript",
+          "projects": [
+            {
+              "project": "chrome-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "keyboard focus and long replies stay inside the panel",
+          "projects": [
+            {
+              "project": "chrome-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "first message survives opening the chat",
+          "projects": [
+            {
+              "project": "webkit-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "booking questions preserve the current choice and retire stale buttons",
+          "projects": [
+            {
+              "project": "webkit-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "books through the displayed calendar, contact fields, and payment link",
+          "projects": [
+            {
+              "project": "webkit-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "human reply arrives once and a new chat resets the server handoff",
+          "projects": [
+            {
+              "project": "webkit-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "network and expired-session failures leave the chat usable",
+          "projects": [
+            {
+              "project": "webkit-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "ending human help collects a rating and returns to the bot",
+          "projects": [
+            {
+              "project": "webkit-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "slow agent polls cannot duplicate replies or revive a restarted chat",
+          "projects": [
+            {
+              "project": "webkit-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "a pending reply finishes before a new chat can clear its transcript",
+          "projects": [
+            {
+              "project": "webkit-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "keyboard focus and long replies stay inside the panel",
+          "projects": [
+            {
+              "project": "webkit-phone",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "first message survives opening the chat",
+          "projects": [
+            {
+              "project": "chrome-desktop",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "booking questions preserve the current choice and retire stale buttons",
+          "projects": [
+            {
+              "project": "chrome-desktop",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "books through the displayed calendar, contact fields, and payment link",
+          "projects": [
+            {
+              "project": "chrome-desktop",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "human reply arrives once and a new chat resets the server handoff",
+          "projects": [
+            {
+              "project": "chrome-desktop",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "network and expired-session failures leave the chat usable",
+          "projects": [
+            {
+              "project": "chrome-desktop",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "ending human help collects a rating and returns to the bot",
+          "projects": [
+            {
+              "project": "chrome-desktop",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "slow agent polls cannot duplicate replies or revive a restarted chat",
+          "projects": [
+            {
+              "project": "chrome-desktop",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "a pending reply finishes before a new chat can clear its transcript",
+          "projects": [
+            {
+              "project": "chrome-desktop",
+              "status": "expected"
+            }
+          ]
+        },
+        {
+          "scenario": "keyboard focus and long replies stay inside the panel",
+          "projects": [
+            {
+              "project": "chrome-desktop",
+              "status": "expected"
+            }
+          ]
+        }
+      ]
+    },
+    "build": {
+      "status": "PASSED",
+      "mode": "Next.js webpack production build; isolated snapshot; fixture public credentials",
+      "warnings": [
+        "Existing middleware convention deprecation",
+        "Next/Sentry Edge Runtime import warnings",
+        "Outdated Browserslist data"
+      ]
+    },
+    "edge_type_checks": {
+      "status": "PASSED",
+      "command": "deno check --config supabase/functions/deno.json --node-modules-dir=none supabase/functions/web-chat/index.ts supabase/functions/wa-webhook/index.ts"
+    },
+    "component_lint": {
+      "status": "PASSED",
+      "command": "cd booking && ./node_modules/.bin/eslint app/components/ChatWidget.tsx app/components/ChatCalendar.tsx"
+    },
+    "full_repository_unit": {
+      "total": 1513,
+      "passed": 1506,
+      "failed": 6,
+      "skipped": 1,
+      "command": "./node_modules/.bin/vitest run --maxWorkers=2 --testTimeout=15000",
+      "failures": [
+        {
+          "file": "tests/unit/db-column-refs.test.ts",
+          "case": "database column references in code exist in the schema every referenced table.column exists"
+        },
+        {
+          "file": "tests/unit/help-chat-navigation.test.ts",
+          "case": "help assistant survives following its own links only closes on the mobile breakpoint"
+        },
+        {
+          "file": "tests/unit/storefront-checkout-updates.test.ts",
+          "case": "storefront authoritative checkout sends proof, promo, vouchers and extras for cash checkout"
+        },
+        {
+          "file": "tests/unit/storefront-checkout-updates.test.ts",
+          "case": "storefront authoritative checkout sends proof, promo, vouchers and extras for free checkout"
+        },
+        {
+          "file": "tests/unit/storefront-checkout-updates.test.ts",
+          "case": "storefront authoritative checkout shows a server capacity failure without opening payment"
+        },
+        {
+          "file": "tests/unit/storefront-checkout-updates.test.ts",
+          "case": "storefront authoritative checkout retries an existing held booking without inserting another or changing its price"
+        }
+      ],
+      "classification": "Failures involve unchanged source and schema fixture files; need separate triage."
+    },
+    "visual_review": {
+      "status": "REVIEWED",
+      "notes": "Reviewed mobile Chrome and WebKit calendar screenshots. Raised chat-panel background opacity to keep page text from interfering. Keyboard containment and long-message overflow checks pass."
+    }
+  },
+  "fixes_verified": [
+    "Questions and restarts work across booking and gift steps; current choices stay usable.",
+    "Quick Answers are checked before the model and do not match unrelated short words.",
+    "Successful bot exchanges are saved as complete transcripts.",
+    "Party expressions are parsed as quantities; unrelated numbers and fractional or negative quantities are rejected.",
+    "Purchase confirmation requires explicit consent.",
+    "Duplicate and parallel booking/gift confirmations reuse a durable primary-key claim.",
+    "Payment-provider errors, malformed responses and network failures release booking holds and save a real human handoff.",
+    "Expired, depleted and skipped vouchers cannot retain or revive credit; voucher codes containing no are accepted.",
+    "Completed voucher bookings remain confirmed on retry after their voucher is consumed.",
+    "Peak prices, cents-based group discounts, closed or past slots and final contact details are checked.",
+    "Operator timezones remain isolated during overlapping requests.",
+    "The first visitor message survives opening; stale controls retire; New chat resets server handoff.",
+    "Agent replies survive reload; slow polls are serialized and cannot append old replies after restart.",
+    "Session renewal, network retry, ratings, keyboard focus and long multilingual replies work in three browser profiles."
+  ],
+  "test_boundaries": [
+    "The real TypeScript handlers and React widget execute, with in-memory database responses and simulated model/payment/email services.",
+    "Browser tests use the compiled production app with fake public credentials. The production CSP is stripped only from isolated test responses to allow the localhost fixture.",
+    "Service workers are blocked in this suite; installed PWA/offline caching is outside this validation.",
+    "No real bookings, charges, emails, WhatsApp messages or operator notifications were sent.",
+    "These results establish functional behavior under the tested cases, not production throughput or real-model answer quality."
+  ],
+  "remaining_production_checks": [
+    "Deploy to a staging environment with Yoco test mode and verify real database holds, retry deduplication, voucher balances and payment webhooks.",
+    "Verify transcript visibility and live handoff delivery through the real operator inbox.",
+    "Evaluate answers against the actual operator knowledge and configured model, including follow-up questions and repeated wording.",
+    "Verify actual confirmation-email delivery and perform a deployed-origin smoke test.",
+    "Triage the six existing repository regression failures before whole-application release signoff."
+  ],
+  "live_service_checks": {
+    "status": "DEFERRED_AT_USER_REQUEST",
+    "instruction": "no please leave that",
+    "note": "No staging or real payment/database-provider checks performed."
+  }
+}

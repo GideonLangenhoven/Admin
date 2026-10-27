@@ -47,6 +47,11 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "Invalid parameters" }), { status: 400, headers: getCors(req) });
     }
 
+    if (send_whatsapp) return new Response(JSON.stringify({ error: "WhatsApp broadcasts require verified channel permission. No messages sent." }), { status: 409, headers: getCors(req) });
+    // Free-form promotion has no durable queue identity, frequency reservation or safe recovery.
+    // Keep it unavailable until routed through the shared promotional delivery gate.
+    return new Response(JSON.stringify({ error: "Promotional broadcasts unavailable: shared delivery gate required. No messages sent." }),
+      { status: 409, headers: getCors(req) });
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Default limit
@@ -118,6 +123,20 @@ Deno.serve(async (req: Request) => {
       const parsedMessage = message.replace(/\{name\}/gi, firstName);
       const emailLowerRaw = String(b.email || "").toLowerCase();
       const isUnsubscribed = !!emailLowerRaw && unsubscribedEmails.has(emailLowerRaw);
+
+      // Free-form broadcast content has no verified operational purpose contract.
+      // It cannot acquire marketing authority merely from a booking or a label.
+      const { data: marketingContact, error: contactError } = await supabase.from("marketing_contacts")
+        .select("id").eq("business_id", business_id).eq("email", emailLowerRaw).maybeSingle();
+      const permission = marketingContact && !contactError
+        ? await supabase.rpc("marketing_eligibility", { p_business_id: business_id, p_contact_id: marketingContact.id })
+        : { data: "permission_unknown", error: contactError };
+      if (permission.error || permission.data !== "eligible") continue;
+      // WhatsApp promotion needs its own channel evidence and approved templates.
+      if (send_whatsapp) {
+        return new Response(JSON.stringify({ error: "WhatsApp broadcasts require a verified channel-permission workflow. No messages sent." }),
+          { status: 409, headers: getCors(req) });
+      }
 
       // WhatsApp — send with an approved-template fallback so out-of-window
       // recipients still get the message (as a template) rather than silently

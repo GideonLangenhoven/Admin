@@ -1,0 +1,107 @@
+{
+  "verified_at_utc": "2026-10-03T14:13:49.062710+00:00",
+  "authorization": "User: please deploy",
+  "status": "published_and_verified",
+  "scope": "Two disabled Admin agent-summary source files: per-person waiver counts and explicit all-active payment booking counts.",
+  "deployment": {
+    "id": "dpl_87K1ScSv97w5aBRuhYr6V39nZkpW",
+    "url": "https://caepweb-admin-n6l9jzqnn-jerrys-projects-f4e4eaf9.vercel.app",
+    "live_domain": "https://admin.bookingtours.co.za",
+    "status": "READY",
+    "promoted": true,
+    "previous_live_deployment": "dpl_7Gy8PAtiUue5QERVdTkEWR29eZJS",
+    "live_alias_id_verified": true,
+    "previous_live_id_rechecked_before_promotion": true
+  },
+  "source": {
+    "baseline_deployment": "dpl_7Gy8PAtiUue5QERVdTkEWR29eZJS",
+    "baseline_runtime_files": 449,
+    "preserved_runtime_files": 447,
+    "changed_runtime_files": {
+      "app/lib/agent-tools.ts": "71f538357ddc6a21f3fb1de6240ec376bb0d789a5f50e57beecb53c6be7af544",
+      "app/lib/agent-read-service.ts": "947041cfea9ad095dcab3d6d774780057af357ba48438aadd4fc4dddee6f7830"
+    },
+    "candidate_matches_current_workspace_changed_files": true,
+    "verification": "Candidate runtime files checked against the previously source-verified live snapshot; exactly two differ.",
+    "catalogue_preview_and_existing_agent_safeguards_preserved": true
+  },
+  "checks": {
+    "focused_unit_tests": {
+      "passed": 155,
+      "agent_read_service": 138,
+      "operator_acquisition": 17,
+      "environment": "Labelled fictional Auth/grant/provider fixtures in isolated source; no real connector journey"
+    },
+    "next_typegen": "passed",
+    "typescript": "passed; whole application, tsc --noEmit --incremental false",
+    "focused_lint": "passed; both changed runtime files",
+    "cloud_production_build": "passed",
+    "candidate_http": [
+      {
+        "case": "candidate-home",
+        "status": 200,
+        "cache_control": "public, max-age=0, must-revalidate"
+      },
+      {
+        "case": "candidate-agent-get",
+        "status": 503,
+        "cache_control": "no-store",
+        "code": "INTEGRATION_DISABLED"
+      },
+      {
+        "case": "candidate-agent-post",
+        "status": 503,
+        "cache_control": "no-store",
+        "code": "INTEGRATION_DISABLED"
+      },
+      {
+        "case": "candidate-admin-auth",
+        "status": 401,
+        "cache_control": "public, max-age=0, must-revalidate"
+      }
+    ],
+    "live_http": [
+      {
+        "case": "live-home",
+        "domain": "admin.bookingtours.co.za",
+        "path": "/",
+        "status": 200,
+        "cache_control": "public, max-age=0, must-revalidate",
+        "protection_bypass": false
+      },
+      {
+        "case": "live-agent-get",
+        "domain": "admin.bookingtours.co.za",
+        "path": "/api/agent/read",
+        "status": 503,
+        "cache_control": "no-store",
+        "protection_bypass": false,
+        "code": "INTEGRATION_DISABLED"
+      },
+      {
+        "case": "live-admin-auth",
+        "domain": "admin.bookingtours.co.za",
+        "path": "/api/admin/data-requests?summary=actionable",
+        "status": 401,
+        "cache_control": "public, max-age=0, must-revalidate",
+        "protection_bypass": false
+      }
+    ]
+  },
+  "boundaries": {
+    "production_sql_changes": 0,
+    "agent_sql_candidate_uploaded": false,
+    "external_agent_access_enabled": false,
+    "provider_connections_enabled": false,
+    "customer_data_mutations": 0,
+    "booking_deployment_changed": false,
+    "git_push_or_merge": false,
+    "broader_rollout": "paused",
+    "broader_verdict": "FAILED_GATE"
+  },
+  "limitations": [
+    "The per-person SQL aggregate remains a local candidate outside the migration ledger; no production RPC was installed or exercised.",
+    "The HTTP route remains closed and the service has no production caller; source deployment does not release a customer connector."
+  ],
+  "artifacts": "agent-participant-deployment-20261003/"
+}

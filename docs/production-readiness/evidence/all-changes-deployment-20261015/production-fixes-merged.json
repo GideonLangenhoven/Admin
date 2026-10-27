@@ -1,0 +1,13 @@
+{
+  "paths": [
+    "supabase/functions/_shared/marketing-outbox.ts",
+    "supabase/functions/auto-messages/index.ts",
+    "supabase/functions/broadcast/index.ts",
+    "supabase/functions/marketing-automation-dispatch/index.ts",
+    "supabase/functions/marketing-dispatch/index.ts",
+    "supabase/functions/wa-webhook/index.ts",
+    ".vercelignore",
+    "booking/.vercelignore"
+  ],
+  "reason": "Keep working source aligned with deployed marketing protections and upload exclusions."
+}

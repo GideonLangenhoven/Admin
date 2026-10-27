@@ -1,0 +1,203 @@
+{
+  "at": "2026-10-21T11:37:45.336686+00:00",
+  "scope": "Copy shortening, icon-only WhatsApp labels, removal of automation template explanations and settlement paragraph. Only session changes applied over current production sources.",
+  "web": {
+    "admin": {
+      "id": "dpl_HrqD12M6ke6z6hqr7nY23bgyEfV6",
+      "url": "caepweb-admin-ou6hp6wvi-jerrys-projects-f4e4eaf9.vercel.app",
+      "files_verified": 505,
+      "changed": [
+        "app/ai-usage/page.tsx",
+        "app/api/guide/photo-session/route.ts",
+        "app/billing/page.tsx",
+        "app/bookings/[id]/page.tsx",
+        "app/bookings/page.tsx",
+        "app/broadcasts/page.tsx",
+        "app/change-password/page.tsx",
+        "app/customers/page.tsx",
+        "app/embed/embed/availability/page.tsx",
+        "app/guide/page.tsx",
+        "app/guide/slot/[slotId]/page.tsx",
+        "app/guide-setup/page.tsx",
+        "app/inbox/components/BotStatusBanner.tsx",
+        "app/inbox/page.tsx",
+        "app/invoices/page.tsx",
+        "app/lib/marketing-journey.ts",
+        "app/marketing/automations/[id]/page.tsx",
+        "app/marketing/automations/page.tsx",
+        "app/marketing/contacts/[id]/page.tsx",
+        "app/marketing/contacts/page.tsx",
+        "app/marketing/page.tsx",
+        "app/marketing/promotions/page.tsx",
+        "app/marketing/templates/page.tsx",
+        "app/new-booking/page.tsx",
+        "app/not-found.tsx",
+        "app/notifications/page.tsx",
+        "app/operators/page.tsx",
+        "app/page.tsx",
+        "app/partnerships/page.tsx",
+        "app/pricing/page.tsx",
+        "app/refunds/page.tsx",
+        "app/reports/page.tsx",
+        "app/reviews/page.tsx",
+        "app/settings/agent-connections/page.tsx",
+        "app/settings/chat-faq/page.tsx",
+        "app/settings/components/WhatsAppBotSection.tsx",
+        "app/settings/ota/page.tsx",
+        "app/settings/page.tsx",
+        "app/simple/calendar/page.tsx",
+        "app/simple/check-ins/page.tsx",
+        "app/simple/help/page.tsx",
+        "app/simple/page.tsx",
+        "app/simple/photos/page.tsx",
+        "app/simple/use-simple-day.ts",
+        "app/slots/page.tsx",
+        "app/super-admin/page.tsx",
+        "app/super-admin/sensitive-actions/page.tsx",
+        "app/vouchers/page.tsx",
+        "components/AdminContactEditor.tsx",
+        "components/AppShell.tsx",
+        "components/AuthGate.tsx",
+        "components/BulkSlotWizard.tsx",
+        "components/DashboardTiles.tsx",
+        "components/ExternalBookingSettings.tsx",
+        "components/HelpChat.tsx",
+        "components/InlineSlotManager.tsx",
+        "components/PaymentRecoveryPanel.tsx",
+        "components/PlatformOperations.tsx",
+        "components/RemoveIntegrationButton.tsx",
+        "components/WelcomeChecklist.tsx",
+        "components/booking/ArrivalApproval.tsx",
+        "components/booking/BookingSitePreview.tsx",
+        "components/guide/GuideAccessSettings.tsx",
+        "components/guide/GuideDay.tsx",
+        "components/inbox/PhoneAlerts.tsx",
+        "components/marketing/BookingDiscountSettings.tsx",
+        "components/marketing/ContactPermissionEditor.tsx",
+        "components/marketing/MarketingSetupNotice.tsx",
+        "components/marketing/starter-templates.ts",
+        "components/photos/TripPhotosWorkspace.tsx",
+        "components/simple/BookingContact.tsx",
+        "components/marketing/blocks/block-editors.tsx"
+      ],
+      "live": {
+        "at": "2026-10-21T11:37:27.498Z",
+        "origin": "https://admin.bookingtours.co.za",
+        "checks": [
+          {
+            "path": "/marketing/automations",
+            "status": 200,
+            "assets_checked": 18,
+            "copy_verified": true
+          },
+          {
+            "path": "/partnerships",
+            "status": 200,
+            "assets_checked": 16,
+            "copy_verified": true
+          },
+          {
+            "path": "/settings",
+            "status": 200,
+            "assets_checked": 18,
+            "copy_verified": true
+          }
+        ]
+      },
+      "build": "READY",
+      "production_target_verified": true
+    },
+    "booking": {
+      "id": "dpl_E947VY1nM96PDYU8q3Bwo85ZSExS",
+      "url": "booking-ahdneyi7n-jerrys-projects-f4e4eaf9.vercel.app",
+      "files_verified": 171,
+      "changed": [
+        "app/book/page.tsx",
+        "app/cancelled/page.tsx",
+        "app/combo/[id]/page.tsx",
+        "app/components/ChatWidget.tsx",
+        "app/components/CookieBanner.tsx",
+        "app/components/HoldCountdown.tsx",
+        "app/components/OperatorDirectory.tsx",
+        "app/embed/page.tsx",
+        "app/error.tsx",
+        "app/lib/chat-contact.ts",
+        "app/lib/rate-limit.ts",
+        "app/my-bookings/BookingCard.tsx",
+        "app/my-bookings/LoginScreen.tsx",
+        "app/my-bookings/ProfileTab.tsx",
+        "app/my-bookings/RescheduleFlow.tsx",
+        "app/my-bookings/modals/CancelModal.tsx",
+        "app/my-bookings/modals/VoucherCheckerModal.tsx",
+        "app/my-bookings/page.tsx",
+        "app/not-found.tsx",
+        "app/popia/page.tsx",
+        "app/review/[token]/page.tsx",
+        "app/success/page.tsx",
+        "app/voucher/page.tsx",
+        "app/voucher-confirmed/page.tsx",
+        "app/waiver/page.tsx"
+      ],
+      "live": {
+        "at": "2026-10-21T11:37:24.539Z",
+        "origin": "https://aonyx.booking.bookingtours.co.za",
+        "checks": [
+          {
+            "path": "/book",
+            "status": 200,
+            "assets_checked": 14,
+            "copy_verified": true
+          },
+          {
+            "path": "/my-bookings",
+            "status": 200,
+            "assets_checked": 14,
+            "copy_verified": true
+          }
+        ]
+      },
+      "build": "READY",
+      "production_target_verified": true
+    }
+  },
+  "edge": {
+    "slug": "web-chat",
+    "version": 155,
+    "verify_jwt": false,
+    "status": "ACTIVE",
+    "files_verified": 17
+  },
+  "validation": {
+    "production_builds": "passed",
+    "uploaded_source_hashes": "all matched expected release files",
+    "unrelated_web_source_files": "unchanged",
+    "new_copy_and_removed_paragraphs": "verified in served production assets",
+    "unit_tests": {
+      "passed": 2582,
+      "failed": 3,
+      "skipped": 58,
+      "failures_reproduced_on_baseline": true
+    },
+    "additional_focused_tests": {
+      "whatsapp": 17,
+      "automation_and_partnerships": 43
+    },
+    "visual_browser_check": "unavailable: native computer-use pipe failed"
+  },
+  "rollback": {
+    "admin": {
+      "id": "dpl_5RajBzqEWsopWBv3orKydKiTiUBQ",
+      "url": "caepweb-admin-ph1ncjdw4-jerrys-projects-f4e4eaf9.vercel.app"
+    },
+    "booking": {
+      "id": "dpl_7D44Kx9Vw9yEPeNs1M2cifuqCNyb",
+      "url": "booking-9i6mdbkt4-jerrys-projects-f4e4eaf9.vercel.app"
+    },
+    "edge": {
+      "slug": "web-chat",
+      "version": 154,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    }
+  }
+}

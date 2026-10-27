@@ -1,0 +1,168 @@
+{
+  "reviewed_at_utc": "2026-10-02T10:40:30.915538+00:00",
+  "scope": "Continuation review of work completed by another session; safe local corrections only",
+  "repository": {
+    "path": "/Users/gideonlangenhoven/dev/capekayak",
+    "branch": "feature/simple-view-2026-09-20",
+    "head": "43304b65314c2b9974f939304e7b2ebae0a62c0c",
+    "concurrent_main_admin_only_changes_preserved": true
+  },
+  "changes": [
+    "Do not return confirmed zero attention counts while a source or destination departure has pending reschedules. Return unknown counts with pending_reschedule_payments_not_evaluated, without duplicating upgrade pricing or changing booking rules.",
+    "Retain the current MAIN_ADMIN-only policy and all owner-policy tests and SQL changes introduced by the separate concurrent session.",
+    "Use official Muse platform material and separate Meta AI API/MCP/OAuth directions; detailed Muse auth/runtime compatibility remains blocked.",
+    "Reuse the website maintained facts/commercial contract and update the safe handoff without publishing claims."
+  ],
+  "files_changed_by_this_continuation": [
+    "app/lib/agent-read-service.ts",
+    "app/lib/agent-tools.ts",
+    "tests/unit/agent-read-service.test.ts",
+    "tests/agent-foundation-local.mjs",
+    "docs/ai/agent-read-foundation.md",
+    "docs/ai/product-facts.internal.md",
+    "docs/ai/website-handoff.public.md",
+    "docs/ai/review-followup-20261002.json"
+  ],
+  "checks": [
+    {
+      "command": "node_modules/.bin/vitest run tests/unit/agent-read-service.test.ts tests/unit/operator-acquisition.test.ts",
+      "exit_code": 0,
+      "passed": 117,
+      "environment": "labelled fixtures; Auth/client responses mocked; not a real platform test"
+    },
+    {
+      "command": "node tests/agent-foundation-local.mjs /private/tmp/capekayak-db-test-agent20261002 55473",
+      "exit_code": 0,
+      "passed": 31,
+      "environment": "disposable private-socket PostgreSQL; candidate SQL, canonical capacity and existing pending-reschedule RLS; not Supabase Auth/MCP/provider certification"
+    },
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "environment": "isolated current-state application, labelled fixture URL and keys; existing fonts fetched; prebuild live email check skipped, telemetry/upload disabled",
+      "attempts": "Initial sandbox font DNS failure; next attempt compiled/typechecked then failed because a required fixture server key was missing; final build passed with fixture-only configuration"
+    },
+    {
+      "command": "node_modules/.bin/tsc --noEmit --incremental false",
+      "exit_code": 0,
+      "environment": "Final explicit check after the successful merged build"
+    },
+    {
+      "command": "node_modules/.bin/eslint --no-config-lookup --config [installed Next TypeScript rules] app/lib/agent-read-service.ts app/lib/agent-tools.ts tests/unit/agent-read-service.test.ts tests/agent-foundation-local.mjs",
+      "exit_code": 0,
+      "note": "Focused rules only; no claim that repository lint passes"
+    },
+    {
+      "command": "npm run test:unit",
+      "exit_code": 1,
+      "passed": 1697,
+      "failed": 2,
+      "skipped": 1,
+      "failures": [
+        "db-column-refs: existing snapshot lacks bookings.first_operator_booked_at, bookings.first_operator_booking and bookings.whatsapp_booking_updates_opt_in used by unchanged auto-messages/send-email code",
+        "help-chat-navigation: existing test expects 768px while unchanged HelpChat uses 1024px"
+      ]
+    },
+    {
+      "command": "npm run lint",
+      "exit_code": 2,
+      "failure": "Existing configuration references react-hooks rules without its plugin"
+    },
+    {
+      "command": "npm run check:edge",
+      "exit_code": 1,
+      "failure": "Two existing Deno TS2339 errors for token.length in supabase/functions/_shared/intent.ts:151; this file was not changed by the continuation"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    },
+    {
+      "command": "vercel inspect https://admin.bookingtours.co.za",
+      "exit_code": 0,
+      "environment": "read-only deployment metadata",
+      "result": "Existing production deployment dpl_8SAj3nTCJB6CAMrxzD4EYRHxoPrC is READY; deployed by a separate run"
+    },
+    {
+      "command": "vercel curl /api/agent/read --deployment https://admin.bookingtours.co.za -- --silent --show-error --include",
+      "exit_code": 0,
+      "environment": "one read-only production rejection check; no customer data",
+      "http_status": 503,
+      "cache_control": "no-store",
+      "code": "INTEGRATION_DISABLED"
+    }
+  ],
+  "stages": {
+    "shared_reads": {
+      "specified": true,
+      "implemented": true,
+      "tested": "fixtures/local PostgreSQL",
+      "deployed": "earlier disabled source only; this safeguard and owner policy remain local",
+      "platform_approved": false,
+      "available_to_customers": false
+    },
+    "http_route": {
+      "specified": true,
+      "implemented": true,
+      "tested": "fixtures/local HTTP and current production GET rejection",
+      "deployed": "existing closed route",
+      "platform_approved": false,
+      "available_to_customers": false
+    },
+    "chatgpt_mcp_oauth": {
+      "specified": true,
+      "implemented": false,
+      "tested": false,
+      "deployed": false,
+      "platform_approved": false,
+      "available_to_customers": false
+    },
+    "muse_connector": {
+      "specified": "separate provider contract/blockers",
+      "implemented": false,
+      "tested": false,
+      "deployed": false,
+      "platform_approved": false,
+      "available_to_customers": false
+    },
+    "attribution": {
+      "specified": true,
+      "implemented": "consent-aware tag helper and read-only billing/audit projection; no intake/account join or automatic emitter",
+      "tested": "fictional outcomes only",
+      "deployed": "earlier unwired helper source only",
+      "platform_approved": "not applicable",
+      "available_to_customers": false
+    }
+  },
+  "blockers": [
+    "Resource-bound scoped OAuth credentials and confinement from existing private-field/write APIs",
+    "Real consent, disconnect, refresh revocation, role-change and provider acceptance journeys",
+    "Fail-closed distributed rate limit before multi-instance activation",
+    "Muse-specific transport/auth/registration/redirect contract and developer access",
+    "Consented website/intake/operator-account/trial join with immutable authoritative events; live software payment provenance",
+    "Canonical pending-upgrade evaluation if confirmed attention counts are required while reschedules are pending",
+    "Existing regression, lint, Edge and wider FAILED_GATE readiness findings"
+  ],
+  "boundaries": {
+    "pushed": false,
+    "merged": false,
+    "deployed_by_this_continuation": false,
+    "production_migrations": false,
+    "connectors_published": false,
+    "provider_actions": false,
+    "live_customer_data_modified": false,
+    "dns_changes": false,
+    "paid_services_purchased": false,
+    "local_db_stopped": true
+  },
+  "verification_evidence_directory": "/private/tmp/bookingtours-agent-review-evidence-20261002",
+  "changed_files_sha256": {
+    "app/lib/agent-read-service.ts": "36885a2b78babd1d741000faa9dfe57a037e6b2b1687991a4affa6e2e6ffb260",
+    "app/lib/agent-tools.ts": "c19470f9958c832ca1419e68029e69a06586b7d728cb799dd8559a30c405b17f",
+    "tests/unit/agent-read-service.test.ts": "a316cdad37b94002e47f82b177791a55c458c837cd54feda8f9a92b80a54e5e6",
+    "tests/agent-foundation-local.mjs": "f7b3ed9b21f8c89cf5ff33367877d1f0fcb3c6ade1f4d632d813d04bd3c7fcad",
+    "docs/ai/agent-read-foundation.md": "e07fd6dfde2266e699a2e8f4c452c7eb17c310a6adb8edf601e8831b7803feee",
+    "docs/ai/product-facts.internal.md": "0a935593d5a34f86bee7c20371829124384a1f3fda2cd77f00a4e5c0103f50cb",
+    "docs/ai/website-handoff.public.md": "df91fa71ed7e3b4b91447ed4376b73f93f40de5be6ea0050961b4017798c69aa"
+  }
+}

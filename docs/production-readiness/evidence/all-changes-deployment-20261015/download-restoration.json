@@ -1,0 +1,72 @@
+{
+  "restored": [
+    "supabase/functions/_shared/tenant.ts",
+    "supabase/functions/_shared/auth.ts",
+    "supabase/functions/_shared/bot-guards.ts",
+    "supabase/functions/_shared/customer-session.ts",
+    "supabase/functions/_shared/ota-readiness.ts",
+    "supabase/functions/_shared/llm.ts",
+    "supabase/functions/_shared/kb.ts",
+    "supabase/functions/_shared/subscription.ts",
+    "supabase/functions/_shared/demo-guide.ts",
+    "supabase/functions/_shared/chat-booking-pricing.ts",
+    "supabase/functions/_shared/web-chat-session.ts",
+    "supabase/functions/_shared/booking-custom-fields.ts",
+    "supabase/functions/_shared/pagination.ts",
+    "supabase/functions/_shared/openrouter-provider.ts",
+    "supabase/functions/_shared/sentry.ts",
+    "supabase/functions/_shared/platform-invariants.ts",
+    "supabase/functions/_shared/intent.ts",
+    "supabase/functions/_shared/duration.ts"
+  ],
+  "ota_checks": [
+    {
+      "path": "supabase/functions/_shared/getyourguide.ts",
+      "original_record_match": true
+    },
+    {
+      "path": "supabase/functions/_shared/ota-availability.ts",
+      "original_record_match": true
+    },
+    {
+      "path": "supabase/functions/_shared/ota-backend.ts",
+      "original_record_match": true
+    },
+    {
+      "path": "supabase/functions/_shared/ota-runtime.ts",
+      "original_record_match": true
+    },
+    {
+      "path": "supabase/functions/_shared/ota-supplier.ts",
+      "original_record_match": true
+    },
+    {
+      "path": "supabase/functions/_shared/viator.ts",
+      "original_record_match": true
+    },
+    {
+      "path": "supabase/functions/cron-tasks/index.ts",
+      "original_record_match": true
+    },
+    {
+      "path": "supabase/functions/getyourguide-availability-sync/index.ts",
+      "original_record_match": true
+    },
+    {
+      "path": "supabase/functions/getyourguide-webhook/index.ts",
+      "original_record_match": true
+    },
+    {
+      "path": "supabase/functions/ota-reconcile/index.ts",
+      "original_record_match": true
+    },
+    {
+      "path": "supabase/functions/viator-availability-sync/index.ts",
+      "original_record_match": true
+    },
+    {
+      "path": "supabase/functions/viator-webhook/index.ts",
+      "original_record_match": true
+    }
+  ]
+}

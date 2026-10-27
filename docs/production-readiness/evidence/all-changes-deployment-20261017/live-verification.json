@@ -1,0 +1,38 @@
+{
+  "at": "2026-10-17T08:57:45.721Z",
+  "deployment": "dpl_3u134cjqjn3x7at3YiEEvRbVkH1p",
+  "checks": [
+    {
+      "url": "https://admin.bookingtours.co.za/settings",
+      "status": 200
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/super-admin/sensitive-actions",
+      "status": 200
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/simpleguide",
+      "status": 200
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/photos",
+      "status": 200
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/api/credentials",
+      "status": 403
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/api/guide/photo-session",
+      "status": 401
+    },
+    {
+      "url": "https://kayak.booking.bookingtours.co.za",
+      "status": 200
+    },
+    {
+      "url": "https://claires-hiking.booking.bookingtours.co.za",
+      "status": 200
+    }
+  ]
+}

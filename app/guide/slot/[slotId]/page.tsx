@@ -21,11 +21,14 @@ import {
   type GuideCheckInPayload,
   type GuideQueueUpdate,
 } from "@/app/lib/guide-offline";
+import { arrivalReadiness, type ArrivalBooking } from "@/app/lib/operator-day";
+import { bookingResolutionUrl } from "@/app/lib/simple-view";
 import { useBusinessContext } from "@/components/BusinessContext";
 import { notify } from "@/app/lib/app-notify";
 import { Check } from "@phosphor-icons/react";
+import { bookingCustomFieldEntries } from "../../../../supabase/functions/_shared/booking-custom-fields";
 
-type Booking = {
+type Booking = ArrivalBooking & {
   id: string;
   customer_name: string;
   phone: string;
@@ -34,7 +37,7 @@ type Booking = {
   checked_in: boolean;
   checked_in_at: string | null;
   waiver_status: string | null;
-  dietary: string | null;
+  question_answers: Array<{ key: string; label: string; value: string }>;
   add_ons: Array<{ name: string; qty: number }>;
 };
 
@@ -94,33 +97,33 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
       notify({
         tone: "warning",
         message: update.reason === "STALE" || update.reason === "STALE_SLOT"
-          ? "An offline check-in conflicted with newer trip data. Review the current count before retrying."
-          : "An offline check-in was rejected. Review the current booking before trying again.",
+          ? "Trip data changed. Check the current count before retrying the offline check-in."
+          : "Offline check-in rejected. Review the booking before retrying.",
       });
     };
     window.addEventListener(GUIDE_QUEUE_UPDATE_EVENT, onQueueUpdate);
     return () => window.removeEventListener(GUIDE_QUEUE_UPDATE_EVENT, onQueueUpdate);
   }, [slotId, businessId]);
 
+  const [loadError, setLoadError] = useState("");
   async function reload() {
     if (!businessId) return;
     setLoading(true);
-
-    const { data: slot } = await supabase
+    setLoadError("");
+    try {
+    const { data: slot, error: slotError } = await supabase
       .from("slots")
       .select("start_time, tours(name)")
       .eq("id", slotId)
+      .eq("business_id", businessId)
       .maybeSingle();
 
+    if (slotError || !slot) throw new Error("Departure unavailable");
     if (slot) setSlotInfo({ tour_name: (slot as any).tours?.name || "Tour", start_time: slot.start_time });
 
-    const { data } = await supabase
-      .from("bookings")
-      .select("id, customer_name, phone, qty, custom_fields, arrived_count, checked_in, checked_in_at, waiver_status")
-      .eq("slot_id", slotId)
-      .eq("business_id", businessId)
-      .in("status", ["PAID", "CONFIRMED", "COMPLETED"])
-      .order("customer_name", { ascending: true });
+    const result = await supabase.rpc("operator_departure_manifest",{p_business_id:businessId,p_range_start:slot.start_time,p_range_end:new Date(new Date(slot.start_time).getTime()+1).toISOString()});
+    if(result.error || !Array.isArray(result.data)) throw new Error("Manifest unavailable");
+    const data=result.data.filter((booking:any)=>booking.slot_id===slotId);
 
     const bookingIds = (data || []).map((b: any) => b.id);
     const addOnsByBooking: Record<string, Array<{ name: string; qty: number }>> = {};
@@ -137,6 +140,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
     }
 
     const nextBookings = (data || []).map((b: any) => ({
+      ...b,
       id: b.id,
       customer_name: b.customer_name || "Guest",
       phone: b.phone || "",
@@ -145,16 +149,17 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
       checked_in: !!b.checked_in,
       checked_in_at: b.checked_in_at || null,
       waiver_status: b.waiver_status || null,
-      dietary: b.custom_fields?.dietary || null,
+      question_answers: bookingCustomFieldEntries(b.custom_fields),
       add_ons: addOnsByBooking[b.id] || [],
     }));
     setBookings(nextBookings);
-    setLoading(false);
+    } catch { setLoadError("Departure information is unavailable. Refresh before checking in guests."); setBookings([]); }
+    finally { setLoading(false); }
   }
 
   async function checkIn(bookingId: string) {
     const booking = bookings.find(b => b.id === bookingId);
-    if (!booking) return;
+    if (!booking || !arrivalReadiness(booking).canIncrease) return;
     if (readOnly) {
       notify({ tone: "warning", message: "This demo account is read-only." });
       return;
@@ -196,7 +201,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
       );
       if (stillOwnsResult) {
         restoreOptimisticState();
-        notify({ tone: "error", message: "Session expired. Please sign in again to check in guests." });
+        notify({ tone: "error", message: "Session expired. Sign in to check in guests." });
       }
       return;
     }
@@ -233,7 +238,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
       } catch {
         if (canUpdate()) {
           revert();
-          notify({ tone: "error", message: "Check-in could not be saved offline. Please reconnect and try again." });
+          notify({ tone: "error", message: "Check-in not saved offline. Reconnect and retry." });
         }
         return false;
       }
@@ -301,13 +306,15 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
       if (canUpdate()) notify({
         tone: "error",
         message: r.status === 401
-          ? "Not authorized to check in. Please sign in again."
-          : result?.error || "Check-in was rejected. Please refresh and try again.",
+          ? "Sign in again to check in guests."
+          : result?.error || "Check-in rejected. Refresh and try again.",
       });
     } catch {
       await queueForRetry(true);
     }
   }
+
+  if (loadError) return <div role="alert" className="ui-card p-5"><p>{loadError}</p><button className="ui-btn ui-btn-primary mt-3" onClick={reload}>Refresh departure</button></div>;
 
   const checkedCount = bookings.reduce((sum, b) => sum + b.arrived_count, 0);
   const totalPax = bookings.reduce((s, b) => s + b.qty, 0);
@@ -379,15 +386,25 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
                     </>
                   )}
                 </div>
-                {(b.add_ons.length > 0 || b.dietary) && (
+                {b.add_ons.length > 0 && (
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {b.add_ons.map((ao, idx) => (
                       <span key={idx} className="ui-pill ui-pill-amber text-[11px]">
                         {ao.qty > 1 ? `${ao.qty}× ` : "+ "}{ao.name}
                       </span>
                     ))}
-                    {b.dietary && <span className="ui-pill ui-pill-danger text-[11px]">🍽 {b.dietary}</span>}
                   </div>
+                )}
+                {!arrivalReadiness(b).canIncrease && <Link href={bookingResolutionUrl(b.id,"/simple",arrivalReadiness(b).resolutionSection)} className="block mt-2 text-sm underline">{arrivalReadiness(b).resolutionLabel}</Link>}
+                {b.question_answers.length > 0 && (
+                  <dl className="mt-3 space-y-2 text-[14px]">
+                    {b.question_answers.map(answer => (
+                      <div key={answer.key} className="min-w-0">
+                        <dt className="font-semibold break-words" style={{ color: "var(--ck-text-strong)" }}>{answer.label}</dt>
+                        <dd className="whitespace-pre-wrap break-words" style={{ color: "var(--ck-text-muted)" }}>{answer.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
                 )}
               </div>
               {b.checked_in ? (
@@ -395,7 +412,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
                   <Check size={22} weight="bold" />
                 </div>
               ) : (
-                <button onClick={() => checkIn(b.id)} className="ui-btn ui-btn-primary shrink-0">
+                <button disabled={!arrivalReadiness(b).canIncrease} title={arrivalReadiness(b).resolutionLabel} onClick={() => checkIn(b.id)} className="ui-btn ui-btn-primary shrink-0">
                   {b.arrived_count > 0 ? "Check in rest" : "Check in"}
                 </button>
               )}
@@ -408,7 +425,7 @@ export default function GuideSlotPage({ params }: { params: Promise<{ slotId: st
         <Link href={"/guide/photos/" + slotId}
           className="ui-card ui-card-hover flex items-center justify-center gap-2 mt-6 p-4 font-semibold text-[14px] active:scale-[0.99]"
           style={{ color: "var(--ck-text-strong)" }}>
-          Upload trip photos &amp; send thank-you
+          Trip photos
         </Link>
       )}
     </div>

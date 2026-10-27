@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-16",
+  "verified_at": "2026-10-16T07:41:09.282171+00:00",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "admin": {
+    "id": "dpl_DV7xuxRfeemH3XhLj7jr3TvA4xPS",
+    "url": "caepweb-admin-r8dbl7hin-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 484,
+    "production_url": "https://admin.bookingtours.co.za"
+  },
+  "scope": [
+    "Added target=_blank and rel=noopener noreferrer to the shared Simple View Call link. WhatsApp already uses these attributes.",
+    "Applies to roll call, Calendar and Check-ins; shared guide contact controls inherit the same behavior."
+  ],
+  "changed_files": [
+    "components/simple/BookingContact.tsx"
+  ],
+  "preserved_baseline": "dpl_45o3HogLgGoNEsuQoQUXaE7nLxFx",
+  "validation": {
+    "unit_tests_passed": 16,
+    "eslint": "PASS",
+    "production_build": "PASS",
+    "source_files_verified": 484,
+    "live_http_checks": 10,
+    "live_browser_cases": 1,
+    "live_contact_routes": [
+      "/simple",
+      "/simple/calendar",
+      "/simple/check-ins"
+    ],
+    "whatsapp_popup_and_original_page_preserved": true,
+    "call_target_verified_without_placing_calls": true
+  },
+  "limits": [
+    "The device/browser chooses the installed handler for tel links and may launch its calling app."
+  ],
+  "real_calls_or_messages_sent": false,
+  "database_changes": false,
+  "edge_changes": false,
+  "auth_config_changes": false,
+  "fixture_correction": "Supplied the operator manifest RPC in the synthetic fixture before the passing browser rerun.",
+  "evidence_directory": "docs/production-readiness/evidence/simple-contact-tabs-20261016"
+}

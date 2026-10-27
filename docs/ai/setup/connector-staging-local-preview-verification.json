@@ -1,0 +1,13 @@
+{
+  "verified_at": "2026-10-08T14:18:11.914Z",
+  "target_project": "gwwnkihblioayklptdab",
+  "local_origin": "http://127.0.0.1:3194",
+  "login_page_visible": true,
+  "browser_project_config_verified": true,
+  "server_credentials_absent_from_public_responses": true,
+  "browser_errors": 0,
+  "connectors_disabled": true,
+  "native_password_sign_in_tested": false,
+  "provider_link_tested": false,
+  "boundary": "Separate loopback-only application snapshot using the verified synthetic test project. No account password entered, native sign-in attempted, provider enabled or public deployment created."
+}

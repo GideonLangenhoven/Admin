@@ -1,0 +1,18 @@
+{
+  "status": 200,
+  "result": {
+    "ok": true,
+    "total": 169,
+    "embedded": 9,
+    "skipped": 160,
+    "removed": 0,
+    "failed": 0,
+    "errors": []
+  },
+  "articles": [
+    "bookings",
+    "marketing",
+    "payment-reminders",
+    "simple-view"
+  ]
+}

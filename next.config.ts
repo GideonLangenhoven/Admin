@@ -6,6 +6,9 @@ const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === "tr
 
 const releaseName = (process.env.SENTRY_RELEASE || process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_URL)?.trim();
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: {
+    "/api/internal/voucher-image": ["./node_modules/next/dist/compiled/@vercel/og/Geist-Regular.ttf", "./app/lib/voucher-fonts.conf", "./public/brand/bt-mark-ivory.png"],
+  },
   env: {
     NEXT_PUBLIC_SENTRY_RELEASE: releaseName || "",
     NEXT_PUBLIC_SENTRY_ENVIRONMENT: process.env.VERCEL_ENV || process.env.NODE_ENV || "development",
@@ -34,11 +37,11 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: blob: https:",
               "font-src 'self' data:",
               "style-src 'self' 'unsafe-inline'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.windguru.cz https://unpkg.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.windguru.cz https://unpkg.com https://*.bookingtours.co.za",
               // cdn.jsdelivr.net: dotlottie-wc fetches its WASM from there at
               // runtime — blocking it kills the settings/super-admin animations.
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://api.resend.com https://api.yoco.com https://api.whatsapp.com https://*.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://*.googleusercontent.com https://lottie.host https://unpkg.com https://cdn.jsdelivr.net",
-              "frame-src 'self' https://www.windguru.cz https://embed.windy.com",
+              "frame-src 'self' https://www.windguru.cz https://embed.windy.com https://*.bookingtours.co.za",
             ].join("; "),
           },
         ],

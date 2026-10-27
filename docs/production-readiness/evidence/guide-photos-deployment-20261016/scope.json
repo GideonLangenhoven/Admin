@@ -1,0 +1,28 @@
+{
+  "baseline": "dpl_8HkAM5XjaP6XkNHiMMEFRd9bCVgB",
+  "baseline_files": 482,
+  "changed": [
+    "app/photos/page.tsx",
+    "app/guide/photos/[slotId]/page.tsx",
+    "components/photos/TripPhotosWorkspace.tsx",
+    "app/api/guide/photos/route.ts",
+    "app/api/guide/photo-session/route.ts",
+    "app/api/guide/send-thank-you/route.ts",
+    "app/lib/photo-folder-token.ts",
+    "supabase/functions/admin-help-chat/index.ts"
+  ],
+  "database_changes": false,
+  "marketing_activation": false,
+  "excluded_pending_changes": [
+    "chat discount wording",
+    "Data Requests placement",
+    "MFA product notes"
+  ],
+  "packaging_correction": "Restore current native v23 help source plus only two guide-photo instruction lines. Set the explicit caepweb-admin project link before deployment.",
+  "preserved_concurrent_files": [
+    "components/AuthGate.tsx",
+    "components/SignOutButton.tsx"
+  ],
+  "original_baseline": "dpl_3ELT2erzNJAya63VE6U35WhbH125",
+  "final_visual_correction": "Use the existing Simple View intro card and put the send action on a contrasting card; final native help source also included."
+}

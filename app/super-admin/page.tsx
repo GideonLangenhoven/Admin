@@ -7,7 +7,7 @@ import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
 import { SETTINGS_SECTIONS } from "../lib/settings-sections";
 import { useBusinessContext } from "../../components/BusinessContext";
 import PlatformOperations from "../../components/PlatformOperations";
-import { MfaStatus, useSensitiveActionMfa } from "../../components/MfaSensitiveAction";
+import AdminContactEditor from "../../components/AdminContactEditor";
 
 type OnboardForm = {
   businessName: string;
@@ -57,7 +57,6 @@ type BusinessRow = {
 
 export default function SuperAdminPage() {
   const { role, readOnly, refreshBusiness } = useBusinessContext();
-  const onboardingMfa = useSensitiveActionMfa(Boolean(readOnly) || !/super/i.test(role || ""), "super-admin-onboarding");
 
   const [form, setForm] = useState<OnboardForm>(DEFAULT_FORM);
   const [submitting, setSubmitting] = useState(false);
@@ -79,7 +78,7 @@ export default function SuperAdminPage() {
   useEffect(() => () => { detailRequest.current += 1; }, []);
   const [bizTours, setBizTours] = useState<any[]>([]);
   const [bizFaqs, setBizFaqs] = useState<Array<{ q: string; a: string }>>([]);
-  const [bizAdmins, setBizAdmins] = useState<Array<{ id: string; email: string; name: string | null; role: string; suspended: boolean; settings_permissions: Record<string, boolean> | null }>>([]);
+  const [bizAdmins, setBizAdmins] = useState<Array<{ id: string; email: string; name: string | null; phone?: string | null; role: string; suspended: boolean; settings_permissions: Record<string, boolean> | null }>>([]);
   const [resettingPasswordId, setResettingPasswordId] = useState<string | null>(null);
   const [changingRoleId, setChangingRoleId] = useState<string | null>(null);
   const [expandedPermsAdmin, setExpandedPermsAdmin] = useState<string | null>(null);
@@ -188,9 +187,11 @@ export default function SuperAdminPage() {
   }
 
   async function toggleSubscriptionStatus(bizId: string, current: string) {
-    const next = current === "SUSPENDED" ? "ACTIVE" : "SUSPENDED";
+    const onboarding = current === "ONBOARDING";
+    const next = onboarding || current === "SUSPENDED" ? "ACTIVE" : "SUSPENDED";
+    const action = next === "SUSPENDED" ? "Suspend" : onboarding ? "Activate" : "Reactivate";
     const business = businesses.find(b => b.id === bizId);
-    if (!await confirmAction({ title: `${next === "SUSPENDED" ? "Suspend" : "Reactivate"}: ${business?.business_name}`, message: next === "SUSPENDED" ? "Stop new bookings and marketing for this business? Existing customer obligations remain. This manual suspension is recorded and will not be cleared automatically by a payment." : "Allow this business to accept new bookings again? Check its payment connection and outstanding issues first.", tone: "warning", confirmLabel: next === "SUSPENDED" ? "Suspend business" : "Reactivate business" })) return;
+    if (!await confirmAction({ title: `${action}: ${business?.business_name}`, message: next === "SUSPENDED" ? "Stop new bookings and marketing for this business? Existing customer obligations remain. This manual suspension is recorded and will not be cleared automatically by a payment." : onboarding ? "Move this operator from onboarding to active and enable online bookings? Complete missing billing setup under Client readiness & support first, and check its payment connection and launch readiness." : "Allow this business to accept new bookings again? Check its payment connection and outstanding issues first.", tone: "warning", confirmLabel: `${action} operator` })) return;
     const reason = window.prompt("Why are you changing this business's access? This reason is saved in the audit trail.");
     if (!reason) return;
     setTogglingStatusId(bizId);
@@ -198,7 +199,7 @@ export default function SuperAdminPage() {
       const response = await fetch("/api/super-admin/business", { method: "POST", headers: await getAuthHeaders(bizId), body: JSON.stringify({ action: "status", business_id: bizId, status: next, expected_status: current, reason }) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Could not change status");
-      notify({ title: next === "SUSPENDED" ? "Suspended" : "Reactivated", message: "Subscription status updated to " + next + ".", tone: "success" });
+      notify({ title: next === "SUSPENDED" ? "Suspended" : onboarding ? "Activated" : "Reactivated", message: "Subscription status updated to " + next + ".", tone: "success" });
       setBusinesses((prev) => prev.map((b) => b.id === bizId ? { ...b, subscription_status: next } : b));
       await refreshBusiness?.();
     } catch (error: any) { notify({ title: "Status unchanged", message: error.message, tone: "error" }); }
@@ -218,7 +219,7 @@ export default function SuperAdminPage() {
     const [business, tours, admins, subscription] = await Promise.all([
       supabase.from("businesses").select("*").eq("id", bizId).single(),
       supabase.from("tours").select("id, name, base_price_per_person, duration_minutes, default_capacity, hidden, image_url, description").eq("business_id", bizId).order("sort_order"),
-      supabase.from("admin_users").select("id, email, name, role, suspended, settings_permissions").eq("business_id", bizId).order("role"),
+      supabase.from("admin_users").select("id, email, name, phone, role, suspended, must_set_password, invite_sent_at, settings_permissions").eq("business_id", bizId).order("role"),
       supabase.from("subscriptions").select("plan_id").eq("business_id", bizId).maybeSingle(),
     ]);
     if (request !== detailRequest.current) return;
@@ -419,8 +420,6 @@ export default function SuperAdminPage() {
       notify({ title: "Access denied", message: "Only super admins can onboard new clients.", tone: "error" });
       return;
     }
-    const linksCredentials = Boolean(form.waToken || form.waPhoneId || form.yocoSecretKey || form.yocoWebhookSecret);
-    if (linksCredentials && !await onboardingMfa.requireMfa("Link credentials while creating this client")) return;
 
     setSubmitting(true);
     onboardingRequest.current ||= crypto.randomUUID();
@@ -508,8 +507,8 @@ export default function SuperAdminPage() {
       <div className="anim-fade-up">
         <p className="ui-mono-label mb-2">Platform Control</p>
         <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Super Admin</h1>
-        <p className="mt-2 text-sm text-[var(--ck-text-muted)]">Hidden onboarding workspace for creating new client tenants without touching SQL manually.</p>
-        <a href="/super-admin/sensitive-actions" className="ui-btn ui-btn-ghost mt-4 inline-flex">MFA support and sensitive settings</a>
+        <p className="mt-2 text-sm text-[var(--ck-text-muted)]">Create and set up client accounts.</p>
+        <a href="/super-admin/sensitive-actions" className="ui-btn ui-btn-ghost mt-4 inline-flex">Operator settings support</a>
       </div>
 
       {createdClient && (
@@ -591,17 +590,12 @@ export default function SuperAdminPage() {
           </div>
         </div>
 
-        <div className="space-y-3">
-          <MfaStatus status={onboardingMfa.status} />
-          {onboardingMfa.panel}
-        </div>
-
         <div className="rounded-xl border border-[var(--ck-border-subtle)] bg-[var(--ck-bg)] p-4 text-xs text-[var(--ck-text-muted)]">
-          This creates a new business row, a main admin account, stores encrypted payment and WhatsApp credentials when supplied, and sends the main admin a password setup email.
+          Creates the business and Main Admin, encrypts any supplied credentials, and emails a password setup link.
         </div>
 
         <div className="flex justify-end">
-          <button type="submit" disabled={Boolean(readOnly) || submitting || onboardingMfa.busy} className="ui-btn ui-btn-primary disabled:opacity-50">
+          <button type="submit" disabled={Boolean(readOnly) || submitting} className="ui-btn ui-btn-primary disabled:opacity-50">
             {submitting ? "Creating client..." : "Add New Client"}
           </button>
         </div>
@@ -615,7 +609,7 @@ export default function SuperAdminPage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Business Management</h2>
-            <p className="text-xs text-[var(--ck-text-muted)] mt-1">Manage subdomains, admin seats, and booking page routes per business.</p>
+            <p className="text-xs text-[var(--ck-text-muted)] mt-1">Manage each business&apos;s subdomain, admin seats and booking URLs.</p>
           </div>
           <button onClick={loadBusinesses} disabled={loadingBiz} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">
             {loadingBiz ? "Loading..." : "Refresh"}
@@ -640,12 +634,12 @@ export default function SuperAdminPage() {
                       {/* Subscription status */}
                       <button
                         onClick={() => toggleSubscriptionStatus(b.id, b.subscription_status || "ACTIVE")}
-                        disabled={togglingStatusId === b.id}
-                        title={b.subscription_status === "SUSPENDED" ? "Click to reactivate" : "Click to suspend"}
+                        disabled={Boolean(readOnly) || togglingStatusId === b.id}
+                        title={b.subscription_status === "ONBOARDING" ? "Activate operator" : b.subscription_status === "SUSPENDED" ? "Click to reactivate" : "Click to suspend"}
                         className={"ui-status cursor-pointer transition-opacity hover:opacity-80 " +
-                          (b.subscription_status === "SUSPENDED" ? "ui-pill-danger" : "ui-pill-success")}
+                          (b.subscription_status === "SUSPENDED" ? "ui-pill-danger" : b.subscription_status === "ONBOARDING" ? "ui-pill-warning" : "ui-pill-success")}
                       >
-                        {togglingStatusId === b.id ? "..." : (b.subscription_status || "ACTIVE")}
+                        {togglingStatusId === b.id ? "..." : b.subscription_status === "ONBOARDING" ? "ONBOARDING · Activate operator" : (b.subscription_status || "ACTIVE")}
                       </button>
                     </div>
                     <div className="text-[10px] text-[var(--ck-text-muted)] font-mono mt-0.5 break-all">{b.id}</div>
@@ -707,7 +701,7 @@ export default function SuperAdminPage() {
                   )}
                   {/* View/Edit Details toggle */}
                   <button onClick={() => loadBizDetail(b.id)} className="text-xs font-medium hover:underline shrink-0 self-start sm:self-auto" style={{ color: "var(--ck-accent)" }}>
-                    {expandedBiz === b.id ? "▲ Hide Details" : "▼ View / Edit Details"}
+                    {expandedBiz === b.id ? "▲ Hide Details" : "Edit details"}
                   </button>
                 </div>
 
@@ -849,7 +843,7 @@ export default function SuperAdminPage() {
                             <legend className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--ck-text-muted)" }}>Booking Site URLs</legend>
                             <button type="button" onClick={() => regenerateDerivedUrls(b.id, bizDetail.subdomain || b.subdomain)}
                               className="text-[10px] font-medium hover:underline" style={{ color: "var(--ck-accent)" }}>
-                              ⟲ Regenerate from subdomain
+                              Reset URLs
                             </button>
                           </div>
                           <div className="grid grid-cols-1 gap-2">
@@ -990,7 +984,7 @@ export default function SuperAdminPage() {
                             Tours ({bizTours.length})
                           </legend>
                           {bizTours.length === 0 ? (
-                            <p className="text-xs italic text-[var(--ck-text-muted)]">No tours configured. Tours can be added in Settings when logged in as this business.</p>
+                            <p className="text-xs italic text-[var(--ck-text-muted)]">No tours. Sign in as this business to add them in Settings.</p>
                           ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                               {bizTours.map((t) => (
@@ -1032,6 +1026,7 @@ export default function SuperAdminPage() {
                                       <div className="text-[10px] text-[var(--ck-text-muted)]">
                                         {admin.email} · {admin.role}
                                       </div>
+                                      {admin.phone && <div className="text-xs text-[var(--ck-text-muted)]">{admin.phone}</div>}
                                     </div>
                                     <div className="flex flex-wrap items-center gap-2">
                                       {admin.role !== "SUPER_ADMIN" && <button onClick={() => setAdminSuspended(admin)} disabled={changingRoleId === admin.id} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs">{admin.suspended ? "Reactivate" : "Suspend"}</button>}
@@ -1061,6 +1056,9 @@ export default function SuperAdminPage() {
                                       </button>
                                     </div>
                                   </div>
+                                  <AdminContactEditor key={`${b.id}:${admin.id}`} admin={admin} businessId={b.id} disabled={readOnly} onSaved={updated => {
+                                    setBizAdmins(rows => rows.map(row => row.id === updated.id ? { ...row, ...updated } : row));
+                                  }} />
                                   {permsExpanded && admin.role !== "MAIN_ADMIN" && admin.role !== "SUPER_ADMIN" && (
                                     <div className="mt-2 pt-2 border-t grid grid-cols-1 sm:grid-cols-2 gap-1.5" style={{ borderColor: "var(--ck-border-subtle)" }}>
                                       {SETTINGS_SECTIONS.map(section => (
@@ -1344,7 +1342,7 @@ function OnboardingInvitesPanel({ businesses, onInviteCreated }: { businesses: B
         {rows.length === 0 ? (
           <div className="ui-empty">
             <p className="text-sm font-medium text-[var(--ck-text-strong)]">No invites loaded</p>
-            <p className="text-xs text-[var(--ck-text-muted)]">Select Refresh to see the 50 most recent invites.</p>
+            <p className="text-xs text-[var(--ck-text-muted)]">Refresh for the latest 50 invites.</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -1442,25 +1440,25 @@ function ChatbotRatingsPanel() {
       {count === 0 ? (
         <p className="text-sm text-[var(--ck-text-muted)]">No chat ratings yet.</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="ui-table-container overflow-x-auto">
+          <table role="table" className="ui-responsive-table w-full text-sm">
             <thead>
               <tr className="text-left text-[var(--ck-text-muted)] border-b border-[var(--ck-border-subtle)]">
-                <th className="py-2 pr-3 font-medium">Rating</th>
-                <th className="py-2 pr-3 font-medium">Handled by</th>
-                <th className="py-2 pr-3 font-medium">Business</th>
-                <th className="py-2 pr-3 font-medium">Visitor</th>
-                <th className="py-2 font-medium">When</th>
+                <th scope="col" className="py-2 pr-3 font-medium">Rating</th>
+                <th scope="col" className="py-2 pr-3 font-medium">Handled by</th>
+                <th scope="col" className="py-2 pr-3 font-medium">Business</th>
+                <th scope="col" className="py-2 pr-3 font-medium">Visitor</th>
+                <th scope="col" className="py-2 font-medium">When</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-b border-[var(--ck-border-subtle)]">
-                  <td className="py-2 pr-3 whitespace-nowrap" style={{ color: "var(--ck-accent)" }}>{"★".repeat(r.rating)}<span className="text-[var(--ck-text-muted)]">{"★".repeat(5 - r.rating)}</span></td>
-                  <td className="py-2 pr-3">{r.handled_by === "HUMAN" ? "Human" : "Bot"}</td>
-                  <td className="py-2 pr-3">{names[r.business_id] || r.business_id?.slice(0, 8) || "—"}</td>
-                  <td className="py-2 pr-3">{r.customer_name || "Website visitor"}</td>
-                  <td className="py-2 whitespace-nowrap text-[var(--ck-text-muted)]">{r.rating_at ? new Date(r.rating_at).toLocaleString() : "—"}</td>
+                  <td data-label="Rating" className="py-2 pr-3 whitespace-nowrap" style={{ color: "var(--ck-accent)" }}>{"★".repeat(r.rating)}<span className="text-[var(--ck-text-muted)]">{"★".repeat(5 - r.rating)}</span></td>
+                  <td data-label="Handled by" className="py-2 pr-3">{r.handled_by === "HUMAN" ? "Human" : "Bot"}</td>
+                  <td data-label="Business" className="py-2 pr-3">{names[r.business_id] || r.business_id?.slice(0, 8) || "—"}</td>
+                  <td data-label="Visitor" className="py-2 pr-3">{r.customer_name || "Website visitor"}</td>
+                  <td data-label="When" className="py-2 whitespace-nowrap text-[var(--ck-text-muted)]">{r.rating_at ? new Date(r.rating_at).toLocaleString() : "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -1537,6 +1535,9 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
       color_nav: biz.color_nav || "#ffffff",
       color_hover: biz.color_hover || "#48cfad",
       booking_url: biz.booking_site_url || (biz.subdomain ? `https://${biz.subdomain}.${BOOKING_DOMAIN}` : "#"),
+      my_bookings_url: biz.manage_bookings_url || (biz.subdomain ? `https://${biz.subdomain}.${BOOKING_DOMAIN}` : "#"),
+      has_widget: Boolean(biz.subdomain),
+      widget_embed: biz.subdomain ? `<div id="bookingtours-widget" data-tenant="${biz.subdomain}"></div>\n<script src="https://${BOOKING_DOMAIN}/widget.js" async></script>` : "",
       subdomain: biz.subdomain || "",
       directions: biz.directions || "",
       what_to_bring: biz.what_to_bring || "",
@@ -1644,7 +1645,7 @@ function LandingPageManager({ businesses }: { businesses: any[] }) {
     <div className="ui-card anim-fade-up anim-d3 p-4 sm:p-6">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Landing Pages</h2>
-        <p className="text-xs text-[var(--ck-text-muted)] mt-1">Generate polished landing pages for each business. Choose a template, preview, and deploy to Firebase.</p>
+        <p className="text-xs text-[var(--ck-text-muted)] mt-1">Choose a template, preview the page and deploy to Firebase.</p>
       </div>
 
       {/* Step 1: Select business */}
@@ -2222,7 +2223,6 @@ function PlatformSettingsPanel() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [bankDirty, setBankDirty] = useState(false);
-  const mfa = useSensitiveActionMfa(false, "platform-settings");
 
   async function load() {
     setLoading(true);
@@ -2255,7 +2255,6 @@ function PlatformSettingsPanel() {
   }
 
   async function save() {
-    if (bankDirty && !await mfa.requireMfa("Save platform banking details")) return;
     setSaving(true);
     try {
       const res = await fetch("/api/platform-settings", {
@@ -2277,7 +2276,7 @@ function PlatformSettingsPanel() {
     <div className="ui-card anim-fade-up anim-d3 p-4 sm:p-6">
       <div className="mb-4">
         <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Platform Settings</h2>
-        <p className="text-xs text-[var(--ck-text-muted)] mt-1">BookingTours' own logo and banking details, shown on platform invoices.</p>
+        <p className="text-xs text-[var(--ck-text-muted)] mt-1">BookingTours logo and banking details for platform invoices.</p>
       </div>
       {loading ? (
         <p className="text-xs text-[var(--ck-text-muted)]">Loading...</p>
@@ -2303,13 +2302,11 @@ function PlatformSettingsPanel() {
               <input value={bank.account_type} onChange={(e) => { setBank({ ...bank, account_type: e.target.value }); setBankDirty(true); }} placeholder="Account type" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
               <input value={bank.branch_code} onChange={(e) => { setBank({ ...bank, branch_code: e.target.value }); setBankDirty(true); }} placeholder="Branch code" className="ui-control w-full rounded-lg px-3 py-2 text-sm" />
             </div>
-            <MfaStatus status={mfa.status} />
-            {mfa.panel}
           </div>
         </div>
       )}
       <div className="flex justify-end pt-4 mt-4 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
-        <button onClick={save} disabled={saving || loading || mfa.busy} className="ui-btn ui-btn-primary disabled:opacity-50">
+        <button onClick={save} disabled={saving || loading} className="ui-btn ui-btn-primary disabled:opacity-50">
           {saving ? "Saving..." : "Save Platform Settings"}
         </button>
       </div>
@@ -2422,7 +2419,7 @@ function ChatbotAvatarManager() {
     <section className="ui-card anim-fade-up anim-d3 p-4 sm:p-6 space-y-4">
       <div>
         <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">Chatbot Avatars</h2>
-        <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Global catalog. Every tenant sees the active avatars in their booking-site settings. Only super admins can add, edit, or remove entries.</p>
+        <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Shared avatar library for all booking sites. Only super admins can edit it.</p>
       </div>
 
       <form onSubmit={addAvatar} className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_180px_90px_auto] items-end border-t border-[var(--ck-border-subtle)] pt-4">
@@ -2547,7 +2544,7 @@ function DirectoryPanel() {
         <a href="https://booking.bookingtours.co.za" target="_blank" rel="noreferrer" className="text-xs font-medium text-[var(--ck-accent)] hover:underline">View live page</a>
       </div>
       <p className="text-xs text-[var(--ck-text-muted)] mb-4">
-        The central landing page on the bare booking domain listing every operator. Blank fields fall back to the built-in defaults; new operators are listed automatically.
+        Operator directory on the main booking domain. Blank fields use defaults; new operators appear automatically.
       </p>
 
       {loading ? (

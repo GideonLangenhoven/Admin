@@ -1,0 +1,198 @@
+--- a/app/marketing/layout.tsx
++++ b/app/marketing/layout.tsx
+@@ -1,6 +1,6 @@
+ "use client";
+ import SectionTabs from "../../components/SectionTabs";
+-import Link from "next/link";
++import MarketingSetupNotice from "../../components/marketing/MarketingSetupNotice";
+ 
+ export default function MarketingLayout({ children }: { children: React.ReactNode }) {
+   return (
+@@ -11,10 +11,7 @@
+       </div>
+ 
+       <SectionTabs section="marketing" />
+-      <section className="ui-card flex flex-wrap items-center justify-between gap-3 p-4" aria-label="Email sending setup">
+-        <div><p className="font-semibold">Marketing emails are not enabled yet</p><p className="mt-1 text-sm ui-text-muted">Ask BookingTours to finish setup. You can save drafts now.</p></div>
+-        <div className="flex flex-wrap gap-2"><Link href="/marketing/contacts" className="ui-btn ui-btn-soft min-h-11">Review contacts</Link><a className="ui-btn ui-btn-primary min-h-11" href="mailto:support@bookingtours.co.za?subject=Help%20enable%20marketing%20emails&body=Please%20help%20finish%20our%20marketing%20email%20setup%20and%20check%20our%20customer%20permission%20records.">Request email setup</a></div>
+-      </section>
++      <MarketingSetupNotice />
+ 
+       {children}
+     </div>
+--- a/app/marketing/automations/[id]/page.tsx
++++ b/app/marketing/automations/[id]/page.tsx
+@@ -823,7 +823,7 @@
+               Review your emails
+             </h2>
+             <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
+-              Preview each email, then save your draft. Use Request email setup above to arrange sending.
++              Preview each email, then save your draft. Use Email BookingTours above for help with sending.
+             </p>
+           </div>
+           <div className="space-y-2">
+--- /dev/null
++++ b/app/api/marketing/setup/route.ts
+@@ -0,0 +1,26 @@
++import { NextResponse } from "next/server";
++import { getCallerAdmin } from "@/app/lib/api-auth";
++import { isMarketingSetup } from "@/app/lib/marketing-setup";
++
++export async function GET(req: Request) {
++  const headers = { "Cache-Control": "no-store" };
++  const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers });
++  const caller = await getCallerAdmin(req);
++  if (!caller) return reply({ error: "Operator access required" }, 401);
++  try {
++    const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
++    const response = await fetch(process.env.NEXT_PUBLIC_SUPABASE_URL + "/functions/v1/marketing-setup-status", {
++      method: "POST", headers: { Authorization: "Bearer " + key, apikey: key, "Content-Type": "application/json" },
++      body: JSON.stringify({ business_id: caller.business_id }), cache: "no-store", signal: AbortSignal.timeout(10000),
++    });
++    const data = await response.json();
++    if (!response.ok || !isMarketingSetup(data)) return reply({ error: "Email setup could not be checked" }, 503);
++    // Return only known status fields, never credentials or provider responses.
++    return reply({
++      email_service_configured: data.email_service_configured,
++      email_feedback_configured: data.email_feedback_configured,
++      operator_status: data.operator_status,
++      welcome_back_available: data.welcome_back_available,
++    });
++  } catch { return reply({ error: "Email setup could not be checked" }, 503); }
++}
+--- /dev/null
++++ b/app/lib/marketing-setup.ts
+@@ -0,0 +1,33 @@
++export type MarketingSetup = {
++  email_service_configured: boolean;
++  email_feedback_configured: boolean;
++  operator_status: "eligible" | "quiet_hours" | "policy_approval_pending" | "timezone_unavailable";
++  welcome_back_available: boolean;
++};
++
++export function isMarketingSetup(value: unknown): value is MarketingSetup {
++  if (!value || typeof value !== "object") return false;
++  const data = value as Record<string, unknown>;
++  return typeof data.email_service_configured === "boolean"
++    && typeof data.email_feedback_configured === "boolean"
++    && typeof data.welcome_back_available === "boolean"
++    && ["eligible", "quiet_hours", "policy_approval_pending", "timezone_unavailable"].includes(String(data.operator_status));
++}
++
++export function marketingSetupSteps(setup: MarketingSetup): string[] {
++  const steps: string[] = [];
++  if (!setup.email_service_configured) steps.push("BookingTours: connect the email service.");
++  if (!setup.email_feedback_configured) steps.push("BookingTours: connect bounced-email and spam reports.");
++  if (setup.operator_status === "policy_approval_pending") steps.push("BookingTours: enable marketing emails for this operator.");
++  if (setup.operator_status === "timezone_unavailable") steps.push("BookingTours: set this operator’s local time zone.");
++  if (!setup.welcome_back_available) steps.push("BookingTours: finish automatic welcome-back emails.");
++  return steps;
++}
++
++export function marketingSetupEmail(businessName: string, businessId: string, steps: string[]): string {
++  const params = new URLSearchParams({
++    subject: "Marketing email setup: " + businessName,
++    body: `Operator: ${businessName}\nOperator ID: ${businessId}\n\nPlease help with these setup steps:\n${steps.map(step => "- " + step).join("\n")}`,
++  });
++  return "mailto:support@bookingtours.co.za?" + params.toString();
++}
+--- /dev/null
++++ b/components/marketing/MarketingSetupNotice.tsx
+@@ -0,0 +1,42 @@
++"use client";
++import { useEffect, useState } from "react";
++import Link from "next/link";
++import { getAuthHeaders } from "@/app/lib/admin-auth";
++import { isMarketingSetup, marketingSetupEmail, marketingSetupSteps, type MarketingSetup } from "@/app/lib/marketing-setup";
++import { useBusinessContext } from "@/components/BusinessContext";
++
++export default function MarketingSetupNotice() {
++  const { businessId, businessName } = useBusinessContext();
++  const [result, setResult] = useState<{ businessId: string; setup?: MarketingSetup; error?: string }>();
++  const [reload, setReload] = useState(0);
++  useEffect(() => {
++    const controller = new AbortController();
++    if (!businessId) return () => controller.abort();
++    getAuthHeaders(businessId).then(headers => fetch("/api/marketing/setup", { headers, signal: controller.signal }))
++      .then(async response => {
++        const data: unknown = await response.json();
++        if (!response.ok || !isMarketingSetup(data)) throw new Error("Email setup could not be checked.");
++        if (!controller.signal.aborted) setResult({ businessId, setup: data });
++      }).catch(() => {
++        if (!controller.signal.aborted) setResult({ businessId, error: "Email setup could not be checked." });
++      });
++    return () => controller.abort();
++  }, [businessId, reload]);
++  const current = result?.businessId === businessId ? result : undefined;
++  const setup = current?.setup;
++  const steps = setup ? marketingSetupSteps(setup) : [];
++  if (setup && steps.length === 0) return null;
++  return <section className="ui-card space-y-3 p-4" aria-label="Email sending setup">
++    {!current ? <p role="status" className="text-sm ui-text-muted">Checking email setup…</p> : current.error ? <>
++      <p role="alert" className="text-sm">{current.error}</p>
++      <button type="button" className="ui-btn ui-btn-soft min-h-11" onClick={() => { setResult(undefined); setReload(value => value + 1); }}>Check again</button>
++    </> : <>
++      <p className="font-semibold">{!setup?.welcome_back_available && setup?.email_service_configured && setup.email_feedback_configured && ["eligible", "quiet_hours"].includes(setup.operator_status) ? "Automatic welcome-back emails are not available yet" : "Marketing emails need setup"}</p>
++      <ul className="list-disc space-y-1 pl-5 text-sm ui-text-muted">{steps.map(step => <li key={step}>{step}</li>)}</ul>
++      <div className="flex flex-wrap gap-2">
++        <Link className="ui-btn ui-btn-soft min-h-11" href="/marketing/contacts">Review contacts</Link>
++        <a className="ui-btn ui-btn-primary min-h-11" href={marketingSetupEmail(businessName, businessId, steps)}>Email BookingTours</a>
++      </div>
++    </>}
++  </section>;
++}
+--- /dev/null
++++ b/supabase/functions/marketing-setup-status/index.ts
+@@ -0,0 +1,31 @@
++import "jsr:@supabase/functions-js/edge-runtime.d.ts";
++import { requireAuth } from "../_shared/auth.ts";
++import { createServiceClient } from "../_shared/tenant.ts";
++
++// Read-only server-to-server diagnostics, separate from the sending workers.
++Deno.serve(async (req: Request) => {
++  const headers = { "Cache-Control": "no-store" };
++  const reply = (body: unknown, status = 200) => Response.json(body, { status, headers });
++  if (req.method !== "POST") return reply({ error: "Method not allowed" }, 405);
++  let auth;
++  try { auth = await requireAuth(req); } catch { return reply({ error: "Unauthorized" }, 401); }
++  if (!auth.isServiceRole) return reply({ error: "Server access required" }, 403);
++  let body;
++  try { body = await req.json(); } catch { return reply({ error: "Invalid request" }, 400); }
++  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body?.business_id || "")) {
++    return reply({ error: "Choose an operator" }, 400);
++  }
++  try {
++    const { data, error } = await createServiceClient().rpc("marketing_policy_reason", { p_business_id: body.business_id });
++    if (error || !["eligible", "quiet_hours", "policy_approval_pending", "timezone_unavailable"].includes(data)) {
++      return reply({ error: "Email setup could not be checked" }, 503);
++    }
++    return reply({
++      email_service_configured: Boolean(Deno.env.get("RESEND_API_KEY")),
++      email_feedback_configured: Boolean(Deno.env.get("RESEND_WEBHOOK_SECRET")),
++      operator_status: data,
++      // booking_inactive remains held by marketing_step_eligibility.
++      welcome_back_available: false,
++    });
++  } catch { return reply({ error: "Email setup could not be checked" }, 503); }
++});
+--- a/supabase/config.toml
++++ b/supabase/config.toml
+@@ -156,3 +156,7 @@
+ # Signature verified over the raw body inside the handler.
+ [functions.resend-webhook]
+ verify_jwt = false
++
++# Read-only server diagnostics.
++[functions.marketing-setup-status]
++verify_jwt = false
+--- a/supabase/functions/admin-help-chat/index.ts
++++ b/supabase/functions/admin-help-chat/index.ts
+@@ -83,7 +83,7 @@
+   "Returning clients: expand a departure in Bookings to see Welcome back, the previous paid/completed booking date and prior paid booking count, excluding the current booking. History matches email/phone within the same operator. Failed, pending and cancelled bookings do not count. Returning guests get a welcome-back greeting in their booking confirmation email.",
+   "Automatic WhatsApp discounts: Marketing → Promotions → Automatic WhatsApp discounts. Add discount rule, choose Bookings within a period, Time since last booking or Group size, set thresholds and minimum/optional maximum guests, enable the rule and Save automatic discounts. Only paid/completed booking history counts. All conditions on a rule must match; the largest matching percentage wins without stacking. New WhatsApp quotes use saved rules and checkout rechecks them. Website promo codes are separate.",
+   "Welcome-back sequences: Marketing → Automations → Welcome-back email sequence. Timing is Days since last paid booking, never signup date, and the channel is email only. Edit templates, delays and optional promo-code steps, then save and preview a draft. Automatic welcome-back delivery, activation, promotional test sends and automated offer issuance are held; never tell the user that saving starts emails. Rebooking, upcoming reservations, permission and unsubscribe checks still apply. Transactional payment/booking emails are separate.",
+-  "Marketing setup: the Marketing page says Marketing emails are not enabled yet. Request email setup opens an email addressed to BookingTours support so the operator can ask for help completing setup and checking customer permission records; the operator sends it themselves. Review contacts opens the contact list. Adding/importing contacts does not prove that they agreed to marketing emails. Choose email opens a template preview for Ask for reviews, Welcome new enquiries or Invite customers back. Voucher expiry reminders are not available yet; View vouchers opens the voucher list for manual review. There is no self-service switch to bypass the current sending restriction.",
++  "Marketing setup: the Marketing page checks the selected operator's actual email setup. Marketing emails need setup lists the specific work remaining for BookingTours: configure the email service, connect bounced-email and spam reports, set the operator's local time zone if missing, and enable the operator's sending policy. Email BookingTours opens a support email with the operator name, ID and current setup steps; the operator reviews and sends it themselves. It does not enable sending. Review contacts opens the contact list. Configured email credentials alone do not prove sending readiness. Automatic welcome-back emails remain unavailable while booking-based delivery is completed, even if email settings are configured. If status cannot be loaded, use Check again; do not claim setup is incomplete from a failed lookup. Adding/importing contacts does not prove marketing permission. Automations → Suggested email sequences contains Ask for reviews, Welcome new enquiries and Invite customers back. Preview sequence shows the emails and timing without creating a draft or sending. Voucher expiry reminders remain unavailable; View vouchers opens the voucher list for manual review. There is no self-service switch to bypass the current sending restriction.",
+   "Daily operations: Simple View Check-ins supports exact partial group arrival counts and actual offline payment recording with method/reference. Payment and signed-waiver checks still apply; an account/reseller arrival exception needs explicit approval, a reference and reason. Add walk-in opens /simple/new-booking with the selected departure/date, adult/child counts, extras and configured participant questions. Review booking precedes Create Booking. Record payment already received records money actually collected and does not charge a card. A missing, negative or invalid configured price blocks booking creation; ask an admin to correct the tour/departure pricing. For all current totals and outcomes, open the relevant dashboard page; the help assistant cannot inspect them.",
+ ].join("\n\n");
+ 

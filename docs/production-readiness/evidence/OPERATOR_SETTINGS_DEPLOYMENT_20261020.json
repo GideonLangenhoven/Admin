@@ -1,0 +1,56 @@
+{
+  "changes": [
+    "Tour duration clearly displayed in hours and minutes, with readable duration fields on mobile",
+    "Main admin Add admin shortcut restores access to the existing invitation form",
+    "Close weekday slots applies a weekend-only schedule to existing future availability for the selected tour and dates"
+  ],
+  "source": {
+    "id": "dpl_5pa9GGeoR9MC7K822ZMKoC7rnKTC",
+    "url": "caepweb-admin-1myvnlhg2-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 503,
+    "preserved_files": 501,
+    "changed": [
+      "app/settings/page.tsx",
+      "app/slots/page.tsx"
+    ]
+  },
+  "live": {
+    "at": "2026-10-20T12:06:00.505Z",
+    "id": "dpl_5pa9GGeoR9MC7K822ZMKoC7rnKTC",
+    "url": "https://admin.bookingtours.co.za",
+    "checks": [
+      {
+        "path": "/",
+        "status": 200
+      },
+      {
+        "path": "/settings",
+        "status": 200
+      },
+      {
+        "path": "/slots",
+        "status": 200
+      },
+      {
+        "path": "/bookings",
+        "status": 200
+      }
+    ],
+    "no_customer_actions": true
+  },
+  "validation": {
+    "unit_cases": 56,
+    "settings_browser_cases": 6,
+    "hosted_synthetic_cases": 2,
+    "application_typecheck": "passed",
+    "deployment_build": "passed"
+  },
+  "operational_data_changed": false,
+  "instructions": {
+    "add_admin": "Settings \u2192 Add admin (main admin only)",
+    "weekend_only": "Slots \u2192 Bulk Edit \u2192 select tour and date range \u2192 Close weekday slots. Existing bookings and holds remain; no cancellations or refunds are triggered."
+  },
+  "help_synced_at": "2026-10-20T12:51:30.595Z",
+  "current_live_deployment": "dpl_AyNikjVVhebHzVu3fTNWsjrZrFXh"
+}

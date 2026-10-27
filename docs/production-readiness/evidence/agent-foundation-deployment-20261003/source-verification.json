@@ -1,0 +1,49 @@
+{
+  "deployment": "dpl_7Gy8PAtiUue5QERVdTkEWR29eZJS",
+  "archive_uid": "b62c2c1b32004625495bea8123073f791c8a2a80",
+  "baseline_files": 453,
+  "deployed_files": 451,
+  "unchanged_files": 445,
+  "added_files": [],
+  "removed_fixture_source_files": [
+    "tests/fixtures/agent-columns.local.json",
+    "tests/unit/db-column-refs.test.ts"
+  ],
+  "updated_files_sha256": {
+    "components/booking/catalogue.css": {
+      "before": "08cbdf0056beb8841ffc223cbd5215aab83764e86d8bf033d2d4a7aadcd5b9a0",
+      "after": "35306e47634f35083c4b685ac8068b09bcd3482cf978eaa725025c222ade6940"
+    },
+    "components/booking/BookingSitePreview.tsx": {
+      "before": "4247b186e76a23a35ef726acade0fbf33e24fd954cca82fdd5e9f83318e5e106",
+      "after": "5858d18bb3f48b9a7c7d23f234c1242744dc9f621adbb5ae76746ad6a8adb138"
+    },
+    "components/booking/Catalogue.tsx": {
+      "before": "a1f83bc85d3d33b3a72a1c5b705bd4c3188cea4d10c3b58761b9d859fcbaa216",
+      "after": "f8007b5026b5a8c8f87a8064049749cb6b339cc8412cebe7a98fb616baac7aaa"
+    },
+    "app/lib/agent-read-service.ts": {
+      "before": "bcffe6fd503b483aa1a6963065dd8479653bf9af372eeba8de86ccd4de7db435",
+      "after": "e8ef5384a55ac069c4a5d8619eac425e5ede013effdc8d3c0639c287e76203bf"
+    },
+    "tests/unit/agent-read-service.test.ts": {
+      "before": "69203ab1c6b91d2eb95bb44340033372020a3b4cabfd3f5edb8cf7c54f7be202",
+      "after": "412695e8ef99c1eb6ea1e3f6aeef82b40eb4b2ffb381dc43f961ef27976c91f7"
+    },
+    "app/lib/agent-tools.ts": {
+      "before": "a16ae8d29a68e6016804be19bb7be0a8a59a9ce5bfa7659d06dbfd16d428b54e",
+      "after": "be49b5b2c472e4706535da9f9aaaecc6b30da9b14ce14aea3402d600c591cf17"
+    }
+  },
+  "task_runtime_hashes_match_tested_candidate": true,
+  "concurrent_catalogue_changes_preserved": [
+    "components/booking/BookingSitePreview.tsx",
+    "components/booking/Catalogue.tsx",
+    "components/booking/catalogue.css"
+  ],
+  "remote_archive_hashes_verified": true,
+  "environment_files_present": false,
+  "agent_sql_candidate_present": false,
+  "verification": "Both Vercel source archives read back and compared byte for byte; fixtures are source only, without a production caller",
+  "api_documentation": "https://vercel.com/docs/rest-api/deployments/get-deployment-file-contents"
+}

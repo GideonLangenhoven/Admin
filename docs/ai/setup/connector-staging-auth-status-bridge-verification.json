@@ -1,0 +1,13 @@
+{
+  "verified_at": "2026-10-08T12:45:49.495Z",
+  "target_project": "gwwnkihblioayklptdab",
+  "sql_sha256": "6b802b612e3719541390d1b527d0f24534a7f234c58d8c9545000cddb2abe205",
+  "checks": 8,
+  "report": {
+    "auth_rls_still_enabled": true,
+    "gateway_direct_access_blocked": true,
+    "status_writes_blocked": true,
+    "enabled_connectors": "0"
+  },
+  "boundary": "Local PostgreSQL 17 with synthetic identities, enabled Auth RLS and no Auth policies. The existing postgres admin authority is simulated; no new gateway/owner bypass, native credential, hosted sign-in or provider connection is created."
+}

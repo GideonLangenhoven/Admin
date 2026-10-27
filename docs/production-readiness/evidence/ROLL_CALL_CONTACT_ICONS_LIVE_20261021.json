@@ -1,0 +1,137 @@
+{
+  "released_at": "2026-10-21T16:12:40.938318+00:00",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "production_url": "https://admin.bookingtours.co.za",
+  "deployment": {
+    "id": "dpl_8XGtsZSMLdftJw4Phjz8fih764gG",
+    "url": "caepweb-admin-miz6oigdb-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 517,
+    "changed": [
+      "app/page.tsx",
+      "app/dashboard.module.css",
+      "app/simple/check-ins/page.tsx",
+      "components/AppShell.tsx",
+      "components/DashboardContact.tsx",
+      "components/simple/BookingContact.tsx",
+      "components/simple/DepartureCard.tsx",
+      "components/simple/simple-view.css"
+    ]
+  },
+  "preserved_source_files": 509,
+  "changes": [
+    "Removed the Existing admin shortcuts section from the dashboard.",
+    "Mobile dashboard Roll Call uses separate rounded guest cards with a name-and-contact header and a grouped attendance row.",
+    "WhatsApp, phone and email are icon-only with 44px targets and accessible labels beside guest names on mobile and desktop.",
+    "Applied the same contact layout to Simple View roll calls and Check-ins; retained contact validation, arrival checks and guest-count pencils."
+  ],
+  "validation": {
+    "production_build": "PASS",
+    "active_application_typecheck": "PASS",
+    "focused_unit_tests": 48,
+    "eslint_errors": 0,
+    "eslint_existing_warnings": 9,
+    "design_detector": [],
+    "candidate": {
+      "at": "2026-10-21T16:11:17.943Z",
+      "origin": "https://caepweb-admin-miz6oigdb-jerrys-projects-f4e4eaf9.vercel.app",
+      "checks": [
+        {
+          "path": "/",
+          "status": 200,
+          "scripts_checked": 20,
+          "stylesheets_checked": 4,
+          "copy_verified": true
+        },
+        {
+          "path": "/simple",
+          "status": 200,
+          "scripts_checked": 22,
+          "stylesheets_checked": 4,
+          "copy_verified": true
+        },
+        {
+          "path": "/simple/calendar",
+          "status": 200,
+          "scripts_checked": 19,
+          "stylesheets_checked": 4,
+          "copy_verified": true
+        },
+        {
+          "path": "/simple/check-ins",
+          "status": 200,
+          "scripts_checked": 20,
+          "stylesheets_checked": 4,
+          "copy_verified": true
+        }
+      ]
+    },
+    "production": {
+      "at": "2026-10-21T16:12:17.331Z",
+      "origin": "https://admin.bookingtours.co.za",
+      "checks": [
+        {
+          "path": "/",
+          "status": 200,
+          "scripts_checked": 20,
+          "stylesheets_checked": 4,
+          "copy_verified": true
+        },
+        {
+          "path": "/simple",
+          "status": 200,
+          "scripts_checked": 22,
+          "stylesheets_checked": 4,
+          "copy_verified": true
+        },
+        {
+          "path": "/simple/calendar",
+          "status": 200,
+          "scripts_checked": 19,
+          "stylesheets_checked": 4,
+          "copy_verified": true
+        },
+        {
+          "path": "/simple/check-ins",
+          "status": 200,
+          "scripts_checked": 20,
+          "stylesheets_checked": 4,
+          "copy_verified": true
+        }
+      ]
+    },
+    "source_files_verified": 517,
+    "chrome_used": false,
+    "playwright_used": false,
+    "physical_device_tested": false,
+    "customer_actions_performed": false
+  },
+  "help": {
+    "at": "2026-10-21T16:12:13.987Z",
+    "articles": [
+      "dashboard",
+      "simple-view"
+    ],
+    "changed": [
+      "help:dashboard:4",
+      "help:simple-view:1"
+    ],
+    "removed": [],
+    "result": {
+      "ok": true,
+      "total": 177,
+      "embedded": 2,
+      "skipped": 175,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    },
+    "all_chunks_verified": 177
+  },
+  "baseline": {
+    "id": "dpl_F9Gu4GcQHhe6rPaR1buU3aqkvsqV",
+    "url": "caepweb-admin-fn5sdmfmp-jerrys-projects-f4e4eaf9.vercel.app",
+    "other_published_work_preserved": true
+  },
+  "database_changes": false,
+  "edge_function_changes": false
+}

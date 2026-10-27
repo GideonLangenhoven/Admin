@@ -1,0 +1,99 @@
+{
+  "changes": [
+    "Add walk-in X returns to the selected screen/date and preserves an unfinished draft",
+    "Arrival count and Edit link appear at the right of the guest name as 2/2 Edit",
+    "Separate Edit arrival counts button removed; guide Trip photos retained",
+    "Phone/email text reduced from 14px to 7px while contact actions and 44px tap targets remain"
+  ],
+  "source": {
+    "id": "dpl_AyNikjVVhebHzVu3fTNWsjrZrFXh",
+    "url": "caepweb-admin-lqykxv7ay-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 503,
+    "preserved_files": 500,
+    "changed": [
+      "app/new-booking/page.tsx",
+      "components/simple/DepartureCard.tsx",
+      "components/simple/simple-view.css"
+    ]
+  },
+  "live": {
+    "at": "2026-10-20T12:51:04.008Z",
+    "id": "dpl_AyNikjVVhebHzVu3fTNWsjrZrFXh",
+    "url": "https://admin.bookingtours.co.za",
+    "checks": [
+      {
+        "path": "/simple",
+        "status": 200
+      },
+      {
+        "path": "/simple/new-booking",
+        "status": 200
+      },
+      {
+        "path": "/settings",
+        "status": 200
+      },
+      {
+        "path": "/slots",
+        "status": 200
+      }
+    ],
+    "no_customer_actions": true
+  },
+  "preservation": {
+    "prior_live_deployment": "dpl_9X2jgcQYEd223BY86kVS5yveS1Rj",
+    "preserved_newer_changes": [
+      "components/BookingsMonthCalendar.tsx",
+      "components/MonthPicker.tsx",
+      "components/booking/CopyEmailButton.tsx",
+      "app/bookings/page.tsx"
+    ],
+    "requested_code_matches_tested_candidate": true
+  },
+  "validation": {
+    "production_build": "passed",
+    "application_typecheck": "passed",
+    "eslint": "passed",
+    "candidate_browser_checks": {
+      "startTime": "2026-10-20T12:47:36.868Z",
+      "duration": 51468.019,
+      "expected": 7,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "live_browser_checks": {
+      "startTime": "2026-10-20T12:51:02.388Z",
+      "duration": 14130.634,
+      "expected": 2,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "devices": "Chrome emulated viewports, including 320, 390, 820 and 1180 pixels",
+    "physical_devices_tested": false
+  },
+  "help": {
+    "at": "2026-10-20T12:51:30.595Z",
+    "articles": 30,
+    "chunks": 179,
+    "changed": 5,
+    "result": {
+      "ok": true,
+      "total": 179,
+      "embedded": 5,
+      "skipped": 174,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    }
+  },
+  "operational_customer_data_changed": false,
+  "earlier_changes_preserved": [
+    "Mobile-width fixes",
+    "Readable tour duration",
+    "Main admin Add admin shortcut",
+    "Close weekday slots for an existing date range and tour"
+  ]
+}

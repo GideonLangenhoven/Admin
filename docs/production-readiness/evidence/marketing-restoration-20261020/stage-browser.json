@@ -1,0 +1,61 @@
+{
+  "at": "2026-10-20T04:28:39.852Z",
+  "origin": "https://caepweb-admin-qadyv829h-jerrys-projects-f4e4eaf9.vercel.app",
+  "checks": [
+    {
+      "path": "/marketing/contacts/10000000-0000-4000-8000-000000000020",
+      "role": "MAIN_ADMIN",
+      "readOnly": false,
+      "width": 390,
+      "passed": true,
+      "synthetic_writes": 6,
+      "page_errors": 0
+    },
+    {
+      "path": "/marketing/contacts/10000000-0000-4000-8000-000000000020",
+      "role": "MAIN_ADMIN",
+      "readOnly": false,
+      "width": 1280,
+      "passed": true,
+      "synthetic_writes": 6,
+      "page_errors": 0
+    },
+    {
+      "path": "/marketing/contacts/10000000-0000-4000-8000-000000000020",
+      "role": "SUPER_ADMIN",
+      "readOnly": false,
+      "width": 390,
+      "passed": true,
+      "synthetic_writes": 6,
+      "page_errors": 0
+    },
+    {
+      "path": "/marketing/contacts/10000000-0000-4000-8000-000000000020",
+      "role": "SUPER_ADMIN",
+      "readOnly": false,
+      "width": 1280,
+      "passed": true,
+      "synthetic_writes": 6,
+      "page_errors": 0
+    },
+    {
+      "path": "/marketing/contacts/10000000-0000-4000-8000-000000000020",
+      "role": "MAIN_ADMIN",
+      "readOnly": true,
+      "width": 390,
+      "passed": true,
+      "synthetic_writes": 0,
+      "page_errors": 0
+    },
+    {
+      "path": "/marketing/contacts/10000000-0000-4000-8000-000000000020",
+      "role": "MAIN_ADMIN",
+      "readOnly": true,
+      "width": 1280,
+      "passed": true,
+      "synthetic_writes": 0,
+      "page_errors": 0
+    }
+  ],
+  "live_account_writes": 0
+}

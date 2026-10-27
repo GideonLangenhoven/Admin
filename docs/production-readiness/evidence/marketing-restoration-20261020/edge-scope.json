@@ -1,0 +1,18 @@
+{
+  "marketing-setup-status": {
+    "_shared/auth.ts": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade",
+    "_shared/pagination.ts": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e",
+    "_shared/tenant.ts": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669",
+    "marketing-setup-status/index.ts": "967fb4a2ac6879441fae050d72312e1ef8d6a93cdaed48e7e1289218562e467a"
+  },
+  "admin-help-chat": {
+    "_shared/auth.ts": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade",
+    "_shared/demo-guide.ts": "f9d714820fd3340ad1dc00a680be2e7207f9feeb0d44f98cd9344b954d666c49",
+    "_shared/kb.ts": "5d89feee2c9ef467716d48625b112ecb86b81b84679e48c7a22da42a5f88b68d",
+    "_shared/llm.ts": "e7bed1f1ed96a04d6b326ee3580fc6550c37821b19d2618321f4d4be9b3c85c1",
+    "_shared/openrouter-provider.ts": "52aa270a8467d6476d17a8881a4fe29ced09b52cdb44b4bec9e05246af202cd8",
+    "_shared/pagination.ts": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e",
+    "_shared/tenant.ts": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669",
+    "admin-help-chat/index.ts": "b925bf3636acc8563c9debc60fd3b93ad6dcb3017787e535924ed0b3f44c4178"
+  }
+}

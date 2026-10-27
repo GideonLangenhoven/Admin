@@ -1,0 +1,148 @@
+{
+  "at": "2026-10-17T08:58:48.029Z",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "admin": {
+    "id": "dpl_3u134cjqjn3x7at3YiEEvRbVkH1p",
+    "url": "caepweb-admin-9pnr48d0n-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 488,
+    "production_url": "https://admin.bookingtours.co.za"
+  },
+  "baseline": "dpl_3xJNNVaSHyEGCRgYx6ihPGQ4Rf4P",
+  "admin_runtime_changes": [
+    "app/api/credentials/route.ts",
+    "app/dashboard.module.css",
+    "app/guide/slot/[slotId]/page.tsx",
+    "app/lib/operator-day.ts",
+    "app/new-booking/page.tsx",
+    "app/page.tsx",
+    "app/settings/page.tsx",
+    "app/simple/page.tsx",
+    "app/super-admin/sensitive-actions/page.tsx",
+    "components/simple/DepartureCard.tsx",
+    "components/simple/simple-view.css",
+    "supabase/config.toml",
+    "supabase/functions/google-drive/index.ts"
+  ],
+  "added_admin_files": [
+    "app/new-booking/booking-form.module.css",
+    "components/RemoveIntegrationButton.tsx"
+  ],
+  "booking": {
+    "id": "dpl_DEtYg9jBcEThHpReFGiaJE6dX4qZ",
+    "files": 169,
+    "changed": [],
+    "missing": [],
+    "local_matches_live": true
+  },
+  "migration": {
+    "at": "2026-10-17T08:54:59.423Z",
+    "function": {
+      "proname": "clear_sensitive_credentials_audited",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=public"
+      ],
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "service_execute": true
+    },
+    "ledger": [
+      {
+        "version": "20261017120000",
+        "name": "clear_integration_credentials"
+      }
+    ]
+  },
+  "functions": [
+    {
+      "slug": "billing-enforcement",
+      "before": 11,
+      "after": 12,
+      "verify_jwt": false
+    },
+    {
+      "slug": "confirm-booking",
+      "before": 79,
+      "after": 80,
+      "verify_jwt": false
+    },
+    {
+      "slug": "manual-mark-paid",
+      "before": 81,
+      "after": 82,
+      "verify_jwt": false
+    }
+  ],
+  "help": {
+    "at": "2026-10-17T08:53:14.363Z",
+    "articles": 30,
+    "chunks": 177,
+    "changed": 9,
+    "result": {
+      "ok": true,
+      "total": 177,
+      "embedded": 9,
+      "skipped": 168,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    }
+  },
+  "checks": {
+    "unit_tests_passed": 2434,
+    "unit_tests_skipped": 58,
+    "production_build": "passed",
+    "production_typescript": "passed",
+    "uploaded_admin_sources_verified": 488,
+    "edge_source_files_verified": 14,
+    "edge_typecheck": "passed",
+    "hosted_integration_browser_cases": 5,
+    "hosted_booking_browser_cases": 4,
+    "live_http_and_access_checks": 8
+  },
+  "limits": [
+    "Browser identities and operational data are simulated; no customer configuration, booking, payment or message is changed by verification.",
+    "Historical unrecorded migration versions were not replayed.",
+    "Marketing activation, provider secrets and broader launch qualification were not changed."
+  ],
+  "live": {
+    "at": "2026-10-17T08:57:45.721Z",
+    "deployment": "dpl_3u134cjqjn3x7at3YiEEvRbVkH1p",
+    "checks": [
+      {
+        "url": "https://admin.bookingtours.co.za/settings",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/super-admin/sensitive-actions",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/simpleguide",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/photos",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/api/credentials",
+        "status": 403
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/api/guide/photo-session",
+        "status": 401
+      },
+      {
+        "url": "https://kayak.booking.bookingtours.co.za",
+        "status": 200
+      },
+      {
+        "url": "https://claires-hiking.booking.bookingtours.co.za",
+        "status": 200
+      }
+    ]
+  },
+  "evidence_directory": "docs/production-readiness/evidence/all-changes-deployment-20261017"
+}

@@ -1,0 +1,27 @@
+[
+  {
+    "case": "live-home",
+    "domain": "admin.bookingtours.co.za",
+    "path": "/",
+    "status": 200,
+    "cache_control": "public, max-age=0, must-revalidate",
+    "protection_bypass": false
+  },
+  {
+    "case": "live-agent-get",
+    "domain": "admin.bookingtours.co.za",
+    "path": "/api/agent/read",
+    "status": 503,
+    "cache_control": "no-store",
+    "protection_bypass": false,
+    "code": "INTEGRATION_DISABLED"
+  },
+  {
+    "case": "live-admin-auth",
+    "domain": "admin.bookingtours.co.za",
+    "path": "/api/admin/data-requests?summary=actionable",
+    "status": 401,
+    "cache_control": "public, max-age=0, must-revalidate",
+    "protection_bypass": false
+  }
+]

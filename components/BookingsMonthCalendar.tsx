@@ -1,5 +1,6 @@
 "use client";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { addMonths } from "date-fns/addMonths";
@@ -197,7 +198,7 @@ export default function BookingsMonthCalendar({ businessId, tours, selectedDate,
     return (
       <div className="fixed inset-0 z-[60] flex flex-col" style={{ background: "var(--ck-surface, #fff)" }} role="dialog" aria-modal="true" aria-label="Bookings month view" onClick={(e) => e.stopPropagation()}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-6" style={{ borderColor: "var(--ck-border-subtle)" }}>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button onClick={() => changeMonth(addMonths(displayMonth, -1))} className="ui-btn ui-btn-ghost !h-8 !px-2.5" aria-label="Previous month">‹</button>
             <span className="min-w-[150px] text-center font-display text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>{format(displayMonth, "MMMM yyyy")}</span>
             <button onClick={() => changeMonth(addMonths(displayMonth, 1))} className="ui-btn ui-btn-ghost !h-8 !px-2.5" aria-label="Next month">›</button>
@@ -208,9 +209,9 @@ export default function BookingsMonthCalendar({ businessId, tours, selectedDate,
         </div>
         <div className="border-b px-4 py-2 md:hidden" style={{ borderColor: "var(--ck-border-subtle)" }}>{legend}</div>
         <div className="flex-1 overflow-auto p-3 sm:p-4">
-          <div className="grid grid-cols-7 gap-1.5" style={{ minWidth: 700 }}>
+          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-7">
             {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-              <div key={d} className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--ck-text-muted)" }}>{d}</div>
+              <div key={d} className="hidden px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide sm:block" style={{ color: "var(--ck-text-muted)" }}>{d}</div>
             ))}
             {weeks.flat().map((d) => {
               const key = format(d, "yyyy-MM-dd");
@@ -228,7 +229,7 @@ export default function BookingsMonthCalendar({ businessId, tours, selectedDate,
                     opacity: outside ? 0.4 : 1,
                   }}
                 >
-                  <span className="text-[12px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{d.getDate()}</span>
+                  <span className="text-[12px] font-semibold" style={{ color: "var(--ck-text-strong)" }}><span className="sm:hidden">{format(d, "EEE")} </span>{d.getDate()}</span>
                   <span className="flex flex-col gap-1 overflow-hidden">
                     {marked.map((t) => {
                       const c = perTour![t.id];
@@ -248,12 +249,10 @@ export default function BookingsMonthCalendar({ businessId, tours, selectedDate,
     );
   })();
 
-  return (
-    /* Overlay, not in-flow: an inline card gets clipped or pushed below the
-       fold by the page around it. Same modal recipe as the slot editor —
-       bottom sheet on mobile, centred card on desktop; backdrop click and
-       Esc close it. Kept OUTSIDE any anim-fade-up wrapper: that animation
-       transforms an ancestor, which would hijack position:fixed. */
+  if (typeof document === "undefined") return null;
+
+  // Portal past animated containers so the calendar stays above booking rows.
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
       style={{ background: "rgba(10,18,13,0.55)", backdropFilter: "blur(2px)" }}
@@ -304,6 +303,7 @@ export default function BookingsMonthCalendar({ businessId, tours, selectedDate,
       </div>
       </div>
       {fullscreenView}
-    </div>
+    </div>,
+    document.body
   );
 }

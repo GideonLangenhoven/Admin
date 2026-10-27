@@ -1,0 +1,190 @@
+{
+  "status": "DEPLOYED_AND_VERIFIED",
+  "at": "2026-10-18T12:56:52.571Z",
+  "scope": "Reduce the voucher BookingTours credit and logo to 50% of their previous dimensions, keeping bottom-right alignment in HTML previews, emails and downloadable PNGs",
+  "admin": {
+    "id": "dpl_ARBXhbY4vttefSLMbxzUkBMmw84t",
+    "url": "caepweb-admin-al9q92zyd-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 494,
+    "changed": [
+      "app/lib/gift-voucher-image.ts",
+      "supabase/functions/_shared/gift-voucher-face.ts"
+    ]
+  },
+  "booking": {
+    "id": "dpl_7BsjtYsfXkqsj6gKz2DRD62AqfBX",
+    "url": "booking-l1hmdsy4n-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 170,
+    "changed": [
+      "lib/gift-voucher-face.ts"
+    ]
+  },
+  "email": {
+    "at": "2026-10-18T12:53:23.501Z",
+    "project": "ukdsrndqhsatjkmxijuj",
+    "functions": [
+      {
+        "slug": "send-email",
+        "version": 193,
+        "status": "ACTIVE",
+        "verify_jwt": false
+      }
+    ],
+    "source_files": [
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/send-email/index.ts",
+        "sha256": "34f5d61e539842aafd24cbde2c099f11babfe37ee2740f4159f29cc6a26f3075"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/gift-voucher-face.ts",
+        "sha256": "4982b74021049a968a5e0353e6ec67a15fc9a47426f030e7f48681822621f91e"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/sentry.ts",
+        "sha256": "cf5cad26d7ddb3a103a60d658dab85fa647d98e574d5ddb44ab83700c915bafb"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/waiver.ts",
+        "sha256": "8a81bc17ec5a1106629301c77e2d479b7b7ba6fc66a8927534fb70b7311829d7"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/tenant.ts",
+        "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/pagination.ts",
+        "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/duration.ts",
+        "sha256": "4f6eb2b814536b6066378deb29002e829e4784ff09e26245009ea76aee22626c"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/marketing-tokens.ts",
+        "sha256": "ac28048ac64a3e0bca6d84db933d91aa2f33479804e457e2922f595b3934ab12"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/marketing-email-html.ts",
+        "sha256": "fa51d920412113136b15c3bf90b694cf5bfc33caec1588357bb64b5bc9c29b42"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/auth.ts",
+        "sha256": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/payment-deadline.ts",
+        "sha256": "afb8e3a68337c44ddd81d5f2c90a5f1504f89530ee2077b109ce9e57388bb3a7"
+      }
+    ],
+    "probes": [
+      {
+        "slug": "send-email",
+        "status": 401
+      }
+    ],
+    "worker": [
+      {
+        "status": "succeeded",
+        "start_time": "2026-10-18 12:53:00.115085+00",
+        "end_time": "2026-10-18 12:53:00.12921+00"
+      },
+      {
+        "status": "succeeded",
+        "start_time": "2026-10-18 12:52:00.808807+00",
+        "end_time": "2026-10-18 12:52:00.892921+00"
+      },
+      {
+        "status": "succeeded",
+        "start_time": "2026-10-18 12:51:00.768635+00",
+        "end_time": "2026-10-18 12:51:00.810187+00"
+      }
+    ],
+    "unrelated_functions_unchanged": true,
+    "customer_messages_sent": 0
+  },
+  "live_image": {
+    "at": "2026-10-18T12:56:13.289Z",
+    "deployment": "dpl_ARBXhbY4vttefSLMbxzUkBMmw84t",
+    "width": 1200,
+    "height": 936,
+    "bytes": 1054763,
+    "operator_logo": true,
+    "bookingtours_logo": true,
+    "customer_messages_sent": 0
+  },
+  "browser": [
+    {
+      "width": 375,
+      "background": "rgb(255, 255, 255)",
+      "color": "rgb(11, 18, 32)",
+      "blur": "none",
+      "details_step_white": true,
+      "operator_logo_beside_name": true,
+      "bookingtours_bottom_right": true,
+      "overflow": false,
+      "page_errors": 0,
+      "writes": 0
+    },
+    {
+      "width": 1440,
+      "background": "rgb(255, 255, 255)",
+      "color": "rgb(11, 18, 32)",
+      "blur": "none",
+      "details_step_white": true,
+      "operator_logo_beside_name": true,
+      "bookingtours_bottom_right": true,
+      "overflow": false,
+      "page_errors": 0,
+      "writes": 0
+    }
+  ],
+  "sizes": {
+    "png": {
+      "font_before": 24,
+      "font_after": 12,
+      "logo_height_before": 44,
+      "logo_height_after": 22
+    },
+    "html": {
+      "font_before": 10,
+      "font_after": 5,
+      "logo_before": [
+        14,
+        18
+      ],
+      "logo_after": [
+        7,
+        9
+      ]
+    }
+  },
+  "validation": {
+    "unit_tests_passed": 21,
+    "production_builds_passed": 2,
+    "customer_emails_sent": 0,
+    "purchases_created": 0
+  },
+  "reminder_diagnosis": {
+    "timezone": "Africa/Johannesburg",
+    "older_unfinished_checkout": "2026-10-18 14:26:25",
+    "reminder_accepted": "2026-10-18 14:42:03",
+    "newer_checkout": "2026-10-18 14:42:14",
+    "newer_voucher_status_at_inspection": "ACTIVE",
+    "mode": "test",
+    "reminder_policy_changed": false
+  },
+  "limits": [
+    "Native email clients not tested."
+  ]
+}

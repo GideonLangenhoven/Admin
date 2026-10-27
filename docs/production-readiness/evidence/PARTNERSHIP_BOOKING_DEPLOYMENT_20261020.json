@@ -1,0 +1,285 @@
+{
+  "deployed_at": "2026-10-20T04:03:05.503828+00:00",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "admin": {
+    "id": "dpl_7pwz1xkCZRMvurXSbrwSHnEoeF3u",
+    "url": "caepweb-admin-4rc7nyab8-jerrys-projects-f4e4eaf9.vercel.app",
+    "source_files_verified": 497
+  },
+  "booking": {
+    "id": "dpl_2zcz26pMhrc4GTDXUC61d6cMHhkW",
+    "url": "booking-dvmjjh3ra-jerrys-projects-f4e4eaf9.vercel.app",
+    "source_files_verified": 171
+  },
+  "scope": {
+    "admin": {
+      "baseline": "dpl_EPVCgC5T3JdAZ3CEoh4bmKktyCBo",
+      "changed": [
+        "app/api/partnerships/route.ts",
+        "app/api/partnerships/approve/route.ts",
+        "app/api/combo-offers/route.ts",
+        "app/partnerships/page.tsx",
+        "components/booking/CopyEmailButton.tsx",
+        "app/bookings/page.tsx",
+        "app/bookings/[id]/page.tsx"
+      ],
+      "added": [
+        "components/booking/CopyEmailButton.tsx"
+      ],
+      "preserved": 490,
+      "downloaded": 0,
+      "source_sha256": {
+        "app/api/partnerships/route.ts": "082cb5276a15cd40b99cda80f8f6fd28b0f8ad9535367a44f8ce24e53c21ed7d",
+        "app/api/partnerships/approve/route.ts": "c91e94cbd3adec034b7b93557dbf1f48e07744d6d9b77a7783daac7ffff1773b",
+        "app/api/combo-offers/route.ts": "466942a62c0328b4e54588fb04d1668754dc71972539f7e459387e27afa6b529",
+        "app/partnerships/page.tsx": "2595d3fd599b01f2d81573435ff0faa94f69dda7b052419cf71e5ce8e79ef371",
+        "components/booking/CopyEmailButton.tsx": "8a00d145528d8e7457035adddbc150db6d719e477302b4ac2db6c33912751dfe",
+        "app/bookings/page.tsx": "6dd1357460be1b6b7f5b21e7383c31e3293af355c12ff722ba0bd55d69e40bd2",
+        "app/bookings/[id]/page.tsx": "328f122ab292b2aad59b5cf24ced791bd4fe10e68559765aafbba6438118ea20"
+      },
+      "migration_sha256": "50de7babff14bd4e093bdfbcb393ebdac01d5c5caeb90f14bb4b0a3a74c06a44"
+    },
+    "booking": {
+      "baseline": "dpl_7BsjtYsfXkqsj6gKz2DRD62AqfBX",
+      "changed": [
+        "app/my-bookings/layout.tsx",
+        "app/my-bookings/LoginScreen.tsx",
+        "app/my-bookings/my-bookings.css",
+        "app/my-bookings/BookingCard.tsx"
+      ],
+      "added": [
+        "app/my-bookings/my-bookings.css"
+      ],
+      "preserved": 167,
+      "downloaded": 0,
+      "source_sha256": {
+        "app/my-bookings/layout.tsx": "16a223f6598d776baa94a6e1709f82ca22179db7f4095d9b2257e76bd9a58448",
+        "app/my-bookings/LoginScreen.tsx": "498b9015cc50fad9e986859881ea0b3f791aea93b5f3c42ab61cb9519d602a2d",
+        "app/my-bookings/my-bookings.css": "34c233f98a1077cd2571db2790f801a9cfb773b991d29832bbce07c5dec185fe",
+        "app/my-bookings/BookingCard.tsx": "8b1384fff339f1d747a14e4c805cdd447aa9836aa8f11066cc4f3326bed8bc29"
+      },
+      "migration_sha256": "50de7babff14bd4e093bdfbcb393ebdac01d5c5caeb90f14bb4b0a3a74c06a44"
+    },
+    "edge": {
+      "at": "2026-10-20T03:53:46.485Z",
+      "slug": "create-paysafe-checkout",
+      "version": 51,
+      "verify_jwt": true,
+      "source_files_verified": 5,
+      "unrelated_functions_unchanged": true
+    }
+  },
+  "database": {
+    "at": "2026-10-20T03:50:06.833Z",
+    "version": "20261019140000",
+    "functions": [
+      {
+        "proname": "assert_combo_offer_partnerships",
+        "prosecdef": true,
+        "proconfig": [
+          "search_path=\"\""
+        ],
+        "anon_execute": false,
+        "authenticated_execute": false,
+        "service_execute": true
+      },
+      {
+        "proname": "deactivate_revoked_partnership_offers",
+        "prosecdef": true,
+        "proconfig": [
+          "search_path=\"\""
+        ],
+        "anon_execute": false,
+        "authenticated_execute": false,
+        "service_execute": true
+      },
+      {
+        "proname": "guard_combo_offer_partnerships",
+        "prosecdef": true,
+        "proconfig": [
+          "search_path=\"\""
+        ],
+        "anon_execute": false,
+        "authenticated_execute": false,
+        "service_execute": true
+      }
+    ],
+    "triggers": [
+      {
+        "tgname": "combo_checkout_partnership_guard",
+        "tgenabled": "O"
+      },
+      {
+        "tgname": "combo_item_partnership_guard",
+        "tgenabled": "O"
+      },
+      {
+        "tgname": "combo_offer_partnership_guard",
+        "tgenabled": "O"
+      },
+      {
+        "tgname": "partnership_deactivate_offers",
+        "tgenabled": "O"
+      }
+    ],
+    "partnerships_preserved": true
+  },
+  "help": {
+    "at": "2026-10-20T04:02:15.722Z",
+    "changed": [
+      "help:partnerships:1"
+    ],
+    "result": {
+      "ok": true,
+      "total": 178,
+      "embedded": 1,
+      "skipped": 177,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    },
+    "unrelated_help_preserved": true
+  },
+  "http_checks": [
+    {
+      "url": "https://kayak.admin.bookingtours.co.za/bookings",
+      "status": 200
+    },
+    {
+      "url": "https://kayak.admin.bookingtours.co.za/partnerships",
+      "status": 200
+    },
+    {
+      "url": "https://kayak.admin.bookingtours.co.za/api/partnerships/approve?token=invalid",
+      "status": 400
+    },
+    {
+      "url": "https://kayak.booking.bookingtours.co.za/my-bookings",
+      "status": 200
+    }
+  ],
+  "live_api_checks": [
+    {
+      "name": "Pending invitation secrets are absent from live dashboard responses",
+      "status": "PASS"
+    },
+    {
+      "name": "Live API rejects sender self-acceptance",
+      "status": "PASS",
+      "http": 409
+    },
+    {
+      "name": "Opening the live email link does not accept the partnership",
+      "status": "PASS"
+    },
+    {
+      "name": "Wrong invitation email is denied",
+      "status": "PASS",
+      "http": 403
+    },
+    {
+      "name": "Recipient dashboard acceptance consumes the token",
+      "status": "PASS"
+    },
+    {
+      "name": "Consumed email link cannot be reused",
+      "status": "PASS",
+      "http": 404
+    },
+    {
+      "name": "Explicit live email confirmation POST accepts once",
+      "status": "PASS"
+    },
+    {
+      "name": "Live revocation removes partner-tour access",
+      "status": "PASS"
+    },
+    {
+      "name": "Original active Kayak–Claire partnership restored; Aonyx untouched",
+      "status": "PASS"
+    },
+    {
+      "name": "Deployed database checkout guard rejects unavailable offers",
+      "status": "PASS"
+    },
+    {
+      "name": "Deployed checkout validates requests before payment",
+      "status": "PASS",
+      "http": 400
+    }
+  ],
+  "live_browser_checks": [
+    {
+      "name": "Live sign-in confirmation panels are white",
+      "status": "PASS",
+      "width": 390,
+      "synthetic_browser_data": true
+    },
+    {
+      "name": "Live sign-in confirmation panels are white",
+      "status": "PASS",
+      "width": 1440,
+      "synthetic_browser_data": true
+    },
+    {
+      "name": "Live trip management panels are white",
+      "status": "PASS",
+      "width": 390,
+      "synthetic_browser_data": true
+    },
+    {
+      "name": "Live Profile panels and fields are white",
+      "status": "PASS",
+      "width": 390,
+      "synthetic_browser_data": true
+    },
+    {
+      "name": "Live trip management panels are white",
+      "status": "PASS",
+      "width": 1440,
+      "synthetic_browser_data": true
+    },
+    {
+      "name": "Live Profile panels and fields are white",
+      "status": "PASS",
+      "width": 1440,
+      "synthetic_browser_data": true
+    },
+    {
+      "name": "Active test partnership appears on the deployed Partners page",
+      "status": "PASS"
+    },
+    {
+      "name": "Live bookings table copies the exact email without navigating",
+      "status": "PASS"
+    },
+    {
+      "name": "Live booking detail copies the exact email on mobile",
+      "status": "PASS"
+    }
+  ],
+  "screenshots": "partnership-booking-deployment-20261020/",
+  "test_partnership": {
+    "operators": [
+      "Kayak",
+      "Claire’s Hiking"
+    ],
+    "id": "ad9f7f4a-bbc3-4ade-aa04-4d746555eb43",
+    "status": "ACTIVE",
+    "original_state_restored": true,
+    "aonyx_changed": false
+  },
+  "verification_notes": [
+    "Customer UI checks used the deployed production bundle and theme with synthetic guest data intercepted in the test browser.",
+    "Admin clipboard checks used the demo Kayak operator and verified exact clipboard text without recording email addresses in this report.",
+    "Partnership lifecycle checks temporarily cycled only the previously authorized fake partnership and restored its original fields.",
+    "The database had zero combo offers and combo bookings before migration; revocation/activation concurrency and historical-sales preservation were verified with disposable PostgreSQL in the prior local checks.",
+    "The production migration withdrew zero invitation tokens and deactivated zero offers."
+  ],
+  "real_emails_sent": 0,
+  "real_payments": 0,
+  "not_checked": [
+    "Actual invitation email delivery",
+    "Real payment capture, refunds or settlement transfers"
+  ]
+}

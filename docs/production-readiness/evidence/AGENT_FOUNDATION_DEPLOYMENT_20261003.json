@@ -1,0 +1,375 @@
+{
+  "verified_at_utc": "2026-10-03T05:55:14.229081+00:00",
+  "authorization": "User: please deploy all changes",
+  "scope": "All deployable changes from the application-side AI foundation task; preserve unrelated work and external access disabled",
+  "repository": {
+    "branch": "feature/simple-view-2026-09-20",
+    "head": "43304b65314c2b9974f939304e7b2ebae0a62c0c",
+    "branch_switched": false,
+    "git_push_or_merge": false
+  },
+  "project": "caepweb-admin",
+  "deployment": {
+    "id": "dpl_7Gy8PAtiUue5QERVdTkEWR29eZJS",
+    "url": "https://caepweb-admin-3k63qviy9-jerrys-projects-f4e4eaf9.vercel.app",
+    "live_domain": "https://admin.bookingtours.co.za",
+    "default_alias": "https://caepweb-admin-jerrys-projects-f4e4eaf9.vercel.app",
+    "target": "production",
+    "status": "READY",
+    "promoted": true,
+    "both_aliases_verified": true,
+    "published_by": "Concurrent catalogue session, retaining this continuation\u2019s earlier safeguard release"
+  },
+  "source": {
+    "read_back_verification": {
+      "deployment": "dpl_7Gy8PAtiUue5QERVdTkEWR29eZJS",
+      "archive_uid": "b62c2c1b32004625495bea8123073f791c8a2a80",
+      "baseline_files": 453,
+      "deployed_files": 451,
+      "unchanged_files": 445,
+      "added_files": [],
+      "removed_fixture_source_files": [
+        "tests/fixtures/agent-columns.local.json",
+        "tests/unit/db-column-refs.test.ts"
+      ],
+      "updated_files_sha256": {
+        "components/booking/catalogue.css": {
+          "before": "08cbdf0056beb8841ffc223cbd5215aab83764e86d8bf033d2d4a7aadcd5b9a0",
+          "after": "35306e47634f35083c4b685ac8068b09bcd3482cf978eaa725025c222ade6940"
+        },
+        "components/booking/BookingSitePreview.tsx": {
+          "before": "4247b186e76a23a35ef726acade0fbf33e24fd954cca82fdd5e9f83318e5e106",
+          "after": "5858d18bb3f48b9a7c7d23f234c1242744dc9f621adbb5ae76746ad6a8adb138"
+        },
+        "components/booking/Catalogue.tsx": {
+          "before": "a1f83bc85d3d33b3a72a1c5b705bd4c3188cea4d10c3b58761b9d859fcbaa216",
+          "after": "f8007b5026b5a8c8f87a8064049749cb6b339cc8412cebe7a98fb616baac7aaa"
+        },
+        "app/lib/agent-read-service.ts": {
+          "before": "bcffe6fd503b483aa1a6963065dd8479653bf9af372eeba8de86ccd4de7db435",
+          "after": "e8ef5384a55ac069c4a5d8619eac425e5ede013effdc8d3c0639c287e76203bf"
+        },
+        "tests/unit/agent-read-service.test.ts": {
+          "before": "69203ab1c6b91d2eb95bb44340033372020a3b4cabfd3f5edb8cf7c54f7be202",
+          "after": "412695e8ef99c1eb6ea1e3f6aeef82b40eb4b2ffb381dc43f961ef27976c91f7"
+        },
+        "app/lib/agent-tools.ts": {
+          "before": "a16ae8d29a68e6016804be19bb7be0a8a59a9ce5bfa7659d06dbfd16d428b54e",
+          "after": "be49b5b2c472e4706535da9f9aaaecc6b30da9b14ce14aea3402d600c591cf17"
+        }
+      },
+      "task_runtime_hashes_match_tested_candidate": true,
+      "concurrent_catalogue_changes_preserved": [
+        "components/booking/BookingSitePreview.tsx",
+        "components/booking/Catalogue.tsx",
+        "components/booking/catalogue.css"
+      ],
+      "remote_archive_hashes_verified": true,
+      "environment_files_present": false,
+      "agent_sql_candidate_present": false,
+      "verification": "Both Vercel source archives read back and compared byte for byte; fixtures are source only, without a production caller",
+      "api_documentation": "https://vercel.com/docs/rest-api/deployments/get-deployment-file-contents"
+    },
+    "runtime_sha256": {
+      "app/lib/agent-tools.ts": "be49b5b2c472e4706535da9f9aaaecc6b30da9b14ce14aea3402d600c591cf17",
+      "app/lib/agent-read-service.ts": "e8ef5384a55ac069c4a5d8619eac425e5ede013effdc8d3c0639c287e76203bf",
+      "app/api/agent/read/route.ts": "1e2ae70b755be50acdecb31be0a74669617c08e028afe32eb06b7b09b0376a57",
+      "scripts/operator-acquisition-report.mjs": "56f26595517d34dd7cfb4225ae1e35a53969f5402b7a6359aad99be39297d442"
+    },
+    "runtime_files_updated_by_foundation": [
+      "app/lib/agent-tools.ts",
+      "app/lib/agent-read-service.ts"
+    ],
+    "fixture_source_file_updated": "tests/unit/agent-read-service.test.ts",
+    "concurrent_catalogue_changes_preserved": [
+      "components/booking/BookingSitePreview.tsx",
+      "components/booking/Catalogue.tsx",
+      "components/booking/catalogue.css"
+    ],
+    "local_schema_fixture_note": "tests/fixtures/agent-columns.local.json and tests/unit/db-column-refs.test.ts remain in the application repository but are absent from the current deployment archive. They have no production runtime caller. Grant SQL and environment files are not uploaded."
+  },
+  "checks": [
+    {
+      "command": "node_modules/.bin/vitest run tests/unit/agent-read-service.test.ts tests/unit/operator-acquisition.test.ts",
+      "exit_code": 0,
+      "passed": 128,
+      "service_tests": 111,
+      "acquisition_tests": 17,
+      "environment": "Exact isolated upload candidate; labelled fictional records and mocked Auth/client responses; not platform tests"
+    },
+    {
+      "command": "node tests/agent-foundation-local.mjs /private/tmp/capekayak-db-test-agent20261002 55473",
+      "exit_code": 0,
+      "passed": 40,
+      "environment": "Disposable private-socket PostgreSQL; latest local grant SQL and canonical capacity/pending-reschedule RLS",
+      "retry": "Initial sandbox EPERM; approved retry passed; fixture databases dropped and cluster stopped"
+    },
+    {
+      "command": "node_modules/.bin/tsc --noEmit --incremental false",
+      "exit_code": 0,
+      "environment": "Isolated candidate; repeated successfully after matching all three concurrent live catalogue files"
+    },
+    {
+      "command": "node_modules/.bin/eslint --no-config-lookup --config [installed Next TypeScript rules] app/lib/agent-read-service.ts app/lib/agent-tools.ts app/api/agent/read/route.ts scripts/operator-acquisition-report.mjs tests/unit/agent-read-service.test.ts tests/unit/operator-acquisition.test.ts",
+      "exit_code": 0,
+      "scope": "Focused task files only"
+    },
+    {
+      "command": "vercel deploy --prod --skip-domain --yes --archive=tgz --meta task=agent-read-foundation --meta baselineDeployment=dpl_8SAj3nTCJB6CAMrxzD4EYRHxoPrC --meta externalAgentAccess=disabled",
+      "exit_code": 0,
+      "production_build": "passed",
+      "existing_prebuild_email_authorization_check": "passed; unknown template; no email sent",
+      "builds": [
+        "dpl_32yBpxp6MkoQ65d1bfiriymbSyQR",
+        "dpl_2cE6KEW2u1WcXnQtVJfvKWHcwYBD"
+      ],
+      "cloud_typescript": "passed",
+      "nonblocking_build_warnings": "Existing Node engines policy, Sentry deprecation and source-map reference warnings"
+    },
+    {
+      "command": "vercel promote https://caepweb-admin-5swypxbjs-jerrys-projects-f4e4eaf9.vercel.app --yes",
+      "exit_code": 0
+    },
+    {
+      "command": "vercel inspect [Admin and default project aliases]",
+      "exit_code": 0,
+      "observed_id": "dpl_7Gy8PAtiUue5QERVdTkEWR29eZJS",
+      "observed_status": "READY"
+    },
+    {
+      "command": "python3 [local verifier] candidate",
+      "exit_code": 0,
+      "environment": "Official Vercel GET file-contents API read-back; exact 453-file source and seven HTTP cases"
+    },
+    {
+      "command": "python3 [local verifier] current",
+      "exit_code": 0,
+      "environment": "Active archive task-source hashes verified; three concurrent catalogue changes preserved; seven live HTTP checks plus two public HEAD checks"
+    },
+    {
+      "command": "vercel promote https://caepweb-admin-3k63qviy9-jerrys-projects-f4e4eaf9.vercel.app --yes",
+      "exit_code": 1,
+      "response": "409: already current production; no production replacement performed"
+    },
+    {
+      "command": "vercel alias set caepweb-admin-3k63qviy9-jerrys-projects-f4e4eaf9.vercel.app caepweb-admin-jerrys-projects-f4e4eaf9.vercel.app",
+      "exit_code": 0,
+      "scope": "Restore existing default alias to the verified current release; concurrent catalogue work retained"
+    }
+  ],
+  "candidate_http_checks": [
+    {
+      "case": "get",
+      "status": 503,
+      "cache_control": "no-store",
+      "body": {
+        "ok": false,
+        "code": "INTEGRATION_DISABLED"
+      }
+    },
+    {
+      "case": "post",
+      "status": 503,
+      "cache_control": "no-store",
+      "body": {
+        "ok": false,
+        "code": "INTEGRATION_DISABLED"
+      }
+    },
+    {
+      "case": "forged",
+      "status": 503,
+      "cache_control": "no-store",
+      "body": {
+        "ok": false,
+        "code": "INTEGRATION_DISABLED"
+      }
+    },
+    {
+      "case": "unsupported",
+      "status": 503,
+      "cache_control": "no-store",
+      "body": {
+        "ok": false,
+        "code": "INTEGRATION_DISABLED"
+      }
+    },
+    {
+      "case": "head",
+      "status": 503,
+      "cache_control": "no-store"
+    },
+    {
+      "case": "home",
+      "status": 200,
+      "cache_control": "public, max-age=0, must-revalidate"
+    },
+    {
+      "case": "auth",
+      "status": 401,
+      "cache_control": "public, max-age=0, must-revalidate",
+      "body": {
+        "error": "Unauthorized"
+      }
+    }
+  ],
+  "live_http_checks": [
+    {
+      "case": "get",
+      "status": 503,
+      "cache_control": "no-store",
+      "body": {
+        "ok": false,
+        "code": "INTEGRATION_DISABLED"
+      }
+    },
+    {
+      "case": "post",
+      "status": 503,
+      "cache_control": "no-store",
+      "body": {
+        "ok": false,
+        "code": "INTEGRATION_DISABLED"
+      }
+    },
+    {
+      "case": "forged",
+      "status": 503,
+      "cache_control": "no-store",
+      "body": {
+        "ok": false,
+        "code": "INTEGRATION_DISABLED"
+      }
+    },
+    {
+      "case": "unsupported",
+      "status": 503,
+      "cache_control": "no-store",
+      "body": {
+        "ok": false,
+        "code": "INTEGRATION_DISABLED"
+      }
+    },
+    {
+      "case": "head",
+      "status": 503,
+      "cache_control": "no-store"
+    },
+    {
+      "case": "home",
+      "status": 200,
+      "cache_control": "public, max-age=0, must-revalidate"
+    },
+    {
+      "case": "auth",
+      "status": 401,
+      "cache_control": "public, max-age=0, must-revalidate",
+      "body": {
+        "error": "Unauthorized"
+      }
+    }
+  ],
+  "public_http_checks": [
+    {
+      "path": "/",
+      "method": "HEAD",
+      "status": 200,
+      "cache_control": "public, max-age=0, must-revalidate",
+      "deployment_protection_bypass": false
+    },
+    {
+      "path": "/api/agent/read",
+      "method": "HEAD",
+      "status": 503,
+      "cache_control": "no-store",
+      "deployment_protection_bypass": false
+    }
+  ],
+  "stages": {
+    "shared_reads": "Specified, implemented, fixture/local-backend tested, disabled source deployed; no production caller, platform approval or customer availability",
+    "http_route": "Deployed; always disabled; not MCP",
+    "consent_grants": "Specified and locally tested SQL candidate; not deployed",
+    "chatgpt_mcp_oauth": "Specified; adapter/authorization unimplemented, untested on platform and unapproved",
+    "muse_connector": "Separate blockers specified; adapter unimplemented, untested and unapproved",
+    "attribution": "Existing helper/report source preserved and fixture tested; no consented intake/account join, live report or automatic emitter"
+  },
+  "boundaries": {
+    "external_agent_access_enabled": false,
+    "production_read_service_caller": false,
+    "production_sql_changes": 0,
+    "agent_sql_candidate_uploaded": false,
+    "production_report_run": false,
+    "provider_connection_enabled": false,
+    "bookings_holds_charges_refunds_or_messages_created_by_verification": false,
+    "live_customer_data_modified": false,
+    "dns_changes": false,
+    "git_push_or_merge": false,
+    "broader_verdict": "FAILED_GATE",
+    "broader_rollout": "paused",
+    "unrelated_dirty_working_tree_deployed_by_this_continuation": false,
+    "concurrent_catalogue_changes_preserved": true,
+    "marketing_site_deployed_by_this_continuation": false,
+    "traveller_storefront_deployed_by_this_continuation": false
+  },
+  "existing_failures_not_resolved_by_this_release": {
+    "reference": "docs/ai/review-followup-20261002.json",
+    "whole_workspace_unit": "Earlier run: 1697 passed, 2 failed, 1 skipped; existing schema snapshot and HelpChat breakpoint failures",
+    "whole_workspace_lint": "Existing react-hooks plugin configuration failure",
+    "edge_types": "Existing token.length TS2339 errors in intent.ts",
+    "qualification": "Failed BT500 capacity gate and existing provider/harness blockers; not rerun or cleared"
+  },
+  "application_files_deployed_with_new_content": [
+    "app/lib/agent-tools.ts",
+    "app/lib/agent-read-service.ts"
+  ],
+  "documentation_files_updated": [
+    "docs/ai/agent-read-foundation.md",
+    "docs/ai/website-handoff.public.md",
+    "docs/production-readiness/STATE.md",
+    "docs/production-readiness/evidence/agent-foundation-deployment-20261003/baseline-source-sha256.json",
+    "docs/production-readiness/evidence/agent-foundation-deployment-20261003/deployed-source-sha256.json",
+    "docs/production-readiness/evidence/agent-foundation-deployment-20261003/source-verification.json",
+    "docs/production-readiness/evidence/agent-foundation-deployment-20261003/candidate-source-verification.json",
+    "docs/production-readiness/evidence/agent-foundation-deployment-20261003/candidate-http-results.json",
+    "docs/production-readiness/evidence/agent-foundation-deployment-20261003/live-http-results.json",
+    "docs/production-readiness/evidence/agent-foundation-deployment-20261003/public-http-results.json",
+    "docs/production-readiness/evidence/AGENT_FOUNDATION_DEPLOYMENT_20261003.json"
+  ],
+  "verification_evidence_directory": "/private/tmp/bookingtours-agent-deploy-20261003",
+  "limitations": [
+    "Mocked Auth fixtures and local PostgreSQL are not real Supabase OAuth or provider-platform tests.",
+    "Grant SQL, OAuth, consent/disconnect, scoped token confinement and distributed fail-closed rate limiting remain blockers.",
+    "Confirmed attention counts remain unavailable during pending reschedules; booking rules were not changed.",
+    "Passing scoped checks/build does not establish whole-platform readiness."
+  ],
+  "deployment_sequence": [
+    {
+      "id": "dpl_8SAj3nTCJB6CAMrxzD4EYRHxoPrC",
+      "role": "Disabled baseline at task start"
+    },
+    {
+      "id": "dpl_32yBpxp6MkoQ65d1bfiriymbSyQR",
+      "role": "This continuation built, checked and promoted the two runtime safeguards; two labelled schema-test source artifacts were absent from its archive"
+    },
+    {
+      "id": "dpl_2cE6KEW2u1WcXnQtVJfvKWHcwYBD",
+      "role": "Fixture-complete isolated candidate; exact 453-file source read-back, cloud build and HTTP checks pass; not promoted to Admin because a newer concurrent release includes this work plus catalogue updates"
+    },
+    {
+      "id": "dpl_7Gy8PAtiUue5QERVdTkEWR29eZJS",
+      "role": "Concurrent active release retained; task hashes and live boundaries independently verified; existing default alias restored to it"
+    }
+  ],
+  "local_backend_artifacts_tested_not_deployed": [
+    "tests/agent-foundation-local.mjs",
+    "supabase/agent-foundation.local.sql"
+  ],
+  "fixture_source_files_deployed_with_new_content": [
+    "tests/unit/agent-read-service.test.ts"
+  ],
+  "diagnostics_resolved": [
+    "Source comparison identified two omitted schema-test source artifacts; restored in the isolated candidate. The active concurrent release retains the runtime safeguards; both schema-test files remain local.",
+    "A subsequent comparison found three concurrent catalogue differences. The newer release was retained instead of promoting the older presentation source.",
+    "Promotion of the retained release returned 409 because it was already production. Its default alias was aligned directly and rechecked."
+  ]
+}

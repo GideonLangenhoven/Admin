@@ -1,0 +1,55 @@
+{
+  "initial": {
+    "overflow": 0,
+    "clipped": [],
+    "targets": [
+      47,
+      47,
+      47
+    ],
+    "ratios": [
+      2,
+      2.0000999500249876,
+      2
+    ],
+    "phoneLauncher": null
+  },
+  "narrow": {
+    "overflow": 0,
+    "clipped": [],
+    "targets": [
+      47,
+      47,
+      47
+    ],
+    "ratios": [
+      1.7777777777777777,
+      1.7777777777777777,
+      1.7777777777777777
+    ],
+    "phoneLauncher": {
+      "width": 44,
+      "height": 44,
+      "withinHeader": true,
+      "collisions": []
+    }
+  },
+  "tours": [
+    {
+      "id": "96e07644-315b-4e96-8f36-bb070b665cf8",
+      "name": "Morning Kayak",
+      "base_price_per_person": 600
+    },
+    {
+      "id": "33910bd3-6826-4ee4-9dcc-4fcfcaf9097b",
+      "name": "Sunset Paddle",
+      "base_price_per_person": 500
+    },
+    {
+      "id": "8dbdf290-7a45-4bd9-a07e-77f0176b41ed",
+      "name": "Midday Hike",
+      "base_price_per_person": 700
+    }
+  ],
+  "pageErrors": []
+}

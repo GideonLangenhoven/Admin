@@ -1,0 +1,12 @@
+{
+  "new_live_baseline": "dpl_32yBpxp6MkoQ65d1bfiriymbSyQR",
+  "remote_archive_uid": "0c67aba5f2b68cb3ec8ae84cc75cb6c6158faff6",
+  "baseline_files": 451,
+  "preserved_files": 448,
+  "changed_files": [
+    "components/booking/BookingSitePreview.tsx",
+    "components/booking/Catalogue.tsx",
+    "components/booking/catalogue.css"
+  ],
+  "already_built_candidate_preserves_concurrent_agent_fixes": true
+}

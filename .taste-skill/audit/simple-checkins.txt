@@ -1,0 +1,32 @@
+TASTESKILL · INSPECT   http://127.0.0.1:3000/simple/check-ins
+
+MEASURED (first viewport listed)
+  hero headline   "Check-ins"  1 words · 1 line(s) · 36px (3.5vw) · satoshi 600 · tracking -0.03em · leading 1.2
+  @768px          1 line(s) · 36px
+  @390px          1 line(s) · 28px
+  typefaces       Plus Jakarta Sans 100%
+  sizes in use    12 / 14 / 16 / 18 / 20 / 36 px   body 12px / 1.63
+  colour          page #f7f5f0 · sections #141815 #fbfbf8 · button #141815
+  page            1 screens · 370 words · 1 images · hero media none
+  headings        1 · longest 1 line(s) · median - words
+
+WARN — fix, or be able to defend
+  [palette-cream] @1024px (+768, 390)  Yellow-cream background (page background #f7f5f0, section #fbfbf8, text #f6f5ef).
+      → Use the drawn palette. If you want warmth, take a low-chroma stone or bone, not a yellow cream.
+  [icon-chips] @1024px (+768, 390)  20 icons sit in tinted squares or circles.
+      → This is the commonest tell of a generated dashboard. Drop the tinted square: a KPI is a label and a number; an icon, if it helps, is plain and in the text colour.
+  [colour-sprawl] @1024px  14% of the first screen is strongly coloured.
+      → Keep the screen neutral and spend colour on data and status: the studied screens sit near 3%, and only tinted styles reach 10–15%, as pale tints rather than saturated fills.
+  [app-title-size] @1024px (+768)  The h1 is 36px ("Check-ins").
+      → An app screen is not a landing page: the title is 18-32px (20-24px on a phone).
+
+LOOK AT THE RENDER — open these with your image viewer / Read tool before saying anything about quality:
+  tablet 1024px   .taste-skill/audit/simple-checkins/tablet-1024-fold.jpg
+                  .taste-skill/audit/simple-checkins/tablet-1024-page-01.jpg
+  tablet 768px    .taste-skill/audit/simple-checkins/tablet-768-fold.jpg
+                  .taste-skill/audit/simple-checkins/tablet-768-page-01.jpg
+  mobile 390px    .taste-skill/audit/simple-checkins/mobile-fold.jpg
+                  .taste-skill/audit/simple-checkins/mobile-page-01.jpg
+
+report: .taste-skill/audit/simple-checkins/report.json
+RESULT: 0 FAIL, 4 WARN — measurements pass. Passing the meter is the floor, not the grade: score the screenshots with references/critique.md.

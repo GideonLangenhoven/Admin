@@ -1,0 +1,15 @@
+PASS candidate OTA queried schema matches executed migration
+PASS migration blocks runtime and service-role activation
+PASS concurrent last-seat creates one booking and one event
+PASS duplicate creation returns exact result; conflict fails; tenant ref isolated
+PASS injected event completion failure rolls back booking, customer and capacity; same event retries
+PASS date/product/option/quantity amendments move seats; later amendments and waived new guests
+PASS closed/full/held capacity and exact option mapping reject without acknowledging
+PASS reservation, booked retry, cancellation, terminal reserve retry and atomic expiry
+PASS actual GYG handlers execute A -> B -> A replacement, retries and old-reference cancellations
+PASS actual Viator fixture retry ignores Retry flag, exact local calendar closures and DB failure
+PASS canonical direct checkout hold races OTA for last shared seat
+PASS failed amendment and cancellation roll back source/destination seats and event completion
+PASS actual Viator v2 reserve -> v1 book consumes held seats, retries and rejects mismatched hold
+PASS actual availability sync emits change closures and rolls back successful status on write failure
+Passed 14 PostgreSQL OTA regression groups

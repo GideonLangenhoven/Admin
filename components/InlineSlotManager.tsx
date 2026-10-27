@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "../app/lib/supabase";
 import { notify, confirmAction } from "../app/lib/app-notify";
+import { zonedToUtc } from "../app/lib/admin-timezone";
 
 interface SlotItem {
   id: string;
@@ -16,9 +17,11 @@ interface SlotItem {
 export default function InlineSlotManager({
   tourId,
   businessId,
+  timezone,
 }: {
   tourId: string;
   businessId: string;
+  timezone: string;
 }) {
   const [slots, setSlots] = useState<SlotItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,12 +33,12 @@ export default function InlineSlotManager({
 
   useEffect(() => {
     loadSlots();
-  }, [tourId, businessId]);
+  }, [tourId, businessId, timezone]);
 
   async function loadSlots() {
     setLoading(true);
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    const startOfToday = new Date(zonedToUtc(today + "T00:00:00", timezone));
 
     const { data, error } = await supabase
       .from("slots")
@@ -110,35 +113,26 @@ export default function InlineSlotManager({
     setSlots(curr => curr.map(s => allIds.includes(s.id) ? { ...s, capacity_total: editCap } : s));
   }
 
-  // Bundle slots by local Time (SAST)
   const bundled = useMemo(() => {
     const map = new Map<string, SlotItem[]>();
     for (const slot of slots) {
-      const sastTime = new Date(new Date(slot.start_time).getTime() + 2 * 60 * 60 * 1000);
-      // Generate a clean 12-hour AM/PM string, e.g. "08:00 AM"
-      const timeKey = sastTime.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: true });
+      const timeKey = new Intl.DateTimeFormat("en-GB", { timeZone: timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(slot.start_time));
       if (!map.has(timeKey)) map.set(timeKey, []);
       map.get(timeKey)!.push(slot);
     }
-    
-    // Sort array chronologically by creating a dummy date
-    return Array.from(map.entries()).sort((a, b) => {
-      const timeA = new Date(`1970/01/01 ${a[0]}`).getTime();
-      const timeB = new Date(`1970/01/01 ${b[0]}`).getTime();
-      return timeA - timeB;
-    });
-  }, [slots]);
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [slots, timezone]);
 
   return (
     <div className="mt-4 border-t border-[var(--ck-border-subtle)] pt-4">
       <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-2">Manage Schedule Times</h3>
-      <p className="text-xs text-[var(--ck-text-muted)] mb-4">View, edit, or delete all future upcoming times for this tour in bulk.</p>
+      <p className="text-xs text-[var(--ck-text-muted)] mb-4">View, edit, or delete upcoming times in bulk. All times use the 24-hour clock ({timezone}).</p>
 
       {/* Bundled Slots List */}
       {loading ? (
         <div className="text-xs text-[var(--ck-text-muted)] p-4 text-center">Loading schedule...</div>
       ) : bundled.length === 0 ? (
-        <div className="text-xs text-[var(--ck-text-muted)] p-4 text-center rounded-xl border border-dashed border-[var(--ck-border-subtle)]">No upcoming schedules generated for this tour yet.</div>
+        <div className="text-xs text-[var(--ck-text-muted)] p-4 text-center rounded-xl border border-dashed border-[var(--ck-border-subtle)]">No upcoming departures for this tour.</div>
       ) : (
         <div className="space-y-3">
           {bundled.map(([timeKey, items]) => {
@@ -177,7 +171,7 @@ export default function InlineSlotManager({
                        
                        <div className="w-px h-6 bg-[var(--ck-border-strong)] hidden sm:block"></div>
                        
-                       <button data-demo-action="slot.delete-open" type="button" onClick={() => handleBundleDelete(timeKey, items)} disabled={openItems.length === 0 || editingBundleTime === timeKey} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md transition-colors disabled:opacity-40 disabled:hover:bg-red-50" title={openItems.length === 0 ? "Cannot delete times that only contain booked slots" : "Delete all upcoming empty slots at this time"}>
+                       <button data-demo-action="slot.delete-open" type="button" onClick={() => handleBundleDelete(timeKey, items)} disabled={openItems.length === 0 || editingBundleTime === timeKey} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md transition-colors disabled:opacity-40 disabled:hover:bg-red-50" title={openItems.length === 0 ? "All departures at this time have bookings." : "Delete all upcoming empty slots at this time"}>
                          Delete Open
                        </button>
                      </div>

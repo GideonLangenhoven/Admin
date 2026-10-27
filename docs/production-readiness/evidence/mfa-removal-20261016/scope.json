@@ -1,0 +1,22 @@
+{
+  "baseline": "dpl_HyUe8UGUfYHyrdDrVCCRQB4czYVS",
+  "changed": [
+    "app/api/mfa/recovery/route.ts",
+    "app/lib/mfa-sensitive.ts",
+    "app/settings/page.tsx",
+    "app/super-admin/page.tsx",
+    "app/super-admin/sensitive-actions/page.tsx",
+    "components/MfaSensitiveAction.tsx",
+    "components/MfaSensitiveActionPanel.tsx",
+    "supabase/functions/admin-help-chat/index.ts",
+    "supabase/functions/bank-details/index.ts",
+    "supabase/functions/super-admin-onboard/index.ts"
+  ],
+  "functions": [
+    "admin-help-chat",
+    "bank-details",
+    "super-admin-onboard"
+  ],
+  "database_changes": false,
+  "marketing_activation": false
+}

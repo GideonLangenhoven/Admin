@@ -1,0 +1,187 @@
+{
+  "at": "2026-10-20T08:33:01.552Z",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "scope": "All pending workspace runtime changes, preserving the promotional email rollback",
+  "admin": {
+    "id": "dpl_EDKqqDjiSeqtd3tQB5qcjgwuf8tP",
+    "url": "caepweb-admin-dvk9m183c-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 503,
+    "production_url": "https://admin.bookingtours.co.za"
+  },
+  "booking": {
+    "id": "dpl_Dpckn5CgwuCnh68G2hQxE4E1fp2c",
+    "state": "READY",
+    "source_files_verified": 171,
+    "already_current": true,
+    "production_urls": [
+      "https://kayak.booking.bookingtours.co.za",
+      "https://claires-hiking.booking.bookingtours.co.za"
+    ]
+  },
+  "backend": {
+    "at": "2026-10-20T08:11:06.657Z",
+    "checks": [
+      {
+        "slug": "auto-messages",
+        "source_files_verified": 6
+      },
+      {
+        "slug": "manual-mark-paid",
+        "source_files_verified": 5
+      },
+      {
+        "slug": "marketing-setup-status",
+        "source_files_verified": 4
+      },
+      {
+        "slug": "resend-webhook",
+        "source_files_verified": 3
+      },
+      {
+        "slug": "wa-webhook",
+        "source_files_verified": 17
+      }
+    ],
+    "verified": true
+  },
+  "database_changes": false,
+  "recent_migrations_already_applied": true,
+  "historical_migration_ledger_gaps_unchanged": [
+    "20260711090000_tenant_health.sql",
+    "20260711160000_s1_chat_intent_daily_isolation.sql",
+    "20260711160100_s2_atomic_refund.sql",
+    "20260711160200_s3_reconcile_slot_held.sql",
+    "20260711170000_s8_combo_capacity_check.sql",
+    "20260711180000_payment_reminder.sql",
+    "20260711190000_hold_qty_insert_fix.sql",
+    "20260711200000_admin_help_kb_and_onboarding.sql",
+    "20260712090000_help_chat_hidden_pref.sql",
+    "20260713170000_security_audit_fixes.sql",
+    "20260714080000_fix_tour_delete_data_loss_risk.sql",
+    "20260714120000_voucher_payment_reminder.sql",
+    "20260714130000_tour_confirmation_tagline.sql",
+    "20260715090000_platform_invoices.sql",
+    "20260716090000_vouchers_operator_scoped.sql",
+    "20260716110000_platform_billing_contact.sql",
+    "20260716120000_single_plan_pricing.sql",
+    "20260718080000_popia_anonymize_multi_customer_and_dsr.sql",
+    "20260721090000_chat_conversation_rating.sql",
+    "20260724090000_combo_settlement_payment_links.sql",
+    "20260724120000_combo_items_settled_at.sql",
+    "20260724150000_operator_directory.sql",
+    "20260724170000_operator_directory_from_price.sql",
+    "20260725090000_last_minute_deals.sql",
+    "20260725130000_last_minute_deal_window.sql",
+    "20260803130000_llm_usage.sql",
+    "20260803160000_billing_enforcement_and_ai_cap.sql",
+    "20260804090000_rls_initplan_and_tenant_indexes.sql",
+    "20260804120000_rls_merge_permissive_and_holds_scope.sql",
+    "20260804140000_bookings_anon_write_tenant_scope.sql",
+    "20260804160000_last_minute_deals_follow_config.sql",
+    "20260805090000_ai_overage_invoice_and_5000_allowance.sql",
+    "20260815140000_onboarding_wizard.sql",
+    "20260817090000_combo_rules.sql"
+  ],
+  "help": {
+    "at": "2026-10-20T08:26:44.945Z",
+    "articles": 30,
+    "chunks": 179,
+    "changed": 9,
+    "result": {
+      "ok": true,
+      "total": 179,
+      "embedded": 9,
+      "skipped": 170,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    }
+  },
+  "checks": {
+    "unit_passed": 2540,
+    "unit_skipped": 58,
+    "unit_failed": 0,
+    "edge_typecheck_files": 58,
+    "admin_production_build": "passed",
+    "typescript": "passed in isolated production build",
+    "eslint_errors": 0,
+    "eslint_warnings": 154,
+    "responsive_page_cases_passed": 43,
+    "hosted_browser_cases_passed": 6,
+    "live_http_checks": 12,
+    "uploaded_source_files_verified": 503,
+    "unchanged_booking_source_files_verified": 171
+  },
+  "fixture_repairs": [
+    "Updated the help test to the released activation wording.",
+    "Refreshed three schema fixture tables from the live information_schema.",
+    "Waited for responsive chart resizing before measuring page overflow.",
+    "Mocked the new dashboard-layout API and checked adjacency using dashboard tile containers.",
+    "Used a future departure and the required synthetic email in the hosted booking-review fixture."
+  ],
+  "promotional_email_sender_rollback_preserved": true,
+  "real_customer_actions_performed": false,
+  "live": {
+    "at": "2026-10-20T08:32:21.007Z",
+    "deployment": "dpl_EDKqqDjiSeqtd3tQB5qcjgwuf8tP",
+    "booking": "dpl_Dpckn5CgwuCnh68G2hQxE4E1fp2c",
+    "workspace_matches": true,
+    "checks": [
+      {
+        "url": "https://admin.bookingtours.co.za/",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/bookings",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/marketing",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/reports",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/settings",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/super-admin/sensitive-actions",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/simpleguide",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/photos",
+        "status": 200
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/api/credentials",
+        "status": 403
+      },
+      {
+        "url": "https://admin.bookingtours.co.za/api/guide/photo-session",
+        "status": 401
+      },
+      {
+        "url": "https://kayak.booking.bookingtours.co.za",
+        "status": 200
+      },
+      {
+        "url": "https://claires-hiking.booking.bookingtours.co.za",
+        "status": 200
+      }
+    ],
+    "no_customer_actions": true
+  },
+  "limitations": [
+    "Browser verification used synthetic users and bookings with operational writes blocked.",
+    "No real payment or customer message was sent during verification.",
+    "The broader production qualification status is unchanged."
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "at": "2026-10-16T05:11:44.702Z",
+  "deployment": "dpl_BUdA5CF8mUHjAtj1h4L7qHWwPZwT",
+  "results": [
+    {
+      "path": "/marketing",
+      "status": 200
+    },
+    {
+      "path": "/marketing/automations",
+      "status": 200
+    },
+    {
+      "path": "/simpleguide",
+      "status": 200
+    },
+    {
+      "path": "/api/marketing/setup",
+      "status": 401
+    }
+  ],
+  "no_customer_actions": true
+}

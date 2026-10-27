@@ -1,0 +1,71 @@
+{
+  "admin": {
+    "id": "dpl_ATUtJHejxdaatHqiCFbGEgggeTaQ",
+    "files": 488,
+    "changed": [
+      "app/dashboard.module.css",
+      "app/globals.css",
+      "app/new-booking/booking-form.module.css",
+      "app/new-booking/page.tsx",
+      "app/page.tsx",
+      "components/AppShell.tsx",
+      "components/AuthGate.tsx",
+      "components/MobileMenuDrawer.tsx",
+      "components/WelcomeChecklist.tsx",
+      "components/simple/DepartureCard.tsx",
+      "components/simple/simple-view.css",
+      "supabase/functions/marketing-unsubscribe/index.ts"
+    ],
+    "missing": []
+  },
+  "booking": {
+    "id": "dpl_DEtYg9jBcEThHpReFGiaJE6dX4qZ",
+    "files": 169,
+    "changed": [
+      "app/components/Header.tsx",
+      "app/globals.css",
+      "app/my-bookings/ActionBtn.tsx",
+      "app/my-bookings/Modal.tsx",
+      "app/review/[token]/page.tsx",
+      "app/voucher/page.tsx"
+    ],
+    "missing": []
+  },
+  "pendingMigrations": [
+    "20260711090000_tenant_health.sql",
+    "20260711160000_s1_chat_intent_daily_isolation.sql",
+    "20260711160100_s2_atomic_refund.sql",
+    "20260711160200_s3_reconcile_slot_held.sql",
+    "20260711170000_s8_combo_capacity_check.sql",
+    "20260711180000_payment_reminder.sql",
+    "20260711190000_hold_qty_insert_fix.sql",
+    "20260711200000_admin_help_kb_and_onboarding.sql",
+    "20260712090000_help_chat_hidden_pref.sql",
+    "20260713170000_security_audit_fixes.sql",
+    "20260714080000_fix_tour_delete_data_loss_risk.sql",
+    "20260714120000_voucher_payment_reminder.sql",
+    "20260714130000_tour_confirmation_tagline.sql",
+    "20260715090000_platform_invoices.sql",
+    "20260716090000_vouchers_operator_scoped.sql",
+    "20260716110000_platform_billing_contact.sql",
+    "20260716120000_single_plan_pricing.sql",
+    "20260718080000_popia_anonymize_multi_customer_and_dsr.sql",
+    "20260721090000_chat_conversation_rating.sql",
+    "20260724090000_combo_settlement_payment_links.sql",
+    "20260724120000_combo_items_settled_at.sql",
+    "20260724150000_operator_directory.sql",
+    "20260724170000_operator_directory_from_price.sql",
+    "20260725090000_last_minute_deals.sql",
+    "20260725130000_last_minute_deal_window.sql",
+    "20260803130000_llm_usage.sql",
+    "20260803160000_billing_enforcement_and_ai_cap.sql",
+    "20260804090000_rls_initplan_and_tenant_indexes.sql",
+    "20260804120000_rls_merge_permissive_and_holds_scope.sql",
+    "20260804140000_bookings_anon_write_tenant_scope.sql",
+    "20260804160000_last_minute_deals_follow_config.sql",
+    "20260805090000_ai_overage_invoice_and_5000_allowance.sql",
+    "20260815140000_onboarding_wizard.sql",
+    "20260817090000_combo_rules.sql"
+  ],
+  "functions": 57
+}

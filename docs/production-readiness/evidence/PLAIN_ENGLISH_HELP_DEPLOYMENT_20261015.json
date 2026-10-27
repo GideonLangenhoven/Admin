@@ -1,0 +1,61 @@
+{
+  "date": "2026-10-15",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "verified_at": "2026-10-15T16:34:02.652335+00:00",
+  "dashboard": {
+    "url": "https://admin.bookingtours.co.za",
+    "previous": "dpl_4v2DFh5cJqNDVfFZWgAeK7qXc9EZ",
+    "deployment": "dpl_9jATfEpt4yWvmhF1SUh4MAahrLox",
+    "uploaded_source_files_verified": 474
+  },
+  "scope": [
+    "Remove repeated feature introductions from payment recovery, guides, automatic discounts, daily operations and booking forms",
+    "Plain-English marketing goals, matching contact counts and direct Choose email actions",
+    "Replace technical sending hold notice with Marketing emails are not enabled yet, Review contacts, and Request email setup",
+    "Hide detailed sequence rules behind an optional disclosure and remove the invented-contact planning UI",
+    "Update dashboard AI guidance and nine help articles for all current released workflows and their next actions"
+  ],
+  "help": {
+    "at": "2026-10-15T16:32:42.416Z",
+    "articles": [
+      "guide",
+      "simple-view",
+      "settings",
+      "photos",
+      "new-booking",
+      "dashboard",
+      "bookings",
+      "marketing",
+      "payment-reminders"
+    ],
+    "verified_chunks": 71,
+    "all_chunks": 176,
+    "unrelated_articles_unchanged": true,
+    "chatbot": {
+      "slug": "admin-help-chat",
+      "version": 21,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    "unrelated_functions_unchanged": true,
+    "bundle_sha256": "93f5d96782c5d473c457b73614a42e44b919dbb22f54560015d5da9460660c25",
+    "source_sha256": "f44379e2a650fbe4e624497110c1a07bc93af4ff61e55b4d8f771afa8da06922"
+  },
+  "validation": {
+    "production_build": "PASS, including TypeScript and page generation",
+    "focused_candidate_tests": 135,
+    "local_marketing_browser_checks": 4,
+    "deployed_guide_and_marketing_browser_checks": 5,
+    "live_route_checks": 10,
+    "live_AI_answer_checks": 4,
+    "phone_visual_review": "PASS, 390px without horizontal overflow",
+    "lint": "Zero errors in focused changed marketing and component files; two existing dependency warnings",
+    "earlier_build": "An unpromoted candidate included concurrent guide work and failed TypeScript. Final release applies the copy-only changes to the verified production guide files and preserves concurrent shared-workspace edits."
+  },
+  "limits": [
+    "Marketing sending remains disabled. Request email setup opens a mail draft to support@bookingtours.co.za; it does not send a request automatically or enable sending.",
+    "No customer email, payment, guide account or real photo upload was created for these checks. Browser provider writes use synthetic fixtures.",
+    "No sending, permission or payment gates were weakened. Other Edge functions and help articles were verified unchanged."
+  ],
+  "evidence_directory": "plain-english-help-20261015/"
+}

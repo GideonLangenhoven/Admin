@@ -1,0 +1,10 @@
+{
+  "unchanged_backend_files": [
+    "supabase/functions/marketing-dispatch/index.ts",
+    "supabase/functions/marketing-automation-dispatch/index.ts",
+    "supabase/functions/auto-messages/index.ts",
+    "supabase/functions/broadcast/index.ts",
+    "supabase/functions/wa-webhook/index.ts"
+  ],
+  "no_sending_or_consent_gate_changes": true
+}

@@ -117,7 +117,7 @@ export default function AiUsage() {
           <p className="ui-mono-label mb-2">AI · Usage</p>
           <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>AI Assistant Usage</h2>
           <p className="mt-2 text-[13px]" style={{ color: "var(--ck-text-muted)" }}>
-            Customer-facing bot replies this month. Updates every 30 seconds{updatedAt ? " · last checked " + updatedAt : ""}.
+            Bot replies this month. Refreshes every 30 seconds.{updatedAt ? " · last checked " + updatedAt : ""}.
           </p>
         </div>
       </div>
@@ -126,8 +126,7 @@ export default function AiUsage() {
         <div className="ui-card anim-fade-up p-4" style={{ borderColor: "var(--ck-danger, #b3261e)" }}>
           <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Fair-use ceiling reached</p>
           <p className="mt-1 text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>
-            The assistant has paused generating new replies for this month and customers now see the menu options instead.
-            Existing bookings, reminders and payments are unaffected. Talk to us to raise your allowance.
+            Monthly reply limit reached. Customers can still use the menu; bookings, reminders and payments continue. Contact us for more replies.
           </p>
         </div>
       )}
@@ -178,26 +177,26 @@ export default function AiUsage() {
         {surfaces.length === 0 ? (
           <div className="ui-empty">
             <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No AI activity yet this month</p>
-            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Replies from the WhatsApp bot and website chat will appear here.</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>No WhatsApp or website replies yet.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
+          <div className="ui-table-container overflow-x-auto">
+            <table role="table" className="ui-responsive-table w-full text-[13px]">
               <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left"><span className="ui-mono-label !text-[10px]">Surface</span></th>
-                  <th className="px-4 py-3 text-right"><span className="ui-mono-label !text-[10px]">Calls</span></th>
-                  <th className="px-4 py-3 text-right"><span className="ui-mono-label !text-[10px]">Tokens</span></th>
-                  <th className="px-4 py-3 text-right"><span className="ui-mono-label !text-[10px]">Counts to allowance</span></th>
+                  <th scope="col" className="px-4 py-3 text-left"><span className="ui-mono-label !text-[10px]">Surface</span></th>
+                  <th scope="col" className="px-4 py-3 text-right"><span className="ui-mono-label !text-[10px]">Calls</span></th>
+                  <th scope="col" className="px-4 py-3 text-right"><span className="ui-mono-label !text-[10px]">Tokens</span></th>
+                  <th scope="col" className="px-4 py-3 text-right"><span className="ui-mono-label !text-[10px]">Counts to allowance</span></th>
                 </tr>
               </thead>
               <tbody>
                 {surfaces.map(([fn, s]) => (
                   <tr key={fn}>
-                    <td className="px-4 py-3" style={{ color: "var(--ck-text-strong)" }}>{SURFACE_LABELS[fn] || fn}</td>
-                    <td className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{s.calls.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{s.tokens.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right" style={{ color: "var(--ck-text-muted)" }}>{s.billable ? "Yes" : "No"}</td>
+                    <td data-label="Surface" className="px-4 py-3" style={{ color: "var(--ck-text-strong)" }}>{SURFACE_LABELS[fn] || fn}</td>
+                    <td data-label="Calls" className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{s.calls.toLocaleString()}</td>
+                    <td data-label="Tokens" className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{s.tokens.toLocaleString()}</td>
+                    <td data-label="Counts to allowance" className="px-4 py-3 text-right" style={{ color: "var(--ck-text-muted)" }}>{s.billable ? "Yes" : "No"}</td>
                   </tr>
                 ))}
               </tbody>

@@ -1,0 +1,764 @@
+--- a/app/lib/theme-engine.ts
++++ b/app/lib/theme-engine.ts
+@@ -98,13 +98,13 @@
+  * button must render under its label: a translucent black/white layer strong
+  * enough to get the chosen ink to 4.5:1 — the operator's hue shows through.
+  */
+-export type ButtonInk = { ink: RGB; overlay: string | null };
++export type ButtonInk = { ink: RGB; overlay: string | null; surface: RGB };
+ 
+ export function solveButtonInk(base: RGB): ButtonInk {
+   const dark = contrast(base, INK_DARK);
+   const light = contrast(base, INK_LIGHT);
+   if (Math.max(dark, light) >= 4.5) {
+-    return { ink: dark >= light ? INK_DARK : INK_LIGHT, overlay: null };
++    return { ink: dark >= light ? INK_DARK : INK_LIGHT, overlay: null, surface: base };
+   }
+   // Mid-tone: darken under light ink (usually cheaper perceptually).
+   const white: RGB = [255, 255, 255];
+@@ -112,14 +112,21 @@
+   for (let a = 0.1; a <= 0.75; a += 0.05) {
+     const darkened = over(black, a, base);
+     if (contrast(darkened, INK_LIGHT) >= 4.5) {
+-      return { ink: INK_LIGHT, overlay: rgba(black, +a.toFixed(2)) };
++      return { ink: INK_LIGHT, overlay: rgba(black, +a.toFixed(2)), surface: darkened };
+     }
+     const lightened = over(white, a, base);
+     if (contrast(lightened, INK_DARK) >= 4.5) {
+-      return { ink: INK_DARK, overlay: rgba(white, +a.toFixed(2)) };
++      return { ink: INK_DARK, overlay: rgba(white, +a.toFixed(2)), surface: lightened };
+     }
+   }
+-  return { ink: light >= dark ? INK_LIGHT : INK_DARK, overlay: rgba(black, 0.75) };
++  return { ink: light >= dark ? INK_LIGHT : INK_DARK, overlay: rgba(black, 0.75), surface: over(black, 0.75, base) };
++}
++
++// Supporting catalogue text can be quieter only while it still passes AA.
++function supportingInk({ ink, surface }: ButtonInk): string {
++  let alpha = 0.72;
++  while (alpha < 1 && contrast(over(ink, alpha, surface), surface) < 4.5) alpha += 0.04;
++  return rgba(ink, Math.min(1, alpha));
+ }
+ 
+ // ── Theme derivation ──────────────────────────────────────────────────────
+@@ -190,6 +197,10 @@
+ 
+   const ctaInk = solveButtonInk(cta);
+   const mainInk = solveButtonInk(main);
++  // Opaque catalogue surfaces keep uploaded backgrounds outside the text
++  // layer. Reuse the existing small contrast repair for mid-tone palettes.
++  const catalogue = solveButtonInk(bg);
++  const catalogueNav = solveButtonInk(nav);
+ 
+   // Accent as TEXT (links, eyebrows): only when the raw accent passes AA on
+   // the card surface over every worst backdrop; otherwise fall back to ink
+@@ -214,6 +225,12 @@
+     "--cfg-bg": rgbToHex(bg),
+     "--cfg-nav": rgbToHex(nav),
+     "--cfg-hover": rgbToHex(hover),
++
++    "--catalogue-surface": rgbToHex(catalogue.surface),
++    "--catalogue-ink": rgbToHex(catalogue.ink),
++    "--catalogue-muted": supportingInk(catalogue),
++    "--catalogue-nav-surface": rgbToHex(catalogueNav.surface),
++    "--catalogue-nav-ink": rgbToHex(catalogueNav.ink),
+ 
+     "--ink": rgbToHex(ink),
+     "--ink-muted": rgba(ink, 0.72),
+--- a/app/settings/page.tsx
++++ b/app/settings/page.tsx
+@@ -10,7 +10,7 @@
+ import { getAdminTimezone, setAdminTimezone, zonedToUtc } from "../lib/admin-timezone";
+ import { useBusinessContext } from "../../components/BusinessContext";
+ import DataRequestBadge from "../../components/DataRequestBadge";
+-import { computeTheme as computeGlassTheme } from "../lib/theme-engine";
++import BookingSitePreview from "../../components/booking/BookingSitePreview";
+ import dynamic from "next/dynamic";
+ import { CaretDown } from "@phosphor-icons/react";
+ import { DatePicker } from "../../components/DatePicker";
+@@ -51,73 +51,6 @@
+ // SUPER_ADMIN has every right that MAIN_ADMIN has, plus cross-tenant access.
+ function isPrivileged(r: string | null) {
+     return r === "MAIN_ADMIN" || r === "SUPER_ADMIN";
+-}
+-
+-// Live glass preview of the public booking site, driven by the SAME theme
+-// engine the customer site runs (booking/lib/theme-engine): the inks and
+-// glass alphas shown here are exactly what customers will get — including
+-// automatic contrast repair for hard palettes.
+-function BookingSitePreview({ siteSettings }: { siteSettings: Record<string, any> }) {
+-    const glass = computeGlassTheme({
+-        main: siteSettings.color_main,
+-        secondary: siteSettings.color_secondary,
+-        cta: siteSettings.color_cta,
+-        bg: siteSettings.color_bg,
+-        nav: siteSettings.color_nav,
+-        hover: siteSettings.color_hover,
+-    });
+-    const v = glass.vars;
+-    const glassCard: React.CSSProperties = {
+-        background: v["--glass-tint-card"],
+-        border: "1px solid " + v["--glass-border"],
+-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22), 0 8px 32px rgba(0,0,0,0.22)",
+-        backdropFilter: "blur(14px) saturate(160%)",
+-        WebkitBackdropFilter: "blur(14px) saturate(160%)",
+-    };
+-    return (
+-        <div>
+-            <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1 pb-2 border-b border-[var(--ck-border-subtle)]">Booking Page Preview</h3>
+-            <p className="text-xs text-[var(--ck-text-muted)] mb-4">Live glass preview. Text colors are solved automatically so any palette stays readable.</p>
+-            <div
+-                className="rounded-3xl border border-[var(--ck-border-subtle)] overflow-hidden"
+-                style={{
+-                    background:
+-                        `radial-gradient(90% 70% at 12% 8%, color-mix(in srgb, ${v["--cfg-main"]} 42%, transparent), transparent 60%),` +
+-                        `radial-gradient(80% 65% at 88% 18%, color-mix(in srgb, ${v["--cfg-hover"]} 30%, transparent), transparent 62%),` +
+-                        `radial-gradient(110% 80% at 50% 105%, color-mix(in srgb, ${v["--cfg-secondary"]} 55%, transparent), transparent 70%),` +
+-                        v["--cfg-bg"],
+-                }}
+-            >
+-                <div className="flex items-center justify-between gap-4 px-5 py-3 m-3 rounded-full" style={{ ...glassCard, background: v["--glass-tint-nav"] }}>
+-                    <div className="min-w-0">
+-                        <div className="text-base font-semibold truncate" style={{ color: v["--ink-nav"] }}>{siteSettings.business_name || "Business Name"}</div>
+-                        <div className="text-xs truncate" style={{ color: v["--ink-nav"], opacity: 0.72 }}>{siteSettings.business_tagline || "Business tagline"}</div>
+-                    </div>
+-                    <div className="flex items-center gap-3 text-sm shrink-0">
+-                        <span style={{ color: v["--ink-nav"] }}>{siteSettings.nav_gift_voucher_label || "Gift Voucher"}</span>
+-                        <span className="px-4 py-2 rounded-full font-semibold" style={{ backgroundColor: v["--accent"], backgroundImage: `linear-gradient(${v["--main-overlay"]}, ${v["--main-overlay"]})`, color: v["--ink-on-main"] }}>{siteSettings.nav_my_bookings_label || "My Bookings"}</span>
+-                    </div>
+-                </div>
+-                <div className="px-6 py-8 text-center">
+-                    <div className="text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: v["--accent-text"] }}>{siteSettings.hero_eyebrow || "Hero Eyebrow"}</div>
+-                    <div className="mt-3 text-4xl font-semibold" style={{ color: v["--ink"] }}>{siteSettings.hero_title || "Hero Title"}</div>
+-                    <div className="mt-3 text-base max-w-2xl mx-auto" style={{ color: v["--ink-muted"] }}>{siteSettings.hero_subtitle || "Hero subtitle appears here."}</div>
+-                    <div className="mt-6 mx-auto max-w-sm rounded-3xl p-4 text-left" style={glassCard}>
+-                        <div className="text-sm font-semibold" style={{ color: v["--ink"] }}>Sample Tour Card</div>
+-                        <div className="text-xs mt-0.5" style={{ color: v["--ink-muted"] }}>2 hours · R495 per person</div>
+-                        <div className="mt-3 inline-flex w-full items-center justify-center px-5 py-2.5 rounded-full font-semibold text-sm" style={{ backgroundColor: v["--cta"], backgroundImage: `linear-gradient(${v["--cta-overlay"]}, ${v["--cta-overlay"]})`, color: v["--ink-on-cta"] }}>{siteSettings.card_cta_label || "Book Now"}</div>
+-                    </div>
+-                </div>
+-                <div className="px-6 pb-6 text-center text-sm">
+-                    <div style={{ color: v["--ink"] }}>{siteSettings.footer_line_one || ((siteSettings.business_name || "Business Name") + " · Coastal Activity Centre")}</div>
+-                    <div className="mt-1" style={{ color: v["--ink-muted"] }}>{siteSettings.footer_line_two || "Established: 1994 · BookingTours Platform"}</div>
+-                    <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold" style={glassCard}>
+-                        <span style={{ color: v["--ink"] }}>{siteSettings.chat_widget_label || "Book here"}</span>
+-                    </div>
+-                </div>
+-            </div>
+-        </div>
+-    );
+ }
+ 
+ // Personal (per-admin) preference — stored on the caller's own admin_users row
+@@ -2443,11 +2376,11 @@
+                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Explore the Atlantic coastline by kayak with Cape Town's original guided team." />
+                             </div>
+                             {/* Site background image — saves immediately on upload/remove
+-                                (same pattern as the logo). Falls back to the first active
+-                                tour's photo, then a palette gradient, when empty. */}
++                                (same pattern as the logo). Uses a palette background
++                                when empty. */}
+                             <div className="md:col-span-2 rounded-2xl border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] p-4">
+-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Site Background Image <span className="text-[var(--ck-accent)]">(the photo behind the glass panels on your booking site)</span></label>
+-                                <p className="mb-3 text-[11px] text-[var(--ck-text-muted)]">Upload any landscape photo up to 20MB. It&apos;s automatically resized to 2560px wide and optimised for fast loading. Best shape: 16:9 landscape (e.g. 2560×1440). It renders softly blurred behind frosted panels, so good colour and light matter more than sharpness. If empty, your first tour&apos;s photo is used.</p>
++                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Site Background Image <span className="text-[var(--ck-accent)]">(the photo behind your booking catalogue)</span></label>
++                                <p className="mb-3 text-[11px] text-[var(--ck-text-muted)]">Upload any landscape photo up to 20MB. It&apos;s automatically resized to 2560px wide and optimised for fast loading. Best shape: 16:9 landscape (e.g. 2560×1440). It appears softly blurred behind readable card surfaces. If empty, your palette provides the background.</p>
+                                 <div className="flex items-center gap-3">
+                                     {siteSettings.hero_image && (
+                                         /* eslint-disable-next-line @next/next/no-img-element */
+@@ -2478,7 +2411,7 @@
+                                         <button data-demo-action="site.hero-remove" type="button" onClick={async () => {
+                                             setSiteSettings(prev => ({ ...prev, hero_image: "" }));
+                                             const { error } = await supabase.from("businesses").update({ hero_image: null }).eq("id", businessId);
+-                                            notify(error ? { message: "Failed to remove background: " + error.message, tone: "error" } : { message: "Background removed. The site falls back to your first tour photo.", tone: "success" });
++                                            notify(error ? { message: "Failed to remove background: " + error.message, tone: "error" } : { message: "Background removed. Your palette provides the background.", tone: "success" });
+                                         }} className="text-xs text-[var(--ck-danger)] hover:underline">Remove</button>
+                                     )}
+                                 </div>
+@@ -2585,7 +2518,7 @@
+                         </div>
+                     )}
+ 
+-                    <BookingSitePreview siteSettings={siteSettings} />
++                    <BookingSitePreview siteSettings={siteSettings} tours={tours} />
+ 
+                     {/* Branding Colors */}
+                     <div>
+--- a/components/booking/BookingSitePreview.tsx
++++ b/components/booking/BookingSitePreview.tsx
+@@ -0,0 +1,99 @@
++import { Inter, Quicksand } from "next/font/google";
++import type { CSSProperties } from "react";
++import { computeTheme } from "../../app/lib/theme-engine";
++import { formatDuration } from "../../app/lib/duration";
++import { CatalogueCard, CatalogueIntro } from "./Catalogue";
++
++// The storefront's existing font defaults. Keep the preview's display token
++// scoped here so it cannot change the admin application's typography.
++const body = Inter({ subsets: ["latin"] });
++const display = Quicksand({ subsets: ["latin"], weight: ["500", "600", "700"], variable: "--font-display" });
++
++type PreviewTour = {
++  id: string;
++  name: string;
++  duration_minutes: number | null;
++  base_price_per_person: number | null;
++  description: string | null;
++  image_url: string | null;
++  active: boolean;
++  hidden: boolean;
++};
++type PreviewSettings = Partial<Record<
++  "color_main" | "color_secondary" | "color_cta" | "color_bg" | "color_nav" | "color_hover" |
++  "business_name" | "business_tagline" | "logo_url" | "booking_site_url" |
++  "hero_title" | "hero_eyebrow" | "hero_subtitle" | "hero_image" |
++  "nav_gift_voucher_label" | "nav_my_bookings_label" | "card_cta_label" |
++  "footer_line_one" | "footer_line_two" | "chat_widget_label", string | null
++>>;
++
++export default function BookingSitePreview({ siteSettings, tours }: { siteSettings: PreviewSettings; tours: PreviewTour[] }) {
++  const theme = computeTheme({
++    main: siteSettings.color_main, secondary: siteSettings.color_secondary,
++    cta: siteSettings.color_cta, bg: siteSettings.color_bg,
++    nav: siteSettings.color_nav, hover: siteSettings.color_hover,
++  });
++  const name = siteSettings.business_name || "Book Your Tour";
++  const base = (siteSettings.booking_site_url || "").replace(/\/+$/, "");
++  const actionLabel = siteSettings.card_cta_label || "Book Now";
++  const visibleTours = tours.filter(tour => tour.active && !tour.hidden);
++
++  return (
++    <div>
++      <div className="flex flex-wrap items-center justify-between gap-2 mb-2 pb-2 border-b border-[var(--ck-border-subtle)]">
++        <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Booking Page Preview</h3>
++        {base && <a href={base} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--ck-accent)] underline underline-offset-2">Open booking page</a>}
++      </div>
++      <p className="text-xs text-[var(--ck-text-muted)] mb-4">Live layout preview using your visible tours and current settings. Text colours adjust automatically for readability.</p>
++      <div className={`catalogue-preview ${body.className} ${display.variable}`} style={theme.vars as CSSProperties} data-booking-preview>
++        <div className="catalogue-backdrop" aria-hidden="true">
++          <div className="glass-backdrop-mesh" />
++          {siteSettings.hero_image && (
++            // eslint-disable-next-line @next/next/no-img-element
++            <img src={siteSettings.hero_image} alt="" loading="lazy" />
++          )}
++        </div>
++        <div className="catalogue-header">
++          <div className="catalogue-header-content">
++            <a className="catalogue-brand" href={base || undefined} target="_blank" rel="noopener noreferrer">
++              {siteSettings.logo_url ? (
++                // eslint-disable-next-line @next/next/no-img-element
++                <img src={siteSettings.logo_url} alt={name} />
++              ) : <span className="catalogue-monogram" aria-hidden="true">{name.trim().charAt(0).toUpperCase() || "B"}</span>}
++              <div className="min-w-0">
++                <div className="catalogue-brand-name">{name}</div>
++                {siteSettings.business_tagline && <p>{siteSettings.business_tagline}</p>}
++              </div>
++            </a>
++            <nav className="catalogue-nav" aria-label="Booking preview">
++              <a href={base ? base + "/voucher" : undefined} target="_blank" rel="noopener noreferrer">{siteSettings.nav_gift_voucher_label || "Gift Voucher"}</a>
++              <a href={base ? base + "/my-bookings" : undefined} target="_blank" rel="noopener noreferrer">{siteSettings.nav_my_bookings_label || "My Bookings"}</a>
++            </nav>
++          </div>
++        </div>
++        <div className="catalogue-preview-content">
++          <CatalogueIntro title={siteSettings.hero_title} eyebrow={siteSettings.hero_eyebrow} subtitle={siteSettings.hero_subtitle} />
++          <div className="catalogue-grid">
++            {visibleTours.map(tour => (
++              <CatalogueCard key={tour.id} name={tour.name} duration={formatDuration(tour.duration_minutes)}
++                price={tour.base_price_per_person} description={tour.description}
++                image={tour.image_url ? (
++                  // eslint-disable-next-line @next/next/no-img-element
++                  <img src={tour.image_url} alt={tour.name + " tour"} loading="lazy" />
++                ) : undefined}
++                action={base ? (
++                  <a href={base + "/book?tour=" + tour.id} className="catalogue-action" target="_blank" rel="noopener noreferrer" aria-label={`${actionLabel}: ${tour.name}`}>{actionLabel}</a>
++                ) : <span className="catalogue-action">{actionLabel}</span>} />
++            ))}
++          </div>
++          {visibleTours.length === 0 && <p className="catalogue-surface catalogue-preview-content catalogue-description">Your visible tours will appear here.</p>}
++          <div className="catalogue-surface catalogue-preview-footer">
++            <p className="catalogue-description">{siteSettings.footer_line_one || (name + (siteSettings.business_tagline ? " · " + siteSettings.business_tagline : ""))}</p>
++            {siteSettings.footer_line_two && <p className="catalogue-description">{siteSettings.footer_line_two}</p>}
++            <span className="catalogue-supporting">{siteSettings.chat_widget_label || "Book here"}</span>
++          </div>
++        </div>
++      </div>
++    </div>
++  );
++}
+--- a/components/booking/Catalogue.tsx
++++ b/components/booking/Catalogue.tsx
+@@ -0,0 +1,51 @@
++import type { ReactNode } from "react";
++import "./catalogue.css";
++
++// Presentation only. The public catalogue supplies its existing price and
++// booking URL; the admin preview carries an identical copy across repo builds.
++export function CatalogueCard({ name, duration, price, description, image, reviews, urgency, action }: {
++  name: string;
++  duration: string;
++  price: number | null | undefined;
++  description?: string | null;
++  image?: ReactNode;
++  reviews?: string;
++  urgency?: string | null;
++  action: ReactNode;
++}) {
++  return (
++    <article className="catalogue-card" data-shot="tour-card">
++      {image && <div className="catalogue-photo">{image}</div>}
++      <div className="catalogue-card-content">
++        <div className="catalogue-card-heading">
++          <h3>{name}</h3>
++          <div className="catalogue-card-details">
++            <span className="catalogue-supporting">{duration}</span>
++            {typeof price === "number" && Number.isFinite(price) && (
++              <p className="catalogue-price">R{price}<span>per person</span></p>
++            )}
++          </div>
++        </div>
++        {reviews && <p className="catalogue-supporting">{reviews}</p>}
++        {urgency && <p className="catalogue-availability">{urgency}</p>}
++        <div className="catalogue-card-action">{action}</div>
++        {description && <p className="catalogue-description">{description}</p>}
++      </div>
++    </article>
++  );
++}
++
++export function CatalogueIntro({ title, eyebrow, subtitle }: {
++  title?: string | null;
++  eyebrow?: string | null;
++  subtitle?: string | null;
++}) {
++  if (!title?.trim()) return null;
++  return (
++    <div className="catalogue-intro catalogue-surface">
++      {eyebrow && <p className="catalogue-supporting">{eyebrow}</p>}
++      <h2>{title}</h2>
++      {subtitle && <p className="catalogue-description">{subtitle}</p>}
++    </div>
++  );
++}
+--- a/components/booking/catalogue.css
++++ b/components/booking/catalogue.css
+@@ -0,0 +1,408 @@
++/* Shared catalogue presentation. Keep the admin's components/booking copy
++   identical: the two apps deploy from separate repositories. */
++.catalogue-page,
++.catalogue-footer,
++.catalogue-preview {
++  --catalogue-space: 0.25rem;
++  --catalogue-radius: 0.75rem;
++  --catalogue-border: color-mix(in srgb, var(--catalogue-ink, var(--ink)) 14%, transparent);
++}
++
++.catalogue-page {
++  --ink: var(--catalogue-ink);
++  --ink-muted: var(--catalogue-muted);
++  padding-block: calc(var(--catalogue-space) * 6);
++}
++
++.catalogue-footer {
++  --ink: var(--catalogue-ink);
++  --ink-muted: var(--catalogue-muted);
++}
++
++.catalogue-footer .catalogue-surface { color: var(--catalogue-muted); }
++
++/* Existing resume, deal and combo panels use the same restrained surfaces. */
++.catalogue-page .glass {
++  border-radius: var(--catalogue-radius);
++  background: var(--catalogue-surface);
++  box-shadow: 0 2px 6px rgb(0 0 0 / 0.05);
++  -webkit-backdrop-filter: none;
++  backdrop-filter: none;
++}
++
++.catalogue-page .glass-chip {
++  border-radius: 0.5rem;
++  background: transparent;
++  box-shadow: none;
++  -webkit-backdrop-filter: none;
++  backdrop-filter: none;
++}
++
++.catalogue-page .glass-hover:hover { transform: none; }
++.catalogue-page .btn {
++  min-height: 2.75rem;
++  border-radius: 0.5rem;
++  white-space: normal;
++  box-shadow: none;
++}
++
++.catalogue-page .btn-primary:hover { filter: none; text-decoration: underline; }
++
++.catalogue-grid {
++  display: grid;
++  grid-template-columns: minmax(0, 1fr);
++  gap: calc(var(--catalogue-space) * 6);
++}
++
++.catalogue-card,
++.catalogue-surface {
++  min-width: 0;
++  border: 1px solid var(--catalogue-border);
++  border-radius: var(--catalogue-radius);
++  background: var(--catalogue-surface, var(--cfg-bg, var(--bg)));
++  color: var(--catalogue-ink, var(--ink));
++  box-shadow: 0 2px 6px rgb(0 0 0 / 0.05);
++}
++
++.catalogue-card {
++  position: relative;
++  display: flex;
++  flex-direction: column;
++  text-align: left;
++}
++
++.catalogue-photo {
++  position: relative;
++  flex-shrink: 0;
++  aspect-ratio: 16 / 9;
++  overflow: hidden;
++  border-radius: calc(var(--catalogue-radius) - 1px) calc(var(--catalogue-radius) - 1px) 0 0;
++}
++
++.catalogue-photo img {
++  width: 100%;
++  height: 100%;
++  object-fit: cover;
++  object-position: center;
++}
++
++.catalogue-card-content {
++  display: flex;
++  flex: 1;
++  flex-direction: column;
++  gap: calc(var(--catalogue-space) * 3);
++  padding: calc(var(--catalogue-space) * 4);
++  min-width: 0;
++  overflow-wrap: anywhere;
++}
++
++.catalogue-card h3 {
++  margin: 0;
++  color: inherit;
++  font-family: var(--font-display, inherit);
++  font-size: 1.25rem;
++  font-weight: 600;
++  line-height: 1.35;
++  letter-spacing: -0.015em;
++}
++
++.catalogue-card-details {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: baseline;
++  gap: calc(var(--catalogue-space) * 2) calc(var(--catalogue-space) * 4);
++  margin-top: calc(var(--catalogue-space) * 2);
++}
++
++.catalogue-price {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: baseline;
++  gap: calc(var(--catalogue-space) * 2);
++  margin: 0 0 0 auto;
++  color: var(--catalogue-ink, var(--ink));
++  font-size: 1.125rem;
++  font-weight: 600;
++  line-height: 1.5;
++  font-variant-numeric: tabular-nums;
++}
++
++.catalogue-price span,
++.catalogue-supporting,
++.catalogue-description {
++  margin-block: 0;
++  color: var(--catalogue-muted, var(--ink-muted));
++  font-size: 0.875rem;
++  font-weight: 400;
++  line-height: 1.55;
++}
++
++.catalogue-availability {
++  margin: 0;
++  color: var(--catalogue-ink, var(--ink));
++  font-size: 0.875rem;
++  font-weight: 600;
++  line-height: 1.5;
++}
++
++.catalogue-action {
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  width: 100%;
++  min-height: 2.75rem;
++  padding: calc(var(--catalogue-space) * 3) calc(var(--catalogue-space) * 4);
++  border: 1px solid transparent;
++  border-radius: 0.5rem;
++  background-color: var(--cta);
++  background-image: linear-gradient(var(--cta-overlay), var(--cta-overlay));
++  color: var(--ink-on-cta);
++  font-size: 0.875rem;
++  font-weight: 600;
++  line-height: 1.5;
++  text-align: center;
++  text-decoration: none;
++  white-space: normal;
++  overflow-wrap: anywhere;
++}
++
++/* One link and one tab stop per tour. Its hit area includes the card. */
++.catalogue-card .catalogue-action::after {
++  content: "";
++  position: absolute;
++  inset: 0;
++  border-radius: var(--catalogue-radius);
++}
++
++.catalogue-action:focus-visible {
++  outline: 2px solid var(--catalogue-ink, var(--ink));
++  outline-offset: 3px;
++  box-shadow: none;
++}
++
++.catalogue-card .catalogue-action:focus-visible::after {
++  outline: 2px solid var(--catalogue-ink, var(--ink));
++  outline-offset: 3px;
++}
++
++.catalogue-intro {
++  display: grid;
++  gap: calc(var(--catalogue-space) * 2);
++  margin-bottom: calc(var(--catalogue-space) * 6);
++  padding: calc(var(--catalogue-space) * 4);
++  overflow-wrap: anywhere;
++}
++
++.catalogue-intro h2 {
++  margin: 0;
++  color: inherit;
++  font-family: var(--font-display, inherit);
++  font-size: 1.75rem;
++  font-weight: 600;
++  line-height: 1.25;
++}
++
++.catalogue-header {
++  position: sticky;
++  top: 0;
++  z-index: 40;
++  border-bottom: 1px solid color-mix(in srgb, var(--catalogue-nav-ink, var(--ink-nav)) 14%, transparent);
++  background: var(--catalogue-nav-surface, var(--cfg-nav, var(--surface)));
++  color: var(--catalogue-nav-ink, var(--ink-nav));
++}
++
++.catalogue-header-content {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: center;
++  justify-content: space-between;
++  gap: 0.5rem 1rem;
++  padding-block: 0.75rem;
++}
++
++.catalogue-brand {
++  display: flex;
++  flex: 1 1 12rem;
++  align-items: center;
++  gap: 0.75rem;
++  min-width: 0;
++  color: inherit;
++  text-decoration: none;
++  overflow-wrap: anywhere;
++}
++
++.catalogue-brand img {
++  width: auto;
++  height: auto;
++  max-width: 6rem;
++  max-height: 2.25rem;
++  object-fit: contain;
++}
++
++.catalogue-monogram {
++  display: flex;
++  flex-shrink: 0;
++  align-items: center;
++  justify-content: center;
++  width: 2.25rem;
++  height: 2.25rem;
++  border: 1px solid currentColor;
++  border-radius: 0.5rem;
++  font-weight: 600;
++}
++
++.catalogue-brand h1,
++.catalogue-brand-name {
++  margin: 0;
++  color: inherit;
++  font-family: var(--font-display, inherit);
++  font-size: 1.125rem;
++  font-weight: 600;
++  line-height: 1.4;
++}
++
++.catalogue-brand p {
++  margin: 0;
++  color: inherit;
++  font-size: 0.875rem;
++  line-height: 1.5;
++}
++
++.catalogue-nav {
++  display: flex;
++  flex-wrap: wrap;
++  align-items: center;
++  gap: 0.25rem;
++  min-width: 0;
++}
++
++.catalogue-nav a {
++  display: flex;
++  align-items: center;
++  min-height: 2.75rem;
++  padding: 0.5rem 0.75rem;
++  border: 1px solid transparent;
++  border-radius: 0.5rem;
++  color: inherit;
++  font-size: 0.875rem;
++  font-weight: 500;
++  line-height: 1.5;
++  text-decoration: none;
++  overflow-wrap: anywhere;
++}
++
++.catalogue-brand:focus-visible,
++.catalogue-nav a:focus-visible {
++  outline: 2px solid var(--catalogue-nav-ink, var(--ink-nav));
++  outline-offset: 2px;
++  box-shadow: none;
++}
++
++/* The uploaded photo stays intact. This treatment only quiets the backdrop. */
++.catalogue-backdrop .glass-backdrop-mesh {
++  position: absolute;
++  inset: 0;
++  background:
++    radial-gradient(90% 70% at 12% 8%, color-mix(in srgb, var(--cfg-main) 16%, transparent), transparent 62%),
++    radial-gradient(80% 65% at 88% 18%, color-mix(in srgb, var(--cfg-hover) 10%, transparent), transparent 64%),
++    var(--cfg-bg);
++}
++
++.catalogue-backdrop .glass-backdrop-mesh::after { content: none; }
++.catalogue-backdrop::after {
++  content: "";
++  position: absolute;
++  inset: 0;
++  background: color-mix(in srgb, var(--cfg-bg) 24%, transparent);
++}
++
++.catalogue-preview {
++  position: relative;
++  isolation: isolate;
++  border: 1px solid var(--ck-border-subtle);
++  border-radius: var(--catalogue-radius);
++  overflow: hidden;
++  container-type: inline-size;
++  background: var(--cfg-bg);
++}
++
++.catalogue-preview .catalogue-backdrop {
++  position: absolute;
++  inset: 0;
++  z-index: -1;
++  pointer-events: none;
++}
++
++.catalogue-preview .catalogue-backdrop img {
++  width: 100%;
++  height: 100%;
++  object-fit: cover;
++  filter: blur(2px);
++}
++
++.catalogue-preview .catalogue-header { position: relative; z-index: auto; }
++.catalogue-preview .catalogue-header-content { padding-inline: 1rem; }
++.catalogue-preview-content { padding: calc(var(--catalogue-space) * 4); }
++.catalogue-preview-footer {
++  margin-top: calc(var(--catalogue-space) * 6);
++  padding: calc(var(--catalogue-space) * 4);
++  text-align: center;
++  overflow-wrap: anywhere;
++}
++
++/* Keep the phone chat launcher clear of catalogue prices and actions. */
++@media (max-width: 479px) {
++  body:has(.catalogue-page):has(.chat-launcher-lift) .catalogue-brand {
++    max-width: calc(100% - 64px);
++    flex-wrap: wrap;
++    gap: 12px;
++  }
++
++  body:has(.catalogue-page):has(.chat-launcher-lift) .catalogue-brand > div {
++    flex: 1 1 8rem;
++  }
++
++  body:has(.catalogue-page):has(.chat-launcher-lift) .catalogue-brand img,
++  body:has(.catalogue-page):has(.chat-launcher-lift) .catalogue-monogram {
++    max-width: 44px;
++    max-height: 44px;
++  }
++
++  body:has(.catalogue-page) .chat-launcher-lift {
++    top: 0.75rem;
++    right: 1rem;
++    bottom: auto;
++  }
++
++  body:has(.catalogue-page) .chat-launcher-lift button {
++    width: 44px;
++    height: 44px;
++  }
++}
++
++@media (min-width: 768px) {
++  .catalogue-page { padding-block: calc(var(--catalogue-space) * 8); }
++  .catalogue-page .catalogue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
++  .catalogue-page .catalogue-photo { aspect-ratio: 2 / 1; }
++}
++
++@media (min-width: 1280px) {
++  .catalogue-page .catalogue-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
++}
++
++@container (min-width: 640px) {
++  .catalogue-preview .catalogue-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
++  .catalogue-preview .catalogue-photo { aspect-ratio: 2 / 1; }
++}
++
++@container (min-width: 900px) {
++  .catalogue-preview .catalogue-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
++}
++
++@media (hover: hover) {
++  .catalogue-card:hover {
++    border-color: color-mix(in srgb, var(--cfg-hover) 65%, var(--catalogue-ink, var(--ink)));
++  }
++  .catalogue-action:hover { text-decoration: underline; text-underline-offset: 0.2em; }
++  .catalogue-nav a:hover { text-decoration: underline; text-underline-offset: 0.2em; }
++}
+--- a/.vercelignore
++++ b/.vercelignore
+@@ -2,7 +2,7 @@
+ video1/
+ my-video/
+ auto-research/
+-booking/
++/booking/
+ .next/
+ node_modules/
+ coverage/

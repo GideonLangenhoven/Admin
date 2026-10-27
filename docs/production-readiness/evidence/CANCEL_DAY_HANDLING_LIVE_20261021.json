@@ -1,0 +1,177 @@
+{
+  "released_at": "2026-10-21T17:36:05.603403+00:00",
+  "status": "LIVE_AND_DELIVERY_VERIFIED",
+  "branches": {
+    "admin": "feature/cancel-day-handling-20261021",
+    "booking": "feature/cancel-day-handling-20261021"
+  },
+  "commits": {
+    "admin_implementation": "ec7652e",
+    "admin_live_baseline": "317b296",
+    "booking_implementation": [
+      "6486919",
+      "4dbe52a"
+    ],
+    "booking_live_baseline": "b882a70"
+  },
+  "admin": {
+    "id": "dpl_cxr4bmRxRttV68z5SNCDqJBG7SVk",
+    "url": "caepweb-admin-7dpjafrel-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 517,
+    "changed": [
+      "app/slots/page.tsx"
+    ]
+  },
+  "booking": {
+    "id": "dpl_HDMfskyZvotbmrDW26zPB2GrhncX",
+    "url": "booking-4m7u32t39-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 171,
+    "changed": [
+      "app/my-bookings/BookingCard.tsx"
+    ]
+  },
+  "guest_handling": {
+    "Guests choose": {
+      "offer_choice": true,
+      "behavior": "Existing eligible booking actions remain available in My Bookings."
+    },
+    "Contact operator": {
+      "offer_choice": false,
+      "behavior": "My Bookings shows the existing contact flow instead of refund/voucher/reschedule choices. Existing server-side guest action restrictions remain enforced."
+    }
+  },
+  "platform": {
+    "at": "2026-10-21T17:28:28.457Z",
+    "functions": [
+      {
+        "slug": "weather-cancel",
+        "version": 93,
+        "files_verified": 4,
+        "verify_jwt": false
+      },
+      {
+        "slug": "cancel-booking",
+        "version": 43,
+        "files_verified": 3,
+        "verify_jwt": false
+      },
+      {
+        "slug": "rebook-booking",
+        "version": 99,
+        "unchanged": true
+      },
+      {
+        "slug": "send-email",
+        "version": 198,
+        "files_verified": 11,
+        "verify_jwt": false
+      },
+      {
+        "slug": "my-bookings-lookup",
+        "version": 30,
+        "unchanged": true
+      },
+      {
+        "slug": "wa-webhook",
+        "version": 244,
+        "unchanged": true
+      }
+    ],
+    "real_cancellations": 0,
+    "messages_sent": 0,
+    "database_writes": 0
+  },
+  "existing_schema": {
+    "columns": [
+      {
+        "column_name": "cancellation_self_service",
+        "is_nullable": "NO",
+        "column_default": "true"
+      }
+    ],
+    "transaction_arguments": 6,
+    "read_only": true
+  },
+  "checks": {
+    "focused_tests": {
+      "passed": 65,
+      "files": 4,
+      "log": "/Users/gideonlangenhoven/dev/capekayak/.vercel/cancel-day-handling-20261021/focused-tests.log"
+    },
+    "focused_cancellation_tests": {
+      "passed": 29,
+      "included_in_65": true
+    },
+    "local_postgres_acceptance_groups": 23,
+    "local_payment_recovery_checks": "passed as part of the existing disposable PostgreSQL harness",
+    "production_builds": "Admin and customer build READY",
+    "lint": "Zero errors; existing warnings remain (6 admin, 1 customer).",
+    "source_files_verified": {
+      "admin": 517,
+      "booking": 171
+    },
+    "unrelated_files_preserved": {
+      "admin": 516,
+      "booking": 170
+    },
+    "live_admin_delivery": {
+      "at": "2026-10-21T17:34:49.151Z",
+      "phase": "production",
+      "target": "admin",
+      "checks": [
+        {
+          "origin": "https://admin.bookingtours.co.za",
+          "path": "/slots",
+          "status": 200,
+          "scripts_verified": 18,
+          "updated_code_served": true
+        }
+      ],
+      "authenticated_interaction": "Not exercised",
+      "real_cancellations": 0,
+      "messages_sent": 0,
+      "browser_used": false
+    },
+    "live_booking_delivery": {
+      "at": "2026-10-21T17:34:47.613Z",
+      "phase": "production",
+      "target": "booking",
+      "checks": [
+        {
+          "origin": "https://aonyx.booking.bookingtours.co.za",
+          "path": "/my-bookings",
+          "status": 200,
+          "scripts_verified": 14,
+          "updated_code_served": true
+        },
+        {
+          "origin": "https://kayak.booking.bookingtours.co.za",
+          "path": "/my-bookings",
+          "status": 200,
+          "scripts_verified": 14,
+          "updated_code_served": true
+        }
+      ],
+      "authenticated_interaction": "Not exercised",
+      "real_cancellations": 0,
+      "messages_sent": 0,
+      "browser_used": false
+    },
+    "browser_or_playwright": "Not used, per user instruction",
+    "unverified": "Authenticated browser interaction, responsive visual review and real notification delivery are not exercised."
+  },
+  "safety": {
+    "production_schema_migrations": 0,
+    "production_business_data_writes": 0,
+    "real_cancellations": 0,
+    "messages_sent": 0,
+    "new_integrations": 0
+  },
+  "rollback": {
+    "admin": "dpl_8XGtsZSMLdftJw4Phjz8fih764gG",
+    "booking": "dpl_E947VY1nM96PDYU8q3Bwo85ZSExS",
+    "notification_functions": "Redeploy the three source snapshots under functions-before; preserve their existing verify_jwt=false settings and internal authentication.",
+    "database": "No database rollback required; the existing cancellation_self_service contract was reused."
+  },
+  "release_directory": "/Users/gideonlangenhoven/dev/capekayak/.vercel/cancel-day-handling-20261021"
+}

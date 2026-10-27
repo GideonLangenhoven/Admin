@@ -1,0 +1,25 @@
+{
+  "at": "2026-10-16T06:14:56.482Z",
+  "results": [
+    {
+      "question": "Where do I change the automatic discounts for WhatsApp and web chat, and how are returning guests checked?",
+      "page": "/marketing/promotions",
+      "answer": "Open [Marketing → Promotions](/marketing/promotions), then use **Automatic chat discounts**. Select **Add discount rule**, choose **Qualify by**:\n\n- **Bookings within a period**\n- **Time since last booking**\n- **Group size**\n\nSet the thresholds, guest limits, percentage, and enable the rule. Select **Save automatic discounts**.\n\nReturning guests are checked by the supplied phone number. Only paid or completed bookings count. Every condition in a rule must match, and the largest matching percentage applies without stacking. WhatsApp and web chat use the same rules and recheck eligibility at checkout. Website promo codes are separate.\n\n[[open:/marketing/promotions]]",
+      "pass": true
+    },
+    {
+      "question": "As an operator owner, do I need an authenticator to save banking or Yoco details? Where is Data Requests in Settings?",
+      "page": "/settings",
+      "answer": "No. Operator accounts do not need an authenticator to change banking, payment, or messaging settings. Authenticator verification is required only for platform **SUPER_ADMIN** accounts.\n\nHowever, your operations account cannot save banking or Yoco integration details. Banking details and integration credentials require your **main admin**, and your main admin has not granted you any Settings sections.\n\n**Data Requests** is the link at the bottom of [Settings](/settings). It opens [Data Requests](/privacy/data-requests), but only your main admin can use it.",
+      "pass": true
+    },
+    {
+      "question": "Can guides upload videos and send trip photos and the thank you email? What is the send button called?",
+      "page": "/photos",
+      "answer": "Yes. Guides can upload images and videos, then send the trip photos and thank-you message for their own operator.\n\nThey should sign in through [Guide Simple View](/simpleguide), choose a departure, and open **Trip photos**. The button is called **Send photos and thank you email**.\n\nUploading alone does not notify guests.",
+      "pass": true
+    }
+  ],
+  "internal_questions_only": true,
+  "no_customer_actions": true
+}

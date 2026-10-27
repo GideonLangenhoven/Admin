@@ -1,0 +1,26 @@
+{
+  "unit_full_suite": {
+    "passed": 2390,
+    "skipped": 58,
+    "files_passed": 144,
+    "files_skipped": 2,
+    "scope": "Working tree full suite, before final presentation-only changes."
+  },
+  "focused_unit_tests_after_functional_changes": 50,
+  "final_local_photo_browser_cases": 5,
+  "final_live_photo_browser_cases": 5,
+  "final_live_browser_seconds": 17.5,
+  "typescript": "PASS",
+  "production_build": "PASS",
+  "eslint_errors": 0,
+  "hosted_schema_reads_with_zero_rows": 3,
+  "live_http_and_anonymous_access_checks": 7,
+  "native_help_files_verified": 8,
+  "uploaded_source_files_verified": 486,
+  "preserved_guide_login_source_hashes": {
+    "components/AuthGate.tsx": "2783a3fb2bc243b21cd7a1763d1ac73355500cad978c88ae1f20e895d9169645",
+    "components/SignOutButton.tsx": "212ac7c49abd943f26331ae7f086c30b305b96233df078039884361ac12707e0"
+  },
+  "visual_review": "PASS phone guide header and contrast, shared trip/upload/link/history tools and visible send action.",
+  "provider_delivery_scope": "Customer/auth/provider requests in browser tests are synthetic intercepted fixtures. Hosted Drive status probe used a nonexistent operator; no upload or guest message. Real provider delivery was not exercised."
+}

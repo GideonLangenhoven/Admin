@@ -1,0 +1,22 @@
+{
+  "guide_accounts": [
+    "id",
+    "business_id",
+    "login_name",
+    "email",
+    "user_id",
+    "must_set_password",
+    "password_set_at",
+    "suspended",
+    "setup_token_hash",
+    "setup_token_expires_at",
+    "setup_claim_id",
+    "created_at"
+  ],
+  "trip_photos": [
+    "uploaded_by_guide_id"
+  ],
+  "slot_check_ins": [
+    "actor_guide_id"
+  ]
+}

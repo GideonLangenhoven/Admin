@@ -1,0 +1,46 @@
+{
+  "at": "2026-10-18T12:01:51.886676+00:00",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "deployment": {
+    "at": "2026-10-18T12:01:34.617Z",
+    "id": "dpl_9w8e8gESdf4MqUkYftQvLQJp13XJ",
+    "url": "https://admin.bookingtours.co.za",
+    "state": "READY",
+    "pages": [
+      "/",
+      "/simple"
+    ],
+    "http_status": 200
+  },
+  "changes": [
+    "Removed the checkbox and partial-arrival explanatory sentence from Roll Call.",
+    "Payment recovery excludes paid/completed bookings and captured payments even when legacy amount_due remains positive. The existing realtime refresh and 30-second fallback polling remove paid rows automatically."
+  ],
+  "validation": {
+    "production_build": "passed",
+    "typescript": "passed",
+    "source_files_verified": 491,
+    "hosted_browser_cases_passed": 4,
+    "browser_widths": [
+      390,
+      1280
+    ],
+    "cases": [
+      "Manual paid status with stale positive balance removed by automatic refresh",
+      "Captured payment with stale positive balance removed by automatic refresh",
+      "Roll-call sentence and inline link absent at both viewport sizes"
+    ],
+    "eslint_errors": 0,
+    "eslint_existing_warnings": 6,
+    "git_diff_check": "passed",
+    "live_pages": [
+      "/",
+      "/simple"
+    ]
+  },
+  "limits": [
+    "Browser writes were mocked; no real payments or customer messages were created.",
+    "No database or backend-function changes were required."
+  ],
+  "evidence_directory": "docs/production-readiness/evidence/payment-recovery-cleanup-20261018"
+}

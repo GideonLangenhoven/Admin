@@ -229,8 +229,10 @@ export async function proxy(req: NextRequest) {
   const ip = getClientIp(req);
   const isAuth =
     req.nextUrl.pathname.startsWith("/api/admin/login") ||
-    req.nextUrl.pathname.startsWith("/api/admin/setup-link");
-  const config = isAuth ? AUTH_LIMIT : API_LIMIT;
+    req.nextUrl.pathname.startsWith("/api/admin/setup-link") ||
+    req.nextUrl.pathname.startsWith("/api/guide/access");
+  const config = req.nextUrl.pathname.startsWith("/api/guide/access")
+    ? { ...AUTH_LIMIT, name: "guide-setup" } : isAuth ? AUTH_LIMIT : API_LIMIT;
 
   let result: RateLimitResult;
   try {

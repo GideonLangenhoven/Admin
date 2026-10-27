@@ -1,0 +1,247 @@
+{
+  "recorded_at": "2026-10-04T16:18:09.312434+00:00",
+  "scope": "local MCP release continuation; no deployment, SQL application or external enablement",
+  "source": {
+    "branch": "feature/simple-view-2026-09-20",
+    "commit": "43304b65314c2b9974f939304e7b2ebae0a62c0c"
+  },
+  "checks": {
+    "unit": {
+      "passed": 1988,
+      "skipped": 1,
+      "files": 123,
+      "mcp_backend_cases": 48
+    },
+    "focused_tests": {
+      "passed": 16
+    },
+    "lint": {
+      "files": 579,
+      "errors": 0,
+      "warnings": 259
+    },
+    "typescript": "passed after completing the current source snapshot",
+    "build": "passed; placeholder configuration and production email probe skipped",
+    "audit_full": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 7,
+      "critical": 0,
+      "total": 7
+    },
+    "audit_production_only": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    }
+  },
+  "boundary": "Synthetic identities/data and local PostgreSQL; no positive native Auth or real provider journey.",
+  "resolved_attempts": [
+    "Temporary source snapshot lacked an existing untracked BookingContact; copied current source, no application fix.",
+    "Whole-suite obsolete source-string assertion replaced by a behavioral read-only demo regression.",
+    "Initial regression assumed photo pages were hidden; corrected against the established demo policy.",
+    "Restricted network stalled package update; retried with scoped network approval."
+  ],
+  "live_observation": {
+    "admin_release": "dpl_5K9GzkGeVe3ChTZdCZdQWh7acw2n",
+    "status": "READY",
+    "mcp_url": "https://admin.bookingtours.co.za/api/mcp/chatgpt",
+    "head_status": 404,
+    "booking_project_branches": [
+      "main"
+    ],
+    "read_only": true
+  },
+  "staging_selection": {
+    "environment_type": "isolated staging with a synthetic business",
+    "owner_answer": "Isolated staging with a synthetic business (Recommended)",
+    "selected_on": "2026-10-04",
+    "project_reference": null,
+    "tester": null,
+    "synthetic_pilot_identifier": null,
+    "provisioned": false
+  },
+  "remaining": [
+    "Staging project reference/tester/synthetic pilot and restricted TLS gateway credential",
+    "Real catalog/RLS/ACL/pooler rehearsal and preservation of native permissions",
+    "Native Auth/consent and deployed external-token bypass checks",
+    "Actual HTTPS Inspector and ChatGPT link/read/refresh/disconnect/tool-selection tests",
+    "Unpatched build-tool advisory review and operational retention/release approval",
+    "Muse independent protocol/auth/onboarding and test access"
+  ],
+  "installation": {
+    "status": "applied; installed workspace checks passed",
+    "completed_at": "2026-10-04T17:01:48.620696+00:00",
+    "files": 17,
+    "backup_root": "/private/tmp/bookingtours-mcp-release-20261004/before",
+    "unrelated_authored_files_preserved": 1147,
+    "checks": [
+      {
+        "command": [
+          "npm",
+          "ci",
+          "--no-audit",
+          "--no-fund",
+          "--cache",
+          "/private/tmp/bookingtours-mcp-release-20261004/npm-cache"
+        ],
+        "exit_code": 0,
+        "log": "/private/tmp/bookingtours-mcp-release-20261004/npm-ci-installed.log",
+        "sha256": "4767ff998e9e21faac856cca655cf2f52ebc34ed5a7602004328e19ed0b114be"
+      },
+      {
+        "command": [
+          "npm",
+          "run",
+          "test:unit",
+          "--",
+          "tests/unit/runtime-dependency-floors.test.ts",
+          "tests/unit/demo-account-read-only.test.ts",
+          "tests/unit/admin-help-current-guide.test.ts"
+        ],
+        "exit_code": 0,
+        "log": "/private/tmp/bookingtours-mcp-release-20261004/focused-installed.log",
+        "sha256": "b1792cdc36eefee8f9dc0a16454e879827a8e12146edb94f8273d2592a8d8a1a"
+      },
+      {
+        "command": [
+          "npm",
+          "run",
+          "lint",
+          "--",
+          "--format",
+          "json"
+        ],
+        "exit_code": 0,
+        "log": "/private/tmp/bookingtours-mcp-release-20261004/lint-installed.json",
+        "sha256": "c69b35887897358f75ed86e1e24c5c6b6b8fb9b446735c43eecea3bb944fcc7e"
+      },
+      {
+        "command": [
+          "./node_modules/.bin/tsc",
+          "--noEmit",
+          "--incremental",
+          "false"
+        ],
+        "exit_code": 0,
+        "log": "/private/tmp/bookingtours-mcp-release-20261004/typescript-installed.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "exit_code": 0,
+        "log": "/private/tmp/bookingtours-mcp-release-20261004/diff-check-installed.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "lint_errors": 0,
+    "lint_warnings": 259,
+    "no_git_or_deploy": true
+  },
+  "files": [
+    {
+      "source": "/private/tmp/bookingtours-mcp-20261003/candidate/eslint.config.mjs",
+      "destination": "/Users/gideonlangenhoven/dev/capekayak/eslint.config.mjs",
+      "before_sha256": "152c42fe588dec0300d00c20ed6652bd8f50ddd9ec000c4b97ee579a941911e1",
+      "after_sha256": "ec86a54e3a0bab518a3681050ebbd036c8564b94b5379f7dec819d0fc8868877"
+    },
+    {
+      "source": "/private/tmp/bookingtours-mcp-20261003/candidate/package-lock.json",
+      "destination": "/Users/gideonlangenhoven/dev/capekayak/package-lock.json",
+      "before_sha256": "b81400e5ab4bae5ecb592bd1fef89dcdc1625f401a59cb96cee92e0d80421779",
+      "after_sha256": "16631fa3975cb05ce8df0a64a09d526744d5c17aee90099004f2f45f552ce388"
+    },
+    {
+      "source": "/private/tmp/bookingtours-mcp-20261003/candidate/tests/unit/runtime-dependency-floors.test.ts",
+      "destination": "/Users/gideonlangenhoven/dev/capekayak/tests/unit/runtime-dependency-floors.test.ts",
+      "before_sha256": "f5529961aeb92e5057095c9360e904973a4162e9122e4510259da0a716b90083",
+      "after_sha256": "9f3ef4e2e4a26d54d2dd15506b82b97fa6a90e5ad7848cce6e2c0b889358bc36"
+    },
+    {
+      "source": "/private/tmp/bookingtours-mcp-20261003/candidate/tests/unit/demo-account-read-only.test.ts",
+      "destination": "/Users/gideonlangenhoven/dev/capekayak/tests/unit/demo-account-read-only.test.ts",
+      "before_sha256": "20f3bd65cf9a3964045a920117c9adef8d43137967db8cd2a5b1835a94223143",
+      "after_sha256": "aa2f7c62a36cba4b9d26e0156b220be6d3d97f758ebc404f9578d7525910035e"
+    },
+    {
+      "source": "/private/tmp/bookingtours-mcp-20261003/candidate/tests/unit/admin-help-current-guide.test.ts",
+      "destination": "/Users/gideonlangenhoven/dev/capekayak/tests/unit/admin-help-current-guide.test.ts",
+      "before_sha256": "24f850e54d6a029bda53a6207dd015b55ff18dc321ebfc92ec1994d154e7e5b3",
+      "after_sha256": "9704929df916154b6b953fce11a735597b7a2910ccdbaada341f079f1627cba9"
+    },
+    {
+      "source": "/private/tmp/bookingtours-mcp-20261003/candidate/docs/ai/mcp-implementation.md",
+      "destination": "/Users/gideonlangenhoven/dev/capekayak/docs/ai/mcp-implementation.md",
+      "before_sha256": "bae7769123450c923ee47bf528016e62a006e1a38b6bbb5293da78cc625957ff",
+      "after_sha256": "b0aa7857bbcff2480ea84b693fa4486e7ea3d4336164fb0dfd842a246cab4b06"
+    },
+    {
+      "source": "/private/tmp/bookingtours-mcp-20261003/candidate/docs/ai/evidence/mcp-release-preparation-20261004/unit-final.log",
+      "destination": "/Users/gideonlangenhoven/dev/capekayak/docs/ai/evidence/mcp-release-preparation-20261004/unit-final.log",
+      "before_sha256": null,
+      "after_sha256": "31734854bff681b1a254bffff159e1f6a40cd1a5ff482af99dc28b152152288e"
+    },
+    {
+      "source": "/private/tmp/bookingtours-mcp-20261003/candidate/docs/ai/evidence/mcp-release-preparation-20261004/focused-final.log",
+      "destination": "/Users/gideonlangenhoven/dev/capekayak/docs/ai/evidence/mcp-release-preparation-20261004/focused-final.log",
+      "before_sha256": null,
+      "after_sha256": "42c4518c01cd553328722a57ccdfa75acc8614c8a2554e3da492a88ec931f16d"
+    },
+    {
+      "source": "/private/tmp/bookingtours-mcp-20261003/candidate/docs/ai/evidence/mcp-release-preparation-20261004/build-final.log",
+      "destination": "/Users/gideonlangenhoven/dev/capekayak/docs/ai/evidence/mcp-release-preparation-20261004/build-final.log",
+      "before_sha256": null,
+      "after_sha256": "8563b4822146aee9df6d9fdb9b4779c04acc3a040094ffb3d6b3f7ff397182d8"
+    },
+    {
+      "source": "/private/tmp/bookingtours-mcp-20261003/candidate/docs/ai/evidence/mcp-release-preparation-20261004/lint-final.json",
+      "destination": "/Users/gideonlangenhoven/dev/capekayak/docs/ai/evidence/mcp-release-preparation-20261004/lint-final.json",
+      "before_sha256": null,
+      "after_sha256": "8d78ada4366db72df2d25454e7b8becfb55b02da6d9ac097e8407c91af43e69d"
+    },
+    {
+      "source": "/private/tmp/bookingtours-mcp-20261003/candidate/docs/ai/evidence/mcp-release-preparation-20261004/audit-final.json",
+      "destination": "/Users/gideonlangenhoven/dev/capekayak/docs/ai/evidence/mcp-release-preparation-20261004/audit-final.json",
+      "before_sha256": null,
+      "after_sha256": "d453df7714dfb5c44d25d66acd2dc9d41284de825725cb899de7f1c9ba404228"
+    },
+    {
+      "source": "/private/tmp/bookingtours-mcp-20261003/candidate/docs/ai/evidence/mcp-release-preparation-20261004/audit-runtime.json",
+      "destination": "/Users/gideonlangenhoven/dev/capekayak/docs/ai/evidence/mcp-release-preparation-20261004/audit-runtime.json",
+      "before_sha256": null,
+      "after_sha256": "0d9e8d185426cfe297d0a7b8a5dea2fc4b054d1a52c9a0a29b95b7915a387a25"
+    },
+    {
+      "source": "/private/tmp/bookingtours-mcp-20261003/candidate/docs/ai/mcp-release-review-20261004.md",
+      "destination": "/Users/gideonlangenhoven/dev/capekayak/docs/ai/mcp-release-review-20261004.md",
+      "before_sha256": null,
+      "after_sha256": "64323b6494751cc63401b8e07ab179d0cbbdde57774b007697f156f1783908ab"
+    },
+    {
+      "source": "/private/tmp/bookingtours-mcp-release-20261004/connectors/SETUP.md",
+      "destination": "/Users/gideonlangenhoven/Connectors/SETUP.md",
+      "before_sha256": "11d49be2bcbaebfcf07033f82fb976d97502424e4e2a5e064a0ca12048f26e21",
+      "after_sha256": "3075d6a3e954041474d5bb8a013b3ad8ed81e7bcf38cf5ac4a66c44d0637f93c"
+    },
+    {
+      "source": "/private/tmp/bookingtours-mcp-release-20261004/connectors/README.md",
+      "destination": "/Users/gideonlangenhoven/Connectors/README.md",
+      "before_sha256": "0fb6e5df7fd41ac5f9a9c0e84da41ce1e66e6baa4c13eb938b00da34334789c8",
+      "after_sha256": "3f5e52179305046712a62d2934cc878f87e8ea53d8335168dacedef4469624a2"
+    },
+    {
+      "source": "/private/tmp/bookingtours-mcp-release-20261004/connectors/DECISIONS.md",
+      "destination": "/Users/gideonlangenhoven/Connectors/DECISIONS.md",
+      "before_sha256": "0bf81c4308e7e03f2fd5da5717a8cf9a6dd22932f169efcd0d6d9b60abdbb9ea",
+      "after_sha256": "8ce130d3b0bc59b27f47455a26fb450cdc451828160a9636f67200fb38b1ecb8"
+    }
+  ]
+}

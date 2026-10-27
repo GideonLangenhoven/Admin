@@ -32,6 +32,7 @@ export default function Refunds() {
   const [confirmState, setConfirmState] = useState<null | {
     title: string;
     message: string;
+    confirmLabel: string;
     tone: "danger" | "default";
     onConfirm: () => Promise<void>;
   }>(null);
@@ -206,10 +207,11 @@ export default function Refunds() {
     if (booking?.refund_status === "REFUND_PENDING") { void executeAutoRefund(id); return; }
     const isPartial = booking && amount < Number(booking.total_amount || 0);
     setConfirmState({
-      title: isPartial ? "Confirm partial automatic refund" : "Confirm automatic refund",
+      title: `Refund R${amount.toFixed(2)}?`,
       message: isPartial
-        ? `Submit a Yoco refund of R${amount.toFixed(2)} out of R${Number(booking?.total_amount || 0).toFixed(2)} paid? It may remain pending while the provider confirms it.`
-        : "Submit this refund? Card refunds may remain pending, and bank transfers remain in the queue until you confirm the transfer.",
+        ? `Partial refund from R${Number(booking?.total_amount || 0).toFixed(2)} paid. Card refunds may stay pending; bank transfers need confirmation.`
+        : "Card refunds may stay pending. Bank transfers need confirmation after payment.",
+      confirmLabel: "Submit refund",
       tone: "danger",
       onConfirm: async () => {
         setConfirmState(null);
@@ -223,10 +225,11 @@ export default function Refunds() {
     const amount = booking ? getRefundAmount(booking) : 0;
     const isPartial = booking && amount < Number(booking.total_amount || 0);
     setConfirmState({
-      title: isPartial ? "Confirm partial manual refund" : "Mark refund as processed",
+      title: "Confirm bank transfer",
       message: isPartial
-        ? `Only continue after transferring R${amount.toFixed(2)} out of R${Number(booking?.total_amount || 0).toFixed(2)} paid. Mark that bank transfer as completed?`
-        : "Only continue after the bank transfer has been made. Mark this refund as manually completed?",
+        ? `Confirm only after transferring R${amount.toFixed(2)} of R${Number(booking?.total_amount || 0).toFixed(2)} paid to the guest.`
+        : `Confirm only after transferring R${amount.toFixed(2)} to the guest.`,
+      confirmLabel: "Transfer completed",
       tone: "default",
       onConfirm: async () => {
         setConfirmState(null);
@@ -268,8 +271,9 @@ export default function Refunds() {
 
   function declineRefund(id: string) {
     setConfirmState({
-      title: "Decline refund request",
-      message: "Decline this refund request? The customer will be notified by email and no refund will be paid.",
+      title: "Decline this refund?",
+      message: "The guest will be emailed. No refund will be paid.",
+      confirmLabel: "Decline refund",
       tone: "danger",
       onConfirm: async () => {
         setConfirmState(null);
@@ -280,8 +284,9 @@ export default function Refunds() {
 
   function refundAll() {
     setConfirmState({
-      title: "Submit all refunds",
-      message: `Submit all ${refunds.length} queued refunds one at a time? Card refunds may remain pending and bank transfers still require confirmation. Keep this page open until every item has been submitted.`,
+      title: `Submit ${refunds.length} refunds?`,
+      message: "Keep this page open until submission finishes. Card refunds may stay pending; bank transfers still need confirmation.",
+      confirmLabel: "Submit all",
       tone: "danger",
       onConfirm: async () => {
         setConfirmState(null);
@@ -290,184 +295,136 @@ export default function Refunds() {
     });
   }
 
-  if (loading) return <div className="space-y-4 py-2"><div className="ui-skeleton h-8 w-48" /><div className="ui-skeleton h-[140px] !rounded-2xl" /><div className="ui-skeleton h-[320px] !rounded-2xl" /></div>;
+  if (loading) return <div className="space-y-4 py-2"><div className="ui-skeleton h-8 w-36" /><div className="ui-skeleton h-[320px] !rounded-xl" /></div>;
 
   const totalRefund = refunds.reduce((sum, b) => sum + Number(b.refund_amount || 0), 0);
+  const money = (amount: number) => `R${amount.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
-    <div className="max-w-4xl space-y-6">
-      <div className="anim-fade-up flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="ui-mono-label mb-2">Customers · Refunds</p>
-          <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Refund Queue</h2>
-          <p className="mt-2 text-[13px]" style={{ color: "var(--ck-text-muted)" }}>Review refund requests and follow payments through to completion.</p>
-        </div>
-        {refunds.length > 1 && (
-          <button data-demo-action="refund.all" disabled={!!processing} onClick={refundAll} className="ui-btn ui-btn-danger w-full sm:w-auto">
-            Submit All ({refunds.length})
-          </button>
-        )}
-      </div>
-
-      {refunds.length > 0 && (
-        <div className="anim-fade-up anim-d1 grid grid-cols-2 gap-3 sm:max-w-md">
-          <div className="ui-card p-4">
-            <div className="mb-2 flex items-center gap-2.5">
-              <span className="ui-mono-label !text-[10px]">Pending</span>
-            </div>
-            <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{refunds.length}</p>
-          </div>
-          <div className="ui-card p-4">
-            <div className="mb-2 flex items-center gap-2.5">
-              <span className="ui-mono-label !text-[10px]">To Refund</span>
-            </div>
-            <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{totalRefund.toLocaleString()}</p>
-          </div>
-        </div>
-      )}
+    <div className="max-w-5xl space-y-5">
+      <h2 className="text-2xl font-semibold" style={{ color: "var(--ck-text-strong)" }}>Refunds</h2>
 
       {refunds.length === 0 ? (
-        <div className="ui-card">
-          <div className="ui-empty">
-            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No pending refunds</p>
-            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Refund requests awaiting action will appear here.</p>
-          </div>
-        </div>
+        <div className="rounded-xl border px-4 py-8 text-sm" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-muted)" }}>No refunds waiting.</div>
       ) : (
-        <div className="anim-fade-up anim-d2 space-y-3">
-          {refunds.map((b: any) => {
-            const res = results[b.id];
-            const isProcessing = processing === b.id;
-            const actionInFlight = !!processing;
-            const resultLabel = res?.outcome === "completed" ? "Refund completed"
-              : res?.outcome === "pending" ? "Refund pending"
-                : res?.outcome === "manual_action" ? "Manual action required"
-                  : res?.outcome === "failed" ? "Refund failed"
-                    : res?.outcome === "unknown" ? "Refund outcome unknown"
-                      : "Not submitted";
-            const resultMessage = res?.message || res?.error || (res?.outcome === "unprocessed"
-              ? "This item has not been submitted. Keep this browser open while the queue runs."
-              : "Refresh the refund queue before taking another action.");
-            const resultStyle = res?.outcome === "completed"
-              ? { background: "var(--ck-success-soft)", color: "var(--ck-success)" }
-              : res?.outcome === "failed"
-                ? { background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }
-                : { background: "var(--ck-warning-soft)", color: "var(--ck-warning)" };
+        <section aria-label="Refund queue" className="overflow-hidden rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" }}>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
+            <p className="text-sm" style={{ color: "var(--ck-text)" }}>
+              <span className="font-semibold" style={{ color: "var(--ck-text-strong)" }}>{refunds.length} waiting</span>
+              <span className="ml-3 tabular-nums">{money(totalRefund)} requested</span>
+            </p>
+            {refunds.length > 1 && <button data-demo-action="refund.all" disabled={!!processing} onClick={refundAll} className="ui-btn ui-btn-ghost min-h-11 disabled:opacity-40">Submit all</button>}
+          </div>
+          <div className="divide-y divide-[var(--ck-border-subtle)]">
+            {refunds.map((b: any) => {
+              const res = results[b.id];
+              const isProcessing = processing === b.id;
+              const actionInFlight = !!processing;
+              const resultLabel = res?.outcome === "completed" ? "Refund completed"
+                : res?.outcome === "pending" ? "Refund pending"
+                  : res?.outcome === "manual_action" ? "Bank transfer needed"
+                    : res?.outcome === "failed" ? "Refund failed"
+                      : res?.outcome === "unknown" ? "Refund outcome unknown"
+                        : "Not submitted";
+              const resultMessage = res?.message || res?.error || (res?.outcome === "unprocessed"
+                ? "Not submitted yet. Keep this page open."
+                : "Refresh the queue before taking another action.");
+              const statusLabel = b.refund_status === "REFUND_PENDING" ? "Card refund pending"
+                : b.refund_status === "MANUAL_EFT_REQUIRED" ? "Bank transfer needed"
+                  : b.refund_status === "FAILED" ? "Refund failed" : "Requested";
 
-            return (
-              <div key={b.id} className="ui-card p-4">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                  <div className="flex-1">
-                    <p className="font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name} <span className="font-mono text-xs" style={{ color: "var(--ck-text-muted)" }}>({b.id.substring(0, 8).toUpperCase()})</span></p>
-                    <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>{b.tours?.name} · {b.slots?.start_time ? fmtTime(b.slots.start_time) : "-"} · {b.qty} pax</p>
-                    <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>{b.phone} · {b.email}</p>
-                    {b.cancellation_reason && <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>Reason: {b.cancellation_reason}</p>}
-                    {b.refund_status === "MANUAL_EFT_REQUIRED" && <p className="mt-1 text-xs" style={{ color: "var(--ck-warning)" }}>Awaiting bank transfer confirmation</p>}
-                  </div>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <div className="sm:text-right">
-                      <div className="flex items-center gap-1 sm:justify-end">
-                        <span className="text-lg font-bold" style={{ color: "var(--ck-danger)" }}>R</span>
+              return (
+                <article key={b.id} className="p-4 sm:p-5">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 md:grid-cols-[minmax(0,1fr)_10rem_11rem] md:items-start md:gap-x-6">
+                    <div className="min-w-0">
+                      <h3 className="break-words text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "Guest"}</h3>
+                      <p className="mt-1 text-sm" style={{ color: "var(--ck-text)" }}>{b.tours?.name || "Booking"}</p>
+                      <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.slots?.start_time ? fmtTime(b.slots.start_time) : "No departure date"} · {b.qty} {b.qty === 1 ? "guest" : "guests"}</p>
+                      <p className="mt-2 text-xs" style={{ color: "var(--ck-text-muted)" }}>Booking {b.id.substring(0, 8).toUpperCase()}</p>
+                      <p className="mt-2 text-xs font-medium" style={{ color: b.refund_status === "FAILED" ? "var(--ck-danger)" : "var(--ck-text)" }}>{statusLabel}</p>
+                    </div>
+                    <div className="w-32 md:w-auto">
+                      <label htmlFor={`refund-${b.id}`} className="mb-1 block text-xs" style={{ color: "var(--ck-text-muted)" }}>Refund amount</label>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: "var(--ck-text-muted)" }}>R</span>
                         <input
+                          id={`refund-${b.id}`}
                           type="number"
+                          inputMode="decimal"
                           step="0.01"
                           min="0"
                           max={Number(b.total_captured || b.total_amount || 0)}
                           disabled={actionInFlight || ["REFUND_PENDING", "MANUAL_EFT_REQUIRED"].includes(b.refund_status)}
-                          aria-label="Refund amount"
                           value={editedAmounts[b.id] !== undefined ? editedAmounts[b.id] : String(b.refund_amount || 0)}
                           onChange={e => setEditedAmounts({ ...editedAmounts, [b.id]: e.target.value })}
-                          className="ui-control w-28 px-2 py-1 text-right text-2xl font-bold tabular-nums"
-                          style={{ color: "var(--ck-danger)", background: "var(--ck-danger-soft)" }}
+                          className="ui-control min-h-11 w-full !pl-7 !pr-2 text-right text-base font-semibold tabular-nums"
                         />
                       </div>
-                      {Number(b.total_amount || 0) > 0 && (
-                        <p className="mt-1 text-[11px]" style={{ color: "var(--ck-text-muted)" }}>
-                          of R{Number(b.total_amount).toFixed(2)} paid
-                          {editedAmounts[b.id] !== undefined && parseFloat(editedAmounts[b.id]) < Number(b.total_amount) && (
-                            <span className="ml-1 font-medium" style={{ color: "var(--ck-warning)" }}>(partial)</span>
-                          )}
-                        </p>
-                      )}
-                      <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.refund_notes}</p>
+                      {Number(b.total_amount || 0) > 0 && <p className="mt-1 text-right text-xs tabular-nums" style={{ color: "var(--ck-text-muted)" }}>of {money(Number(b.total_amount))}</p>}
                     </div>
-                    <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-col">
-                      {b.refund_status !== "MANUAL_EFT_REQUIRED" && (
-                        <button data-demo-action={b.refund_status === "REFUND_PENDING" ? "refund.check" : "refund.process"} onClick={() => autoRefund(b.id)} disabled={actionInFlight}
-                          className="ui-btn ui-btn-danger whitespace-nowrap disabled:opacity-40">
-                          {isProcessing ? "Submitting..." : b.refund_status === "REFUND_PENDING" ? "Check status" : "Submit refund"}
-                        </button>
-                      )}
-                      {b.refund_status === "MANUAL_EFT_REQUIRED" && <button data-demo-action="refund.manual" onClick={() => manualRefund(b.id)} disabled={actionInFlight}
-                        className="ui-btn ui-btn-ghost whitespace-nowrap disabled:opacity-40">
-                        Confirm bank transfer
+                    <div className="col-span-2 flex items-center gap-2 border-t pt-3 md:col-span-1 md:flex-col md:items-stretch md:border-0 md:pt-0" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                      {b.refund_status !== "MANUAL_EFT_REQUIRED" && <button data-demo-action={b.refund_status === "REFUND_PENDING" ? "refund.check" : "refund.process"} onClick={() => autoRefund(b.id)} disabled={actionInFlight} className="ui-btn ui-btn-primary min-h-11 flex-1 whitespace-nowrap disabled:opacity-40">
+                        {isProcessing ? "Submitting…" : b.refund_status === "REFUND_PENDING" ? "Check status" : "Submit refund"}
                       </button>}
-                      <button data-demo-action="refund.decline" onClick={() => declineRefund(b.id)} disabled={actionInFlight || !["REQUESTED", "FAILED"].includes(b.refund_status)}
-                        className="ui-btn ui-btn-ghost whitespace-nowrap disabled:opacity-40" style={{ color: "var(--ck-text-muted)" }}>
-                        Decline
-                      </button>
+                      {b.refund_status === "MANUAL_EFT_REQUIRED" && <button data-demo-action="refund.manual" onClick={() => manualRefund(b.id)} disabled={actionInFlight} className="ui-btn ui-btn-primary min-h-11 flex-1 whitespace-nowrap disabled:opacity-40">Confirm transfer</button>}
+                      {["REQUESTED", "FAILED"].includes(b.refund_status) && <button data-demo-action="refund.decline" onClick={() => declineRefund(b.id)} disabled={actionInFlight} className="ui-btn ui-btn-ghost min-h-11 whitespace-nowrap disabled:opacity-40">Decline</button>}
                     </div>
                   </div>
-                </div>
-                {res && (
-                  <div role={res.outcome === "failed" || res.outcome === "unknown" ? "alert" : "status"} className="mt-3 rounded-lg p-3 text-sm" style={resultStyle}>
-                    <span className="font-semibold">{resultLabel}.</span> {resultMessage}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  {(b.cancellation_reason || b.refund_notes) && <details className="mt-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                    <summary className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 font-medium"><CaretDown size={12} aria-hidden="true" />Details</summary>
+                    <div className="max-w-prose space-y-1 pb-1">
+                      {b.cancellation_reason && <p>{b.cancellation_reason}</p>}
+                      {b.refund_notes && <p>{b.refund_notes}</p>}
+                    </div>
+                  </details>}
+                  {res && <div role={res.outcome === "failed" || res.outcome === "unknown" ? "alert" : "status"} className="mt-3 text-sm" style={{ color: res.outcome === "failed" || res.outcome === "unknown" ? "var(--ck-danger)" : "var(--ck-text)" }}>
+                    <span className="font-medium">{resultLabel}.</span> {resultMessage}
+                  </div>}
+                </article>
+              );
+            })}
+          </div>
+        </section>
       )}
 
-      {/* Processed refunds */}
-      <div className="pt-4">
-        <button onClick={() => setShowProcessed(!showProcessed)}
-          className="flex items-center gap-1.5 text-sm font-medium transition-colors" style={{ color: "var(--ck-text-muted)" }}>
-          {showProcessed ? <CaretDown size={13} weight="bold" /> : <CaretRight size={13} weight="bold" />} Processed Refunds ({processed.length})
+      <section>
+        <button type="button" onClick={() => setShowProcessed(!showProcessed)} aria-expanded={showProcessed} aria-controls="refund-history" className="flex min-h-11 items-center gap-2 text-sm font-medium" style={{ color: "var(--ck-text)" }}>
+          {showProcessed ? <CaretDown size={14} aria-hidden="true" /> : <CaretRight size={14} aria-hidden="true" />} Recent activity <span style={{ color: "var(--ck-text-muted)" }}>{processed.length}</span>
         </button>
-        {showProcessed && (
-          <div className="mt-3 space-y-2">
-            {processed.map((b: any) => (
-              <div key={b.id} className="flex flex-col gap-2 rounded-xl p-3 sm:flex-row sm:items-center" style={{ background: "var(--ck-surface-sunken)" }}>
-                <div className="flex-1">
-                  <p className="text-sm font-medium" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name} <span className="font-mono text-xs" style={{ color: "var(--ck-text-muted)" }}>({b.id.substring(0, 8).toUpperCase()})</span></p>
-                  <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.tours?.name} · {b.slots?.start_time ? fmtTime(b.slots.start_time) : "-"}</p>
-                </div>
-                <span className={"ui-status " + (b.refund_status === "PROCESSED" || b.refund_status === "REFUNDED" ? "ui-pill-success" : b.refund_status === "DECLINED" ? "ui-pill-neutral" : "ui-pill-danger")}>
-                  {b.refund_status === "PROCESSED" || b.refund_status === "REFUNDED" ? "Refunded" : b.refund_status === "DECLINED" ? "Declined" : "Failed"}
-                </span>
-                <p className="text-sm font-semibold tabular-nums" style={{ color: "var(--ck-text)" }}>R{b.refund_amount}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {confirmState && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="ui-card w-full max-w-md p-6" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
-            <h3 className="text-[17px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{confirmState.title}</h3>
-            <p className="mt-2 text-sm" style={{ color: "var(--ck-text)" }}>{confirmState.message}</p>
-            <div className="mt-6 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setConfirmState(null)}
-                className="ui-btn ui-btn-ghost"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => { if (confirmState) void confirmState.onConfirm(); }}
-                className={`ui-btn ${confirmState?.tone === "danger" ? "ui-btn-danger" : "ui-btn-primary"}`}
-              >
-                Confirm
-              </button>
+        {showProcessed && <div id="refund-history" className="mt-2 divide-y divide-[var(--ck-border-subtle)] rounded-xl border px-4" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" }}>
+          {processed.length === 0 && <p className="py-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>No recent refunds.</p>}
+          {processed.map((b: any) => <div key={b.id} className="flex flex-wrap items-center justify-between gap-3 py-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "Guest"}</p>
+              <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.tours?.name} · {b.slots?.start_time ? fmtTime(b.slots.start_time) : "No departure date"}</p>
+              <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>Booking {b.id.substring(0, 8).toUpperCase()}</p>
             </div>
+            <div className="text-right">
+              <p className="text-sm font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{money(Number(b.refund_amount || 0))}</p>
+              <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.refund_status === "PROCESSED" || b.refund_status === "REFUNDED" ? "Refunded" : b.refund_status === "DECLINED" ? "Declined" : "Failed"}</p>
+            </div>
+          </div>)}
+        </div>}
+      </section>
+
+      {confirmState && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={event => { if (event.target === event.currentTarget) setConfirmState(null); }}>
+        <div role="dialog" aria-modal="true" aria-labelledby="refund-confirm-title" className="ui-card max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto p-5" onKeyDown={event => {
+          if (event.key === "Escape") setConfirmState(null);
+          if (event.key === "Tab") {
+            const buttons = event.currentTarget.querySelectorAll("button");
+            const first = buttons[0], last = buttons[buttons.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+          }
+        }}>
+          <h3 id="refund-confirm-title" className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>{confirmState.title}</h3>
+          <p className="mt-2 text-sm" style={{ color: "var(--ck-text)" }}>{confirmState.message}</p>
+          <div className="mt-5 flex items-center justify-end gap-2">
+            <button type="button" autoFocus onClick={() => setConfirmState(null)} className="ui-btn ui-btn-ghost min-h-11">Cancel</button>
+            <button type="button" onClick={() => { if (confirmState) void confirmState.onConfirm(); }} className={`ui-btn min-h-11 ${confirmState.tone === "danger" ? "ui-btn-danger" : "ui-btn-primary"}`}>{confirmState.confirmLabel}</button>
           </div>
         </div>
-      )}
+      </div>}
     </div>
   );
 }

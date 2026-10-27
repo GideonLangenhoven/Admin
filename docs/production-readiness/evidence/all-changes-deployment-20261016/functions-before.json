@@ -1,0 +1,344 @@
+[
+  {
+    "slug": "wa-webhook",
+    "version": 239,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "wa-send",
+    "version": 85,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "yoco-webhook",
+    "version": 133,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "weather-cancel",
+    "version": 89,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "admin-reply",
+    "version": 107,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "create-checkout",
+    "version": 106,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "web-chat",
+    "version": 151,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "auto-messages",
+    "version": 98,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "broadcast",
+    "version": 84,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "process-refund",
+    "version": 88,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "send-whatsapp-text",
+    "version": 78,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "send-email",
+    "version": 188,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "rebook-booking",
+    "version": 97,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "manual-mark-paid",
+    "version": 81,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "send-invoice",
+    "version": 78,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "external-booking",
+    "version": 71,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "cron-tasks",
+    "version": 83,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "super-admin-onboard",
+    "version": 72,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "waiver-form",
+    "version": 72,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "confirm-booking",
+    "version": 79,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "batch-refund",
+    "version": 50,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "generate-invite-token",
+    "version": 52,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "debug-logs",
+    "version": 46,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "marketing-dispatch",
+    "version": 64,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "marketing-track",
+    "version": 40,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "marketing-unsubscribe",
+    "version": 45,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "marketing-automation-dispatch",
+    "version": 58,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "create-paysafe-checkout",
+    "version": 49,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "paysafe-webhook",
+    "version": 44,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "send-otp",
+    "version": 51,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "cancel-booking",
+    "version": 40,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "google-drive",
+    "version": 37,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "bank-details",
+    "version": 28,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "send-trip-photos",
+    "version": 27,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "fetch-google-reviews",
+    "version": 25,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "viator-webhook",
+    "version": 34,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "viator-availability-sync",
+    "version": 28,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "getyourguide-webhook",
+    "version": 29,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "getyourguide-availability-sync",
+    "version": 28,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "ota-reconcile",
+    "version": 27,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "my-bookings-lookup",
+    "version": 28,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "hold-expiry",
+    "version": 17,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "cron-jobs",
+    "version": 17,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "payfast-itn",
+    "version": 18,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "reminder-scheduler",
+    "version": 16,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "outbox-send",
+    "version": 15,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "kb-sync",
+    "version": 14,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "admin-help-chat",
+    "version": 26,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "platform-bank-details",
+    "version": 12,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "platform-invoice-checkout",
+    "version": 12,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "platform-invoice-webhook",
+    "version": 12,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "combo-settlement-link",
+    "version": 12,
+    "verify_jwt": true,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "billing-enforcement",
+    "version": 11,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "onboarding-wizard",
+    "version": 11,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "booking-success",
+    "version": 8,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "resend-webhook",
+    "version": 1,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  },
+  {
+    "slug": "marketing-setup-status",
+    "version": 1,
+    "verify_jwt": false,
+    "status": "ACTIVE"
+  }
+]

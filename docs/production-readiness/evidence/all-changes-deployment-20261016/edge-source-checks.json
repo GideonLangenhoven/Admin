@@ -1,0 +1,152 @@
+[
+  {
+    "slug": "admin-help-chat",
+    "path": "supabase/functions/admin-help-chat/index.ts",
+    "sha256": "71c3c99c47c0ba10900d094a593375358b11dd0cf9164cea1cf1aacc34cc9c81"
+  },
+  {
+    "slug": "admin-help-chat",
+    "path": "supabase/functions/_shared/tenant.ts",
+    "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+  },
+  {
+    "slug": "admin-help-chat",
+    "path": "supabase/functions/_shared/pagination.ts",
+    "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+  },
+  {
+    "slug": "admin-help-chat",
+    "path": "supabase/functions/_shared/auth.ts",
+    "sha256": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade"
+  },
+  {
+    "slug": "admin-help-chat",
+    "path": "supabase/functions/_shared/llm.ts",
+    "sha256": "e7bed1f1ed96a04d6b326ee3580fc6550c37821b19d2618321f4d4be9b3c85c1"
+  },
+  {
+    "slug": "admin-help-chat",
+    "path": "supabase/functions/_shared/openrouter-provider.ts",
+    "sha256": "52aa270a8467d6476d17a8881a4fe29ced09b52cdb44b4bec9e05246af202cd8"
+  },
+  {
+    "slug": "admin-help-chat",
+    "path": "supabase/functions/_shared/kb.ts",
+    "sha256": "5d89feee2c9ef467716d48625b112ecb86b81b84679e48c7a22da42a5f88b68d"
+  },
+  {
+    "slug": "admin-help-chat",
+    "path": "supabase/functions/_shared/demo-guide.ts",
+    "sha256": "f9d714820fd3340ad1dc00a680be2e7207f9feeb0d44f98cd9344b954d666c49"
+  },
+  {
+    "slug": "bank-details",
+    "path": "supabase/functions/bank-details/index.ts",
+    "sha256": "be7952ed4c8e2db88f5fbf6709a209352d07273e24cb3e1a5e56d018e7d3824c"
+  },
+  {
+    "slug": "onboarding-wizard",
+    "path": "supabase/functions/onboarding-wizard/index.ts",
+    "sha256": "4d5f43b8ac0600d8fdcbd4bef0ab48fa98131e5f61b724fcfb275319985c6d78"
+  },
+  {
+    "slug": "onboarding-wizard",
+    "path": "supabase/functions/_shared/otp-attempts.ts",
+    "sha256": "b07091d7a9756290d4adef429c355fd4ac5cd6f226a1fb02fcf657b21d5b2834"
+  },
+  {
+    "slug": "onboarding-wizard",
+    "path": "supabase/functions/_shared/slot-generation.ts",
+    "sha256": "43ab7b189a834d701007e67a3d25148c8c4c494e4a0312300eb5b6cb08e6f7bf"
+  },
+  {
+    "slug": "onboarding-wizard",
+    "path": "supabase/functions/_shared/onboarding-guards.ts",
+    "sha256": "00a6e133fcd90d5527d5c9a9830e96049a3710a547c64c57ffc9a32d89e99664"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/web-chat/index.ts",
+    "sha256": "566c246d1b6bf4fc1d66d080657e436f13c853ed57ac30f8ce82340e3daf4644"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/sentry.ts",
+    "sha256": "cf5cad26d7ddb3a103a60d658dab85fa647d98e574d5ddb44ab83700c915bafb"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/duration.ts",
+    "sha256": "4f6eb2b814536b6066378deb29002e829e4784ff09e26245009ea76aee22626c"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/tenant.ts",
+    "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/pagination.ts",
+    "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/bot-guards.ts",
+    "sha256": "a6b4c6961536772ca33061f581a6660e82bd85f8fea840dd785c630a8ff77937"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/intent.ts",
+    "sha256": "7145715b15c90fe49ca1986bda5b1f5806539ee7ca6063cadc029044fbb9f0f4"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/subscription.ts",
+    "sha256": "6d8af89fb9e7f48e9b06024b3fa4396bca41fa58ea2265753032222c71060e14"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/booking-custom-fields.ts",
+    "sha256": "3ec06c7dceb92fb96c17fce49e87752af04bf62f59c628b4230be6fcfa90e277"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/chat-booking-pricing.ts",
+    "sha256": "f936f6c6a1c43cd6fe932d02697e04d02575273685886b68dbd646d1b9163d80"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/chat-contact.ts",
+    "sha256": "7da516d1acd7766f66e7e78cda8e657b5a73ed760be80577b45f8a07dcf0e36e"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/platform-invariants.ts",
+    "sha256": "79654892dfbe8e52a93ab7bf7a5d5189ecb74747fe3751470579c77bf47ea22f"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/llm.ts",
+    "sha256": "e7bed1f1ed96a04d6b326ee3580fc6550c37821b19d2618321f4d4be9b3c85c1"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/openrouter-provider.ts",
+    "sha256": "52aa270a8467d6476d17a8881a4fe29ced09b52cdb44b4bec9e05246af202cd8"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/kb.ts",
+    "sha256": "5d89feee2c9ef467716d48625b112ecb86b81b84679e48c7a22da42a5f88b68d"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/customer-session.ts",
+    "sha256": "d0a7724dd8efff914e0040a3571813566a71b0d9ac954ea8debd2aaefc560750"
+  },
+  {
+    "slug": "web-chat",
+    "path": "supabase/functions/_shared/web-chat-session.ts",
+    "sha256": "d2b3fe2717fe367bcf307380f5806d44b39ed9c07c7c871d3a0372d7d71c11d2"
+  }
+]

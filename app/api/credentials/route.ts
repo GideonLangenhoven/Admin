@@ -55,9 +55,16 @@ export async function POST(req: NextRequest) {
 
     let body: any;
     try { body = await req.json(); } catch { return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 }); }
-    const { business_id, section, wa_token, wa_phone_id, yoco_secret_key, yoco_webhook_secret, yoco_test_secret_key, yoco_test_webhook_secret, yoco_test_mode } = body;
+    if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    const { business_id, section, action, wa_token, wa_phone_id, yoco_secret_key, yoco_webhook_secret, yoco_test_secret_key, yoco_test_webhook_secret, yoco_test_mode } = body;
     if (!business_id) return NextResponse.json({ error: "business_id is required" }, { status: 400 });
     if (!section) return NextResponse.json({ error: "section is required ('wa', 'yoco', or 'yoco_test')" }, { status: 400 });
+    if (action !== undefined && action !== "clear") {
+        return NextResponse.json({ error: "Invalid credential action." }, { status: 400 });
+    }
+    if (action === "clear" && !["wa", "yoco", "yoco_test"].includes(section)) {
+        return NextResponse.json({ error: "Invalid section to remove." }, { status: 400 });
+    }
 
     const selectedTarget = req.headers.get("x-admin-business-id")?.trim() || "";
     if (caller.role === "SUPER_ADMIN") {
@@ -81,6 +88,16 @@ export async function POST(req: NextRequest) {
         expectedActorId: caller.id,
     });
     if (!mfa.ok) return NextResponse.json({ error: mfa.message, code: mfa.code }, { status: mfa.status });
+
+    if (action === "clear") {
+        const { error } = await supabase.rpc("clear_sensitive_credentials_audited", {
+            p_business_id: business_id,
+            p_actor_id: caller.id,
+            p_section: section,
+        });
+        if (error) return NextResponse.json({ error: "Failed to remove configuration. Try again." }, { status: 500 });
+        return NextResponse.json({ ok: true });
+    }
 
     const encryptionKey = process.env.SETTINGS_ENCRYPTION_KEY;
     if (!encryptionKey || encryptionKey.length < 32) {

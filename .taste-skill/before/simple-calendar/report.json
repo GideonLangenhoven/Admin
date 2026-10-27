@@ -1,0 +1,1587 @@
+{
+ "url": "http://127.0.0.1:3000/simple/calendar?demo=1",
+ "at": "2026-10-27T14:35:55.283Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 1439,
+   "height": 899,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.18
+   ],
+   "motion": {
+    "elements": 3,
+    "css": 2,
+    "transitions": 1,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1439,
+     "h": 899
+    },
+    "page": {
+     "height": 899,
+     "screens": 1,
+     "words": 30,
+     "img": 1,
+     "video": 0,
+     "canvas": 0,
+     "svg": 0,
+     "sections": 0,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "BookingTours",
+     "words": 1,
+     "chars": 12,
+     "lines": 1,
+     "size": 26,
+     "vw": 1.8,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1.5,
+     "top": 297,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "BookingTours",
+     "words": 1,
+     "lines": 1,
+     "size": 26,
+     "font": "satoshi"
+    },
+    "headings": [],
+    "headingSummary": {
+     "count": 0,
+     "maxLines": 0,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 0.76,
+       "mono": false
+      },
+      {
+       "family": "Geist Mono",
+       "share": 0.17,
+       "mono": true
+      },
+      {
+       "family": "satoshi",
+       "share": 0.07,
+       "mono": false
+      }
+     ],
+     "familyCount": 3,
+     "sizes": [
+      10,
+      12,
+      14,
+      26
+     ],
+     "sizeCount": 4,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 26,
+      "vw": 1.8,
+      "font": "satoshi",
+      "text": "BookingTours"
+     },
+     "monoShare": 0.17,
+     "monoProseShare": 0.17,
+     "monoFamilies": [
+      "Geist Mono"
+     ],
+     "monoSamples": [
+      "Built for adventure operators"
+     ],
+     "microLabels": 1,
+     "microLabelShare": 0.169,
+     "microSamples": [
+      "Built for adventure operators"
+     ],
+     "upperShare": 0.17,
+     "centerShare": 0.79,
+     "smallText": 3
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [],
+     "textColors": [
+      {
+       "color": "#66736b",
+       "share": 0.58
+      },
+      {
+       "color": "#46534b",
+       "share": 0.21
+      },
+      {
+       "color": "#c6453a",
+       "share": 0.1
+      },
+      {
+       "color": "#17221c",
+       "share": 0.07
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.04
+      }
+     ],
+     "button": {
+      "bg": "#176b4b",
+      "hsl": {
+       "h": 157,
+       "s": 0.65,
+       "l": 0.25
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 1,
+     "inHero": 1,
+     "radius": 12,
+     "height": 44,
+     "withShadow": 1,
+     "withGradient": 1,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Sign In"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 2,
+     "shadowOverlay": 0,
+     "shadowSamples": [
+      "div.ui-card.relative → rgba(15, 43, 31, 0.06) 0px 4px 10px 0px, rgba(15, 43, 31, 0.2) 0px 28px 56px -20",
+      "button.ui-btn.ui-btn-primary → rgba(255, 255, 255, 0.16) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.28) 0px 1px "
+     ],
+     "gradients": 1,
+     "scrims": 0,
+     "gradientSamples": [
+      "div.ui-card.relative → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)"
+     ],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 1,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 1,
+     "boxRadius": 16,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": null,
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "geist mono",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 1439,
+     "h": 899
+    },
+    "pageH": 899,
+    "margins": {
+     "left": 561,
+     "right": 561
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "BookingTours",
+      "size": 26,
+      "top": 297,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [],
+    "leftBlocks": 0,
+    "bodySize": 16,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0.33,
+    "voidBox": {
+     "x": 0,
+     "y": 120,
+     "w": 540,
+     "h": 779
+    }
+   },
+   "app": {
+    "viewport": {
+     "w": 1439,
+     "h": 899
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": null,
+    "topbar": null,
+    "canvas": {
+     "left": 561,
+     "right": 561
+    },
+    "hero": {
+     "text": "BookingTours",
+     "words": 1,
+     "chars": 12,
+     "lines": 1,
+     "size": 26,
+     "vw": 1.8,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1.5,
+     "top": 297,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 1,
+     "firstScreen": 1,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 1,
+     "radii": [
+      [
+       16,
+       1
+      ]
+     ],
+     "heavyBorders": 1,
+     "borderSamples": [
+      "#0b2c21 on #f7f5f0 (13.8:1)"
+     ],
+     "heavyShadows": 1,
+     "softShadows": 1,
+     "shadowSamples": [
+      "rgba(15, 43, 31, 0.2) 0px 28px 56px -20px"
+     ],
+     "glass": 0
+    },
+    "chips": {
+     "count": 0,
+     "hues": 0,
+     "samples": []
+    },
+    "numbers": {
+     "cells": 0,
+     "leftAligned": 0,
+     "figures": 0,
+     "tabularShare": null,
+     "kpiMax": null
+    },
+    "rows": null,
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.38,
+     "tiny": 1,
+     "tinySamples": [
+      "Built for adventure oper 10px"
+     ],
+     "sizes": [
+      10,
+      12,
+      14,
+      26
+     ]
+    },
+    "title": {
+     "text": "BookingTours",
+     "size": 26,
+     "top": 297
+    },
+    "colourShare": 0.016
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 1024,
+   "height": 768,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.31
+   ],
+   "motion": {
+    "elements": 3,
+    "css": 2,
+    "transitions": 1,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1024,
+     "h": 768
+    },
+    "page": {
+     "height": 768,
+     "screens": 1,
+     "words": 30,
+     "img": 1,
+     "video": 0,
+     "canvas": 0,
+     "svg": 0,
+     "sections": 0,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "BookingTours",
+     "words": 1,
+     "chars": 12,
+     "lines": 1,
+     "size": 26,
+     "vw": 2.5,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1.5,
+     "top": 232,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "BookingTours",
+     "words": 1,
+     "lines": 1,
+     "size": 26,
+     "font": "satoshi"
+    },
+    "headings": [
+     {
+      "text": "BookingTours",
+      "words": 1,
+      "chars": 12,
+      "lines": 1,
+      "size": 26,
+      "vw": 2.5,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.025,
+      "leading": 1.5,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.15,
+      "top": 232,
+      "tag": "h1",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 1,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 0.76,
+       "mono": false
+      },
+      {
+       "family": "Geist Mono",
+       "share": 0.17,
+       "mono": true
+      },
+      {
+       "family": "satoshi",
+       "share": 0.07,
+       "mono": false
+      }
+     ],
+     "familyCount": 3,
+     "sizes": [
+      10,
+      12,
+      14,
+      26
+     ],
+     "sizeCount": 4,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 26,
+      "vw": 2.5,
+      "font": "satoshi",
+      "text": "BookingTours"
+     },
+     "monoShare": 0.17,
+     "monoProseShare": 0.17,
+     "monoFamilies": [
+      "Geist Mono"
+     ],
+     "monoSamples": [
+      "Built for adventure operators"
+     ],
+     "microLabels": 1,
+     "microLabelShare": 0.169,
+     "microSamples": [
+      "Built for adventure operators"
+     ],
+     "upperShare": 0.17,
+     "centerShare": 0.79,
+     "smallText": 3
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [],
+     "textColors": [
+      {
+       "color": "#66736b",
+       "share": 0.58
+      },
+      {
+       "color": "#46534b",
+       "share": 0.21
+      },
+      {
+       "color": "#c6453a",
+       "share": 0.1
+      },
+      {
+       "color": "#17221c",
+       "share": 0.07
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.04
+      }
+     ],
+     "button": {
+      "bg": "#176b4b",
+      "hsl": {
+       "h": 157,
+       "s": 0.65,
+       "l": 0.25
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 1,
+     "inHero": 1,
+     "radius": 12,
+     "height": 44,
+     "withShadow": 1,
+     "withGradient": 1,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Sign In"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 2,
+     "shadowOverlay": 0,
+     "shadowSamples": [
+      "div.ui-card.relative → rgba(15, 43, 31, 0.06) 0px 4px 10px 0px, rgba(15, 43, 31, 0.2) 0px 28px 56px -20",
+      "button.ui-btn.ui-btn-primary → rgba(255, 255, 255, 0.16) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.28) 0px 1px "
+     ],
+     "gradients": 1,
+     "scrims": 0,
+     "gradientSamples": [
+      "div.ui-card.relative → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)"
+     ],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 1,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 1,
+     "boxRadius": 16,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": null,
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "geist mono",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 1024,
+     "h": 768
+    },
+    "pageH": 768,
+    "margins": {
+     "left": 353,
+     "right": 353
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "BookingTours",
+      "size": 26,
+      "top": 232,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [],
+    "leftBlocks": 0,
+    "bodySize": 16,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0.29,
+    "voidBox": {
+     "x": 0,
+     "y": 102,
+     "w": 341,
+     "h": 666
+    }
+   },
+   "app": {
+    "viewport": {
+     "w": 1024,
+     "h": 768
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": null,
+    "topbar": null,
+    "canvas": {
+     "left": 353,
+     "right": 353
+    },
+    "hero": {
+     "text": "BookingTours",
+     "words": 1,
+     "chars": 12,
+     "lines": 1,
+     "size": 26,
+     "vw": 2.5,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1.5,
+     "top": 232,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 1,
+     "firstScreen": 1,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 1,
+     "radii": [
+      [
+       16,
+       1
+      ]
+     ],
+     "heavyBorders": 1,
+     "borderSamples": [
+      "#0b2c21 on #f7f5f0 (13.8:1)"
+     ],
+     "heavyShadows": 1,
+     "softShadows": 1,
+     "shadowSamples": [
+      "rgba(15, 43, 31, 0.2) 0px 28px 56px -20px"
+     ],
+     "glass": 0
+    },
+    "chips": {
+     "count": 0,
+     "hues": 0,
+     "samples": []
+    },
+    "numbers": {
+     "cells": 0,
+     "leftAligned": 0,
+     "figures": 0,
+     "tabularShare": null,
+     "kpiMax": null
+    },
+    "rows": null,
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.38,
+     "tiny": 1,
+     "tinySamples": [
+      "Built for adventure oper 10px"
+     ],
+     "sizes": [
+      10,
+      12,
+      14,
+      26
+     ]
+    },
+    "title": {
+     "text": "BookingTours",
+     "size": 26,
+     "top": 232
+    },
+    "colourShare": 0.025
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 768,
+   "height": 1024,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.3
+   ],
+   "motion": {
+    "elements": 3,
+    "css": 2,
+    "transitions": 1,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "page": {
+     "height": 1024,
+     "screens": 1,
+     "words": 30,
+     "img": 1,
+     "video": 0,
+     "canvas": 0,
+     "svg": 0,
+     "sections": 0,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "BookingTours",
+     "words": 1,
+     "chars": 12,
+     "lines": 1,
+     "size": 26,
+     "vw": 3.4,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1.5,
+     "top": 360,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "BookingTours",
+     "words": 1,
+     "lines": 1,
+     "size": 26,
+     "font": "satoshi"
+    },
+    "headings": [
+     {
+      "text": "BookingTours",
+      "words": 1,
+      "chars": 12,
+      "lines": 1,
+      "size": 26,
+      "vw": 3.4,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.025,
+      "leading": 1.5,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.2,
+      "top": 360,
+      "tag": "h1",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 1,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 0.76,
+       "mono": false
+      },
+      {
+       "family": "Geist Mono",
+       "share": 0.17,
+       "mono": true
+      },
+      {
+       "family": "satoshi",
+       "share": 0.07,
+       "mono": false
+      }
+     ],
+     "familyCount": 3,
+     "sizes": [
+      10,
+      12,
+      14,
+      26
+     ],
+     "sizeCount": 4,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 26,
+      "vw": 3.4,
+      "font": "satoshi",
+      "text": "BookingTours"
+     },
+     "monoShare": 0.17,
+     "monoProseShare": 0.17,
+     "monoFamilies": [
+      "Geist Mono"
+     ],
+     "monoSamples": [
+      "Built for adventure operators"
+     ],
+     "microLabels": 1,
+     "microLabelShare": 0.169,
+     "microSamples": [
+      "Built for adventure operators"
+     ],
+     "upperShare": 0.17,
+     "centerShare": 0.79,
+     "smallText": 3
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [],
+     "textColors": [
+      {
+       "color": "#66736b",
+       "share": 0.58
+      },
+      {
+       "color": "#46534b",
+       "share": 0.21
+      },
+      {
+       "color": "#c6453a",
+       "share": 0.1
+      },
+      {
+       "color": "#17221c",
+       "share": 0.07
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.04
+      }
+     ],
+     "button": {
+      "bg": "#176b4b",
+      "hsl": {
+       "h": 157,
+       "s": 0.65,
+       "l": 0.25
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 1,
+     "inHero": 1,
+     "radius": 12,
+     "height": 44,
+     "withShadow": 1,
+     "withGradient": 1,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Sign In"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 2,
+     "shadowOverlay": 0,
+     "shadowSamples": [
+      "div.ui-card.relative → rgba(15, 43, 31, 0.06) 0px 4px 10px 0px, rgba(15, 43, 31, 0.2) 0px 28px 56px -20",
+      "button.ui-btn.ui-btn-primary → rgba(255, 255, 255, 0.16) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.28) 0px 1px "
+     ],
+     "gradients": 1,
+     "scrims": 0,
+     "gradientSamples": [
+      "div.ui-card.relative → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)"
+     ],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 1,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 1,
+     "boxRadius": 16,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": null,
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "plus jakarta sans fallback",
+     "geist mono",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "pageH": 1024,
+    "margins": {
+     "left": 225,
+     "right": 225
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "BookingTours",
+      "size": 26,
+      "top": 360,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [],
+    "leftBlocks": 0,
+    "bodySize": 16,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": null,
+    "topbar": null,
+    "canvas": {
+     "left": 225,
+     "right": 225
+    },
+    "hero": {
+     "text": "BookingTours",
+     "words": 1,
+     "chars": 12,
+     "lines": 1,
+     "size": 26,
+     "vw": 3.4,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1.5,
+     "top": 360,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 1,
+     "firstScreen": 1,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 1,
+     "radii": [
+      [
+       16,
+       1
+      ]
+     ],
+     "heavyBorders": 1,
+     "borderSamples": [
+      "#0b2c21 on #f7f5f0 (13.8:1)"
+     ],
+     "heavyShadows": 1,
+     "softShadows": 1,
+     "shadowSamples": [
+      "rgba(15, 43, 31, 0.2) 0px 28px 56px -20px"
+     ],
+     "glass": 0
+    },
+    "chips": {
+     "count": 0,
+     "hues": 0,
+     "samples": []
+    },
+    "numbers": {
+     "cells": 0,
+     "leftAligned": 0,
+     "figures": 0,
+     "tabularShare": null,
+     "kpiMax": null
+    },
+    "rows": null,
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.38,
+     "tiny": 1,
+     "tinySamples": [
+      "Built for adventure oper 10px"
+     ],
+     "sizes": [
+      10,
+      12,
+      14,
+      26
+     ]
+    },
+    "title": {
+     "text": "BookingTours",
+     "size": 26,
+     "top": 360
+    },
+    "colourShare": 0.027
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 390,
+   "height": 844,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.61
+   ],
+   "motion": {
+    "elements": 3,
+    "css": 2,
+    "transitions": 1,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "page": {
+     "height": 844,
+     "screens": 1,
+     "words": 30,
+     "img": 1,
+     "video": 0,
+     "canvas": 0,
+     "svg": 0,
+     "sections": 0,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "BookingTours",
+     "words": 1,
+     "chars": 12,
+     "lines": 1,
+     "size": 26,
+     "vw": 6.7,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1.5,
+     "top": 270,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "BookingTours",
+     "words": 1,
+     "lines": 1,
+     "size": 26,
+     "font": "satoshi"
+    },
+    "headings": [
+     {
+      "text": "BookingTours",
+      "words": 1,
+      "chars": 12,
+      "lines": 1,
+      "size": 26,
+      "vw": 6.7,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.025,
+      "leading": 1.5,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "center",
+      "position": "center",
+      "widthRatio": 0.39,
+      "top": 270,
+      "tag": "h1",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 1,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 0.76,
+       "mono": false
+      },
+      {
+       "family": "Geist Mono",
+       "share": 0.17,
+       "mono": true
+      },
+      {
+       "family": "satoshi",
+       "share": 0.07,
+       "mono": false
+      }
+     ],
+     "familyCount": 3,
+     "sizes": [
+      10,
+      12,
+      14,
+      26
+     ],
+     "sizeCount": 4,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 26,
+      "vw": 6.7,
+      "font": "satoshi",
+      "text": "BookingTours"
+     },
+     "monoShare": 0.17,
+     "monoProseShare": 0.17,
+     "monoFamilies": [
+      "Geist Mono"
+     ],
+     "monoSamples": [
+      "Built for adventure operators"
+     ],
+     "microLabels": 1,
+     "microLabelShare": 0.169,
+     "microSamples": [
+      "Built for adventure operators"
+     ],
+     "upperShare": 0.17,
+     "centerShare": 0.79,
+     "smallText": 3
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [],
+     "textColors": [
+      {
+       "color": "#66736b",
+       "share": 0.58
+      },
+      {
+       "color": "#46534b",
+       "share": 0.21
+      },
+      {
+       "color": "#c6453a",
+       "share": 0.1
+      },
+      {
+       "color": "#17221c",
+       "share": 0.07
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.04
+      }
+     ],
+     "button": {
+      "bg": "#176b4b",
+      "hsl": {
+       "h": 157,
+       "s": 0.65,
+       "l": 0.25
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 1,
+     "inHero": 1,
+     "radius": 12,
+     "height": 44,
+     "withShadow": 1,
+     "withGradient": 1,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Sign In"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 2,
+     "shadowOverlay": 0,
+     "shadowSamples": [
+      "div.ui-card.relative → rgba(15, 43, 31, 0.06) 0px 4px 10px 0px, rgba(15, 43, 31, 0.2) 0px 28px 56px -20",
+      "button.ui-btn.ui-btn-primary → rgba(255, 255, 255, 0.16) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.28) 0px 1px "
+     ],
+     "gradients": 2,
+     "scrims": 0,
+     "gradientSamples": [
+      "div.ui-card.relative → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "button.ui-btn.ui-btn-primary → linear-gradient(rgb(23, 107, 75), rgb(18, 94, 64) 55%, rgb(15, 81, 55))"
+     ],
+     "gradientText": 0,
+     "hairlines": 0,
+     "hairlineSamples": [],
+     "outlinedBoxes": 1,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 1,
+     "boxRadius": 16,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": null,
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "geist mono",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "pageH": 844,
+    "margins": {
+     "left": 49,
+     "right": 49
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "BookingTours",
+      "size": 26,
+      "top": 270,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [],
+    "leftBlocks": 0,
+    "bodySize": 16,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": null,
+    "topbar": null,
+    "canvas": {
+     "left": 49,
+     "right": 49
+    },
+    "hero": {
+     "text": "BookingTours",
+     "words": 1,
+     "chars": 12,
+     "lines": 1,
+     "size": 26,
+     "vw": 6.7,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1.5,
+     "top": 270,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 1,
+     "firstScreen": 1,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 1,
+     "radii": [
+      [
+       16,
+       1
+      ]
+     ],
+     "heavyBorders": 1,
+     "borderSamples": [
+      "#0b2c21 on #f7f5f0 (13.8:1)"
+     ],
+     "heavyShadows": 1,
+     "softShadows": 1,
+     "shadowSamples": [
+      "rgba(15, 43, 31, 0.2) 0px 28px 56px -20px"
+     ],
+     "glass": 0
+    },
+    "chips": {
+     "count": 0,
+     "hues": 0,
+     "samples": []
+    },
+    "numbers": {
+     "cells": 0,
+     "leftAligned": 0,
+     "figures": 0,
+     "tabularShare": null,
+     "kpiMax": null
+    },
+    "rows": null,
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.38,
+     "tiny": 1,
+     "tinySamples": [
+      "Built for adventure oper 10px"
+     ],
+     "sizes": [
+      10,
+      12,
+      14,
+      26
+     ]
+    },
+    "title": {
+     "text": "BookingTours",
+     "size": 26,
+     "top": 270
+    },
+    "colourShare": 0.061
+   },
+   "consoleErrors": []
+  }
+ ],
+ "findings": [
+  {
+   "level": "WARN",
+   "id": "micro-label",
+   "width": 1439,
+   "message": "1 tiny uppercase letter-spaced label(s): \"Built for adventure operators\"",
+   "fix": "Prefer sentence case at body size.",
+   "alsoAt": [
+    1024,
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "gradient",
+   "width": 1439,
+   "message": "1 gradient fill(s): div.ui-card.relative → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+   "fix": "Use a flat colour or a real image. The only gradient allowed by default is a neutral scrim over a photo for legibility.",
+   "alsoAt": [
+    1024,
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "button-fx",
+   "width": 1439,
+   "message": "Buttons with gradient fill and shadow/glow.",
+   "fix": "Flat fill, one colour.",
+   "alsoAt": [
+    1024,
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "palette-cream",
+   "width": 1439,
+   "message": "Yellow-cream background (page background #f7f5f0).",
+   "fix": "Use the drawn palette. If you want warmth, take a low-chroma stone or bone, not a yellow cream.",
+   "alsoAt": [
+    1024,
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "font-count",
+   "width": 1439,
+   "message": "3 typefaces in use (Plus Jakarta Sans, Geist Mono, satoshi).",
+   "fix": "Two at most.",
+   "alsoAt": [
+    1024,
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "hero-void",
+   "width": 1439,
+   "message": "33% of the first screen is one empty block (540×779px at 0,120).",
+   "fix": "Place the void on purpose or fill it: move the picture, the film or one fact into it, grow the headline to meet it, or shrink the screen to its content. A void reads as placed only when something closes it on the far side and it is the screen's one rest.",
+   "alsoAt": [
+    1024
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "heavy-shadow",
+   "width": 1439,
+   "message": "1 panel shadow(s) heavy enough to read as floating: rgba(15, 43, 31, 0.2) 0px 28px 56px -20px",
+   "fix": "Panels sit on the ground: separate them with a fill one step from the ground or a quiet 1px border. A shadow, if any, is under 8% black with a small blur. Real overlays (menus, dialogs, popovers) may float.",
+   "alsoAt": [
+    1024,
+    768,
+    390
+   ]
+  }
+ ],
+ "images": [
+  {
+   "viewport": "desktop",
+   "width": 1439,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/before/simple-calendar/desktop-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/before/simple-calendar/desktop-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "tablet",
+   "width": 1024,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/before/simple-calendar/tablet-1024-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/before/simple-calendar/tablet-1024-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "tablet",
+   "width": 768,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/before/simple-calendar/tablet-768-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/before/simple-calendar/tablet-768-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "mobile",
+   "width": 390,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/before/simple-calendar/mobile-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/before/simple-calendar/mobile-page-01.jpg"
+   ],
+   "film": []
+  }
+ ]
+}

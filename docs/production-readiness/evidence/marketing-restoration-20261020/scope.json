@@ -1,0 +1,29 @@
+{
+  "baseline": "dpl_7pwz1xkCZRMvurXSbrwSHnEoeF3u",
+  "changed": [
+    "app/api/marketing/permission/route.ts",
+    "components/marketing/ContactPermissionEditor.tsx",
+    "app/marketing/contacts/[id]/page.tsx",
+    "app/marketing/automations/[id]/page.tsx",
+    "app/marketing/automations/page.tsx",
+    "components/marketing/starter-templates.ts",
+    "app/lib/marketing-journey.ts"
+  ],
+  "added": [
+    "app/api/marketing/permission/route.ts",
+    "components/marketing/ContactPermissionEditor.tsx"
+  ],
+  "downloaded": 2,
+  "preserved": 492,
+  "source_sha256": {
+    "app/api/marketing/permission/route.ts": "d237f80e53087dca65c95e0aa58cc4ad2ef41c0a5260a959c0b611e4ba1e9aeb",
+    "components/marketing/ContactPermissionEditor.tsx": "4c65f0c743fbebbeabcca6f8b16c0573bd8e9a13474aea4d6386534a591cc5c5",
+    "app/marketing/contacts/[id]/page.tsx": "9d0a511c460cba5e85dc6738c8b8596c05b578e0baa2c4d49e2ad1dabc1e61e9",
+    "app/marketing/automations/[id]/page.tsx": "f9e29bda2c12af01c09918732e0e596b55d1f95d4599e7b997e813410b917b8d",
+    "app/marketing/automations/page.tsx": "8415e060b2fab222a15f0555c618636c11deac38afaea71526c9a1c276c1817c",
+    "components/marketing/starter-templates.ts": "9440f81379783ab4d3b3e68be8265094f4357f42ab6e0d4af99cf9d651f09972",
+    "app/lib/marketing-journey.ts": "36ca1a89ffac72c4ce2c79924ce9944463b89228fdb4a55c55b59ef87b221dc3"
+  },
+  "migration_sha256": "9202c862902b86c98597f890d38093134361cbae08a75fca39b14288683aa5a5",
+  "version": "20261020040000"
+}

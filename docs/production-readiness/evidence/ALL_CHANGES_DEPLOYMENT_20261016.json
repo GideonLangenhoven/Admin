@@ -1,0 +1,116 @@
+{
+  "date": "2026-10-16",
+  "verified_at": "2026-10-16T06:16:54.576486+00:00",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "admin": {
+    "id": "dpl_HyUe8UGUfYHyrdDrVCCRQB4czYVS",
+    "url": "caepweb-admin-jtw0e2emy-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 486,
+    "production_url": "https://admin.bookingtours.co.za"
+  },
+  "preserved_previous_release": "dpl_HCaW5dys6U1GsJ9ueSpEZY6hQ3qQ",
+  "scope": [
+    "Deploy all remaining changes from today while preserving the live guide login, Photos parity, photo/thank-you delivery, payment recovery and marketing setup diagnostics.",
+    "Operator owners save banking and integration credentials with normal sign-in. Existing authorization, tenant binding, account status and audit checks remain. Platform SUPER_ADMIN MFA remains required.",
+    "WhatsApp and web chat use the same configured automatic discount rules. Web chat resolves rules during quotes, when phone details arrive and again before checkout, then stores the resolved percentage and offer details.",
+    "Suggested sequence previews are under Automations; the overview is simpler. Voucher page heading and marketing tabs are consistent. Data Requests is at the bottom of Settings.",
+    "Native help and all changed knowledge sections describe the deployed settings, automatic discounts and guide Photos actions."
+  ],
+  "runtime_changes": [
+    "app/api/mfa/recovery/route.ts",
+    "app/lib/mfa-sensitive.ts",
+    "app/marketing/automations/page.tsx",
+    "app/marketing/page.tsx",
+    "app/settings/page.tsx",
+    "app/super-admin/sensitive-actions/page.tsx",
+    "app/vouchers/page.tsx",
+    "components/MfaSensitiveActionPanel.tsx",
+    "components/marketing/BookingDiscountSettings.tsx",
+    "playwright.marketing-safety.config.ts",
+    "supabase/config.toml",
+    "supabase/functions/admin-help-chat/index.ts",
+    "supabase/functions/bank-details/index.ts",
+    "supabase/functions/onboarding-wizard/index.ts",
+    "supabase/functions/web-chat/index.ts"
+  ],
+  "booking": {
+    "id": "dpl_DEtYg9jBcEThHpReFGiaJE6dX4qZ",
+    "source_files": 169,
+    "local_matches_live": true
+  },
+  "functions": [
+    {
+      "slug": "web-chat",
+      "version": 152,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "bank-details",
+      "version": 29,
+      "verify_jwt": true,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "admin-help-chat",
+      "version": 27,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "onboarding-wizard",
+      "version": 12,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    }
+  ],
+  "edge_source_files_verified": 30,
+  "knowledge": {
+    "at": "2026-10-16T06:08:36.955Z",
+    "articles": 30,
+    "chunks": 176,
+    "changed": 3,
+    "result": {
+      "ok": true,
+      "total": 176,
+      "embedded": 3,
+      "skipped": 173,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    }
+  },
+  "validation": {
+    "unit_files_passed": 144,
+    "unit_files_skipped": 2,
+    "unit_tests_passed": 2390,
+    "unit_tests_skipped": 58,
+    "typescript": "PASS",
+    "edge_typecheck": "PASS",
+    "eslint_errors": 0,
+    "eslint_warnings": 14,
+    "production_build": "PASS",
+    "marketing_desktop_mobile_browser_cases": 8,
+    "operator_settings_browser_cases": 1,
+    "live_guide_photo_browser_cases": 5,
+    "live_http_and_access_checks": 10,
+    "internal_help_answer_checks": 3,
+    "uploaded_admin_source_files_verified": 486,
+    "uploaded_guest_source_files_verified": 169,
+    "local_runtime_matches_release": true,
+    "guest_booking_domain_checks": 2
+  },
+  "database_changes": false,
+  "marketing_activation": false,
+  "limits": [
+    "Marketing delivery and automated welcome-back sequences remain held; missing feedback integration and operator policy activation are not changed by deployment.",
+    "No real customer email, WhatsApp message, upload, payment, booking or credential update was performed by verification.",
+    "58 existing unit cases are intentionally skipped."
+  ],
+  "verification_corrections": [
+    "Initial browser execution was blocked by sandbox permissions; the authorized rerun passed.",
+    "The anonymous credentials endpoint correctly returns its existing 403 access denial; the smoke expectation was corrected from 401."
+  ],
+  "evidence_directory": "docs/production-readiness/evidence/all-changes-deployment-20261016"
+}

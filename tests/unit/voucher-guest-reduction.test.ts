@@ -19,7 +19,7 @@ describe("voucher-aware guest reduction", () => {
 
   it("bookings page money columns include the voucher-funded portion", () => {
     expect(page).toContain("function bookingValue(");
-    expect(page).toContain("total_amount, voucher_amount_paid");
+    expect(page).toContain("total_captured, voucher_amount_paid");
   });
 
   it("edit modal blocks qty changes on paid bookings", () => {

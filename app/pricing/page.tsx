@@ -277,28 +277,28 @@ export default function PeakPricingPage() {
       <div className="anim-fade-up">
         <p className="ui-mono-label mb-2">Revenue</p>
         <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Pricing Management</h1>
-        <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>Manage base rates per activity and apply date-range seasonal overrides for peak periods.</p>
+        <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>Set base rates and seasonal prices.</p>
       </div>
 
       <div className="anim-fade-up anim-d1 ui-card p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Tour rate table</h2>
-            <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>Base pricing is your always-on rate. Peak pricing is used when you apply a seasonal range below.</p>
+            <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>Seasonal prices override the base rate for the dates you choose.</p>
           </div>
           <button data-demo-action="pricing.save" onClick={saveTourPricing} disabled={saving} className="ui-btn ui-btn-primary disabled:opacity-50">
             {saving ? "Saving..." : "Save tour prices"}
           </button>
         </div>
 
-        <div className="mt-4 overflow-x-auto rounded-xl border" style={{ borderColor: "var(--ck-border-subtle)" }}>
-          <table className="w-full text-sm">
+        <div className="ui-table-container mt-4 overflow-x-auto rounded-xl border" style={{ borderColor: "var(--ck-border-subtle)" }}>
+          <table role="table" className="ui-responsive-table w-full text-sm">
             <thead style={{ background: "var(--ck-surface-sunken)" }}>
               <tr>
-                <th className="p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--ck-text-muted)" }}>Tour</th>
-                <th className="p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--ck-text-muted)" }}>Base price</th>
-                <th className="p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--ck-amber)" }}>Peak price</th>
-                <th className="p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--ck-text-muted)" }}>Current spread</th>
+                <th scope="col" className="p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--ck-text-muted)" }}>Tour</th>
+                <th scope="col" className="p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--ck-text-muted)" }}>Base price</th>
+                <th scope="col" className="p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--ck-amber)" }}>Peak price</th>
+                <th scope="col" className="p-3 text-left text-[10.5px] font-medium uppercase tracking-[0.1em]" style={{ color: "var(--ck-text-muted)" }}>Current spread</th>
               </tr>
             </thead>
             <tbody>
@@ -307,14 +307,14 @@ export default function PeakPricingPage() {
                 const peak = peakPrices[tour.id] !== undefined ? peakPrices[tour.id] : String(tour.peak_price_per_person || tour.base_price_per_person || "");
                 return (
                   <tr key={tour.id} className="border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                    <td className="p-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{tour.name}</td>
-                    <td className="p-3">
+                    <td data-label="Tour" className="p-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{tour.name}</td>
+                    <td data-label="Base price" className="p-3">
                       <input type="number" value={base} onChange={(e) => setBasePrices({ ...basePrices, [tour.id]: e.target.value })} className="ui-control w-32 tabular-nums" />
                     </td>
-                    <td className="p-3">
+                    <td data-label="Peak price" className="p-3">
                       <input type="number" value={peak} onChange={(e) => setPeakPrices({ ...peakPrices, [tour.id]: e.target.value })} className="ui-control w-32 tabular-nums" />
                     </td>
-                    <td className="p-3" style={{ color: "var(--ck-text-muted)" }}>
+                    <td data-label="Current spread" className="p-3" style={{ color: "var(--ck-text-muted)" }}>
                       <span className="font-mono tabular-nums" style={{ color: "var(--ck-amber)" }}>R{Math.max(Number(peak || 0) - Number(base || 0), 0).toFixed(2)}</span> uplift during peak dates
                     </td>
                   </tr>
@@ -351,7 +351,7 @@ export default function PeakPricingPage() {
             <input type="number" value={priority} onChange={e => setPriority(e.target.value)}
               min="0" step="1"
               className="ui-control w-full tabular-nums" />
-            <p className="text-xs mt-1" style={{ color: "var(--ck-text-muted)" }}>If date ranges overlap, the rule with the highest priority wins.</p>
+            <p className="text-xs mt-1" style={{ color: "var(--ck-text-muted)" }}>Overlapping dates use the highest-priority rule.</p>
           </div>
         </div>
 
@@ -430,7 +430,7 @@ export default function PeakPricingPage() {
         {peakRanges.length === 0 ? (
           <div className="ui-empty">
             <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No peak pricing set</p>
-            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Apply a seasonal range above to mark slots as peak.</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Add seasonal dates above for peak pricing.</p>
           </div>
         ) : (
           <div className="space-y-2">

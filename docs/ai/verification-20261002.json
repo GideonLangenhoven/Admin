@@ -1,0 +1,163 @@
+{
+  "reviewed_at": "2026-10-02T06:46:02.301362+00:00",
+  "scope": "Local application-side agent foundation and marketing facts handoff; wider production qualification remains paused and FAILED_GATE",
+  "repository": {
+    "branch": "feature/simple-view-2026-09-20",
+    "head": "43304b6",
+    "unrelated_changes_preserved": true
+  },
+  "installed_packages": {
+    "node": "22.23.3",
+    "next": "16.3.3",
+    "react": "19.2.5",
+    "react_dom": "19.2.5",
+    "supabase_js": "2.102.1",
+    "typescript": "5.9.3",
+    "eslint": "9.39.4",
+    "vitest": "4.1.11"
+  },
+  "checks": [
+    {
+      "command": "npm run build",
+      "exit_code": 0,
+      "environment": "local production build, existing fonts fetched after sandbox network failure; source-map upload and Next telemetry disabled",
+      "warning": "existing Sentry config import deprecation"
+    },
+    {
+      "command": "node_modules/.bin/tsc --noEmit --incremental false",
+      "exit_code": 0,
+      "environment": "after build; first concurrent attempt raced Next generated files and was discarded"
+    },
+    {
+      "command": "npm run check:edge",
+      "exit_code": 0
+    },
+    {
+      "command": "node_modules/.bin/vitest run tests/unit/agent-read-service.test.ts tests/unit/operator-acquisition.test.ts",
+      "exit_code": 0,
+      "passed": 101,
+      "environment": "labelled fictional fixtures; Auth/provider/database-query clients mocked; not a real provider connection"
+    },
+    {
+      "command": "node tests/agent-foundation-local.mjs /private/tmp/capekayak-db-test-y2csgqr1 55472",
+      "exit_code": 0,
+      "passed": 22,
+      "environment": "disposable local PostgreSQL on private Unix socket; actual SQL candidate and canonical capacity RPC against schema fixtures"
+    },
+    {
+      "command": "node /private/tmp/bookingtours-agent-20261002-continuation/check-disabled-http.mjs",
+      "exit_code": 0,
+      "passed": 5,
+      "environment": "local Next production-build server; remote rate-limit/monitoring env disabled; fictional inputs; rejects GET/POST/HEAD without exposing data"
+    },
+    {
+      "command": "npm run test:unit",
+      "exit_code": 1,
+      "passed": 1681,
+      "failed": 2,
+      "skipped": 1,
+      "note": "Whole-workspace run; the final added payment provenance fields were subsequently verified by the focused fixtures/ESLint again",
+      "failures": [
+        {
+          "test": "tests/unit/db-column-refs.test.ts: every referenced table.column exists",
+          "cause": "Existing live-schema snapshot lacks bookings.first_operator_booked_at, bookings.first_operator_booking and bookings.whatsapp_booking_updates_opt_in referenced by existing auto-messages/send-email code",
+          "changed_for_this_task": false
+        },
+        {
+          "test": "tests/unit/help-chat-navigation.test.ts: only closes on the mobile breakpoint",
+          "cause": "Existing test expects 768px while the pre-existing HelpChat working-tree change uses 1024px",
+          "changed_for_this_task": false
+        }
+      ]
+    },
+    {
+      "command": "npm run lint",
+      "exit_code": 2,
+      "cause": "Existing ESLint config references react-hooks rules without the corresponding plugin in its config"
+    },
+    {
+      "command": "node_modules/.bin/eslint --no-config-lookup --config /private/tmp/bookingtours-agent-20261002-continuation/focused-eslint.config.mjs [all eight task JS/TS files]",
+      "exit_code": 0,
+      "note": "Installed Next TypeScript recommended config and repository non-React rule choices; does not claim full repository lint passes"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "http_checks": [
+    {
+      "name": "anonymous GET",
+      "status": 503,
+      "cache_control": "no-store"
+    },
+    {
+      "name": "anonymous POST",
+      "status": 503,
+      "cache_control": "no-store"
+    },
+    {
+      "name": "fixture bearer POST",
+      "status": 503,
+      "cache_control": "no-store"
+    },
+    {
+      "name": "unpermitted action POST",
+      "status": 503,
+      "cache_control": "no-store"
+    },
+    {
+      "name": "HEAD",
+      "status": 503,
+      "cache_control": "no-store"
+    }
+  ],
+  "privacy": "No production customer records queried. Tools return projected departure metadata/capacity/booking-level aggregates; audit fixtures contain only hashes, operations and fixed outcomes.",
+  "status": {
+    "external_access": "disabled in route and service; env flag does not enable it",
+    "mcp_transport": "specified, not implemented",
+    "oauth_flow": "not implemented or platform tested",
+    "chatgpt_approval": "unverified",
+    "muse_protocol_and_approval": "unverified",
+    "acquisition_intake_join": "not implemented; source unknown",
+    "operator_account_created": "unavailable; current Auth membership/timestamp cannot establish first acquisition",
+    "live_payment_conversion": "unknown; recorded invoice confirmation is explicitly not proof of live payment environment"
+  },
+  "blockers": [
+    "Resource-bound/scoped credential issuance compatible with Supabase Auth and MCP",
+    "RLS/API confinement against private fields and existing write paths for agent credentials",
+    "Real consent/disconnect/refresh-revocation and role-change journeys",
+    "Distributed rate limiting that denies access when unavailable",
+    "Meta Muse accepted connector/authentication contract and test access",
+    "Consented cross-repository lead/account/trial attribution join and immutable first account-link event",
+    "Live operator payment provenance/settlement evidence",
+    "Existing broad regression and lint failures; existing wider readiness gates"
+  ],
+  "boundaries": {
+    "pushed": false,
+    "merged": false,
+    "deployed": false,
+    "production_migrations": false,
+    "customer_data_changed": false,
+    "real_provider_payments_refunds_or_messages": false,
+    "dns_changed": false,
+    "connectors_published": false,
+    "paid_services_purchased": false
+  },
+  "task_files_sha256": {
+    "app/lib/agent-tools.ts": "a16ae8d29a68e6016804be19bb7be0a8a59a9ce5bfa7659d06dbfd16d428b54e",
+    "app/lib/agent-read-service.ts": "bcffe6fd503b483aa1a6963065dd8479653bf9af372eeba8de86ccd4de7db435",
+    "app/api/agent/read/route.ts": "1e2ae70b755be50acdecb31be0a74669617c08e028afe32eb06b7b09b0376a57",
+    "scripts/operator-acquisition-report.mjs": "56f26595517d34dd7cfb4225ae1e35a53969f5402b7a6359aad99be39297d442",
+    "supabase/agent-foundation.local.sql": "5ff310e01987859e9600a05034615849a2f51f87512111ccf52aa2f063dbfd13",
+    "tests/unit/agent-read-service.test.ts": "69203ab1c6b91d2eb95bb44340033372020a3b4cabfd3f5edb8cf7c54f7be202",
+    "tests/unit/operator-acquisition.test.ts": "a37063a0fe829bcab475cddb871d06e3254e213393ec17a465fd73a9c9e2d440",
+    "tests/unit/db-column-refs.test.ts": "0183ee5d8eac21c7f573ade54241d7921676642c37d1926449f0535d0405cc08",
+    "tests/fixtures/agent-columns.local.json": "54a94a3d1d0167d1064d3f218cfe43d0ec7426ebc0b90e2c044d489d6b0f1af0",
+    "tests/agent-foundation-local.mjs": "c8df85aa97d949ccf8f3bc7bf25c8ce6e8492464e2c3f36e726e0a0aecf1fde7",
+    "docs/ai/agent-read-foundation.md": "2ca9a8aaa03a1af1640b514842ed8d65a13e6acbe2f4ce0ae6e68a5fbc9b8c29",
+    "docs/ai/product-facts.internal.md": "9a75c70d1104dcd7c04251210d5b73f2cf6f42986b0c24342a692d0f0ed6b95a",
+    "docs/ai/website-handoff.public.md": "be8bd82daa0affd54171ad492e69ce0b9edd29af526e7b59050bf1ebfd72897e"
+  },
+  "cleanup": "Local HTTP server stopped; disposable PostgreSQL server stopped; test database dropped by harness. Private temporary fixture/log directory retained as local evidence."
+}

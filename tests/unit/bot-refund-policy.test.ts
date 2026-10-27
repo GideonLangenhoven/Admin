@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { webChatFixture } from "../helpers/web-chat-fixture";
 
 // Bot cancellations must action refunds per the tenant's refund_policies
 // tiers (calculate_refund_percent RPC — same source as rebook-booking),
@@ -19,7 +20,11 @@ describe("bot cancellation refunds follow tenant refund policy", () => {
     expect(web).not.toContain("You'll receive a 95% refund");
   });
 
-  it("web-chat slot lookup is tenant-scoped", () => {
-    expect(web).toContain('.select("id,start_time,tour_id,price_per_person_override").eq("business_id"');
+  it("rejects a slot belonging to another operator even for the selected tour", async () => {
+    const f = webChatFixture();
+    f.slot.business_id = "another-operator";
+    const result = await f.post(await f.session(), "btn:" + f.slot.id, { ...f.bookingState, step: "PICK_TIME" });
+    expect(result.state.step).not.toBe("ASK_QTY");
+    expect(f.rows.bookings).toEqual([]);
   });
 });

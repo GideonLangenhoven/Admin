@@ -1,0 +1,123 @@
+{
+  "at": "2026-10-16T09:21:49.297315+00:00",
+  "deployment": {
+    "id": "dpl_4zjZC4HhmazKQJaqfnvRxkknnWgq",
+    "url": "caepweb-admin-ol1qix01r-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 486
+  },
+  "baseline": {
+    "id": "dpl_HmTU5CGaSLZkrD5ocFv8WTeB2vks",
+    "url": "caepweb-admin-qjx6bg1i8-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY"
+  },
+  "scope": {
+    "baseline": "dpl_HmTU5CGaSLZkrD5ocFv8WTeB2vks",
+    "changed": [
+      "app/bookings/page.tsx",
+      "app/new-booking/page.tsx",
+      "components/PaymentRecoveryPanel.tsx",
+      "playwright.guide-access.config.ts",
+      "supabase/functions/admin-help-chat/index.ts",
+      "supabase/functions/auto-messages/index.ts"
+    ],
+    "functions": [
+      "admin-help-chat",
+      "auto-messages"
+    ],
+    "database_changes": [
+      "20261016110000_unpaid_booking_recovery"
+    ],
+    "marketing_activation": false
+  },
+  "native_functions": [
+    {
+      "slug": "auto-messages",
+      "version": 99,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "admin-help-chat",
+      "version": 29,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    }
+  ],
+  "database": {
+    "at": "2026-10-16T09:19:53.358Z",
+    "version": "20261016110000",
+    "sha256": "5399672542e47e825f7d782ec1d304f491fc93515a8570c47ae863165d0ad542",
+    "view": [
+      {
+        "reloptions": [
+          "security_invoker=true"
+        ]
+      }
+    ],
+    "grants": [
+      {
+        "rolname": "anon",
+        "sel": false,
+        "writes": false,
+        "recovery": false
+      },
+      {
+        "rolname": "authenticated",
+        "sel": true,
+        "writes": false,
+        "recovery": false
+      },
+      {
+        "rolname": "service_role",
+        "sel": true,
+        "writes": false,
+        "recovery": true
+      }
+    ],
+    "email_nullable": true,
+    "unchanged_function_permissions": true
+  },
+  "help": {
+    "at": "2026-10-16T09:20:08.884Z",
+    "articles": 30,
+    "chunks": 176,
+    "changed": 2,
+    "result": {
+      "ok": true,
+      "total": 176,
+      "embedded": 2,
+      "skipped": 174,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    }
+  },
+  "guest_site": {
+    "id": "dpl_DEtYg9jBcEThHpReFGiaJE6dX4qZ",
+    "source_files": 169,
+    "local_matches_live": true
+  },
+  "guide_sessions": {
+    "files_verified": 15,
+    "same_as_live_guide_fix": true
+  },
+  "checks": {
+    "production_build": "passed",
+    "typescript": "passed in production build",
+    "deno_checks": "admin-help-chat and auto-messages passed",
+    "focused_unit_tests": 139,
+    "database_acceptance_groups": 18,
+    "payment_recovery_database_suite": "passed",
+    "name_only_mobile_browser_cases": 4,
+    "live_payment_recovery_browser_cases": 2,
+    "live_aonyx_operator_central_guide_browser_cases": 1,
+    "live_http_checks": 10,
+    "local_source_matches_uploaded_files": 486
+  },
+  "limitations": [
+    "Browser identity, booking data, payment completion and email delivery were simulated. No real customer messages or payments were triggered."
+  ],
+  "marketing_activation": false,
+  "auth_configuration_changed": false
+}

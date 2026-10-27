@@ -1,0 +1,96 @@
+{
+  "at": "2026-10-15T15:52:43.312Z",
+  "migration": "20261015190000_shared_guide_access.sql",
+  "sha256": "5918f903b64885615c67491147506a10e644e47303a87bd86b9edf758be54c5c",
+  "rls": true,
+  "grants": [
+    {
+      "proname": "claim_guide_setup",
+      "anon": false,
+      "authenticated": false,
+      "service": true
+    },
+    {
+      "proname": "complete_guide_setup",
+      "anon": false,
+      "authenticated": false,
+      "service": true
+    },
+    {
+      "proname": "current_guide_business",
+      "anon": false,
+      "authenticated": false,
+      "service": true
+    },
+    {
+      "proname": "guide_context",
+      "anon": false,
+      "authenticated": true,
+      "service": true
+    },
+    {
+      "proname": "guide_day",
+      "anon": false,
+      "authenticated": true,
+      "service": true
+    },
+    {
+      "proname": "guide_photos",
+      "anon": false,
+      "authenticated": true,
+      "service": true
+    },
+    {
+      "proname": "is_shared_guide",
+      "anon": false,
+      "authenticated": true,
+      "service": true
+    },
+    {
+      "proname": "protect_shared_guide_identity",
+      "anon": false,
+      "authenticated": false,
+      "service": true
+    }
+  ],
+  "columns": [
+    {
+      "column_name": "business_id"
+    },
+    {
+      "column_name": "id"
+    },
+    {
+      "column_name": "login_name"
+    },
+    {
+      "column_name": "user_id"
+    }
+  ],
+  "policies": [
+    {
+      "policyname": "guide_storage_delete",
+      "permissive": "RESTRICTIVE",
+      "cmd": "DELETE"
+    },
+    {
+      "policyname": "guide_storage_insert",
+      "permissive": "RESTRICTIVE",
+      "cmd": "INSERT"
+    },
+    {
+      "policyname": "guide_storage_update",
+      "permissive": "RESTRICTIVE",
+      "cmd": "UPDATE"
+    }
+  ],
+  "triggers": [
+    {
+      "tgname": "protect_office_identity"
+    },
+    {
+      "tgname": "protect_shared_guide_identity"
+    }
+  ],
+  "edge_functions_unchanged": true
+}

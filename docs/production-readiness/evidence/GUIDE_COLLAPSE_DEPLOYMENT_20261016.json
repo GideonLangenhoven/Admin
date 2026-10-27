@@ -1,0 +1,59 @@
+{
+  "at": "2026-10-16T10:09:32.166660+00:00",
+  "deployment": {
+    "id": "dpl_8JtvXGv3DA9BPrbhZnufBaRiT7iD",
+    "url": "caepweb-admin-p4afoz1k1-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 486
+  },
+  "scope": {
+    "baseline": "dpl_FVwFNaYyVyy9f5kH9g7wx219mNy6",
+    "changed": [
+      "components/simple/DepartureCard.tsx",
+      "components/simple/simple-view.css"
+    ],
+    "functions": [],
+    "database_changes": false,
+    "marketing_activation": false,
+    "unrelated_local_changes_excluded": [
+      "supabase/.temp/cli-latest",
+      "supabase/config.toml"
+    ]
+  },
+  "checks": {
+    "typescript": "passed",
+    "production_build": "passed",
+    "preview_browser_cases": 4,
+    "live_browser_cases": 4,
+    "phone_and_tablet_widths": [
+      320,
+      390,
+      1024
+    ],
+    "live_http_checks": 10,
+    "guide_help_unit_tests": 4,
+    "unrelated_uploaded_files_preserved": 484
+  },
+  "help": {
+    "at": "2026-10-16T10:07:22.705Z",
+    "articles": 30,
+    "chunks": 176,
+    "changed": 1,
+    "result": {
+      "ok": true,
+      "total": 176,
+      "embedded": 1,
+      "skipped": 175,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    }
+  },
+  "google_drive": "Guide Drive status, folder creation and upload sessions use the authenticated guide business_id and the operator connection. No separate guide Google connection is required.",
+  "limits": [
+    "Browser identities, booking data and photo APIs were simulated; no real Drive upload or customer message was sent."
+  ],
+  "database_migrations": [],
+  "native_function_deployments": [],
+  "marketing_activation": false
+}

@@ -1,0 +1,25 @@
+{
+  "admin": {
+    "base_deployment": "dpl_32yBpxp6MkoQ65d1bfiriymbSyQR",
+    "changed_files": {
+      "components/booking/BookingSitePreview.tsx": "5858d18bb3f48b9a7c7d23f234c1242744dc9f621adbb5ae76746ad6a8adb138",
+      "components/booking/Catalogue.tsx": "f8007b5026b5a8c8f87a8064049749cb6b339cc8412cebe7a98fb616baac7aaa",
+      "components/booking/catalogue.css": "35306e47634f35083c4b685ac8068b09bcd3482cf978eaa725025c222ade6940"
+    },
+    "preserved_files": 448,
+    "uploaded_base_deployment": "dpl_8SAj3nTCJB6CAMrxzD4EYRHxoPrC",
+    "already_live_agent_safeguards_preserved": true
+  },
+  "booking": {
+    "base_deployment": "dpl_DUxb9t2yu3t3pkAYE8uWfaGSXYBP",
+    "changed_files": {
+      "app/page.tsx": "b3d9ba097acafc867b7008c33f76a9fc28ecac27f35c6e345f7f8f3bbda15234",
+      "app/components/Header.tsx": "7b89d9c40a8b4c19d938e245afe55acfb7be9e9804ffc717c696bf0d1d08415d",
+      "app/components/Catalogue.tsx": "f8007b5026b5a8c8f87a8064049749cb6b339cc8412cebe7a98fb616baac7aaa",
+      "app/components/catalogue.css": "35306e47634f35083c4b685ac8068b09bcd3482cf978eaa725025c222ade6940",
+      "app/components/Footer.tsx": "d48dd4ed07699aeabdcd80e8fa1600d71dbb4a4574af1dd3a9fd91e889462110",
+      "app/components/GlassBackdrop.tsx": "5beb5d3559f74fd5e852aa924bc9bb3ca51d64ae813d9469bf891cd98256f46b"
+    },
+    "preserved_files": 157
+  }
+}

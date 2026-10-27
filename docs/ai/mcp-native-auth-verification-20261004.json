@@ -1,0 +1,128 @@
+{
+  "recorded_at_utc": "2026-10-04T16:05:08.840118+00:00",
+  "verification_date": "2026-10-04",
+  "environment": "official isolated local Supabase native runtime; synthetic Auth account only",
+  "application": {
+    "branch": "feature/simple-view-2026-09-20",
+    "commit": "43304b65314c2b9974f939304e7b2ebae0a62c0c",
+    "runtime_source_changed": false,
+    "tested_function": "operatorIdentity",
+    "source_sha256_after_checks": "3e264e7afde509fa258186946f85f7b790db91643f04319d6db4fdd3fd81c84d"
+  },
+  "runtime": {
+    "node": "22.23.3",
+    "supabase_cli": "2.119.0",
+    "supabase_js": "2.102.1",
+    "vitest": "4.1.11",
+    "native_stack_experimental": true,
+    "official_release_checksums_verified": true,
+    "global_cli_upgraded": false,
+    "loopback_only": true,
+    "hosted_project_link": false,
+    "application_schema_loaded": false,
+    "production_config_or_customer_data_copied": false,
+    "synthetic_account_deleted": true
+  },
+  "checks": [
+    {
+      "check": "native_plus_shared_read_regressions",
+      "exit_code": 0
+    },
+    {
+      "check": "disabled_native_test",
+      "exit_code": 0
+    },
+    {
+      "check": "focused_types",
+      "exit_code": 0
+    },
+    {
+      "check": "focused_lint",
+      "exit_code": 0
+    }
+  ],
+  "test_results": {
+    "native_auth_initial_smoke": {
+      "files": 1,
+      "passed": 7,
+      "failed": 0,
+      "auth_mocked": false
+    },
+    "saved_native_test_plus_shared_read_runtime_regressions": {
+      "files": 3,
+      "passed": 161,
+      "failed": 0,
+      "skipped": 0
+    },
+    "saved_native_test_default_off": {
+      "passed": 0,
+      "failed": 0,
+      "skipped": 7
+    },
+    "native_cases": [
+      "accepts the real native sign-in JWT for the synthetic account",
+      "rejects a missing login credential",
+      "rejects an opaque fixture agent token as a native login credential",
+      "uses native Auth to reject a forged signature on a genuine JWT",
+      "fails closed if the native public-key configuration is absent",
+      "does not log private account fields, native JWTs or development keys",
+      "rejects a previously valid JWT after its synthetic identity is deleted"
+    ]
+  },
+  "commands": [
+    "AGENT_NATIVE_AUTH_TEST_STATUS=<guarded local practice status> vitest run tests/unit/agent-native-auth.test.ts tests/unit/agent-runtime.test.ts tests/unit/agent-read-service.test.ts",
+    "vitest run tests/unit/agent-native-auth.test.ts (without opt-in)",
+    "tsc --noEmit -p tests/tsconfig.agent-mcp.json",
+    "eslint tests/unit/agent-native-auth.test.ts --max-warnings=0"
+  ],
+  "failed_approach": {
+    "docker_default_binding": "wildcard bindings observed despite loopback network option",
+    "own_practice_services_stopped": true,
+    "empty_probe_removed": true,
+    "cause_not_assumed": true
+  },
+  "evidence_boundaries": {
+    "native_auth_backend_tested": true,
+    "browser_login_mfa_consent_tested": false,
+    "business_gateway_native_rehearsal_tested": false,
+    "native_jwt_expiry_tested": false,
+    "real_https_chatgpt_platform_connection_tested": false,
+    "muse_platform_connection_tested": false,
+    "full_build_or_full_suite_rerun_this_increment": false
+  },
+  "release_state": {
+    "specified": true,
+    "local_implementation": true,
+    "focused_tests_passed": true,
+    "deployed_this_increment": false,
+    "platform_approved": false,
+    "customer_available": false,
+    "wider_readiness": "PAUSED_BY_USER / FAILED_GATE"
+  },
+  "remaining_blockers": [
+    "Verified isolated hosted test database and application environment",
+    "Native schema/RLS/ACL and restricted TLS gateway rehearsal",
+    "Browser sign-in/MFA/consent/business-selection/disconnect journey",
+    "Actual HTTPS Inspector and ChatGPT linking/tool-selection verification",
+    "Existing dependency/lint findings and scoped operator-pilot release decision",
+    "Muse transport/client/authentication contract and test/review access"
+  ],
+  "exact_application_files_changed": [
+    "tests/unit/agent-native-auth.test.ts",
+    "tests/tsconfig.agent-mcp.json",
+    "docs/ai/mcp-implementation.md",
+    "docs/ai/mcp-security-decision.md",
+    "docs/ai/website-handoff.public.md",
+    "docs/ai/mcp-native-auth-rehearsal.md",
+    "docs/ai/mcp-native-auth-verification-20261004.json"
+  ],
+  "production_actions": {
+    "deployment": false,
+    "migration": false,
+    "customer_data_write": false,
+    "git_push_merge": false,
+    "dns_or_service_purchase": false,
+    "connector_publication": false
+  },
+  "prior_implementation_evidence": "mcp-implementation-verification-20261004.json"
+}

@@ -48,7 +48,7 @@ describe("cancel gate is policy-aware (P1)", () => {
     expect(wa).toContain("if (cancelPct > 0)");
   });
   it("web-chat offers refund whenever the policy percent > 0", () => {
-    expect(web).toContain("if (cnPct > 0)");
+    expect(web).toContain("if (cnPct !== null && cnPct > 0)");
     // refund_status must key off the actual refund, not a hardcoded 24h test
     expect(web).not.toContain('refund_status: ns.hours >= 24 ? "REQUESTED" : "NONE"');
   });

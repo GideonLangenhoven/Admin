@@ -1,0 +1,14 @@
+{
+  "verified_at": "2026-10-08T12:16:52.143Z",
+  "target_project": "gwwnkihblioayklptdab",
+  "sql_sha256": "0536bb2cdec7dc28ff42e53ff237c046da75c3a53dbb794d4b6bfa2ce7c040ce",
+  "checks": 10,
+  "report": {
+    "auth_status_view_ready": true,
+    "identity_view_ready": true,
+    "owner_has_auth_schema_access": false,
+    "gateway_can_access_auth_status": false,
+    "enabled_connectors": "0"
+  },
+  "boundary": "Local PostgreSQL 17 with synthetic Auth identities and hosted-like nondelegable auth schema. Tests SQL/RLS and existing connector reads, not hosted Auth sign-in, TLS hosting, browser consent or provider connection."
+}

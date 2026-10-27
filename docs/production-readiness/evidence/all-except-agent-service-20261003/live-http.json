@@ -1,0 +1,27 @@
+[
+  {
+    "url": "https://kayak.booking.bookingtours.co.za/",
+    "method": "HEAD",
+    "status": 200,
+    "protection_bypass_used": false
+  },
+  {
+    "url": "https://kayak.admin.bookingtours.co.za/",
+    "method": "HEAD",
+    "status": 200,
+    "protection_bypass_used": false
+  },
+  {
+    "url": "https://kayak.admin.bookingtours.co.za/api/agent/read",
+    "method": "HEAD",
+    "status": 503,
+    "protection_bypass_used": false,
+    "cache_control": "no-store"
+  },
+  {
+    "url": "https://kayak.admin.bookingtours.co.za/api/admin/chat-faq",
+    "method": "HEAD",
+    "status": 401,
+    "protection_bypass_used": false
+  }
+]

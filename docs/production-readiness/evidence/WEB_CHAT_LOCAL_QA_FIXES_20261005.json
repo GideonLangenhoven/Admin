@@ -1,0 +1,459 @@
+{
+  "title": "Guest web-chat local regression fixes, 5 October 2026",
+  "status": "implemented_and_tested_locally_ready_for_review",
+  "constraints": {
+    "deploymentPerformed": false,
+    "productionSettingsChanged": false,
+    "realBookingsCreated": false,
+    "realPaymentsCharged": false,
+    "customerEmailsSent": false
+  },
+  "checkout": {
+    "rootHead": "43304b65314c2b9974f939304e7b2ebae0a62c0c",
+    "independentBookingHead": "87d9907c67f427950c621e7f76f6136a0ffaeea3",
+    "preExistingUncommittedWork": true,
+    "testedVersion": "Current working tree, identified by the before/after hashes below. Existing unrelated changes were preserved."
+  },
+  "instructionsRead": [
+    "CLAUDE.md",
+    ".claude/CLAUDE.md",
+    "/Users/gideonlangenhoven/.codex/plugins/cache/ponytail/ponytail/4.12.0/skills/ponytail/SKILL.md",
+    "node_modules/next/dist/docs/01-app/03-api-reference/01-directives/use-client.md",
+    "Local Next.js server/client components guide"
+  ],
+  "identifiedCode": [
+    {
+      "purpose": "Guest UI, conversation state, session/draft recovery, Send/Enter and message/button rendering",
+      "path": "booking/app/components/ChatWidget.tsx"
+    },
+    {
+      "purpose": "Date picker and disabled/current-date choices",
+      "path": "booking/app/components/ChatCalendar.tsx",
+      "changed": false
+    },
+    {
+      "purpose": "Tenant-scoped handler, intent routing, booking selection, contact steps, confirmation and transcript audit",
+      "path": "supabase/functions/web-chat/index.ts"
+    },
+    {
+      "purpose": "Existing quantity/intent utilities, pricing, signed sessions and custom booking questions",
+      "paths": [
+        "supabase/functions/_shared/bot-guards.ts",
+        "supabase/functions/_shared/intent.ts",
+        "supabase/functions/_shared/chat-booking-pricing.ts",
+        "supabase/functions/_shared/web-chat-session.ts",
+        "supabase/functions/_shared/booking-custom-fields.ts"
+      ],
+      "changedInThisTask": false
+    }
+  ],
+  "confirmedCausesAndBehaviour": [
+    {
+      "issue": "Changing tours during contact collection",
+      "reproduce": "Use the real handler with the three-tour fixture, reach ASK_DETAILS for Morning Kayak, then request Sunset Paddle and later Midday Hike. Also name two alternatives, reject the old tour, or request Switch to Dolphin Cruise.",
+      "before": "The correction route recognized only a narrow generic change-tour command. Named or unknown switches fell into contact parsing, could replace the guest name, and retained the old booking.",
+      "after": "Corrections route first. A unique active named tour is selected and confirmed; ambiguous/unknown requests ask which valid tour to use. Only valid contacts and the unconfirmed group preference survive; old date/time, quantity confirmation, extras, custom answers, vouchers and quote are removed and fresh inventory/pricing is checked."
+    },
+    {
+      "issue": "Malformed contacts accepted as names",
+      "contract": "The existing prompt permits full name, email and phone together or one detail at a time; all three are required before confirmation.",
+      "reproduce": "At ASK_DETAILS send Email: guest.example.com, Email: guest@@example.com, Phone: abcdef, malformed mixed input, whitespace, or names with apostrophes/Unicode/more than six words. Also send Name: Friday Moyo and Email: wednesday@fixture.invalid.",
+      "before": "Valid-looking substrings were extracted and remaining labels/punctuation were stripped; malformed contact text became a name. ASCII apostrophes were removed and a six-word restriction rejected legitimate names. Broad scheduling detection misread weekdays inside labeled contact details.",
+      "after": "Full field validation prevents fallback of obvious email/phone input into a name. Invalid mixed messages preserve all previous valid details, show field-specific guidance and remain at contact collection. International names and explicit country-code phones are preserved/canonicalized without inferring a country. Labeled contacts win over weekday detection. UI prevalidation and required server confirmation checks share the tested contract."
+    },
+    {
+      "issue": "Old rejected time after a date change",
+      "reproduce": "Reject 06:00 on the first Morning Kayak date, then type or choose the next date which has only 11:00. Request an unavailable 07:00 on that new date. Delay old availability before completing a newer selection, including refresh/remount.",
+      "before": "Date correction reused pendingTime from the old rejected request, producing a misleading error for the new date.",
+      "after": "A different date clears the old departure and time request/error unless a new time is explicitly supplied. Only current-date options and errors are returned. Existing synchronous request locking and version/unmount guards were traced and preserved; controlled delayed and out-of-order tests verify newer UI state wins."
+    },
+    {
+      "issue": "Raw Markdown contact instructions",
+      "reproduce": "Reach contacts after a valid quantity; the prior instruction included literal *(All in one message ...)* in a plain React text bubble.",
+      "before": "Deterministic Markdown emphasis was sent to a renderer that deliberately displays escaped text.",
+      "after": "Contact/custom-question instructions are plain text. Assistant emphasis and bullet markers are converted consistently in bubbles and button labels while React still escapes HTML. Fixture img/script payloads produce no executable DOM or script."
+    },
+    {
+      "issue": "Supplied party count asked for again",
+      "reproduce": "At contacts send Make it 3 people, Change party size to 3 people, Change the number of people to 3, or 3 people. Use controlled capacities 3 and 6 and a changed slot rate.",
+      "before": "Navigation to ASK_QTY worked but discarded the supplied count. A bare 3 people could additionally overwrite the saved name.",
+      "after": "The valid unambiguous count is applied immediately through refreshed capacity and price checks. Ambiguous, fractional, negative and over-capacity corrections ask a focused quantity question without retaining an invalid quote. Sold-out fixture departures return to available dates."
+    }
+  ],
+  "changedFiles": [
+    {
+      "path": "supabase/functions/web-chat/index.ts",
+      "purpose": "Route booking corrections before contacts, rebuild tour state, invalidate old dates/times/quotes, apply counts using live capacity/current pricing, and validate required contacts before the mocked submission boundary.",
+      "sha256": "8583538918601664d37c2ff5deb7dd60f9bae8be80ec6bae283bac5f989d97cb",
+      "beforeSha256": "8fc8a7203049da4ba9311d457173971178aeae7b994d71b00899b0cb2daa958c",
+      "incrementalAddedLines": 98,
+      "incrementalRemovedLines": 64
+    },
+    {
+      "path": "supabase/functions/_shared/chat-contact.ts",
+      "purpose": "Pure contact parsing and field validation for the all-at-once or one-at-a-time collection contract; preserve valid previous details on invalid mixed input.",
+      "sha256": "7da516d1acd7766f66e7e78cda8e657b5a73ed760be80577b45f8a07dcf0e36e"
+    },
+    {
+      "path": "booking/app/lib/chat-contact.ts",
+      "purpose": "Identical validator inside the independently deployed guest app; parity is tested.",
+      "sha256": "7da516d1acd7766f66e7e78cda8e657b5a73ed760be80577b45f8a07dcf0e36e"
+    },
+    {
+      "path": "booking/app/components/ChatWidget.tsx",
+      "purpose": "Accessible contact correction errors, safe plain-text assistant/button rendering, and unsent draft persistence across refresh; keep existing request locks/version guards.",
+      "sha256": "b42658edec4dd3488bb30847ae114f8b2e0a81c002875fc854b4501dc59fc626",
+      "beforeSha256": "16937e219cb26357475362c6e923e3ab35357b97ccd74c31bcc6703d51a53dcf",
+      "incrementalAddedLines": 31,
+      "incrementalRemovedLines": 6
+    },
+    {
+      "path": "tests/unit/chat-contact.test.ts",
+      "purpose": "International names/phones, whitespace, missing fields, malformed/mixed contacts and mirrored-source parity.",
+      "sha256": "3f1080868b55f55dc0eb3afc132194c6fbef46a1f7372a95444cc202e38abc11"
+    },
+    {
+      "path": "tests/unit/web-chat-selection-regressions.test.ts",
+      "purpose": "Actual-handler regression cases for two tour switches, ambiguous/unknown tours, weekday contact fields, rejected-time/date changes, inline counts/capacity/pricing and required server contact validation.",
+      "sha256": "f5f1787fd5e4e88d031e284e73e3dec37404e3ad47ee606fbc9b9eb06fdba25f"
+    },
+    {
+      "path": "tests/unit/web-chat-widget-regressions.test.ts",
+      "purpose": "UI prevalidation, repeated Send lock, out-of-order availability and plain-text formatting.",
+      "sha256": "ab97ddf2c3fa66e2eb07b0c5beec79e2a64f81a31bfbc2c765d4d41197037e2d"
+    },
+    {
+      "path": "tests/unit/web-chat-identity.test.ts",
+      "purpose": "Use the actual contact/pricing module exports and provide the contact-error setter in the existing reset harness. This file also had unrelated pre-existing changes.",
+      "sha256": "ead8d2c19b658faa3bda8c4e16c79433e253d87d5fefbbc1605401bd87a37dc0"
+    },
+    {
+      "path": "tests/helpers/web-chat-fixture.ts",
+      "purpose": "Allow the snapshotted pre-fix handler to be executed and load actual contact/pricing modules with database/payment/email mocks.",
+      "sha256": "002c052046b2da925bb6dadf94eb61d242e563f8191dc701499c422f3bd69229",
+      "beforeSha256": "4bac08bf3c9adbece9ccd030b1cb20c8657f396c813ce1b344e2e6cb4fd21824",
+      "incrementalAddedLines": 4,
+      "incrementalRemovedLines": 2
+    },
+    {
+      "path": "tests/helpers/web-chat-server.ts",
+      "purpose": "Three controlled tours with distinct departures, capacities and price overrides; local-only inventory/failure controls.",
+      "sha256": "50c4412ece6aed9b24ac2a7b9945190cb0130ed9fbc19e86a5a2a92a19090692",
+      "beforeSha256": "9a879fb5d32ccb9691c478b5edca503273221bfae7acc8a9b34e575415ca2391",
+      "incrementalAddedLines": 24,
+      "incrementalRemovedLines": 1
+    },
+    {
+      "path": "tests/helpers/web-chat-preview.ts",
+      "purpose": "Build the independent guest checkout with local-only credentials and disabled Sentry upload; remove only this temporary build cache after successful compilation.",
+      "sha256": "5f1831dcb04db0f0ef3093ba44e068ac448de4a28b430264bf1e75c3fa525637",
+      "beforeSha256": "2b83d211651fe0b82ba413dcc36dad53de1e009138b95dd55f183b7874877e52",
+      "incrementalAddedLines": 5,
+      "incrementalRemovedLines": 2
+    },
+    {
+      "path": "tests/e2e/web-chat-production.spec.ts",
+      "purpose": "Fourteen added browser scenarios covering the requested regressions and preserving existing interaction/recovery tests.",
+      "sha256": "7d3f7291a913c001fa05ce06592d0001429d580f159178cf20c97bc752858fea",
+      "beforeSha256": "51613158e1fd24183a9cc0dc44a57aa081ee7422399ac97f2b190a124ec40944",
+      "incrementalAddedLines": 386,
+      "incrementalRemovedLines": 1
+    }
+  ],
+  "validation": {
+    "passed": [
+      {
+        "check": "Full repository unit/integration-style handler suite",
+        "command": "node_modules/.bin/vitest run --maxWorkers=2 --reporter=json",
+        "result": {
+          "success": true,
+          "numTotalTests": 2141,
+          "numPassedTests": 2085,
+          "numFailedTests": 0,
+          "numPendingTests": 56
+        }
+      },
+      {
+        "check": "New focused contact, selection and widget regressions",
+        "result": {
+          "success": true,
+          "numTotalTests": 106,
+          "numPassedTests": 106,
+          "numFailedTests": 0,
+          "numPendingTests": 0
+        },
+        "cases": [
+          "the shared multi-field chat contact contract keeps the independently deployed widget and edge contact contracts identical",
+          "the shared multi-field chat contact contract accepts and preserves the name Zoë O'Neill",
+          "the shared multi-field chat contact contract accepts and preserves the name Jean-Luc D’Arcy",
+          "the shared multi-field chat contact contract accepts and preserves the name María del Carmen de la Cruz Fernández",
+          "the shared multi-field chat contact contract accepts and preserves the name 李小龍",
+          "the shared multi-field chat contact contract accepts and preserves the name 李",
+          "the shared multi-field chat contact contract accepts and preserves the name Nǃxau ǂToma",
+          "the shared multi-field chat contact contract accepts and preserves the name Søren Ångström",
+          "the shared multi-field chat contact contract accepts and preserves the name محمد عبد الله",
+          "the shared multi-field chat contact contract accepts and preserves the name Anne · Marie",
+          "the shared multi-field chat contact contract preserves the international number in +44 7700 900123",
+          "the shared multi-field chat contact contract preserves the international number in 0044 7700 900123",
+          "the shared multi-field chat contact contract preserves the international number in +1 (415) 555-0123",
+          "the shared multi-field chat contact contract preserves the international number in +44 (0)20 7946 0958",
+          "the shared multi-field chat contact contract preserves the international number in +86 138 0013 8000",
+          "the shared multi-field chat contact contract preserves the international number in +34 612 34 56 78",
+          "the shared multi-field chat contact contract preserves the international number in 27110000000",
+          "the shared multi-field chat contact contract rejects malformed email without corrupting saved details: Email: guest.example.com",
+          "the shared multi-field chat contact contract rejects malformed email without corrupting saved details: Email guest.example.com",
+          "the shared multi-field chat contact contract rejects malformed email without corrupting saved details: guest.example.com",
+          "the shared multi-field chat contact contract rejects malformed email without corrupting saved details: guest@@example.com",
+          "the shared multi-field chat contact contract rejects malformed email without corrupting saved details: guest@example",
+          "the shared multi-field chat contact contract rejects malformed email without corrupting saved details: guest@example..com",
+          "the shared multi-field chat contact contract rejects malformed email without corrupting saved details: guest@-example.com",
+          "the shared multi-field chat contact contract rejects malformed email without corrupting saved details: guest@example_.com",
+          "the shared multi-field chat contact contract rejects malformed email without corrupting saved details: .guest@example.com",
+          "the shared multi-field chat contact contract rejects malformed email without corrupting saved details: guest..name@example.com",
+          "the shared multi-field chat contact contract rejects malformed email without corrupting saved details: Email:",
+          "the shared multi-field chat contact contract rejects invalid phone without interpreting it as a name: Phone: abcdef",
+          "the shared multi-field chat contact contract rejects invalid phone without interpreting it as a name: Phone abcdef",
+          "the shared multi-field chat contact contract rejects invalid phone without interpreting it as a name: Phone:",
+          "the shared multi-field chat contact contract rejects invalid phone without interpreting it as a name: +44abc123",
+          "the shared multi-field chat contact contract rejects invalid phone without interpreting it as a name: 123abc",
+          "the shared multi-field chat contact contract rejects invalid phone without interpreting it as a name: +44 12",
+          "the shared multi-field chat contact contract rejects invalid phone without interpreting it as a name: +00 123456789",
+          "the shared multi-field chat contact contract rejects invalid phone without interpreting it as a name: +1234567890123456",
+          "the shared multi-field chat contact contract rejects invalid phone without interpreting it as a name: +44 (7700 900123",
+          "the shared multi-field chat contact contract rejects invalid phone without interpreting it as a name: Phone: 082 123 4567",
+          "the shared multi-field chat contact contract collects all fields together: Zoë O'Neill, zoe@example.com, +44 7700 900123",
+          "the shared multi-field chat contact contract collects all fields together: Zoë O'Neill zoe@example.com +44 7700 900123",
+          "the shared multi-field chat contact contract collects all fields together: My name is Zoë O'Neill and my email is zoe@example.com and my phone is +44 7700 900123",
+          "the shared multi-field chat contact contract collects all fields together: Name: Zoë O'Neill; Email: zoe@example.com; Phone: +44 7700 900123",
+          "the shared multi-field chat contact contract collects all fields together: Name: Zoë O'Neill\nEmail: zoe@example.com\nPhone: +44 7700 900123",
+          "the shared multi-field chat contact contract collects separate fields without inventing the missing ones",
+          "the shared multi-field chat contact contract does not advance or replace details for whitespace \"\"",
+          "the shared multi-field chat contact contract does not advance or replace details for whitespace \"   \"",
+          "the shared multi-field chat contact contract does not advance or replace details for whitespace \"\\t\\n\"",
+          "the shared multi-field chat contact contract rejects invalid or conflicting mixed input as a whole: Name: Other Guest, Email: guest@@example.com, Phone: +44 7700 900123",
+          "the shared multi-field chat contact contract rejects invalid or conflicting mixed input as a whole: Other Guest, other@example.com, Phone: nope",
+          "the shared multi-field chat contact contract rejects invalid or conflicting mixed input as a whole: Email: other@example.com; Email: another@example.com",
+          "the shared multi-field chat contact contract rejects invalid or conflicting mixed input as a whole: Phone: +44 7700 900123; Phone: +34 612345678",
+          "the shared multi-field chat contact contract rejects invalid or conflicting mixed input as a whole: Name: <img src=x onerror=alert(1)>, Email: guest@example.com, Phone: +44 7700 900123",
+          "the shared multi-field chat contact contract requires every field at the server boundary and preserves the valid fields",
+          "guest booking corrections at contact collection uses the requested tour and excludes a named old tour: Switch from Morning Kayak to Sunset Paddle",
+          "guest booking corrections at contact collection uses the requested tour and excludes a named old tour: I want Sunset Paddle instead of Morning Kayak",
+          "guest booking corrections at contact collection uses the requested tour and excludes a named old tour: Not Morning Kayak, Sunset Paddle instead",
+          "guest booking corrections at contact collection uses the requested tour and excludes a named old tour: Switch to paddle",
+          "guest booking corrections at contact collection reopens tour selection when the old tour is rejected without a replacement",
+          "guest booking corrections at contact collection asks for a valid tour when a switch names an unknown experience: Switch to Dolphin Cruise",
+          "guest booking corrections at contact collection asks for a valid tour when a switch names an unknown experience: Please change to Dolphin Cruise",
+          "guest booking corrections at contact collection asks for a valid tour when a switch names an unknown experience: Can we swap to Dolphin Cruise?",
+          "guest booking corrections at contact collection switches named tours twice without retaining an old schedule, quote or tour-specific answers",
+          "guest booking corrections at contact collection asks a focused question for an ambiguous tour request before parsing it as contact data",
+          "guest booking corrections at contact collection rejects malformed contact input without using it as a name: Email: guest.example.com",
+          "guest booking corrections at contact collection rejects malformed contact input without using it as a name: Phone: abcdef",
+          "guest booking corrections at contact collection rejects malformed contact input without using it as a name: Email: guest@@example.com",
+          "guest booking corrections at contact collection preserves an international name exactly: Zoë O'Neill",
+          "guest booking corrections at contact collection preserves an international name exactly: María del Carmen de la Cruz Fernández",
+          "guest booking corrections at contact collection preserves an international name exactly: 李小龍",
+          "guest booking corrections at contact collection preserves an international name exactly: Jean-Luc D’Arcy",
+          "guest booking corrections at contact collection treats a weekday inside contact input as a detail: Email: wednesday@fixture.invalid",
+          "guest booking corrections at contact collection treats a weekday inside contact input as a detail: Name: Friday Moyo",
+          "guest booking corrections at contact collection forgets a rejected time when choosing a different date",
+          "guest booking corrections at contact collection produces contact instructions without Markdown delimiters",
+          "guest booking corrections at contact collection applies the requested count instead of asking again: Change party size to 3 people",
+          "guest booking corrections at contact collection applies the requested count instead of asking again: Make it 3 people",
+          "guest booking corrections at contact collection applies the requested count instead of asking again: Change the number of people to 3",
+          "guest booking corrections at contact collection applies the requested count instead of asking again: 3 people",
+          "guest booking corrections at contact collection rechecks a changed count of 2 against 3 available spots and the current rate",
+          "guest booking corrections at contact collection rechecks a changed count of 3 against 3 available spots and the current rate",
+          "guest booking corrections at contact collection rechecks a changed count of 4 against 3 available spots and the current rate",
+          "guest booking corrections at contact collection rechecks a changed count of 2 against 6 available spots and the current rate",
+          "guest booking corrections at contact collection rechecks a changed count of 6 against 6 available spots and the current rate",
+          "guest booking corrections at contact collection rechecks a changed count of 7 against 6 available spots and the current rate",
+          "guest booking corrections at contact collection asks for a valid unambiguous count: Make it 3 or 4 people",
+          "guest booking corrections at contact collection asks for a valid unambiguous count: Change party size to -2 people",
+          "guest booking corrections at contact collection asks for a valid unambiguous count: Change party size to 1.5 people",
+          "guest booking corrections at contact collection clears the rejected time when a different date is selected from the calendar",
+          "guest booking corrections at contact collection honours a newly supplied time on a newly supplied date",
+          "guest booking corrections at contact collection does not advance or overwrite previously valid contacts: Email: nope",
+          "guest booking corrections at contact collection does not advance or overwrite previously valid contacts: Phone: invalid",
+          "guest booking corrections at contact collection does not advance or overwrite previously valid contacts: Name: <script>alert(1)</script>",
+          "guest booking corrections at contact collection does not advance or overwrite previously valid contacts:    ",
+          "guest booking corrections at contact collection rejects missing name at confirmation without erasing another field",
+          "guest booking corrections at contact collection rejects missing email at confirmation without erasing another field",
+          "guest booking corrections at contact collection rejects missing phone at confirmation without erasing another field",
+          "guest booking corrections at contact collection completes Morning Kayak up to contact collection using the actual handler",
+          "guest booking corrections at contact collection completes Sunset Paddle up to contact collection using the actual handler",
+          "guest booking corrections at contact collection completes Midday Hike up to contact collection using the actual handler",
+          "widget contact validation and asynchronous selection boundaries validates Email: guest@@example.com in the UI before sending, without advancing",
+          "widget contact validation and asynchronous selection boundaries validates Phone: invalid in the UI before sending, without advancing",
+          "widget contact validation and asynchronous selection boundaries validates Email: in the UI before sending, without advancing",
+          "widget contact validation and asynchronous selection boundaries routes a tour change before validating contact-shaped text in the UI",
+          "widget contact validation and asynchronous selection boundaries locks a delayed availability request against rapid repeated Send calls",
+          "widget contact validation and asynchronous selection boundaries keeps the newer selection when old availability finishes after a refresh/remount",
+          "widget contact validation and asynchronous selection boundaries removes emphasis delimiters and retains untrusted HTML as ordinary text"
+        ]
+      },
+      {
+        "check": "Production-built guest UI on local fixtures",
+        "command": "npx playwright test --config playwright.web-chat.config.ts",
+        "stats": {
+          "startTime": "2026-10-05T15:06:59.787Z",
+          "duration": 747611.74,
+          "expected": 102,
+          "skipped": 0,
+          "unexpected": 0,
+          "flaky": 0
+        },
+        "projects": [
+          "chrome-phone",
+          "webkit-phone",
+          "chrome-desktop"
+        ]
+      },
+      {
+        "check": "Final unknown-tour and bare party-count browser cases in all three projects",
+        "command": "npx playwright test --config playwright.web-chat.config.ts --grep 'ambiguous and generic tour changes|party-size changes'",
+        "stats": {
+          "startTime": "2026-10-05T16:27:03.073Z",
+          "duration": 181503.375,
+          "expected": 6,
+          "skipped": 0,
+          "unexpected": 0,
+          "flaky": 0
+        }
+      },
+      {
+        "check": "Root and independent booking TypeScript",
+        "command": "node_modules/.bin/tsc --noEmit --incremental false",
+        "exitCode": 0
+      },
+      {
+        "check": "Actual Edge handler TypeScript",
+        "command": "deno check --config supabase/functions/deno.json --node-modules-dir=none supabase/functions/web-chat/index.ts",
+        "exitCode": 0
+      },
+      {
+        "check": "Full root lint",
+        "command": "npm run lint",
+        "errors": 0,
+        "existingWarnings": 259
+      },
+      {
+        "check": "Full booking lint",
+        "command": "npm run lint (booking)",
+        "errors": 0,
+        "existingWarnings": 17
+      },
+      {
+        "check": "Final changed-file lint",
+        "errors": 0,
+        "existingHandlerWarnings": 6,
+        "changedBookingFilesWarnings": 0
+      },
+      {
+        "check": "Independent guest production build",
+        "command": "next build --webpack in an isolated booking copy",
+        "exitCode": 0,
+        "evidence": "The preview helper starts Next production server only after build exits zero; both successful Playwright runs used that server. Only fake local Supabase configuration was supplied. Existing middleware/Sentry/webpack warnings remain."
+      },
+      {
+        "check": "Root and booking git diff --check",
+        "exitCode": 0
+      },
+      {
+        "check": "Visual inspection",
+        "screenshots": [
+          "docs/production-readiness/evidence/web-chat-local-qa-20261005/corrected-summary-chrome-desktop.png",
+          "docs/production-readiness/evidence/web-chat-local-qa-20261005/320-webkit-phone.png",
+          "docs/production-readiness/evidence/web-chat-local-qa-20261005/contact-error-chrome-phone.png"
+        ],
+        "result": "Desktop final summary and mobile 320px contact guidance remain readable with no horizontal overflow or Markdown emphasis. Automated layouts additionally covered 375px and 430px, focus and keyboard controls."
+      }
+    ],
+    "failed": [],
+    "blocked": [],
+    "notRun": [
+      {
+        "check": "Conditional unrelated unit tests",
+        "count": 56,
+        "files": {
+          "agent-mcp-backend.test.ts": 48,
+          "agent-native-auth.test.ts": 7,
+          "anon-cross-tenant-reads.test.ts": 1
+        },
+        "reason": "Native MCP/auth and credential-dependent live isolation checks are skipped by their existing gates."
+      },
+      {
+        "check": "Real final booking submission, payment processing and customer/verification email delivery",
+        "reason": "Explicitly prohibited. Submission, checkout and email calls were tested only against in-memory mocks/fixtures."
+      },
+      {
+        "check": "Production sold-out/concurrent-capacity database behaviour",
+        "reason": "Sold-out inventory, changing capacity/rates, failures and duplicate-attempt boundaries used controlled mocks; no claim is made about live database concurrency."
+      },
+      {
+        "check": "Physical mobile keyboard and assistive technology",
+        "reason": "Browser keyboard/focus, IME, Chrome/WebKit mobile emulation and three viewport widths were tested; no real device was used."
+      },
+      {
+        "check": "Deployment and production setting changes",
+        "reason": "Explicitly prohibited; changes are left for review."
+      }
+    ],
+    "earlierFailures": [
+      {
+        "check": "Deliberate pre-fix reproduction suite",
+        "total": 12,
+        "failed": 10,
+        "passed": 2,
+        "artifact": "/private/tmp/bookingtours-chat-local-review-ulmvlp4y/reproductions-before.json",
+        "resolution": "Each confirmed defect now has passing focused regression coverage."
+      },
+      {
+        "check": "First full browser run",
+        "passed": 92,
+        "failed": 10,
+        "artifact": "/private/tmp/bookingtours-chat-local-review-ulmvlp4y/browser-first.json",
+        "resolution": "Three failures expected a retired calendar button to remain disabled; the assertion now matches the existing UI contract. Seven desktop failures were startup/interaction timeouts during disk exhaustion; WebKit also reported ENOSPC while saving a trace. Only this task’s generated build cache was removed and the preview helper now removes its own cache. The fresh full run passed all 102 checks."
+      },
+      {
+        "check": "Sandbox localhost listener",
+        "error": "EPERM binding fixture port",
+        "resolution": "The same approved Playwright command was rerun with local network/browser execution permission; no production access was introduced."
+      },
+      {
+        "check": "Additional routing reproductions",
+        "artifacts": [
+          "/private/tmp/bookingtours-chat-local-review-ulmvlp4y/contact-schedule-before.log",
+          "/private/tmp/bookingtours-chat-local-review-ulmvlp4y/unknown-tour-before.log",
+          "/private/tmp/bookingtours-chat-local-review-ulmvlp4y/direct-party-before.log"
+        ],
+        "resolution": "Weekday contacts, unknown tour switches and bare party counts have passing handler and browser coverage."
+      }
+    ]
+  },
+  "preservedCoverage": [
+    "All three controlled tour paths reach contacts",
+    "Two successive tour switches yield only the last tour/date/time/price in the final summary",
+    "Below/at/above capacity, changed rates, group discount, sold-out inventory and failure/retry",
+    "Current-date departures and accurate rejected-time errors",
+    "Delayed/out-of-order responses, rapid buttons, double Send and Enter/Send",
+    "Back, cancel, Restart and failed Restart recovery",
+    "Close/reopen, five-step refresh/draft recovery and Restart clearing stale state",
+    "Desktop, mobile Chrome/WebKit, 320/375/430 widths, focus, IME and disabled/loading states",
+    "Safe plain text and escaped untrusted HTML",
+    "Mocked booking/checkout failure, idempotency and submission boundaries from the existing unit/UI suite"
+  ],
+  "remainingRisks": [
+    "Contact validation establishes syntax, not email deliverability or phone reachability.",
+    "The independent guest/Edge validator copies must stay identical; the new parity test enforces this.",
+    "Live payment/email/database concurrency and physical-device behaviour remain unestablished; the controlled fixture results cannot establish them.",
+    "The workspace contains earlier unrelated uncommitted changes; incremental patches in the local evidence packet identify this task’s changes against its entry snapshot."
+  ],
+  "manualRetestChecklist": [
+    "In a local/sandbox environment complete each tour to contacts. Change tours twice and verify only the last tour, current departure and recalculated total appear in the summary; stop before real confirmation.",
+    "Reject a time, choose a date with different departures and verify the old time/error disappears. Delay availability and confirm the newer date remains selected.",
+    "Try Unicode/apostrophe/hyphen names, malformed labeled and mixed contacts, missing fields, and Name: Friday Moyo. Verify valid saved details survive, corrections stay at contacts, and messages show no raw Markdown.",
+    "Try 3 people and party changes below/at/above fixture capacity; change price/capacity and simulate network/sold-out cases. Verify current price/capacity feedback and no booking is submitted.",
+    "Double click and use Enter/Send; try Back/cancel, close/reopen, refresh with an unsent draft, and Restart at several steps. Check 320/375/430 widths, focus and loading/disabled controls."
+  ],
+  "localEvidencePacket": "/private/tmp/bookingtours-chat-local-review-ulmvlp4y"
+}

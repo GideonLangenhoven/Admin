@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-16T06:16:26.799Z",
+  "checks": [
+    {
+      "url": "https://kayak.booking.bookingtours.co.za",
+      "status": 200
+    },
+    {
+      "url": "https://claires-hiking.booking.bookingtours.co.za",
+      "status": 200
+    }
+  ]
+}

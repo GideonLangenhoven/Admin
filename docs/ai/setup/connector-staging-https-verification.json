@@ -1,0 +1,18 @@
+{
+  "verified_at": "2026-10-08T19:07:43.662Z",
+  "target_project": "gwwnkihblioayklptdab",
+  "origin": "https://bookingtours-connector-test-gwwn.vercel.app",
+  "result": "PASS",
+  "https_certificate_verified": true,
+  "login_page_status": 200,
+  "server_credentials_absent_from_public_html": true,
+  "disabled_routes_verified": [
+    "/api/mcp/chatgpt",
+    "/api/mcp/muse",
+    "/.well-known/oauth-authorization-server",
+    "/.well-known/oauth-protected-resource/api/mcp/chatgpt"
+  ],
+  "anonymous_connections_denied": true,
+  "connectors_enabled": false,
+  "credentials_printed": false
+}

@@ -37,10 +37,10 @@ export default function PhoneAlerts() {
           const response = await fetch("/api/admin/web-push", {
             method: "POST", headers, body: JSON.stringify(subscription.toJSON()),
           });
-          if (!response.ok) throw new Error("Could not restore phone alerts");
+          if (!response.ok) throw new Error("Could not restore device notifications");
         }
       }
-    })().catch(() => { if (active) { setStatus("off"); setError("Could not restore phone alerts. Please enable them again."); } });
+    })().catch(() => { if (active) { setStatus("off"); setError("Could not restore device notifications. Please enable them again."); } });
     return () => { active = false; };
   }, [businessId, readOnly]);
 
@@ -52,7 +52,7 @@ export default function PhoneAlerts() {
       if (permission !== "granted") { setStatus(permission === "denied" ? "denied" : "off"); return; }
       const headers = await getAuthHeaders(businessId);
       const response = await fetch("/api/admin/web-push", { headers });
-      if (!response.ok) throw new Error("Could not load phone alert settings");
+      if (!response.ok) throw new Error("Could not load device notification settings");
       const { publicKey } = await response.json();
       if (!publicKey) throw new Error("Phone alerts are not configured yet");
       const registration = await navigator.serviceWorker.register("/admin-sw.js", { scope: "/" });
@@ -62,9 +62,9 @@ export default function PhoneAlerts() {
       const save = await fetch("/api/admin/web-push", {
         method: "POST", headers, body: JSON.stringify(subscription.toJSON()),
       });
-      if (!save.ok) throw new Error("Could not save phone alerts");
+      if (!save.ok) throw new Error("Could not save device notifications");
       setStatus("on");
-    } catch (e) { setError((e as Error).message || "Could not enable phone alerts"); }
+    } catch (e) { setError((e as Error).message || "Could not enable device notifications"); }
     finally { setBusy(false); }
   }
 
@@ -79,11 +79,11 @@ export default function PhoneAlerts() {
           method: "DELETE", headers: await getAuthHeaders(businessId),
           body: JSON.stringify({ endpoint: subscription.endpoint }),
         });
-        if (!response.ok) throw new Error("Could not turn off phone alerts");
+        if (!response.ok) throw new Error("Could not turn off device notifications");
         await subscription.unsubscribe();
       }
       setStatus("off");
-    } catch (e) { setError((e as Error).message || "Could not turn off phone alerts"); }
+    } catch (e) { setError((e as Error).message || "Could not turn off device notifications"); }
     finally { setBusy(false); }
   }
 
@@ -94,13 +94,13 @@ export default function PhoneAlerts() {
   return (
     <div className="ui-card flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
       <div className="min-w-0 flex-1">
-        <p className="font-semibold" style={{ color: "var(--ck-text-strong)" }}>Phone alerts for web chat</p>
+        <p className="font-semibold" style={{ color: "var(--ck-text-strong)" }}>Notifications on this device</p>
         <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
-          {status === "on" ? "On for this phone. Alerts open the guest conversation here." :
-            status === "denied" ? "Notifications are blocked. Allow them in your phone settings." :
-            needsHomeScreen ? "Add BookingTours to your Home Screen, open it there, then enable alerts." :
-            status === "unsupported" ? "This browser does not support phone alerts." :
-            "Get a phone notification when a guest needs a human reply."}
+          {status === "on" ? "On for this browser. Alerts open the guest conversation here." :
+            status === "denied" ? "Alerts blocked. Allow notifications in browser and device settings." :
+            needsHomeScreen ? "Add BookingTours to your Home Screen. Open it there to enable alerts." :
+            status === "unsupported" ? "This browser does not support these notifications." :
+            "Get device alerts when guests need staff."}
         </p>
         {error && <p role="alert" className="mt-1 text-xs text-[var(--ck-danger)]">{error}</p>}
       </div>

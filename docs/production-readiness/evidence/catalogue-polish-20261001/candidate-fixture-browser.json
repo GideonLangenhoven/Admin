@@ -1,0 +1,621 @@
+{
+  "config": {
+    "configFile": "/private/tmp/bookingtours-catalogue-publish-20261001/candidate-fixture.config.ts",
+    "rootDir": "/private/tmp/bookingtours-catalogue-publish-20261001",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/Users/gideonlangenhoven/dev/capekayak/tests/helpers/catalogue-photos.mjs",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/private/tmp/bookingtours-catalogue-publish-20261001/fixture-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "desktop-chrome",
+        "name": "desktop-chrome",
+        "testDir": "/private/tmp/bookingtours-catalogue-publish-20261001",
+        "testIgnore": [],
+        "testMatch": [
+          "candidate-fixture.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/private/tmp/bookingtours-catalogue-publish-20261001/fixture-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "mobile-chrome",
+        "name": "mobile-chrome",
+        "testDir": "/private/tmp/bookingtours-catalogue-publish-20261001",
+        "testIgnore": [],
+        "testMatch": [
+          "candidate-fixture.spec.ts"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "/private/tmp/bookingtours-catalogue-publish-20261001/fixture-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "mobile-webkit",
+        "name": "mobile-webkit",
+        "testDir": "/private/tmp/bookingtours-catalogue-publish-20261001",
+        "testIgnore": [],
+        "testMatch": [
+          "candidate-fixture.spec.ts"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/private/tmp/bookingtours-catalogue-publish-20261001/candidate-fixture-browser.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.59.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "candidate-fixture.spec.ts",
+      "file": "candidate-fixture.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "current three tours show shallower photos, authoritative text prices and one action",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop-chrome",
+              "projectName": "desktop-chrome",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2391,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-01T15:10:52.789Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b6568bdbfc3e943afaa3-f19d9d3fe2455be45c7a",
+          "file": "candidate-fixture.spec.ts",
+          "line": 125,
+          "column": 5
+        },
+        {
+          "title": "six tours, long titles, saved palettes, busy backgrounds and differing font metrics reflow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop-chrome",
+              "projectName": "desktop-chrome",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 5276,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-01T15:10:56.097Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b6568bdbfc3e943afaa3-ab0ab3811bd649bc36bd",
+          "file": "candidate-fixture.spec.ts",
+          "line": 153,
+          "column": 5
+        },
+        {
+          "title": "absent prices and photographs stay absent; zero remains a real price",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop-chrome",
+              "projectName": "desktop-chrome",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 756,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-01T15:11:01.381Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b6568bdbfc3e943afaa3-3dc702ce4eed2c96f03e",
+          "file": "candidate-fixture.spec.ts",
+          "line": 182,
+          "column": 5
+        },
+        {
+          "title": "keyboard focus, whole-card navigation, voucher/bookings links and slot deep links retain destinations",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop-chrome",
+              "projectName": "desktop-chrome",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3248,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-01T15:11:02.146Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b6568bdbfc3e943afaa3-f59f9385aa15aefec16f",
+          "file": "candidate-fixture.spec.ts",
+          "line": 191,
+          "column": 5
+        },
+        {
+          "title": "Booking Page Preview shares tours, styling, background and unsaved configuration changes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "desktop-chrome",
+              "projectName": "desktop-chrome",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 11520,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-01T15:11:05.403Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b6568bdbfc3e943afaa3-764c48906ac079a1e95b",
+          "file": "candidate-fixture.spec.ts",
+          "line": 220,
+          "column": 5
+        },
+        {
+          "title": "current three tours show shallower photos, authoritative text prices and one action",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-chrome",
+              "projectName": "mobile-chrome",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2561,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-01T15:11:17.566Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b6568bdbfc3e943afaa3-6055c8ba33738cf1e874",
+          "file": "candidate-fixture.spec.ts",
+          "line": 125,
+          "column": 5
+        },
+        {
+          "title": "six tours, long titles, saved palettes, busy backgrounds and differing font metrics reflow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-chrome",
+              "projectName": "mobile-chrome",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6470,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-01T15:11:20.326Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b6568bdbfc3e943afaa3-3d5d673cced61e2d7dbe",
+          "file": "candidate-fixture.spec.ts",
+          "line": 153,
+          "column": 5
+        },
+        {
+          "title": "absent prices and photographs stay absent; zero remains a real price",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-chrome",
+              "projectName": "mobile-chrome",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 797,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-01T15:11:26.804Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b6568bdbfc3e943afaa3-567b53c42dd86f908334",
+          "file": "candidate-fixture.spec.ts",
+          "line": 182,
+          "column": 5
+        },
+        {
+          "title": "keyboard focus, whole-card navigation, voucher/bookings links and slot deep links retain destinations",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-chrome",
+              "projectName": "mobile-chrome",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2766,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-01T15:11:27.609Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b6568bdbfc3e943afaa3-488f9e0a01c29fc1cece",
+          "file": "candidate-fixture.spec.ts",
+          "line": 191,
+          "column": 5
+        },
+        {
+          "title": "Booking Page Preview shares tours, styling, background and unsaved configuration changes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-chrome",
+              "projectName": "mobile-chrome",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 9695,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-01T15:11:30.382Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b6568bdbfc3e943afaa3-702c1ad1023803ec9092",
+          "file": "candidate-fixture.spec.ts",
+          "line": 220,
+          "column": 5
+        },
+        {
+          "title": "current three tours show shallower photos, authoritative text prices and one action",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-webkit",
+              "projectName": "mobile-webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3555,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-01T15:11:40.712Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b6568bdbfc3e943afaa3-cfb1a1a9a0b13ddc7b26",
+          "file": "candidate-fixture.spec.ts",
+          "line": 125,
+          "column": 5
+        },
+        {
+          "title": "six tours, long titles, saved palettes, busy backgrounds and differing font metrics reflow",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-webkit",
+              "projectName": "mobile-webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6708,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-01T15:11:45.542Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b6568bdbfc3e943afaa3-a02732ca6e70ff98da6e",
+          "file": "candidate-fixture.spec.ts",
+          "line": 153,
+          "column": 5
+        },
+        {
+          "title": "absent prices and photographs stay absent; zero remains a real price",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-webkit",
+              "projectName": "mobile-webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 886,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-01T15:11:52.264Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b6568bdbfc3e943afaa3-635ea78d46bdcf39c56b",
+          "file": "candidate-fixture.spec.ts",
+          "line": 182,
+          "column": 5
+        },
+        {
+          "title": "keyboard focus, whole-card navigation, voucher/bookings links and slot deep links retain destinations",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-webkit",
+              "projectName": "mobile-webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3458,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-01T15:11:53.160Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b6568bdbfc3e943afaa3-d743647e3aed5d43a08e",
+          "file": "candidate-fixture.spec.ts",
+          "line": 191,
+          "column": 5
+        },
+        {
+          "title": "Booking Page Preview shares tours, styling, background and unsaved configuration changes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 120000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "mobile-webkit",
+              "projectName": "mobile-webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 20009,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-01T15:11:56.636Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "b6568bdbfc3e943afaa3-1e3b1d4e9e26176788fc",
+          "file": "candidate-fixture.spec.ts",
+          "line": 220,
+          "column": 5
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-01T15:09:12.178Z",
+    "duration": 184850.368,
+    "expected": 15,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

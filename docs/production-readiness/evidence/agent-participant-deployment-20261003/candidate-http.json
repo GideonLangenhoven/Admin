@@ -1,0 +1,24 @@
+[
+  {
+    "case": "candidate-home",
+    "status": 200,
+    "cache_control": "public, max-age=0, must-revalidate"
+  },
+  {
+    "case": "candidate-agent-get",
+    "status": 503,
+    "cache_control": "no-store",
+    "code": "INTEGRATION_DISABLED"
+  },
+  {
+    "case": "candidate-agent-post",
+    "status": 503,
+    "cache_control": "no-store",
+    "code": "INTEGRATION_DISABLED"
+  },
+  {
+    "case": "candidate-admin-auth",
+    "status": 401,
+    "cache_control": "public, max-age=0, must-revalidate"
+  }
+]

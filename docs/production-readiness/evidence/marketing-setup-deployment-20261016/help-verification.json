@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-16T05:08:34.025Z",
+  "article": "marketing",
+  "chunks": 10,
+  "result": {
+    "ok": true,
+    "total": 176,
+    "embedded": 1,
+    "skipped": 175,
+    "removed": 0,
+    "failed": 0,
+    "errors": []
+  },
+  "unrelated_articles_unchanged": true
+}

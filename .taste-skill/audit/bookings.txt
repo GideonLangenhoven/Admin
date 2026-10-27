@@ -1,0 +1,46 @@
+TASTESKILL · INSPECT   http://127.0.0.1:3000/bookings
+
+MEASURED (first viewport listed)
+  hero headline   "Claire's Hiking"  2 words · 1 line(s) · 12px (0.8vw) · Plus Jakarta Sans 400 · tracking 0em · leading 1.63
+  @768px          1 line(s) · 28px
+  @390px          1 line(s) · 28px
+  typefaces       Plus Jakarta Sans 71%, Geist Mono 20%, satoshi 8%
+  sizes in use    9 / 10 / 11 / 12 / 13 / 14 / 15 / 20 / 28 px   body 12px / 1.33
+  colour          page #f7f5f0 · button #ffffff
+  page            1 screens · 140 words · 3 images · hero media none
+  headings        1 · longest 1 line(s) · median - words
+
+FAIL — fix every one of these
+  [micro-label] @1440px  4 tiny uppercase letter-spaced labels (e.g. "Claire's Hiking", "Bookings", "Operations", "Totals").
+      → Use sentence-case text at a readable size, or delete the label.
+  [gradient] @1440px (+768, 390)  2 gradient fill(s): aside.hidden.shrink-0 → radial-gradient(140% 50% at 50% -8%, rgba(0, 217, 139, 0.07), rgba(0, 0, 0, 0) 60%), radial-gradient(120% 45%  | div.ui-card.max-w-full → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)
+      → Use a flat colour or a real image. The only gradient allowed by default is a neutral scrim over a photo for legibility.
+  [button-fx] @1440px  Buttons with shadow/glow.
+      → Flat fill, one colour.
+  [heavy-shadow] @1440px (+768, 390)  1 panel shadow(s) heavy enough to read as floating: rgba(15, 43, 31, 0.12) 0px 10px 28px -14px
+      → Panels sit on the ground: separate them with a fill one step from the ground or a quiet 1px border. A shadow, if any, is under 8% black with a small blur. Real overlays (menus, dialogs, popovers) may float.
+  [tiny-text] @1440px (+768, 390)  7 text blocks under 11px: Customer view 10px, Operations 10px, Guest care 10px, Revenue 10px.
+      → Nothing below 11px; secondary text 12px, data 13–14px.
+  [no-title] @768px (+390)  The screen has no h1.
+      → Name the screen in an h1 at the top of the canvas (18–28px): "Overview", "Payouts", the project's name.
+
+WARN — fix, or be able to defend
+  [palette-cream] @1440px (+768, 390)  Yellow-cream background (page background #f7f5f0).
+      → Use the drawn palette. If you want warmth, take a low-chroma stone or bone, not a yellow cream.
+  [font-count] @1440px  3 typefaces in use (Plus Jakarta Sans, Geist Mono, satoshi).
+      → Two at most.
+  [micro-label] @768px (+390)  1 tiny uppercase letter-spaced label(s): "Operations"
+      → Prefer sentence case at body size.
+  [heavy-borders] @768px (+390)  5 panel borders are dark against their ground: #0b2c21 on #f7f5f0 (13.8:1) | #0b2c21 on #f7f5f0 (13.8:1) | #0b2c21 on #f7f5f0 (13.8:1)
+      → A panel border is a whisper: about 1.1–1.3:1 against its ground on a light screen (#e5e7eb–#ededed on white), and about 1.2–1.5:1 on a dark one (#1a1a1a on #000, #2e2e2e on #111). Darker lines turn the screen into a grid of boxes; keep the stronger line for controls.
+
+LOOK AT THE RENDER — open these with your image viewer / Read tool before saying anything about quality:
+  desktop 1440px  .taste-skill/audit/bookings/desktop-fold.jpg
+                  .taste-skill/audit/bookings/desktop-page-01.jpg
+  tablet 768px    .taste-skill/audit/bookings/tablet-fold.jpg
+                  .taste-skill/audit/bookings/tablet-page-01.jpg
+  mobile 390px    .taste-skill/audit/bookings/mobile-fold.jpg
+                  .taste-skill/audit/bookings/mobile-page-01.jpg
+
+report: .taste-skill/audit/bookings/report.json
+RESULT: 6 FAIL, 4 WARN — not done.

@@ -1,0 +1,68 @@
+{
+  "date": "2026-10-20",
+  "status": "deployed_and_verified",
+  "deployed": true,
+  "scope": "Operator-wide persistent dashboard tile ordering and visibility, editable only by MAIN_ADMIN and SUPER_ADMIN with write access.",
+  "behavior": [
+    "Drag handles with touch and edge scrolling; keyboard arrows and move buttons",
+    "Hide and show tiles, explicit save and cancel, all-hidden recovery",
+    "Shared server storage scoped to the selected operator; regular staff use the saved arrangement",
+    "Optimistic revision checks prevent silent concurrent overwrite; read and save failures preserve choices"
+  ],
+  "checks": {
+    "unit_feature_and_snapshot": "16 passed",
+    "database": "PASS: disposable PostgreSQL migration, service-only grants, tenant-scoped records, duplicate and stale revision protection",
+    "browser": "9 passed: 6 feature scenarios plus 3 existing dashboard operation checks; the manifest assertion now accepts either compact or tabular total labels.",
+    "typecheck": "Passed: application and component TypeScript, excluding archived source copies with pre-existing import failures",
+    "eslint": "New runtime and test files clean; app/page.tsx has six pre-existing warnings",
+    "design_detector": [],
+    "diff_check": "Passed"
+  },
+  "unrelated_failure": {
+    "test": "tests/unit/admin-help-current-guide.test.ts: keeps today\u2019s released workflows and limits available to an owner when retrieval is unavailable",
+    "reason": "Existing literal assertion expects \"never tell the user that saving starts emails\"; untouched supabase/functions/admin-help-chat/index.ts uses \"Saving alone does not start emails.\"",
+    "result": "3 other help tests pass"
+  },
+  "rollout": "Migration 20261020090000_operator_dashboard_layouts applied and verified before promoting the admin release. Live permissions, persistence and mobile restoration passed; original test layouts restored.",
+  "files": {
+    "app/page.tsx": "5a1c8d8c410bd2e2c5cf0e6353d5ef7c21da73fa3095903cd42f567f977f3ae2",
+    "app/api/dashboard-layout/route.ts": "e089e9b19d0f6d0ea2061c8c7d302a12e0a65c3a865bcef6b91f3dcea858c02b",
+    "app/lib/dashboard-layout.ts": "8a0c658a4f72abf3c08e215124b1f26ebf6d98b469579935b1833b74bc9b2613",
+    "components/DashboardTiles.tsx": "a5416d0b603267914aed1a086002bef7a618f09ed5c64db5233f0c716771f6d9",
+    "components/DashboardTiles.module.css": "1f119fdc02c5f4769a8a696f267a6d3196aba37676859edd96eb957c57bec0c0",
+    "supabase/migrations/20261020090000_operator_dashboard_layouts.sql": "4ccf310a7fe95b23974253783c30b7c0a801e160570fd36f37abee2177d8109f",
+    "docs/admin-help/dashboard.md": "e4be6360e6e2cce480ce1a77bce45b1ac6ced10bd5175b7da2430b010fc774ca",
+    "tests/unit/dashboard-layout.test.ts": "afd967d0815164cbb05fefa3ec66e08f01212df79704d8bde1771fefe8f12602",
+    "tests/dashboard-layout-local.mjs": "88cf22000180e51d7b84cca5687cfabd95bdcdae7a47f159165a60830c456e54",
+    "tests/e2e/dashboard-layout.spec.ts": "72e9bc73d3b9b97ae2c9815f123e8a8906cacbbb18f22266d84d9c2766015e2e",
+    "tests/fixtures/dashboard-preview-context.tsx": "2820db7db7d460fe230468eca32741d6f7789f31460b70ef08f64dc8d670812b",
+    "tests/helpers/operator-preview.mjs": "2e8dd09eca73d5a5b973ed31eca0cedd466652a7663771783c7d0136ec5fa0ae",
+    "tests/e2e/operator-usability-mocked.spec.ts": "34c74d26d5a7ca73d7e433a59cd54b693251d4f13b5fb4a0cb7b437f28919102",
+    "playwright.dashboard-layout.config.ts": "56c955a03c2b81aaff4de12ec77a16efd935c75bf318c54b59f0bcc3e0333a61"
+  },
+  "visual_review": {
+    "disposition": "ship",
+    "scope": "New dashboard layout editor and its integration at 1440px, 390px and 320px; no material fixes",
+    "reviewer": "impeccable_finish_reviewer"
+  },
+  "documentation_review": {
+    "result": "Passed: ordinary extension matches incumbent palette, typography, components, responsive layout and 44px controls. Functional dashboard help updated.",
+    "reviewer": "impeccable_documenter",
+    "existing_gap": "DESIGN.md and .impeccable/design.json are absent; preserved existing documentation without introducing a new design system."
+  },
+  "screenshots": [
+    ".impeccable/review/dashboard-layout-default-desktop.png",
+    ".impeccable/review/dashboard-layout-desktop.png",
+    ".impeccable/review/dashboard-layout-hidden-desktop.png",
+    ".impeccable/review/dashboard-layout-mobile.png",
+    ".impeccable/review/dashboard-layout-hidden-mobile.png",
+    ".impeccable/review/dashboard-layout-user-320.png"
+  ],
+  "deployment": {
+    "id": "dpl_9TVrVHNzgCuMcGV5a9zApHf68Xpi",
+    "url": "https://kayak.admin.bookingtours.co.za/",
+    "verified_at": "2026-10-20T05:25:05.768Z",
+    "live_check_count": 18
+  },
+  "deployment_evidence": "docs/production-readiness/evidence/DASHBOARD_LAYOUT_DEPLOYMENT_20261020.json"
+}

@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-19T12:50:20.074Z",
+  "id": "0af4d3f6-1f9e-471b-9cf5-5747e0341eb4",
+  "endpoint": "https://ukdsrndqhsatjkmxijuj.supabase.co/functions/v1/resend-webhook",
+  "events": [
+    "email.bounced",
+    "email.complained",
+    "email.suppressed"
+  ],
+  "signed_callback_status": 200,
+  "unsigned_callback_status": 401,
+  "customer_messages_sent": 0,
+  "secret_installed": true
+}

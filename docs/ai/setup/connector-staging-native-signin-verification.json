@@ -1,0 +1,15 @@
+{
+  "verified_at": "2026-10-08T17:19:24.184Z",
+  "target_project": "gwwnkihblioayklptdab",
+  "local_origin": "http://127.0.0.1:3194",
+  "result": "PASS",
+  "native_password_sign_in_tested": true,
+  "actual_admin_login_verified": true,
+  "native_role": "MAIN_ADMIN",
+  "sample_business_context_verified": true,
+  "disabled_connections_notice_visible": true,
+  "connectors_enabled": false,
+  "temporary_test_session_cleanup": "temporary_test_session_revoked",
+  "credentials_printed": false,
+  "boundary": "Real password sign-in through the existing browser AuthGate, Supabase Auth and verified server-side administrator lookup, in the isolated local test app. Only the approved test-account password was changed; no provider enabled or public deployment created."
+}

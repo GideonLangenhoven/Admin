@@ -1,0 +1,24 @@
+{
+  "at": "2026-10-15T16:46:14.764Z",
+  "articles": [
+    "guide",
+    "simple-view",
+    "settings",
+    "photos",
+    "new-booking",
+    "dashboard",
+    "bookings",
+    "marketing",
+    "payment-reminders"
+  ],
+  "result": {
+    "ok": true,
+    "total": 176,
+    "embedded": 2,
+    "skipped": 174,
+    "removed": 0,
+    "failed": 0,
+    "errors": []
+  },
+  "verified_chunks": 71
+}

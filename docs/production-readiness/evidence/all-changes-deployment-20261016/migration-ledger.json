@@ -1,0 +1,102 @@
+[
+  {
+    "version": "20261015200000",
+    "name": "guide_simple_manifest"
+  },
+  {
+    "version": "20261015190000",
+    "name": "shared_guide_access"
+  },
+  {
+    "version": "20261015180000",
+    "name": "marketing_closeout_hold"
+  },
+  {
+    "version": "20261015172000",
+    "name": "operator_cancellation_money"
+  },
+  {
+    "version": "20261015171000",
+    "name": "operator_booking_transaction"
+  },
+  {
+    "version": "20261015170000",
+    "name": "operator_daily_consistency"
+  },
+  {
+    "version": "20261015161000",
+    "name": "marketing_draft_revisions"
+  },
+  {
+    "version": "20261015160000",
+    "name": "marketing_permission_safety"
+  },
+  {
+    "version": "20261015150000",
+    "name": "welcome_back_email_sequences"
+  },
+  {
+    "version": "20261015140000",
+    "name": "customer_return_history"
+  },
+  {
+    "version": "20261015120000",
+    "name": "payment_recovery"
+  },
+  {
+    "version": "20261008120000",
+    "name": "ota_transactions"
+  },
+  {
+    "version": "20261003160000",
+    "name": "agent_read_foundation"
+  },
+  {
+    "version": "20261001131000",
+    "name": "restore_kayak_storefront_layout"
+  },
+  {
+    "version": "20261001091000",
+    "name": "kayak_daily_demo"
+  },
+  {
+    "version": "20261001090000",
+    "name": "repair_claires_demo_refresh"
+  },
+  {
+    "version": "20260929110000",
+    "name": "first_booking_my_bookings"
+  },
+  {
+    "version": "20260929100000",
+    "name": "invoice_numbers_per_business"
+  },
+  {
+    "version": "20260928102000",
+    "name": "admin_web_push_subscriptions"
+  },
+  {
+    "version": "20260927100000",
+    "name": "shared_ingress_rate_limit"
+  },
+  {
+    "version": "20260925120000",
+    "name": "check_ins_policy_hoisted"
+  },
+  {
+    "version": "20260923140000",
+    "name": "waiver_and_client_trigger_paths"
+  },
+  {
+    "version": "20260923130000",
+    "name": "refund_batch_acceptance"
+  },
+  {
+    "version": "20260923120000",
+    "name": "storage_exact_staff_roles"
+  },
+  {
+    "version": "20260923110000",
+    "name": "exact_staff_roles_and_demo_rpc_acl"
+  }
+]

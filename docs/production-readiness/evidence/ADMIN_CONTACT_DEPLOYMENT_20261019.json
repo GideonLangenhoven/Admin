@@ -1,0 +1,48 @@
+{
+  "at": "2026-10-19T09:32:51.584477+00:00",
+  "status": "deployed_and_verified",
+  "production": "https://admin.bookingtours.co.za",
+  "deployment": {
+    "id": "dpl_EPVCgC5T3JdAZ3CEoh4bmKktyCBo",
+    "url": "caepweb-admin-g9lgyy914-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 496
+  },
+  "scope": {
+    "baseline": "dpl_ARBXhbY4vttefSLMbxzUkBMmw84t",
+    "changed": [
+      "app/settings/page.tsx",
+      "app/super-admin/page.tsx",
+      "components/AuthGate.tsx",
+      "app/api/admin/contact/route.ts",
+      "components/AdminContactEditor.tsx"
+    ],
+    "added": [
+      "app/api/admin/contact/route.ts",
+      "components/AdminContactEditor.tsx"
+    ],
+    "downloaded": 0,
+    "preserved": 491,
+    "source_sha256": {
+      "app/settings/page.tsx": "44d8fc8e193fe8e48571d2ce3500f1c4e58b02309772e883947235268ab1a8c0",
+      "app/super-admin/page.tsx": "b9fcd7559f24e510e8b004c2590197b0c1a6e875fee258929e65e4bb9a70eb0a",
+      "components/AuthGate.tsx": "1e1a64a240e3508b4c8a5b2b4ac8dcf9a0c8c66753277c0fde3977b6dbaa86d6",
+      "app/api/admin/contact/route.ts": "f6dc3e177382434ce9163bbca17d7bdbec658aa181198253ea6bc1d3f3148f74",
+      "components/AdminContactEditor.tsx": "e4903d10962234ec4d6cc940aaeb0d4ea079a8e2e6bd3b23b1ff84b09e0db21e"
+    },
+    "migration_sha256": "a972e6e04c1cc1402af92ab3b7aa40be5570ee0b6288387372097858dcb62806",
+    "version": "20261019110000"
+  },
+  "validation": {
+    "focused_unit_tests": 144,
+    "disposable_postgres_checks": "passed",
+    "production_build": "passed",
+    "source_files_verified": 496,
+    "hosted_synthetic_browser_cases": 8,
+    "live_account_writes": 0,
+    "help_updated": 2,
+    "help_preserved": 176
+  },
+  "evidence_directory": "docs/production-readiness/evidence/admin-contact-20261019",
+  "broader_rollout": "remains paused"
+}

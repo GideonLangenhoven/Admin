@@ -1,0 +1,9 @@
+{
+  "baseline": "dpl_45o3HogLgGoNEsuQoQUXaE7nLxFx",
+  "changed": [
+    "components/simple/BookingContact.tsx"
+  ],
+  "functions": [],
+  "database_changes": false,
+  "auth_config_changes": false
+}

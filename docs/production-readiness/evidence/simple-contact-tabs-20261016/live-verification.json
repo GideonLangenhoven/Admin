@@ -1,0 +1,47 @@
+{
+  "at": "2026-10-16T07:39:48.659Z",
+  "deployment": "dpl_DV7xuxRfeemH3XhLj7jr3TvA4xPS",
+  "checks": [
+    {
+      "path": "/photos",
+      "status": 200
+    },
+    {
+      "path": "/simpleguide",
+      "status": 200
+    },
+    {
+      "path": "/settings",
+      "status": 200
+    },
+    {
+      "path": "/vouchers",
+      "status": 200
+    },
+    {
+      "path": "/marketing/promotions",
+      "status": 200
+    },
+    {
+      "path": "/api/mfa/status",
+      "status": 401
+    },
+    {
+      "path": "/api/credentials",
+      "status": 403
+    },
+    {
+      "path": "/api/guide/photos?kind=slots",
+      "status": 401
+    },
+    {
+      "path": "/api/guide/photo-session",
+      "status": 401
+    },
+    {
+      "path": "/api/marketing/setup",
+      "status": 401
+    }
+  ],
+  "no_customer_actions": true
+}

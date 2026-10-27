@@ -1,0 +1,79 @@
+{
+  "at": "2026-10-15T16:53:12.020Z",
+  "admin": "dpl_749ZGg63mBwEQ4zfdG8bdWUPEuCZ",
+  "results": [
+    {
+      "url": "https://admin.bookingtours.co.za/",
+      "status": 200
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/simple",
+      "status": 200
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/simpleguide",
+      "status": 200
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/simpleguide/check-ins",
+      "status": 200
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/marketing",
+      "status": 200
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/marketing/promotions",
+      "status": 200
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/marketing/automations",
+      "status": 200
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/guide-setup",
+      "status": 200
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/settings",
+      "status": 200
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/new-booking",
+      "status": 200
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/api/guide/check-ins",
+      "status": 401
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/api/guide/access",
+      "status": 403
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/api/mcp/chatgpt",
+      "status": 503
+    },
+    {
+      "url": "https://kayak.booking.bookingtours.co.za",
+      "status": 200
+    },
+    {
+      "url": "https://claires-hiking.booking.bookingtours.co.za",
+      "status": 200
+    },
+    {
+      "url": "https://kayak.booking.bookingtours.co.za/book",
+      "status": 200
+    },
+    {
+      "url": "https://ukdsrndqhsatjkmxijuj.supabase.co/rest/v1/rpc/guide_simple_day",
+      "status": 401
+    },
+    {
+      "url": "https://ukdsrndqhsatjkmxijuj.supabase.co/rest/v1/rpc/record_guide_booking_arrival",
+      "status": 401
+    }
+  ],
+  "no_customer_actions": true
+}

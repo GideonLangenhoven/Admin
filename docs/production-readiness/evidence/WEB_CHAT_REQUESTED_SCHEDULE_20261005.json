@@ -1,0 +1,104 @@
+{
+  "status": "published and deployed source verified",
+  "checked_at": "2026-10-05T08:55:01.150636+00:00",
+  "report": "Next week Wednesday and 06:00 were lost, then repeated corrections were consumed as later booking answers.",
+  "previous_release": {
+    "web_chat_version": 149,
+    "before_fix_source_matches_20261004_deployment": true
+  },
+  "changes": [
+    "Recognize requests phrased as get me a booking or a named experience.",
+    "Resolve next week using the operator calendar and retain the requested weekday across follow-ups.",
+    "Capture clock times inside sentences and exclude explicitly rejected dates and times.",
+    "Handle schedule corrections at every booking step before collecting details or confirming checkout.",
+    "Use one live inventory check for all departure selections; require an explicit choice for alternatives."
+  ],
+  "checks": {
+    "initial_regression": {
+      "cases": 30,
+      "failed_before_fix": 22
+    },
+    "unit": {
+      "files": 14,
+      "passed": 450,
+      "new_schedule_cases": 39
+    },
+    "edge_typecheck": "passed",
+    "test_lint": "passed",
+    "whitespace_check": "passed",
+    "browser": {
+      "cases": 60,
+      "first_run_passed": 59,
+      "rerun_passed": 1,
+      "rerun_reason": "Local ECONNRESET during a static chunk request before the IME test loaded; unchanged application and same build pass on focused rerun.",
+      "projects": [
+        "chrome-phone",
+        "webkit-phone",
+        "chrome-desktop"
+      ],
+      "new_reported_conversation_cases": 9,
+      "full_run_seconds": 462.40459400000003,
+      "compiled_preview": "production Next.js build with synthetic Supabase, model and checkout providers"
+    },
+    "visual_qa": [
+      "Missing Wednesday shown honestly with an alternative calendar on mobile Chrome.",
+      "Wednesday 06:00 retained through both corrections on mobile Safari."
+    ],
+    "production_endpoint": {
+      "method": "HEAD",
+      "expected_status": 405,
+      "actual_status": 405,
+      "edge_runtime_response": true,
+      "meaning": "Public endpoint initialized and enforced its POST-only request boundary."
+    }
+  },
+  "publication_package": {
+    "root": "/private/tmp/capekayak-chat-wednesday-0bc_ggs6/edge-package",
+    "source_files": 16,
+    "changed_since_previous_release": [
+      "web-chat/index.ts"
+    ],
+    "manifest": {
+      "web-chat/index.ts": "8fc8a7203049da4ba9311d457173971178aeae7b994d71b00899b0cb2daa958c",
+      "_shared/kb.ts": "5d89feee2c9ef467716d48625b112ecb86b81b84679e48c7a22da42a5f88b68d",
+      "_shared/customer-session.ts": "d0a7724dd8efff914e0040a3571813566a71b0d9ac954ea8debd2aaefc560750",
+      "_shared/sentry.ts": "cf5cad26d7ddb3a103a60d658dab85fa647d98e574d5ddb44ab83700c915bafb",
+      "_shared/pagination.ts": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e",
+      "_shared/bot-guards.ts": "a6b4c6961536772ca33061f581a6660e82bd85f8fea840dd785c630a8ff77937",
+      "_shared/booking-custom-fields.ts": "3ec06c7dceb92fb96c17fce49e87752af04bf62f59c628b4230be6fcfa90e277",
+      "_shared/platform-invariants.ts": "79654892dfbe8e52a93ab7bf7a5d5189ecb74747fe3751470579c77bf47ea22f",
+      "_shared/llm.ts": "e7bed1f1ed96a04d6b326ee3580fc6550c37821b19d2618321f4d4be9b3c85c1",
+      "_shared/duration.ts": "4f6eb2b814536b6066378deb29002e829e4784ff09e26245009ea76aee22626c",
+      "_shared/web-chat-session.ts": "d2b3fe2717fe367bcf307380f5806d44b39ed9c07c7c871d3a0372d7d71c11d2",
+      "_shared/openrouter-provider.ts": "52aa270a8467d6476d17a8881a4fe29ced09b52cdb44b4bec9e05246af202cd8",
+      "_shared/subscription.ts": "6d8af89fb9e7f48e9b06024b3fa4396bca41fa58ea2265753032222c71060e14",
+      "_shared/chat-booking-pricing.ts": "f936f6c6a1c43cd6fe932d02697e04d02575273685886b68dbd646d1b9163d80",
+      "_shared/tenant.ts": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669",
+      "_shared/intent.ts": "7145715b15c90fe49ca1986bda5b1f5806539ee7ca6063cadc029044fbb9f0f4"
+    }
+  },
+  "boundaries": {
+    "git_commit_or_push": false,
+    "database_migration": false,
+    "customer_booking_payment_or_message_submitted": false,
+    "wider_rollout_resumed": false
+  },
+  "source_sha256": {
+    "supabase/functions/web-chat/index.ts": "8fc8a7203049da4ba9311d457173971178aeae7b994d71b00899b0cb2daa958c",
+    "tests/unit/web-chat-requested-schedule.test.ts": "20fbbda811a63416977b5cd2cb613b8c06f5b51b7207ff517d5eefeabce3d55c",
+    "tests/helpers/web-chat-server.ts": "9a879fb5d32ccb9691c478b5edca503273221bfae7acc8a9b34e575415ca2391",
+    "tests/e2e/web-chat-production.spec.ts": "51613158e1fd24183a9cc0dc44a57aa081ee7422399ac97f2b190a124ec40944"
+  },
+  "artifacts": "/private/tmp/capekayak-chat-wednesday-0bc_ggs6",
+  "published_at": "2026-10-05T08:57:12.459996+00:00",
+  "authorization": "Production publication approval granted for edge-cli.mjs publish after review of the tested fix.",
+  "publication": {
+    "slug": "web-chat",
+    "previous_version": 149,
+    "version": 150,
+    "status": "ACTIVE",
+    "verify_jwt": false,
+    "downloaded_source_matches_tested_package": true,
+    "source_files_verified": 16
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "verified_at": "2026-10-08T10:48:50.925Z",
+  "target_project": "gwwnkihblioayklptdab",
+  "sql_sha256": "23c296963a7cb5246ac3876fdbac3bedcc15fce6011406167090182bdbd4b289",
+  "checks": 8,
+  "installer_superuser": false,
+  "setup_report": {
+    "result": "TEST_DATABASE_INSTALLED",
+    "intended_project": "gwwnkihblioayklptdab",
+    "test_tours": "2",
+    "test_departures": "4",
+    "test_bookings": "3",
+    "enabled_connectors": "0",
+    "gateway_privileges": "PASS"
+  },
+  "boundary": "Local PostgreSQL 17 schema/ACL rehearsal with synthetic Auth table and claims. No hosted project, native Auth, credentials, provider connection or customer data was accessed."
+}

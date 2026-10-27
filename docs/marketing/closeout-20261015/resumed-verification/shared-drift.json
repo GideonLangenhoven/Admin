@@ -1,0 +1,102 @@
+[
+  {
+    "path": "app/bookings/page.tsx",
+    "baseline_sha256": "11e3d13e7560ae724d3bc07756d7902b98820d0daa81ee3f1e852018acddf1cd",
+    "current_sha256": "f2188e02352ede75d33042ef02013d24ee00852f063ed03076ae6642774d53d4"
+  },
+  {
+    "path": "app/simple/page.tsx",
+    "baseline_sha256": "4a98740fb5d43d9111d841b0f8de0dff551ad9a5aa9bd53e722140cc75f9fc53",
+    "current_sha256": "154a77615a986b42d0e7951f4810a6a9f16103a8a6e9bf71677c6aedc56e86aa"
+  },
+  {
+    "path": "app/simple/calendar/page.tsx",
+    "baseline_sha256": "20e1587ab34f2a14e74788405849ca7dcd07e3f68580a52c6eacc532428765ba",
+    "current_sha256": "2763d5319b89b09f00fd26ee716ada618ea7a4a773d855b4bc9a8ee3f9c8b0c0"
+  },
+  {
+    "path": "app/simple/use-simple-day.ts",
+    "baseline_sha256": "611eef18935db187daf3f096dc36f3338a1e0001f0e8601cdb82315d59415646",
+    "current_sha256": "904499e1fe8868fead6daa771beec6c0ddc081a7d08d41ca3730fde4078f9ce8"
+  },
+  {
+    "path": "tests/unit/db-column-refs.test.ts",
+    "baseline_sha256": "7a403c6e59d21792c6dc1c1f3bda2a917ff9b080c79c3c22529ac2599b9d9c1c",
+    "current_sha256": "276b9b2dff2ab2a19cd42ec97f16d00433c231ade97fe3c3dc4bace2e0cb64d2"
+  },
+  {
+    "path": "app/inbox/page.tsx",
+    "baseline_sha256": "e828a76e1d253caa0400dc162f52321668b35ae1e343312b181067ed2d45972a",
+    "current_sha256": "1156b782ea2b65648f851543a8a82ad06dbbbd467add23688790b865fc0f0a8c"
+  },
+  {
+    "path": "app/simple/check-ins/page.tsx",
+    "baseline_sha256": "7bbf2c141b5d7bbba562b734812339f3e2d4c3f4169b3f7446a98640d7cd227b",
+    "current_sha256": "71a48404f1da288736a8d265575a9106dd63d2f84a545089312966c784231a3c"
+  },
+  {
+    "path": "components/simple/DepartureCard.tsx",
+    "baseline_sha256": "feaeb971456591f1cb8443a0560e7531df6b5fef20ba643c53bc4f304c5acf7c",
+    "current_sha256": "17fe179fe704288007340a050bd7652cfec93a916b7a3491f639ad3e79220f80"
+  },
+  {
+    "path": "app/new-booking/page.tsx",
+    "baseline_sha256": "f83e82f37f74fe0ee2a3b439ab76f7ea5ef5a0375881926fe74963a4344bb35b",
+    "current_sha256": "0804964fadf3998859acd4dfad1b8d2101bb86f5accab9c461352d3ea83bd7f5"
+  },
+  {
+    "path": "app/guide/slot/[slotId]/page.tsx",
+    "baseline_sha256": "c6b2dcc69eef95ce4d0d89610081c1f74ce7c57746fa4230cf1fe95a7322406c",
+    "current_sha256": "5effa0a8d3a04bb2c37d0605300df46ad1eff8f7e7e5e0d87c3e45935659ca1d"
+  },
+  {
+    "path": "app/lib/simple-view.ts",
+    "baseline_sha256": "4c4941b4430ea6b3df61ba3519c55872e1bfc4ef4c6ba131a5d2f994d7b165de",
+    "current_sha256": "55a7443de85b4583abc139f6e372aeff6734f0a6a05fec0601d92ed1032a7e40"
+  },
+  {
+    "path": "supabase/migrations/20261015170000_operator_daily_consistency.sql",
+    "baseline_sha256": "e9324edb5b50321005cc400b38f8da8e26f39601fe966f938079a210c3a90477",
+    "current_sha256": "05517cf38a86d3f52df9fa8c04d421a1bf595e6cb6fa03815f89691e0a957093"
+  },
+  {
+    "path": "app/bookings/[id]/page.tsx",
+    "baseline_sha256": "d05940d481337f9553f3b25758d73dc44a785796e611a2e9044d34cd082b70be",
+    "current_sha256": "4749f397db5ec634aff13226b21fb44ab62652e868df5f4cd0f39f3893c3f289"
+  },
+  {
+    "path": "components/inbox/PhoneAlerts.tsx",
+    "baseline_sha256": "45f3027357e6d503f1976e6423d4ed81efecfc3c345c83f23d0f0cf49c2c60ee",
+    "current_sha256": "38dd45c3909b0c493a75b6136b010e48648de9506fa3848f3b8ac167b38a8f0b"
+  },
+  {
+    "path": "app/simple/simple-data.ts",
+    "baseline_sha256": "cf54da39a33b84883d80c450e418ca2483cc6b53eb156f14dc7a5b08c5c7d661",
+    "current_sha256": "57211d29d352d38f031d3b58311bfb0151468bf2ed4b7055998cf7086cd4a57a"
+  },
+  {
+    "path": "components/AvailabilityCalendar.tsx",
+    "baseline_sha256": "fe47edc59d780c00f3a42f33b813f1b4bd37d93596cedd1caaa4839f2cf9c03c",
+    "current_sha256": "c40610b40459b91ce3db6dbc236d94f930f9dda61aea22d4ec3d286602908461"
+  },
+  {
+    "path": "app/inbox/components/BotStatusBanner.tsx",
+    "baseline_sha256": "a04e0b7d69d04ba2bc1d524cdfc72fa9f33c221989d0b1898c794d058f6cbec5",
+    "current_sha256": "d76adc9d9c3e1e522df9c92a2fec4b71a25b867a07b5040efd7a0b6662340938"
+  },
+  {
+    "path": "tests/unit/guide-offline-queue.test.ts",
+    "baseline_sha256": "bb8df3292472bb831d769316f2ecc388dd6cf81ed330aa7d24b2913cf805a7e5",
+    "current_sha256": "eee0ac6886d8c969da307a955f06e364801da7593f2b571f8024b89bc0dbc345"
+  },
+  {
+    "path": "components/SimpleViewShell.tsx",
+    "baseline_sha256": "8839ccbb76690d20c060e34e513dbd00c8b21bc9b083af5b39c4324f66b59ffc",
+    "current_sha256": "d4cce6c28af10a603a574d8fe32a26fe3756e0b25527c7a7d04c4c78dde1d2ec"
+  },
+  {
+    "path": "app/page.tsx",
+    "baseline_sha256": "2d63958241eb036734f870b578d77c80f30a2e4e70b7547229c7d0ccf1d13951",
+    "current_sha256": "4e16ff900721f7a2c7346f8603d9ca07f1a5dce8afbb7a1af61219504b5e2197"
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "status": 200,
+  "articles": [
+    "guide",
+    "simple-view",
+    "settings",
+    "photos",
+    "new-booking",
+    "dashboard",
+    "bookings",
+    "marketing",
+    "payment-reminders"
+  ],
+  "result": {
+    "ok": true,
+    "total": 176,
+    "embedded": 9,
+    "skipped": 167,
+    "removed": 0,
+    "failed": 0,
+    "errors": []
+  }
+}

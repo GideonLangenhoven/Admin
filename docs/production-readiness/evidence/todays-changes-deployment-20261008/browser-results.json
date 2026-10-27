@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "origin": "https://admin.bookingtours.co.za",
+  "results": [
+    "Shared Reports heading, width, all six tabs, direct Financials reload, and review moderation passed.",
+    "Help panel and calendar picker fit phone and landscape viewports.",
+    "Specific-date and range scheduling controls switch, add, and remove dates correctly.",
+    "Responsive checks at 320, 390, 768, and 1024 pixels and existing permission/demo/suspension rules passed."
+  ]
+}

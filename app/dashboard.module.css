@@ -1,0 +1,211 @@
+@font-face {
+  font-family: "Dashboard Lato";
+  src: url("/fonts/lato/Lato-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Dashboard Lato";
+  src: url("/fonts/lato/Lato-Bold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+.dashboardMain { background: #f4f5f4; }
+:global(.dark) .dashboardMain { background: #0b0e0c; }
+.workspace {
+  container: dashboard / inline-size;
+  width: 100%;
+  min-width: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  font-family: "Dashboard Lato", Arial, sans-serif;
+  font-weight: 400;
+  font-synthesis: none;
+  --ck-surface: #fff;
+  --ck-surface-warm: #f7f8f7;
+  --ck-surface-sunken: #edf0ee;
+  --ck-text-strong: #17221c;
+  --ck-text: #34453c;
+  --ck-text-muted: #526159;
+  --ck-border-strong: #7e8c84;
+  --ck-success: #146044;
+  --ck-amber: #824411;
+  --ck-warning: #7e550c;
+  --ck-danger: #a62d28;
+}
+
+:global(.dark) .workspace {
+  --ck-surface: #171d19;
+  --ck-surface-warm: #1b231e;
+  --ck-surface-sunken: #101813;
+  --ck-text-strong: #f4f7f5;
+  --ck-text: #d4ded7;
+  --ck-text-muted: #abbcb0;
+  --ck-border-strong: #82988a;
+  --ck-success: #8be5b5;
+  --ck-amber: #f1bd7d;
+  --ck-warning: #e4bd76;
+  --ck-danger: #ffaba4;
+}
+.workspace :global(.font-display), .workspace :global(.font-mono), .workspace :global(.ui-mono-label), .workspace :global(.ui-status),
+.workspace button, .workspace input, .workspace select { font-family: inherit; }
+.workspace :global(.font-medium), .workspace :global(.ui-mono-label),
+.workspace :global(.ui-btn), .workspace :global(.ui-seg-item) { font-weight: 400; }
+.workspace h2, .workspace h3, .workspace h4, .workspace strong,
+.workspace :global(.font-semibold), .workspace :global(.font-bold),
+.workspace :global(.ui-btn-primary), .workspace :global(.ui-status) { font-weight: 700; }
+.workspace :global(.ui-card) { background: var(--ck-surface); }
+.workspace [role="tabpanel"][hidden] { display: none; }
+.workspace :global(.ui-btn), .workspace :global(.ui-seg-item), .workspace select { min-height: 44px; }
+.workspace a:focus-visible, .workspace button:focus-visible, .workspace select:focus-visible,
+.workspace summary:focus-visible, .workspace input:focus-visible { outline: 2px solid var(--ck-text-strong); outline-offset: 3px; }
+.workspace ::selection { color: #fff; background: #146044; }
+.workspace [role="tab"][aria-selected="true"] { color: var(--ck-text-strong); box-shadow: inset 0 -2px var(--ck-accent); }
+.summaryBand { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 1.5rem; align-items: stretch; }
+.paxSummary { align-self: start; min-height: 14.3125rem; }
+.operationsPanel { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); overflow: hidden; }
+.operationsPanel > section { border: 0; border-radius: 0; box-shadow: none; background: transparent !important; }
+.operationsPanel > section + section { border-left: 1px solid var(--ck-border-subtle); }
+.attentionBand { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 1.5rem; }
+.attentionRow { display: flex; gap: 0.75rem; align-items: center; min-height: 72px; padding-block: 0.75rem; }
+
+.workspace :global(.ui-mono-label) {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  letter-spacing: 0.06em;
+}
+
+.sectionTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.prose {
+  max-width: 65ch;
+  font-size: 1rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.operations {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 30rem), 1fr));
+}
+
+.card {
+  container: departure / inline-size;
+  min-width: 0;
+}
+
+.table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.table th,
+.table td {
+  padding-inline: clamp(0.5rem, 1.5cqi, 1rem);
+  overflow-wrap: anywhere;
+}
+
+.table th {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+
+.table td {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.card :global(.ui-status) {
+  max-width: 100%;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+
+.mobileRows {
+  display: none;
+}
+
+.rollCallRows {
+  gap: 0.75rem;
+  padding: 0.75rem 0.5rem;
+  background: var(--ck-surface-warm);
+}
+
+.guestIdentity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.guestName {
+  flex: 1;
+  min-width: 0;
+  color: var(--ck-text-strong);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.rollCallGuest {
+  padding: 0.75rem;
+  border: 1px solid var(--ck-border-subtle);
+  border-radius: 1rem;
+  background: var(--ck-surface);
+}
+
+.rollCallAttendance {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--ck-border-subtle);
+}
+
+.rollCallAttendance > :last-child { margin-left: auto; }
+
+.card [data-selected="true"] {
+  background: var(--ck-accent-soft);
+  box-shadow: inset 0 0 0 1px var(--ck-accent);
+}
+
+@container departure (max-width: 39.99rem) {
+  .table { display: none; }
+  .mobileRows { display: block; }
+  .mobileRows.rollCallRows { display: grid; }
+}
+
+@container departure (max-width: 40rem) {
+  .attendanceTrack { display: none; }
+}
+
+/* The sidebar and shell padding are already accounted for in this width. */
+@container dashboard (max-width: 61.99rem) {
+  .summaryBand, .operationsPanel { grid-template-columns: 1fr; }
+  .operationsPanel > section + section { border-left: 0; border-top: 1px solid var(--ck-border-subtle); }
+  .paxSummary,
+  .revenueSummary { grid-column: auto; }
+  .paxSummary { min-height: 0; padding: 1rem; }
+  .paxSummary :global(.font-display) { font-size: 2rem; margin-block: 0.5rem; }
+  .paxSummary svg { display: none; }
+}
+
+@media (max-width: 767px) {
+  .summaryBand, .attentionBand, .operationsPanel { grid-template-columns: 1fr; gap: 1rem; }
+  .operationsPanel { gap: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace, .workspace * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

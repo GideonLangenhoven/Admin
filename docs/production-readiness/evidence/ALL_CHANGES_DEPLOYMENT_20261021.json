@@ -1,0 +1,255 @@
+{
+  "at": "2026-10-21T13:57:47.287663+00:00",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "scope": "All runtime changes made on 2026-10-21; earlier releases preserved, 14 remaining app files published.",
+  "admin": {
+    "id": "dpl_GUYkbCn7rkk6pgqPuBAPzMSF2oY2",
+    "url": "caepweb-admin-oxviqhpaj-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 509,
+    "changed": [
+      "app/broadcasts/page.tsx",
+      "app/inbox/page.tsx",
+      "app/bookings/page.tsx",
+      "app/new-booking/booking-form.module.css",
+      "app/new-booking/page.tsx",
+      "app/lib/report-booking-periods.ts",
+      "app/billing/page.tsx",
+      "app/reports/page.tsx",
+      "components/AppShell.tsx",
+      "components/ReportsLayout.tsx",
+      "components/PaymentRecoveryPanel.tsx",
+      "components/booking/BookingQuestions.tsx",
+      "components/booking/BookingSelect.tsx",
+      "components/booking/BookingSelect.module.css"
+    ],
+    "state": "READY",
+    "production_url": "https://admin.bookingtours.co.za",
+    "source_files_verified": 509
+  },
+  "booking": {
+    "id": "dpl_E947VY1nM96PDYU8q3Bwo85ZSExS",
+    "url": "booking-ahdneyi7n-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 171,
+    "already_current": true
+  },
+  "edge": {
+    "slug": "web-chat",
+    "version": 156,
+    "verify_jwt": false,
+    "status": "ACTIVE",
+    "files_verified": 17,
+    "live": {
+      "at": "2026-10-21T13:56:54.117Z",
+      "slug": "web-chat",
+      "version": 156,
+      "status": "ACTIVE",
+      "preflight_status": 200,
+      "no_customer_actions": true
+    },
+    "other_today_functions_already_current": [
+      {
+        "slug": "wa-webhook",
+        "version": 244,
+        "verify_jwt": false,
+        "files": 17,
+        "differences": []
+      },
+      {
+        "slug": "weather-cancel",
+        "version": 92,
+        "verify_jwt": false,
+        "files": 4,
+        "differences": []
+      }
+    ]
+  },
+  "candidate_checks": {
+    "at": "2026-10-21T13:54:33.314Z",
+    "origin": "https://caepweb-admin-oxviqhpaj-jerrys-projects-f4e4eaf9.vercel.app",
+    "checks": [
+      {
+        "path": "/new-booking",
+        "status": 200,
+        "scripts_checked": 18,
+        "stylesheets_checked": 3,
+        "copy_verified": true
+      },
+      {
+        "path": "/bookings",
+        "status": 200,
+        "scripts_checked": 21,
+        "stylesheets_checked": 3,
+        "copy_verified": true
+      },
+      {
+        "path": "/simple/bookings",
+        "status": 200,
+        "scripts_checked": 21,
+        "stylesheets_checked": 3,
+        "copy_verified": true
+      },
+      {
+        "path": "/inbox",
+        "status": 200,
+        "scripts_checked": 17,
+        "stylesheets_checked": 2,
+        "copy_verified": true
+      },
+      {
+        "path": "/reports",
+        "status": 200,
+        "scripts_checked": 18,
+        "stylesheets_checked": 3,
+        "copy_verified": true
+      },
+      {
+        "path": "/billing",
+        "status": 200,
+        "scripts_checked": 16,
+        "stylesheets_checked": 2,
+        "copy_verified": true
+      },
+      {
+        "path": "/broadcasts",
+        "status": 200,
+        "scripts_checked": 17,
+        "stylesheets_checked": 2,
+        "copy_verified": true
+      }
+    ]
+  },
+  "live_checks": {
+    "at": "2026-10-21T13:56:25.803Z",
+    "origin": "https://admin.bookingtours.co.za",
+    "checks": [
+      {
+        "path": "/new-booking",
+        "status": 200,
+        "scripts_checked": 18,
+        "stylesheets_checked": 3,
+        "copy_verified": true
+      },
+      {
+        "path": "/bookings",
+        "status": 200,
+        "scripts_checked": 21,
+        "stylesheets_checked": 3,
+        "copy_verified": true
+      },
+      {
+        "path": "/simple/bookings",
+        "status": 200,
+        "scripts_checked": 21,
+        "stylesheets_checked": 3,
+        "copy_verified": true
+      },
+      {
+        "path": "/inbox",
+        "status": 200,
+        "scripts_checked": 17,
+        "stylesheets_checked": 2,
+        "copy_verified": true
+      },
+      {
+        "path": "/reports",
+        "status": 200,
+        "scripts_checked": 18,
+        "stylesheets_checked": 3,
+        "copy_verified": true
+      },
+      {
+        "path": "/billing",
+        "status": 200,
+        "scripts_checked": 16,
+        "stylesheets_checked": 2,
+        "copy_verified": true
+      },
+      {
+        "path": "/broadcasts",
+        "status": 200,
+        "scripts_checked": 17,
+        "stylesheets_checked": 2,
+        "copy_verified": true
+      }
+    ]
+  },
+  "help": {
+    "at": "2026-10-21T13:56:24.985Z",
+    "articles": [
+      "new-booking",
+      "broadcasts",
+      "reports",
+      "inbox",
+      "dashboard",
+      "billing",
+      "bookings"
+    ],
+    "changed": [
+      "help:billing:0",
+      "help:billing:4",
+      "help:billing:5",
+      "help:broadcasts:2",
+      "help:inbox:1",
+      "help:inbox:5",
+      "help:new-booking:3",
+      "help:new-booking:6",
+      "help:new-booking:7",
+      "help:reports:1",
+      "help:reports:2",
+      "help:reports:4"
+    ],
+    "removed": [
+      "help:billing:6",
+      "help:broadcasts:3"
+    ],
+    "result": {
+      "ok": true,
+      "total": 177,
+      "embedded": 12,
+      "skipped": 165,
+      "removed": 2,
+      "failed": 0,
+      "errors": []
+    },
+    "all_chunks_verified": 177
+  },
+  "validation": {
+    "production_build": "PASS",
+    "active_application_typecheck": "PASS",
+    "web_chat_typecheck": "PASS",
+    "eslint_errors": 0,
+    "eslint_warnings": 25,
+    "unit_tests": {
+      "passed": 2625,
+      "failed": 2,
+      "skipped": 58,
+      "existing_failures_verified_against_earlier_baseline": [
+        "demo-action-guide.test.ts: missing slot.close-weekdays explanation",
+        "goal-items-26-30.test.ts: outdated voucher email source assertion"
+      ]
+    },
+    "updated_fixtures": [
+      "rollout pagination bindings include the extracted booking column constant and launch context",
+      "voucher column assertion includes captured payment amount"
+    ],
+    "chrome_used": false,
+    "playwright_used": false,
+    "physical_device_tested": false,
+    "real_customer_messages_sent": false
+  },
+  "database_migrations": false,
+  "whatsapp_delivery_requirement": "Outside an active WhatsApp messaging window, the business needs the approved web_chat_handoff template (or configured equivalent). Actual message delivery was not triggered during deployment.",
+  "rollback": {
+    "admin": {
+      "id": "dpl_DK5faqEwVrFbgE4gVVBkyx9u5MQX",
+      "url": "caepweb-admin-h6xowo1qi-jerrys-projects-f4e4eaf9.vercel.app"
+    },
+    "web_chat": {
+      "slug": "web-chat",
+      "version": 155,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    }
+  }
+}

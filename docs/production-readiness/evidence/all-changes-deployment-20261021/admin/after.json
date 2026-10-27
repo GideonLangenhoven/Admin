@@ -1,0 +1,21 @@
+{
+  "id": "dpl_GUYkbCn7rkk6pgqPuBAPzMSF2oY2",
+  "url": "caepweb-admin-oxviqhpaj-jerrys-projects-f4e4eaf9.vercel.app",
+  "files_verified": 509,
+  "changed": [
+    "app/broadcasts/page.tsx",
+    "app/inbox/page.tsx",
+    "app/bookings/page.tsx",
+    "app/new-booking/booking-form.module.css",
+    "app/new-booking/page.tsx",
+    "app/lib/report-booking-periods.ts",
+    "app/billing/page.tsx",
+    "app/reports/page.tsx",
+    "components/AppShell.tsx",
+    "components/ReportsLayout.tsx",
+    "components/PaymentRecoveryPanel.tsx",
+    "components/booking/BookingQuestions.tsx",
+    "components/booking/BookingSelect.tsx",
+    "components/booking/BookingSelect.module.css"
+  ]
+}

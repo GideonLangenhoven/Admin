@@ -62,7 +62,7 @@ export default function CustomersPage() {
         <div>
           <p className="ui-mono-label mb-2">Customers · Directory</p>
           <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Customers</h1>
-          <p className="mt-2 text-[13px]" style={{ color: "var(--ck-text-muted)" }}>Everyone who has booked with you, ranked by lifetime trips.</p>
+          <p className="mt-2 text-[13px]" style={{ color: "var(--ck-text-muted)" }}>Customers ranked by total trips.</p>
         </div>
         <div className="relative w-full sm:w-72">
           <MagnifyingGlass size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--ck-text-muted)" }} />
@@ -103,32 +103,32 @@ export default function CustomersPage() {
           </div>
         </div>
       ) : (
-        <div className="ui-card overflow-x-auto">
-          <table className="w-full text-sm">
+        <div className="ui-table-container ui-card overflow-x-auto">
+          <table role="table" className="ui-responsive-table w-full text-sm">
             <thead>
               <tr>
-                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Name</th>
-                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Email</th>
-                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Phone</th>
-                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Trips</th>
-                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Spent</th>
-                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Last Trip</th>
-                <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>Marketing</th>
+                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Name</th>
+                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Email</th>
+                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Phone</th>
+                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Trips</th>
+                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Spent</th>
+                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Last Trip</th>
+                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>Marketing</th>
               </tr>
             </thead>
             <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
               {filtered.map(function (r) {
                 return (
                   <tr key={r.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]">
-                    <td className="px-4 py-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{r.name || "\u2014"}</td>
-                    <td className="px-4 py-3" style={{ color: "var(--ck-text)" }}>{r.email}</td>
-                    <td className="px-4 py-3" style={{ color: "var(--ck-text)" }}>{r.phone || "\u2014"}</td>
-                    <td className="px-4 py-3 text-right font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{r.total_bookings}</td>
-                    <td className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--ck-text)" }}>R{Number(r.total_spent).toFixed(0)}</td>
-                    <td className="px-4 py-3" style={{ color: "var(--ck-text-muted)" }}>
+                    <td data-label="Name" className="px-4 py-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{r.name || "\u2014"}</td>
+                    <td data-label="Email" className="px-4 py-3" style={{ color: "var(--ck-text)" }}>{r.email}</td>
+                    <td data-label="Phone" className="px-4 py-3" style={{ color: "var(--ck-text)" }}>{r.phone || "\u2014"}</td>
+                    <td data-label="Trips" className="px-4 py-3 text-right font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{r.total_bookings}</td>
+                    <td data-label="Spent" className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--ck-text)" }}>R{Number(r.total_spent).toFixed(0)}</td>
+                    <td data-label="Last Trip" className="px-4 py-3" style={{ color: "var(--ck-text-muted)" }}>
                       {r.last_booking_at ? new Date(r.last_booking_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "\u2014"}
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td data-label="Marketing" className="px-4 py-3 text-center">
                       {r.marketing_consent ? (
                         <span className="inline-flex h-5 w-5 items-center justify-center rounded-full" style={{ background: "var(--ck-success-soft)", color: "var(--ck-success)" }}><Check size={12} weight="bold" /></span>
                       ) : (

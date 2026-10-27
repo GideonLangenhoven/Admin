@@ -1,0 +1,96 @@
+{
+  "at": "2026-10-18T10:11:28.580497+00:00",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "deployment": {
+    "id": "dpl_ATUtJHejxdaatHqiCFbGEgggeTaQ",
+    "url": "caepweb-admin-72d4poswl-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 488,
+    "production_url": "https://admin.bookingtours.co.za"
+  },
+  "scope": {
+    "baseline": "dpl_3xmvd6WAko3XkCXabX2FeFD4qqzi",
+    "changed": [
+      "app/bookings/page.tsx"
+    ],
+    "preserved": 487,
+    "downloaded": 0,
+    "sha256": "e11bcbb8ecd89f2bb815605c99c9f6cde611e873d8196ab3c184ab7ab34fcbcf",
+    "original_baseline": "dpl_3u134cjqjn3x7at3YiEEvRbVkH1p",
+    "paths": [
+      "/bookings",
+      "/simple/bookings"
+    ],
+    "desktop_breakpoint": 1024,
+    "previous_desktop_breakpoint": 1536,
+    "database_changes": false,
+    "edge_changes": false
+  },
+  "behavior": [
+    "Use the existing desktop booking table at 1024px and wider, including headers, totals, guest details and actions.",
+    "Retain phone/tablet cards below 1024px; close actions when the layout changes.",
+    "Render the mobile action sheet outside the animated table so it stays within the viewport, scrolls independently and restores focus."
+  ],
+  "checks": {
+    "production_build": "passed",
+    "typescript": "passed",
+    "eslint_errors": 0,
+    "pre_existing_eslint_warnings": 7,
+    "focused_unit_tests": 8,
+    "chrome_hosted_browser_cases": 3,
+    "webkit_hosted_browser_cases": 2,
+    "desktop_widths": [
+      1024,
+      1280,
+      1440,
+      1920
+    ],
+    "phone_tablet_viewports": [
+      [
+        320,
+        568
+      ],
+      [
+        390,
+        844
+      ],
+      [
+        768,
+        1024
+      ],
+      [
+        844,
+        390
+      ],
+      [
+        1023,
+        900
+      ]
+    ],
+    "uploaded_sources_verified": 488,
+    "unrelated_source_files_preserved": 487,
+    "live_http_checks": [
+      {
+        "path": "/bookings",
+        "status": 200
+      },
+      {
+        "path": "/simple/bookings",
+        "status": 200
+      },
+      {
+        "path": "/settings",
+        "status": 200
+      },
+      {
+        "path": "/simpleguide",
+        "status": 200
+      }
+    ]
+  },
+  "limits": [
+    "Browser identities and bookings were simulated. No real booking, payment, customer message or configuration was changed.",
+    "The wider production qualification pause remains in place."
+  ],
+  "evidence_directory": "docs/production-readiness/evidence/desktop-bookings-20261018"
+}

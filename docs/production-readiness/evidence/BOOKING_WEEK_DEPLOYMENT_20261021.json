@@ -1,0 +1,75 @@
+{
+  "at": "2026-10-21T06:47:51.573Z",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "source": {
+    "id": "dpl_9NnBmByYwKYiUMotbiuPZb86gxaJ",
+    "url": "caepweb-admin-kjk8g8rwn-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 504,
+    "preserved": 499,
+    "changed": [
+      "app/page.tsx",
+      "app/bookings/page.tsx",
+      "app/lib/operator-day.ts",
+      "app/simple/check-ins/page.tsx",
+      "app/lib/booking-date-range.ts"
+    ]
+  },
+  "live": {
+    "at": "2026-10-21T06:46:44.144Z",
+    "id": "dpl_9NnBmByYwKYiUMotbiuPZb86gxaJ",
+    "url": "https://admin.bookingtours.co.za",
+    "checks": [
+      {
+        "path": "/",
+        "status": 200
+      },
+      {
+        "path": "/bookings",
+        "status": 200
+      },
+      {
+        "path": "/simple/bookings",
+        "status": 200
+      },
+      {
+        "path": "/simple/check-ins",
+        "status": 200
+      }
+    ],
+    "no_customer_actions": true
+  },
+  "candidate_browser": {
+    "startTime": "2026-10-21T06:43:51.163Z",
+    "duration": 11840.83,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "live_browser": {
+    "startTime": "2026-10-21T06:46:48.996Z",
+    "duration": 58816.742999999995,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "help": {
+    "at": "2026-10-21T06:47:51.560Z",
+    "changed": [
+      "help:bookings:1",
+      "help:dashboard:4"
+    ]
+  },
+  "validation": {
+    "focused_unit_cases": 37,
+    "local_browser_cases": 4,
+    "active_application_typecheck": "PASS",
+    "lint": "zero errors; existing warnings",
+    "design_detector": [],
+    "physical_device_tested": false
+  },
+  "scope_note": "Pending cancellation follow-up and unrelated copy changes remain in the workspace; the release uses the verified frozen source package for the requested changes.",
+  "database_migrations": false
+}

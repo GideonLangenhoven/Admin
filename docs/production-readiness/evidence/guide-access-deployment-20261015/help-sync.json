@@ -1,0 +1,16 @@
+{
+  "status": 200,
+  "result": {
+    "ok": true,
+    "total": 171,
+    "embedded": 2,
+    "skipped": 169,
+    "removed": 0,
+    "failed": 0,
+    "errors": []
+  },
+  "articles": [
+    "guide",
+    "simple-view"
+  ]
+}

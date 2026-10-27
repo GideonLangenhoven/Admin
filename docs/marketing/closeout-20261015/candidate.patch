@@ -1,0 +1,987 @@
+--- a/app/lib/marketing-journey.ts
++++ b/app/lib/marketing-journey.ts
+@@ -24,11 +24,11 @@
+     version: MARKETING_CONTRACT_VERSION,
+     trigger: triggerSentence(automation),
+     eligibility: "Verified permission for this operator, email channel and promotional purpose; active contact; no suppression.",
+-    goal: automation.trigger_type === "contact_added" ? "Stop on any non-cancelled reservation, including unpaid."
++    goal: automation.trigger_type === "contact_added" ? "First-booking rule approval is unverified. This promotional path is held."
+       : automation.trigger_type === "booking_inactive" ? "Stop on rebooking or an upcoming reservation."
+       : "Complete the listed steps while still eligible. Review completion is unavailable.",
+-    timing: `Elapsed delays, checked by the dispatcher. Quiet hours: 20:00–08:00, ${timezone}.`,
+-    frequency: "At most one marketing email per contact per 24 hours across campaigns and journeys. Uncertain sends also reserve the slot.",
++    timing: `Elapsed delays, checked by the dispatcher. Sending window pending approval. Test fixture: 08:00–20:00, ${timezone}.`,
++    frequency: "Frequency policy pending approval. Test fixture: one marketing email per 24 hours across campaigns and journeys. Uncertain sends reserve the slot.",
+     reentry: automation.trigger_type === "date_field" ? "At most once per calendar year."
+       : automation.trigger_type === "booking_inactive" ? "Once per last-paid-booking date."
+       : "Automatic enrollment is unique per contact and journey. Manual re-entry needs an explicit decision.",
+@@ -44,7 +44,7 @@
+ export type MarketingGoal = "reviews" | "welcome" | "winback" | "vouchers";
+ export const marketingGoals: { key: MarketingGoal; title: string; recipe: string; why: string; prerequisite: string }[] = [
+   { key: "reviews", title: "Get reviews", recipe: "post-tour-review", why: "Invite guests after their tour, with one bounded reminder.", prerequisite: "A trustworthy completed-tour tag and review links. Review-completion detection is unavailable." },
+-  { key: "welcome", title: "Welcome enquiries", recipe: "welcome-series", why: "Help permitted prospects find a suitable tour.", prerequisite: "Verified permission and no non-cancelled reservation. First-booking offers require approved issuance limits." },
++  { key: "welcome", title: "Welcome enquiries", recipe: "welcome-series", why: "Help permitted prospects find a suitable tour.", prerequisite: "Verified permission. First-booking exclusion policy is pending approval; offers and delivery are held." },
+   { key: "winback", title: "Bring guests back", recipe: "win-back", why: "Follow up after the configured time since a paid booking.", prerequisite: "Booking history and no rebooking or upcoming reservation. Offers need approved limits." },
+   { key: "vouchers", title: "Recover expiring voucher value", recipe: "voucher-expiry", why: "Help holders use a valid voucher before expiry.", prerequisite: "A verified contact-to-voucher mapping, balance and expiry checks. This guided goal is held until that binding is available." },
+ ];
+--- a/app/marketing/layout.tsx
++++ b/app/marketing/layout.tsx
+@@ -11,6 +11,9 @@
+       </div>
+ 
+       <SectionTabs section="marketing" />
++      <p role="status" className="ui-card p-4 text-sm">
++        Promotional delivery is unavailable pending policy approval and safety verification. Drafts and previews remain available. Booking messages continue separately.
++      </p>
+ 
+       {children}
+     </div>
+--- a/app/marketing/automations/page.tsx
++++ b/app/marketing/automations/page.tsx
+@@ -497,6 +497,7 @@
+                 </span>
+               </div>
+               <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>{t.description}</p>
++              <p className="text-sm mt-2" role="status">Unavailable for delivery. This draft recipe has unverified policy, event or offer prerequisites. Example offers and dates are illustrative and are not approved commercial terms.</p>
+             </div>
+           </div>
+           <div className="mt-4 flex gap-3">
+@@ -583,7 +584,7 @@
+             {t.exampleEmail}
+           </div>
+           <p className="text-xs mt-2" style={{ color: "var(--ck-text-muted)" }}>
+-            This is a sample. You'll customise the actual email in your template editor after creating the automation.
++            Illustrative content only. Verify every claim, link, offer and date before review. The saved draft may differ; this is not its audience or delivery estimate.
+           </p>
+         </div>
+ 
+@@ -617,7 +618,7 @@
+             <p className="ui-mono-label mb-2">Growth · Templates</p>
+             <h1 className="font-display text-[26px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Automation Templates</h1>
+             <p className="text-sm mt-1.5" style={{ color: "var(--ck-text-muted)" }}>
+-              Industry-proven workflows designed for tour &amp; activity businesses. Choose a template to get started in seconds.
++              Ten draft recipes for review. Promotional delivery is unavailable until each recipe’s prerequisites and business policies are approved.
+             </p>
+           </div>
+           <button
+@@ -655,6 +656,7 @@
+                             <h3 className="text-sm font-semibold truncate" style={{ color: "var(--ck-text-strong)" }}>
+                               {t.name}
+                             </h3>
++                            <span className="ui-status ui-pill-neutral">Delivery unavailable</span>
+                           </div>
+                           <p className="text-xs line-clamp-2 mb-2" style={{ color: "var(--ck-text-muted)" }}>
+                             {t.description}
+@@ -708,7 +710,7 @@
+           <div className="flex items-start gap-3">
+             <div className="min-w-0">
+               <h3 className="text-sm font-semibold mb-1" style={{ color: "var(--ck-text-strong)" }}>
+-                Your automations run 24/7 in the background
++                Promotional delivery is held for safety review
+               </h3>
+               <p className="text-xs leading-relaxed mb-2" style={{ color: "var(--ck-text-muted)" }}>
+                 Tags are automatically applied to your contacts based on their booking behaviour, like <strong>completed-tour</strong>, <strong>lapsed-90-days</strong>, or <strong>vip</strong>. When a tag is added, any matching automation triggers instantly. No manual work needed.
+@@ -818,7 +820,7 @@
+                   <span className="text-xs font-semibold" style={{ color: "var(--ck-text-strong)" }}>Results Grow</span>
+                 </div>
+                 <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
+-                  More reviews, more rebookings, more referrals, and recovered revenue, all while you focus on running great tours.
++                  Delivery and revenue outcomes are unavailable until dispatch, booking and payment linkage is verified.
+                 </p>
+               </div>
+             </div>
+@@ -908,9 +910,10 @@
+                         {a.status !== "archived" && (
+                           <button data-demo-action={a.status === "active" ? "automation.pause" : "automation.activate"}
+                             onClick={() => toggleStatus(a)}
++                            disabled={a.status !== "active"}
+                             className="inline-flex items-center justify-center rounded-lg border p-1.5 transition-colors hover:bg-[var(--ck-surface-sunken)]"
+                             style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)" }}
+-                            title={a.status === "active" ? "Pause" : "Activate"}
++                            title={a.status === "active" ? "Pause" : "Activation unavailable pending policy approval and safety verification"}
+                           >
+                             {a.status === "active" ? <Pause size={13} /> : <Play size={13} />}
+                           </button>
+--- a/app/marketing/automations/[id]/page.tsx
++++ b/app/marketing/automations/[id]/page.tsx
+@@ -609,6 +609,7 @@
+       </div>}
+       <section className="ui-card p-5 space-y-2" aria-labelledby="journey-contract-title">
+         <h2 id="journey-contract-title" className="font-semibold">Journey contract, version 1</h2>
++        <p className="text-sm" role="status">This describes your current edits, including unsaved steps. Audience, overlap, timing and send-volume estimates are unavailable for this edited journey. No delivery is guaranteed.</p>
+         {Object.entries(journeyContract(automation, steps, timezone)).filter(([key]) => !["version", "steps"].includes(key)).map(([key,value]) => <p key={key} className="text-sm"><strong className="capitalize">{key}:</strong> {String(value)}</p>)}
+       </section>
+       {/* Automation metadata */}
+@@ -738,7 +739,8 @@
+           {automation.status !== "archived" && (
+             <button data-demo-action={automation.status === "active" ? "automation.pause" : "automation.activate"}
+               onClick={toggleAutomationStatus}
+-              disabled={(cacheConflict && automation.status !== "active") || activating || saving || readOnly || !["MAIN_ADMIN", "SUPER_ADMIN"].includes(role)}
++              disabled={automation.status !== "active" || activating || saving || readOnly || !["MAIN_ADMIN", "SUPER_ADMIN"].includes(role)}
++              title={automation.status === "active" ? "Pause promotional delivery" : "Activation unavailable pending policy approval and safety verification"}
+               className={`ui-btn ${automation.status === "active" ? "ui-btn-danger" : "ui-btn-soft"} disabled:opacity-50`}
+             >
+               {activating ? "Checking…" : automation.status === "active" ? "Pause" : "Activate"}
+@@ -822,7 +824,7 @@
+               Before you activate
+             </h2>
+             <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
+-              Review each email and confirm the trigger, then activate when you're ready.
++              Review and save your draft. Activation remains unavailable pending policy approval and safety verification.
+             </p>
+           </div>
+           <div className="space-y-2">
+@@ -863,7 +865,8 @@
+           </div>
+           <button data-demo-action="automation.activate"
+             onClick={toggleAutomationStatus}
+-            disabled={cacheConflict || activating || saving || readOnly || !["MAIN_ADMIN", "SUPER_ADMIN"].includes(role)}
++            disabled
++            title="Activation unavailable pending policy approval and safety verification"
+             className="ui-btn ui-btn-primary disabled:opacity-50"
+           >
+             {activating ? "Checking…" : "Activate"}
+--- a/supabase/functions/_shared/marketing-batch.ts
++++ b/supabase/functions/_shared/marketing-batch.ts
+@@ -26,7 +26,8 @@
+     data?: Array<{ id?: unknown }>;
+     errors?: Array<{ index?: unknown; message?: unknown }>;
+   };
+-  if (!Array.isArray(response.data)) return null;
++  if (!Array.isArray(response.data) || response.data.some(item => typeof item?.id !== "string" || !item.id.trim()) ||
++    new Set(response.data.map(item => item.id)).size !== response.data.length) return null;
+ 
+   // Strict-mode success has no errors array and one ID per input. Permissive
+   // mode compacts successful IDs and identifies failures by original index.
+--- /dev/null
++++ b/supabase/functions/_shared/marketing-outbox.ts
+@@ -0,0 +1,10 @@
++// Legacy outbox bodies have no reliable promotional purpose or permission evidence.
++// Only a cancellation generated for this tenant and booking can continue here.
++export function operationalCancellationFollowup(
++  businessId: string,
++  message: { message_type?: string; booking_id?: string },
++  booking: { id?: string; business_id?: string; status?: string } | null,
++): boolean {
++  return message.message_type === "CANCEL_FOLLOWUP" && !!message.booking_id &&
++    booking?.id === message.booking_id && booking.business_id === businessId && booking.status === "CANCELLED";
++}
+--- a/supabase/functions/broadcast/index.ts
++++ b/supabase/functions/broadcast/index.ts
+@@ -48,6 +48,10 @@
+     }
+ 
+     if (send_whatsapp) return new Response(JSON.stringify({ error: "WhatsApp broadcasts require verified channel permission. No messages sent." }), { status: 409, headers: getCors(req) });
++    // Free-form promotion has no durable queue identity, frequency reservation or safe recovery.
++    // Keep it unavailable until routed through the shared promotional delivery gate.
++    return new Response(JSON.stringify({ error: "Promotional broadcasts unavailable: shared delivery gate required. No messages sent." }),
++      { status: 409, headers: getCors(req) });
+     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+ 
+     // Default limit
+--- a/supabase/functions/send-email/index.ts
++++ b/supabase/functions/send-email/index.ts
+@@ -1850,24 +1850,6 @@
+             </table>
+           </td>
+         </tr>
+-        <!-- Review Request -->
+-        <tr>
+-          <td style="padding: 0 40px 20px; text-align: center;">
+-            <p style="font-size: 14px; color: #555; line-height: 1.6; margin: 0 0 15px 0;">
+-              Had a great time? We'd love it if you could leave us a quick review on Google. It means the world to our small team!
+-            </p>
+-            <a href="https://search.google.com/local/writereview?placeid=ChIJ9a9I09RHzB0Rh9R8O4pM7aQ" style="display: inline-block; background-color: #ffffff; color: #2a5a52; border: 2px solid #2a5a52; text-decoration: none; padding: 12px 30px; border-radius: 8px; font-size: 15px; font-weight: bold;">⭐ Leave a Google Review</a>
+-          </td>
+-        </tr>
+-        <!-- Come Back -->
+-        <tr>
+-          <td style="padding: 0 40px 30px; text-align: center;">
+-            <p style="font-size: 15px; color: #555; line-height: 1.6; margin: 0 0 20px 0;">
+-              We'd love to see you again! Book your next adventure anytime at <a href="{{BOOKING_URL}}" style="color: #2a5a52; font-weight: bold; text-decoration: none;">{{BOOKING_URL}}</a>
+-            </p>
+-            <a href="{{BOOKING_URL}}" style="display: inline-block; background-color: #1b3b36; color: #fff; text-decoration: none; padding: 14px 40px; border-radius: 30px; font-size: 14px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Book Again</a>
+-          </td>
+-        </tr>
+         <!-- Footer -->
+         <tr>
+           <td style="background-color: #1b3b36; text-align: center; padding: 30px;">
+@@ -2656,6 +2638,11 @@
+         }
+         d.business_id = businessId;
+       }
++    }
++    // Legacy manual sends and tests must not bypass promotional queue safeguards.
++    if (["BROADCAST", "MARKETING_TEST", "PARTNERSHIP_INVITE"].includes(type)) {
++      return new Response(JSON.stringify({ error: "Promotional delivery unavailable: shared delivery gate required. No messages sent." }),
++        { status: 409, headers: getCors(req) });
+     }
+     const deliveryIdempotencyKey = serviceCaller && typeof d.delivery_idempotency_key === "string"
+       ? String(d.delivery_idempotency_key).slice(0, 256)
+--- a/supabase/functions/auto-messages/index.ts
++++ b/supabase/functions/auto-messages/index.ts
+@@ -288,6 +288,9 @@
+ }
+ 
+ async function sendReviewRequestsForBusiness(businessId: string) {
++  // Promotional WhatsApp has no channel-evidence gate or durable outcome recovery.
++  return 0;
++
+   const tenant = await getTenantByBusinessId(db, businessId);
+   const brandName = getBusinessDisplayName(tenant.business);
+   const now = Date.now();
+@@ -350,6 +353,9 @@
+ }
+ 
+ async function sendReviewRemindersForBusiness(businessId: string) {
++  // Promotional WhatsApp has no channel-evidence gate or durable outcome recovery.
++  return 0;
++
+   const tenant = await getTenantByBusinessId(db, businessId);
+   const brandName = getBusinessDisplayName(tenant.business);
+   const now = new Date();
+@@ -541,22 +547,7 @@
+     // Release held capacity
+     await db.from("holds").update({ status: "EXPIRED" }).eq("booking_id", booking.id).eq("status", "ACTIVE");
+ 
+-    // No email on auto-expire — only send a friendly WhatsApp nudge if they have a phone
+-    if (booking.phone && bookingSiteUrl) {
+-      try {
+-        const firstName = (booking.customer_name || "").split(" ")[0] || "Hi";
+-        await sendWhatsappTextForTenant(
+-          tenant,
+-          booking.phone,
+-          firstName + ", looks like you didn't finish booking your " +
+-            (booking?.tours?.name || "trip") + ". No worries, spots are still available!\n\n" +
+-            "Book again here: " + bookingSiteUrl,
+-          undefined,
+-        );
+-      } catch (error) {
+-        console.error("AUTO_EXPIRE_WA_ERR", businessId, booking.id, error);
+-      }
+-    }
++    // An expired checkout is not marketing permission. Rebooking nudges remain held.
+ 
+     await logSent(businessId, booking.id, booking.phone || "", "AUTO_CANCEL");
+     cancelled++;
+--- a/supabase/functions/wa-webhook/index.ts
++++ b/supabase/functions/wa-webhook/index.ts
+@@ -1,3 +1,4 @@
++import { operationalCancellationFollowup } from "../_shared/marketing-outbox.ts";
+ // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
+ // Every query against a tenant-owned table MUST include .eq("business_id", X).
+ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+@@ -1005,11 +1006,16 @@
+     try {
+       const { data: queuedMsgs } = await supabase
+         .from("outbox")
+-        .select("id, message_body")
++        .select("id, message_body, message_type, booking_id")
+         .eq("status", "WAITING_WINDOW")
+         .eq("business_id", tenant.business.id)
+         .eq("phone", phone);
+       for (const qm of (queuedMsgs || [])) {
++        // Old broadcasts and unknown free-form retries remain held, even on a new inbound reply.
++        if ((qm as any).message_type !== "CANCEL_FOLLOWUP" || !(qm as any).booking_id) continue;
++        const { data: followupBooking, error: followupError } = await supabase.from("bookings")
++          .select("id, business_id, status").eq("id", (qm as any).booking_id).eq("business_id", tenant.business.id).maybeSingle();
++        if (followupError || !operationalCancellationFollowup(tenant.business.id, qm as any, followupBooking)) continue;
+         try {
+           const drainRes = await sendWhatsappFreeformOrSignal(tenant, phone, (qm as any).message_body);
+           if (drainRes.ok) {
+--- a/supabase/functions/marketing-dispatch/index.ts
++++ b/supabase/functions/marketing-dispatch/index.ts
+@@ -338,7 +338,7 @@
+         if (delivery.reason === "reserved") {
+           deliveryByQueue.set(payload.queueId, delivery.id!);
+           reservedPayloads.push(payload);
+-        } else if (["quiet_hours", "frequency_24h", "campaign_paused", "operator_paused"].includes(delivery.reason)) {
++        } else if (["quiet_hours", "frequency_24h", "frequency_policy", "policy_approval_pending", "campaign_paused", "operator_paused"].includes(delivery.reason)) {
+           await supabase.from("marketing_queue").update({ status: "pending", next_retry_at: new Date(Date.now() + 3600000).toISOString(), error_message: delivery.reason })
+             .eq("id", payload.queueId).eq("business_id", payload.businessId);
+         } else {
+--- a/supabase/functions/marketing-automation-dispatch/index.ts
++++ b/supabase/functions/marketing-automation-dispatch/index.ts
+@@ -262,6 +262,10 @@
+           p_business_id: enrollment.business_id, p_contact_id: contact.id, p_enrollment_id: enrollment.id,
+         });
+         if (eligibility.error) throw new Error("Marketing eligibility unavailable");
++        if (["first_booking_policy_pending", "offer_issuance_unavailable", "domain_event_binding_unavailable"].includes(eligibility.data)) {
++          results.delayed++;
++          continue;
++        }
+         if (eligibility.data !== "eligible") {
+           await supabase.from("marketing_automation_enrollments").update({ status: "exited", updated_at: new Date().toISOString() })
+             .eq("id", enrollment.id).eq("business_id", enrollment.business_id);
+--- /dev/null
++++ b/supabase/migrations/20261015180000_marketing_closeout_hold.sql
+@@ -0,0 +1,158 @@
++BEGIN;
++-- Candidate only: no policy, permission or business approval is inserted.
++CREATE TABLE marketing_delivery_policy (
++ business_id uuid PRIMARY KEY REFERENCES businesses(id),
++ enabled boolean NOT NULL DEFAULT false,
++ minimum_interval_seconds integer CHECK(minimum_interval_seconds>0),
++ window_start time,
++ window_end time,
++ approval_ref text,
++ approved_at timestamptz,
++ first_booking_rule_ref text,
++ CHECK(NOT enabled OR (minimum_interval_seconds IS NOT NULL AND window_start IS NOT NULL
++   AND window_end IS NOT NULL AND window_start<window_end
++   AND nullif(btrim(approval_ref),'') IS NOT NULL AND approved_at IS NOT NULL))
++);
++ALTER TABLE marketing_delivery_policy ENABLE ROW LEVEL SECURITY;
++REVOKE ALL ON marketing_delivery_policy FROM PUBLIC,anon,authenticated;
++GRANT SELECT ON marketing_delivery_policy TO authenticated;
++GRANT SELECT,INSERT,UPDATE ON marketing_delivery_policy TO service_role;
++CREATE POLICY delivery_policy_own ON marketing_delivery_policy FOR SELECT TO authenticated
++ USING(business_id=ANY((SELECT current_business_ids())::uuid[]));
++CREATE POLICY delivery_policy_service ON marketing_delivery_policy FOR ALL TO service_role USING(true) WITH CHECK(true);
++
++CREATE FUNCTION marketing_policy_reason(p_business_id uuid) RETURNS text
++LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=public,pg_temp AS $$
++DECLARE p marketing_delivery_policy%ROWTYPE; zone text; local_time time;
++BEGIN
++ SELECT * INTO p FROM marketing_delivery_policy WHERE business_id=p_business_id;
++ IF NOT FOUND OR NOT p.enabled OR p.approved_at>clock_timestamp() THEN RETURN 'policy_approval_pending'; END IF;
++ SELECT timezone INTO zone FROM businesses WHERE id=p_business_id;
++ -- Named zones only: do not guess the operator's location or use the worker's clock zone.
++ IF zone IS NULL OR zone NOT LIKE '%/%' OR NOT EXISTS(SELECT 1 FROM pg_timezone_names WHERE name=zone) THEN
++   RETURN 'timezone_unavailable'; END IF;
++ local_time:=(clock_timestamp() AT TIME ZONE zone)::time;
++ IF local_time<p.window_start OR local_time>=p.window_end THEN RETURN 'quiet_hours'; END IF;
++ RETURN 'eligible';
++END $$;
++REVOKE ALL ON FUNCTION marketing_policy_reason(uuid) FROM PUBLIC,anon,authenticated;
++GRANT EXECUTE ON FUNCTION marketing_policy_reason(uuid) TO service_role;
++
++CREATE OR REPLACE FUNCTION public.marketing_step_eligibility(p_business_id uuid,p_contact_id uuid,p_enrollment_id uuid DEFAULT NULL)
++RETURNS text LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=public,pg_temp AS $$
++DECLARE reason text; a marketing_automations%ROWTYPE; e marketing_automation_enrollments%ROWTYPE;
++BEGIN
++ reason:=marketing_eligibility(p_business_id,p_contact_id);
++ IF reason<>'eligible' THEN RETURN reason; END IF;
++ IF p_enrollment_id IS NOT NULL THEN
++   SELECT * INTO e FROM marketing_automation_enrollments WHERE id=p_enrollment_id AND business_id=p_business_id AND contact_id=p_contact_id;
++   IF NOT FOUND OR e.status<>'active' THEN RETURN 'enrollment_inactive'; END IF;
++   SELECT * INTO a FROM marketing_automations WHERE id=e.automation_id AND business_id=p_business_id;
++   IF NOT FOUND OR a.status<>'active' THEN RETURN 'journey_paused'; END IF;
++   IF a.trigger_type='contact_added' AND NOT EXISTS(SELECT 1 FROM marketing_delivery_policy
++      WHERE business_id=p_business_id AND nullif(btrim(first_booking_rule_ref),'') IS NOT NULL) THEN RETURN 'first_booking_policy_pending'; END IF;
++   IF EXISTS(SELECT 1 FROM marketing_automation_steps WHERE automation_id=a.id AND business_id=p_business_id
++      AND step_type IN ('generate_voucher','generate_promo')) THEN RETURN 'offer_issuance_unavailable'; END IF;
++   IF a.trigger_type IN ('date_field','post_booking','booking_inactive') THEN RETURN 'domain_event_binding_unavailable'; END IF;
++   -- These tags are not bound to verified domain events in the current engine.
++   IF a.trigger_type='tag_added' AND a.trigger_config->>'tag' IN ('completed-tour','left-review','photos-ready','anniversary-1yr','vip') THEN
++      RETURN 'domain_event_binding_unavailable'; END IF;
++   IF a.trigger_type='tag_added' AND a.trigger_config->>'tag'='voucher-expiring-30d' THEN RETURN 'voucher_expiry_schedule_unavailable'; END IF;
++   IF nullif(e.metadata->>'voucher_code','') IS NOT NULL AND NOT EXISTS(
++     SELECT 1 FROM vouchers v JOIN marketing_contacts c ON c.id=p_contact_id AND c.business_id=v.business_id
++     WHERE v.business_id=p_business_id AND v.code=e.metadata->>'voucher_code' AND v.status='ACTIVE' AND v.current_balance>0
++       AND (v.expires_at IS NULL OR v.expires_at>now()) AND lower(btrim(v.recipient_email))=lower(btrim(c.email))) THEN RETURN 'voucher_ineligible'; END IF;
++   IF nullif(e.metadata->>'promo_code','') IS NOT NULL AND NOT EXISTS(
++     SELECT 1 FROM promotions p WHERE p.business_id=p_business_id AND p.code=e.metadata->>'promo_code' AND p.active
++       AND (p.valid_from IS NULL OR p.valid_from<=now()) AND (p.valid_until IS NULL OR p.valid_until>now())
++       AND (p.max_uses IS NULL OR coalesce(p.used_count,0)<p.max_uses)) THEN RETURN 'promo_ineligible'; END IF;
++   IF a.trigger_type='contact_added' AND marketing_has_reservation(p_business_id,p_contact_id) THEN RETURN 'already_booked'; END IF;
++   IF a.trigger_type='booking_inactive' AND (marketing_has_reservation(p_business_id,p_contact_id,(e.metadata->>'last_booking_at')::timestamptz)
++      OR NOT welcome_back_contact_eligible(p_business_id,p_contact_id,(e.metadata->>'last_booking_at')::timestamptz)) THEN RETURN 'rebooked_or_upcoming'; END IF;
++ END IF;
++ RETURN 'eligible';
++END $$;
++
++CREATE OR REPLACE FUNCTION public.reserve_marketing_delivery(p_business_id uuid,p_contact_id uuid,p_key text,p_payload jsonb,
++ p_queue_id uuid DEFAULT NULL,p_enrollment_id uuid DEFAULT NULL) RETURNS jsonb
++LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
++DECLARE d marketing_deliveries%ROWTYPE; reason text; zone text; policy marketing_delivery_policy%ROWTYPE; local_time time;
++BEGIN
++ reason:=marketing_policy_reason(p_business_id);
++ IF reason<>'eligible' THEN RETURN jsonb_build_object('reason',reason); END IF;
++ SELECT * INTO policy FROM marketing_delivery_policy WHERE business_id=p_business_id;
++ PERFORM pg_advisory_xact_lock(hashtextextended(p_business_id::text||p_contact_id::text,0));
++ SELECT * INTO d FROM marketing_deliveries WHERE delivery_key=p_key;
++ IF FOUND THEN
++   IF d.business_id<>p_business_id OR d.contact_id<>p_contact_id THEN RAISE EXCEPTION 'Delivery identity mismatch'; END IF;
++   RETURN jsonb_build_object('reason','delivery_'||d.status,'id',d.id);
++ END IF;
++ reason:=marketing_step_eligibility(p_business_id,p_contact_id,p_enrollment_id);
++ IF reason<>'eligible' THEN RETURN jsonb_build_object('reason',reason); END IF;
++ IF NOT EXISTS(SELECT 1 FROM businesses WHERE id=p_business_id AND upper(subscription_status) IN ('ACTIVE','TRIAL','PAST_DUE')) THEN
++   RETURN jsonb_build_object('reason','operator_paused'); END IF;
++ IF p_queue_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM marketing_queue q JOIN marketing_campaigns c
++   ON c.id=q.campaign_id AND c.business_id=q.business_id WHERE q.id=p_queue_id AND q.business_id=p_business_id
++   AND q.contact_id=p_contact_id AND c.status='sending' AND q.status='processing') THEN RETURN jsonb_build_object('reason','campaign_paused'); END IF;
++ -- Uncertain acceptance never expires into an automatic retry or a fresh overlapping journey.
++ IF EXISTS(SELECT 1 FROM marketing_deliveries WHERE business_id=p_business_id AND contact_id=p_contact_id
++   AND (status='reconcile' OR (status='sending' AND provider_started_at IS NOT NULL))) THEN
++   RETURN jsonb_build_object('reason','delivery_reconcile'); END IF;
++ -- The configured frequency limit is separate from indefinite uncertainty quarantine.
++ IF EXISTS(SELECT 1 FROM marketing_deliveries WHERE business_id=p_business_id AND contact_id=p_contact_id
++   AND status IN ('sending','sent','reconcile') AND created_at>clock_timestamp()-make_interval(secs => policy.minimum_interval_seconds)) OR
++   EXISTS(SELECT 1 FROM marketing_contacts WHERE id=p_contact_id AND business_id=p_business_id AND last_email_at>clock_timestamp()-make_interval(secs => policy.minimum_interval_seconds)) THEN
++   RETURN jsonb_build_object('reason','frequency_policy'); END IF;
++ SELECT timezone INTO zone FROM businesses WHERE id=p_business_id;
++ IF zone IS NULL OR NOT EXISTS(SELECT 1 FROM pg_timezone_names WHERE name=zone) THEN RETURN jsonb_build_object('reason','timezone_unavailable'); END IF;
++ local_time:=(clock_timestamp() AT TIME ZONE zone)::time;
++ IF local_time<policy.window_start OR local_time>=policy.window_end THEN RETURN jsonb_build_object('reason','quiet_hours'); END IF;
++ IF p_payload->'to' IS DISTINCT FROM jsonb_build_array((SELECT email FROM marketing_contacts WHERE id=p_contact_id AND business_id=p_business_id)) THEN
++   RETURN jsonb_build_object('reason','recipient_changed'); END IF;
++ INSERT INTO marketing_deliveries(business_id,contact_id,delivery_key,queue_id,enrollment_id,payload)
++ VALUES(p_business_id,p_contact_id,p_key,p_queue_id,p_enrollment_id,p_payload) RETURNING * INTO d;
++ RETURN jsonb_build_object('reason','reserved','id',d.id);
++END $$;
++
++CREATE OR REPLACE FUNCTION confirm_marketing_delivery(p_business_id uuid,p_delivery_id uuid) RETURNS text
++LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
++DECLARE d marketing_deliveries%ROWTYPE; reason text; zone text;
++BEGIN
++ SELECT * INTO d FROM marketing_deliveries WHERE id=p_delivery_id AND business_id=p_business_id FOR UPDATE;
++ IF NOT FOUND OR d.status<>'sending' OR d.provider_started_at IS NOT NULL THEN RETURN 'delivery_held'; END IF;
++ PERFORM pg_advisory_xact_lock(hashtextextended(d.business_id::text||d.contact_id::text,0));
++ reason:=marketing_policy_reason(p_business_id);
++ IF reason='eligible' THEN reason:=marketing_step_eligibility(d.business_id,d.contact_id,d.enrollment_id); END IF;
++ IF reason='eligible' AND NOT EXISTS(SELECT 1 FROM businesses WHERE id=d.business_id AND upper(subscription_status) IN ('ACTIVE','TRIAL','PAST_DUE')) THEN reason:='operator_paused'; END IF;
++ IF reason='eligible' AND d.queue_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM marketing_queue q JOIN marketing_campaigns c ON c.id=q.campaign_id AND c.business_id=q.business_id
++   WHERE q.id=d.queue_id AND q.business_id=d.business_id AND q.contact_id=d.contact_id AND q.status='processing' AND c.status='sending') THEN reason:='campaign_paused'; END IF;
++ IF reason='eligible' AND d.payload->'to' IS DISTINCT FROM jsonb_build_array((SELECT email FROM marketing_contacts WHERE id=d.contact_id AND business_id=d.business_id)) THEN reason:='recipient_changed'; END IF;
++ IF reason<>'eligible' THEN UPDATE marketing_deliveries SET status='failed',updated_at=clock_timestamp() WHERE id=d.id; RETURN reason; END IF;
++ UPDATE marketing_deliveries SET provider_started_at=clock_timestamp() WHERE id=d.id;
++ RETURN 'eligible';
++END $$;
++
++CREATE OR REPLACE FUNCTION marketing_offer_allowed(p_business_id uuid,p_automation_id uuid,p_step_type text,p_config jsonb)
++RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public,pg_temp AS $$ SELECT false $$;
++
++CREATE FUNCTION marketing_guard_delivery_policy() RETURNS trigger
++LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
++DECLARE reason text;
++BEGIN
++ IF NEW.status='active' AND (TG_OP='INSERT' OR OLD.status IS DISTINCT FROM 'active') THEN
++   reason:=marketing_policy_reason(NEW.business_id);
++   -- Quiet hours delay dispatch, but do not prevent saving/reviewing a valid journey.
++   IF reason NOT IN ('eligible','quiet_hours') THEN RAISE EXCEPTION 'Promotion unavailable: %',reason; END IF;
++   IF NEW.trigger_type='contact_added' AND NOT EXISTS(SELECT 1 FROM marketing_delivery_policy
++      WHERE business_id=NEW.business_id AND nullif(btrim(first_booking_rule_ref),'') IS NOT NULL) THEN
++      RAISE EXCEPTION 'First-booking policy approval pending'; END IF;
++   IF NEW.trigger_type='tag_added' OR NEW.trigger_type='date_field' THEN
++      RAISE EXCEPTION 'Domain event contract unavailable'; END IF;
++ END IF;
++ RETURN NEW;
++END $$;
++CREATE TRIGGER marketing_guard_delivery_policy BEFORE INSERT OR UPDATE OF status ON marketing_automations
++ FOR EACH ROW EXECUTE FUNCTION marketing_guard_delivery_policy();
++REVOKE ALL ON FUNCTION marketing_guard_delivery_policy() FROM PUBLIC,anon,authenticated;
++NOTIFY pgrst,'reload schema';
++COMMIT;
+--- a/supabase/security-baseline.json
++++ b/supabase/security-baseline.json
+@@ -1,6 +1,6 @@
+ {
+   "generated_at": "2026-10-08T10:16:51.508602+00:00",
+-  "note": "Pre-launch security audit fixes (2026-07-13): admin_users UPDATE fully revoked from authenticated (was: any admin could self-promote to SUPER_ADMIN via business_id-only RLS check with no role restriction); combo_bookings anon/public INSERT policies dropped (was: anon could insert payment_status=PAID directly, bypassing Paysafe); combo_booking_items_anon_insert dropped (settlement forgery); promotion_uses_anon_insert dropped (promo abuse); holds_authenticated_all split into select/update/delete (tenant-scoped, matching prior qual) with INSERT now default-deny (was: with_check=true let any authenticated session write holds against any tenant); zero-policy tables (processed_wa_messages, wa_messages, business_partnerships, combo_settlements, invite_tokens, ngt_intake_submissions, ngt_payments, tenant_invoice_sequences) had broad anon/authenticated grants revoked (RLS already default-denied these, but grants were unnecessarily broad). Migrations: 20260713144334_security_audit_fixes, 20260713144422_security_audit_fixes_c1_correction, plus an admin_setup_token_used_hash column addition. | 2026-08-15 (20260815120000_close_anon_cross_tenant_booking_reads): bookings_read POST/PATCH read-back clause scoped to the writing tenant + DRAFT/PENDING (was: ANY POST or PATCH — including every /rpc/* call — disabled the policy entirely, exposing all tenants' bookings to anon; proven live via check_loyalty); search_bookings_by_ref dropped (SECURITY DEFINER + PUBLIC EXECUTE + caller-supplied business_id, no caller in repo); calculate_booking_refund and check_loyalty EXECUTE revoked from PUBLIC and anon. | 2026-08-15 (20260815140000_onboarding_wizard): new anonymous write path for client onboarding. Edge fn onboarding-wizard is verify_jwt=false and reachable by anyone; its gate is a single-use, unexpired invite_tokens row that resolves to exactly one business_id, plus per-IP check_rate_limit. No request may supply a business_id and writable columns are whitelisted per step, so the encrypted credential columns, subdomain and subscription_status are unreachable from the wizard. Skeleton tenants are created with subscription_status='ONBOARDING' (outside the TRADING set) so a half-finished onboarding cannot take money. New storage bucket onboarding-assets grants anon INSERT, bounded by a 5MB cap and an image-only mime allowlist; the bucket is public-read by design. No public-schema grants, policies or RLS state changed, which is why this snapshot's arrays are unchanged. | 2026-09-12: reviewed deployed first-five release: independent booking proof, tenant-scoped insert/read policy, service-only durable refund operations. | 2026-10-08: deployed reviewed OTA transaction candidate (20261008120000). Four new tables have RLS; events, reservations and availability snapshots are service-only. Runtime boundary grants are revoked from service/anon/authenticated and remain BLOCKED; activation is not enabled.",
++  "note": "Pre-launch security audit fixes (2026-07-13): admin_users UPDATE fully revoked from authenticated (was: any admin could self-promote to SUPER_ADMIN via business_id-only RLS check with no role restriction); combo_bookings anon/public INSERT policies dropped (was: anon could insert payment_status=PAID directly, bypassing Paysafe); combo_booking_items_anon_insert dropped (settlement forgery); promotion_uses_anon_insert dropped (promo abuse); holds_authenticated_all split into select/update/delete (tenant-scoped, matching prior qual) with INSERT now default-deny (was: with_check=true let any authenticated session write holds against any tenant); zero-policy tables (processed_wa_messages, wa_messages, business_partnerships, combo_settlements, invite_tokens, ngt_intake_submissions, ngt_payments, tenant_invoice_sequences) had broad anon/authenticated grants revoked (RLS already default-denied these, but grants were unnecessarily broad). Migrations: 20260713144334_security_audit_fixes, 20260713144422_security_audit_fixes_c1_correction, plus an admin_setup_token_used_hash column addition. | 2026-08-15 (20260815120000_close_anon_cross_tenant_booking_reads): bookings_read POST/PATCH read-back clause scoped to the writing tenant + DRAFT/PENDING (was: ANY POST or PATCH \u2014 including every /rpc/* call \u2014 disabled the policy entirely, exposing all tenants' bookings to anon; proven live via check_loyalty); search_bookings_by_ref dropped (SECURITY DEFINER + PUBLIC EXECUTE + caller-supplied business_id, no caller in repo); calculate_booking_refund and check_loyalty EXECUTE revoked from PUBLIC and anon. | 2026-08-15 (20260815140000_onboarding_wizard): new anonymous write path for client onboarding. Edge fn onboarding-wizard is verify_jwt=false and reachable by anyone; its gate is a single-use, unexpired invite_tokens row that resolves to exactly one business_id, plus per-IP check_rate_limit. No request may supply a business_id and writable columns are whitelisted per step, so the encrypted credential columns, subdomain and subscription_status are unreachable from the wizard. Skeleton tenants are created with subscription_status='ONBOARDING' (outside the TRADING set) so a half-finished onboarding cannot take money. New storage bucket onboarding-assets grants anon INSERT, bounded by a 5MB cap and an image-only mime allowlist; the bucket is public-read by design. No public-schema grants, policies or RLS state changed, which is why this snapshot's arrays are unchanged. | 2026-09-12: reviewed deployed first-five release: independent booking proof, tenant-scoped insert/read policy, service-only durable refund operations. | 2026-10-08: deployed reviewed OTA transaction candidate (20261008120000). Four new tables have RLS; events, reservations and availability snapshots are service-only. Runtime boundary grants are revoked from service/anon/authenticated and remain BLOCKED; activation is not enabled. | Local closeout candidate only: marketing_delivery_policy expected schema. No production migration or live drift check performed.",
+   "grants": [
+     {
+       "grantee": "anon",
+@@ -6305,6 +6305,26 @@
+     {
+       "grantee": "service_role",
+       "table_name": "webchat_sessions",
++      "privilege_type": "UPDATE"
++    },
++    {
++      "grantee": "authenticated",
++      "table_name": "marketing_delivery_policy",
++      "privilege_type": "SELECT"
++    },
++    {
++      "grantee": "service_role",
++      "table_name": "marketing_delivery_policy",
++      "privilege_type": "SELECT"
++    },
++    {
++      "grantee": "service_role",
++      "table_name": "marketing_delivery_policy",
++      "privilege_type": "INSERT"
++    },
++    {
++      "grantee": "service_role",
++      "table_name": "marketing_delivery_policy",
+       "privilege_type": "UPDATE"
+     }
+   ],
+@@ -6757,6 +6777,11 @@
+     {
+       "schema": "public",
+       "table_name": "webchat_sessions",
++      "rls_enabled": true
++    },
++    {
++      "schema": "public",
++      "table_name": "marketing_delivery_policy",
+       "rls_enabled": true
+     }
+   ],
+@@ -8812,6 +8837,24 @@
+       "roles": "{authenticated}",
+       "qual": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))",
+       "with_check": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))"
++    },
++    {
++      "schemaname": "public",
++      "tablename": "marketing_delivery_policy",
++      "policyname": "delivery_policy_own",
++      "cmd": "SELECT",
++      "roles": "{authenticated}",
++      "qual": "(business_id = ANY (( SELECT current_business_ids() AS current_business_ids)))",
++      "with_check": null
++    },
++    {
++      "schemaname": "public",
++      "tablename": "marketing_delivery_policy",
++      "policyname": "delivery_policy_service",
++      "cmd": "ALL",
++      "roles": "{service_role}",
++      "qual": "true",
++      "with_check": "true"
+     }
+   ]
+ }
+--- a/tests/marketing-safety-local.mjs
++++ b/tests/marketing-safety-local.mjs
+@@ -1,12 +1,20 @@
+ import assert from 'node:assert/strict';
+ import { readFileSync } from 'node:fs';
+ import pg from 'pg';
++import { randomBytes } from 'node:crypto';
+ 
+ // No application env, hosted URLs, providers, vouchers or customer data.
+ const host=process.argv[2], port=Number(process.argv[3]);
+ assert(/^\/private\/tmp\/capekayak-db-test-[A-Za-z0-9]+$/.test(host||''));
+ assert(Number.isInteger(port)&&port>1024);
+-const db=new pg.Client({host,port,database:'postgres',user:process.env.USER});
++const database='marketing_fixture_'+randomBytes(6).toString('hex');
++const admin=new pg.Client({host,port,database:'postgres',user:process.env.USER});
++await admin.connect();
++assert.equal((await admin.query('SHOW data_directory')).rows[0].data_directory,host+'/data');
++assert.equal((await admin.query('SHOW listen_addresses')).rows[0].listen_addresses,'');
++await admin.query('CREATE DATABASE '+database);
++await admin.end();
++const db=new pg.Client({host,port,database,user:process.env.USER});
+ const id=n=>`10000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+ const migration=name=>readFileSync('supabase/migrations/'+name,'utf8').replace(/^BEGIN;\s*/i,'').replace(/COMMIT;\s*$/i,'');
+ await db.connect();
+@@ -183,5 +191,6 @@
+  await db.query("UPDATE businesses SET timezone=(SELECT name FROM pg_timezone_names WHERE name LIKE 'Etc/GMT%' AND (extract(hour from now() AT TIME ZONE name)<8 OR extract(hour from now() AT TIME ZONE name)>=20) LIMIT 1) WHERE id=$1",[id(1)]);
+  assert.equal((await reserve('quiet',28)).reason,'quiet_hours');
+  await db.query("UPDATE businesses SET timezone='Unknown/Zone' WHERE id=$1",[id(1)]);assert.equal((await reserve('zone',28)).reason,'timezone_unavailable');
++ await (await import('./marketing-policy-closeout.ts')).checkMarketingPolicy(db,host,port,database);
+  console.log('PASS: local schema apply; unknown import; evidence identity; suppression and normalized reimport; tenant isolation; opt-out race; durable ambiguous/crash hold; callback deduplication/binding; unpaid/reservation/refund exits; atomic draft rollback; revision locks; role/read-only gates; quiet hours; invalid timezone; no provider calls.');
+ }finally{await db.query('ROLLBACK');await db.end();}
+--- /dev/null
++++ b/tests/marketing-schema-closeout.ts
+@@ -0,0 +1,41 @@
++import assert from 'node:assert/strict';
++import { readFileSync, readdirSync } from 'node:fs';
++import pg from 'pg';
++
++// This attempt records missing prerequisites. It must never repair a schema by guessing it.
++const host = process.argv[2];
++const port = Number(process.argv[3]);
++assert.equal(host, '/private/tmp/capekayak-db-test-MktCloseout');
++assert.equal(port, 55439);
++const config = { host, port, user: process.env.USER };
++const admin = new pg.Client({ ...config, database: 'postgres' });
++await admin.connect();
++try {
++  assert.equal((await admin.query('SHOW data_directory')).rows[0].data_directory, host + '/data');
++  assert.equal((await admin.query('SHOW listen_addresses')).rows[0].listen_addresses, '');
++  for (const mode of ['clean', 'upgrade'] as const) {
++    const name = 'marketing_closeout_' + mode;
++    await admin.query('CREATE DATABASE ' + name);
++    const db = new pg.Client({ ...config, database: name });
++    await db.connect();
++    let file = '';
++    let applied = 0;
++    try {
++      if (mode === 'upgrade') {
++        for (file of ['rollout-schema.sql', 'rollout-policies.sql', 'rollout-marketing.sql', 'rollout-cron.sql', 'rollout-platform.sql']) {
++          await db.query(readFileSync('tests/fixtures/' + file, 'utf8'));
++        }
++      }
++      for (file of readdirSync('supabase/migrations').filter(f => /^\d{14}_.*\.sql$/.test(f) &&
++        (mode === 'clean' || f >= '20260907071000_')).sort()) {
++        await db.query(readFileSync('supabase/migrations/' + file, 'utf8'));
++        applied++;
++      }
++      console.log(JSON.stringify({ mode, applied, result: 'schema_applied', representative: false,
++        limitation: mode === 'upgrade' ? 'The checked-in rollout fixture is a reduced September snapshot, not the complete application baseline.' : undefined }));
++    } catch (error: any) {
++      console.log(JSON.stringify({ mode, applied, file, result: 'BLOCKED', code: error.code, message: error.message }));
++      await db.query('ROLLBACK');
++    } finally { await db.end(); }
++  }
++} finally { await admin.end(); }
+--- /dev/null
++++ b/tests/marketing-policy-closeout.ts
+@@ -0,0 +1,104 @@
++import assert from 'node:assert/strict';
++import { readFileSync } from 'node:fs';
++import pg from 'pg';
++
++// Reduced-schema checks only. These cannot satisfy the complete-schema release gate.
++export async function checkMarketingPolicy(db: pg.Client, host: string, port: number, database: string) {
++  const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
++  assert.equal((await db.query('SHOW data_directory')).rows[0].data_directory, host + '/data');
++  assert.equal((await db.query('SHOW listen_addresses')).rows[0].listen_addresses, '');
++  await db.query(readFileSync('supabase/migrations/20261015180000_marketing_closeout_hold.sql', 'utf8')
++    .replace(/^BEGIN;\s*/i, '').replace(/COMMIT;\s*$/i, ''));
++  const policyReason = async () => (await db.query('SELECT marketing_policy_reason($1) r', [id(1)])).rows[0].r;
++  assert.equal(await policyReason(), 'policy_approval_pending');
++  await db.query(`UPDATE businesses SET timezone=(SELECT name FROM pg_timezone_names
++    WHERE name LIKE 'Etc/GMT%' AND extract(hour from clock_timestamp() AT TIME ZONE name) BETWEEN 9 AND 18 LIMIT 1) WHERE id=$1`, [id(1)]);
++  await db.query(`INSERT INTO marketing_delivery_policy(business_id,enabled,minimum_interval_seconds,window_start,window_end,approval_ref,approved_at)
++    VALUES($1,true,86400,'08:00','20:00','SYNTHETIC TEST FIXTURE ONLY',clock_timestamp())`, [id(1)]);
++  assert.equal(await policyReason(), 'eligible');
++  assert.equal((await db.query('SELECT marketing_step_eligibility($1,$2,$3) r',[id(1),id(27),id(41)])).rows[0].r,'first_booking_policy_pending');
++  assert.equal((await db.query("SELECT marketing_offer_allowed($1,$2,'generate_promo','{}') allowed",[id(1),id(40)])).rows[0].allowed,false);
++  console.log('PASS first-booking approval is absent; promotional offer issuance stays unavailable even if historical limit records exist');
++  console.log('PASS policy is absent/disabled by default; proposed 24h and 08:00-20:00 exist only in labelled synthetic fixture');
++  await db.query('SAVEPOINT invalid_policy');
++  await assert.rejects(() => db.query(`INSERT INTO marketing_delivery_policy(business_id,enabled) VALUES($1,true)`, [id(2)]), { code: '23514' });
++  await db.query('ROLLBACK TO SAVEPOINT invalid_policy');
++  await db.query('SET LOCAL ROLE authenticated');
++  assert.equal((await db.query('SELECT count(*)::int n FROM marketing_delivery_policy WHERE business_id=$1', [id(2)])).rows[0].n, 0);
++  await db.query('SAVEPOINT forbidden_policy');
++  await assert.rejects(() => db.query('UPDATE marketing_delivery_policy SET enabled=true'), { code: '42501' });
++  await db.query('ROLLBACK TO SAVEPOINT forbidden_policy');
++  await db.query('RESET ROLE');
++  const seed = async (n: number) => {
++    await db.query('INSERT INTO marketing_contacts(id,business_id,email) VALUES($1,$2,$3)', [id(n), id(1), `race${n}@example.invalid`]);
++    await db.query(`INSERT INTO marketing_permission_events(business_id,contact_id,identity_hash,channel,purpose,decision,source,evidence_at,notice_version,evidence_ref)
++      VALUES($1,$2,marketing_identity($3),'email','promotion','granted','synthetic_fixture',clock_timestamp(),'fixture-notice','fixture-evidence')`, [id(1), id(n), `race${n}@example.invalid`]);
++    await db.query("INSERT INTO marketing_queue(id,business_id,contact_id,campaign_id,status) VALUES($1,$2,$3,$4,'processing')", [id(n + 100), id(1), id(n), id(30)]);
++  };
++  for (let n = 300; n <= 306; n++) await seed(n);
++  // The reduced fixture is committed only in this dedicated disposable cluster, to exercise real concurrent sessions.
++  await db.query('COMMIT');
++  await db.query("SELECT set_config('request.jwt.claim.role','service_role',false)");
++  const clients = [new pg.Client({ host, port, database, user: process.env.USER }), new pg.Client({ host, port, database, user: process.env.USER })];
++  await Promise.all(clients.map(async c => {
++    await c.connect();
++    await c.query('SET ROLE service_role');
++    await c.query("SELECT set_config('request.jwt.claim.role','service_role',false)");
++  }));
++  const reserve = async (client: pg.Client, n: number, key: string) => (await client.query(
++    'SELECT reserve_marketing_delivery($1,$2,$3,$4::jsonb,$5,NULL) d',
++    [id(1), id(n), key, JSON.stringify({ to: [`race${n}@example.invalid`], subject: 'Synthetic', html: 'Synthetic only' }), id(n + 100)],
++  )).rows[0].d;
++  const confirm = async (n: string) => (await db.query('SELECT confirm_marketing_delivery($1,$2) r', [id(1), n])).rows[0].r;
++  try {
++    const concurrent = await Promise.all(clients.map((c, i) => reserve(c, 300, 'overlap/' + i)));
++    assert.deepEqual(concurrent.map(d => d.reason).sort(), ['frequency_policy', 'reserved']);
++    const duplicate = await Promise.all(clients.map(c => reserve(c, 301, 'same-key')));
++    assert.deepEqual(duplicate.map(d => d.reason).sort(), ['delivery_sending', 'reserved']);
++    console.log('PASS two real worker sessions: overlapping journeys reserve once; stable key replay cannot resend');
++    const optedOut = await reserve(db, 302, 'optout-race');
++    await db.query("UPDATE marketing_contacts SET status='unsubscribed' WHERE id=$1", [id(302)]);
++    assert.equal(await confirm(optedOut.id), 'suppressed');
++    assert.equal((await db.query('SELECT provider_started_at FROM marketing_deliveries WHERE id=$1', [optedOut.id])).rows[0].provider_started_at, null);
++    const pause = await reserve(db, 303, 'policy-pause');
++    await db.query('UPDATE marketing_delivery_policy SET enabled=false WHERE business_id=$1', [id(1)]);
++    assert.equal(await confirm(pause.id), 'policy_approval_pending');
++    assert.equal((await db.query('SELECT status FROM marketing_deliveries WHERE id=$1', [pause.id])).rows[0].status, 'failed');
++    await db.query('UPDATE marketing_delivery_policy SET enabled=true WHERE business_id=$1', [id(1)]);
++    assert.equal((await reserve(db, 303, 'explicit-recovery/new-key')).reason, 'reserved');
++    console.log('PASS opt-out and pause before final handoff block provider start; definitely unattempted failure releases frequency slot; old key remains terminal');
++    const unknown = await reserve(db, 304, 'crash-after-handoff');
++    assert.equal(await confirm(unknown.id), 'eligible');
++    // A crash loses the provider response. Time advancing beyond a provider idempotency TTL must not reset this key.
++    await db.query("UPDATE marketing_deliveries SET created_at=clock_timestamp()-interval '2 days' WHERE id=$1", [unknown.id]);
++    assert.equal((await reserve(db, 304, 'crash-after-handoff')).reason, 'delivery_sending');
++    assert.equal(await confirm(unknown.id), 'delivery_held');
++    assert.equal((await reserve(db, 304, 'different-journey-after-crash')).reason, 'delivery_reconcile');
++    console.log('PASS uncertain provider acceptance is quarantined beyond 24h, across both stable and new journey keys');
++    // Configurability test: this is another labelled test value, not a policy approval.
++    const rate = await reserve(db, 305, 'configurable-frequency');
++    await db.query("UPDATE marketing_deliveries SET status='sent',created_at=clock_timestamp()-interval '2 hours' WHERE id=$1", [rate.id]);
++    await db.query('UPDATE marketing_delivery_policy SET minimum_interval_seconds=3600 WHERE business_id=$1', [id(1)]);
++    assert.equal((await reserve(db, 305, 'one-hour-fixture')).reason, 'reserved');
++    await db.query("UPDATE businesses SET timezone='Unknown/Zone' WHERE id=$1", [id(1)]);
++    assert.equal((await reserve(db, 306, 'unknown-zone')).reason, 'timezone_unavailable');
++    console.log('PASS configurable frequency; unknown timezone safely holds delivery; ordinary role cannot enable policy');
++    await db.query(`UPDATE businesses SET timezone=(SELECT name FROM pg_timezone_names WHERE name LIKE 'Etc/GMT%' AND extract(hour from clock_timestamp() AT TIME ZONE name) BETWEEN 9 AND 18 LIMIT 1) WHERE id=$1`,[id(1)]);
++    await db.query('UPDATE marketing_delivery_policy SET enabled=false WHERE business_id=$1',[id(1)]);
++    await db.query('BEGIN');
++    try {
++      const original=readFileSync('supabase/migrations/20261015160000_marketing_permission_safety.sql','utf8');
++      const start=original.indexOf('CREATE FUNCTION public.reserve_marketing_delivery');
++      const end=original.indexOf('CREATE FUNCTION confirm_marketing_delivery',start);
++      await db.query(original.slice(start,end).replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION'));
++      assert.equal((await reserve(db,306,'unsafe-function-rollback')).reason,'reserved');
++      console.log('FAIL RELEASE GATE: restoring the prior reservation function bypasses promotional policy pause; rollback must retain the new gate');
++    } finally { await db.query('ROLLBACK'); }
++    assert.equal((await reserve(db,306,'after-rollback-probe')).reason,'policy_approval_pending');
++    console.log('PASS rolling back the probe retains the gate and all existing queued/uncertain audit rows');
++
++  } finally {
++    await Promise.all(clients.map(c => c.end()));
++    await db.query('BEGIN');
++  }
++}
+--- a/tests/unit/marketing-batch-dispatch.test.ts
++++ b/tests/unit/marketing-batch-dispatch.test.ts
+@@ -38,6 +38,12 @@
+     }, 2)).toBeNull();
+   });
+ 
++  it("holds blank or duplicate provider IDs for reconciliation", () => {
++    for (const data of [[{ id: "" }], [{ id: "   " }], [{ id: "same" }, { id: "same" }]]) {
++      expect(parseResendBatchResponse({ data }, data.length)).toBeNull();
++    }
++  });
++
+   it("enables Resend permissive validation after the local recipient guard", () => {
+     const dispatch = readFileSync("supabase/functions/marketing-dispatch/index.ts", "utf8");
+     expect(dispatch).toContain('"x-batch-validation": "permissive"');
+--- /dev/null
++++ b/tests/unit/marketing-closeout.test.ts
+@@ -0,0 +1,34 @@
++import { operationalCancellationFollowup } from "../../supabase/functions/_shared/marketing-outbox";
++import { it, expect, vi } from "vitest";
++import { sourceHandler, sourceFunction } from "../helpers/source-handler";
++
++it("holds free-form broadcasts after authentication and before recipient/provider reads", async () => {
++  const createClient = vi.fn(() => { throw new Error("Unexpected data or provider access"); });
++  const handler = sourceHandler("supabase/functions/broadcast/index.ts", {
++    "https://esm.sh/@supabase/supabase-js@2": { createClient },
++    "../_shared/auth.ts": { requireAuth: async () => ({ businessId: "fixture", role: "MAIN_ADMIN" }) },
++    "../_shared/tenant.ts": { getAdminAppOrigins: () => ["https://fixture.invalid"], isAllowedOrigin: () => true },
++  });
++  const response = await handler(new Request("https://fixture.invalid", { method: "POST", body: JSON.stringify({ action: "broadcast_targeted", message: "Synthetic only", send_email: true }) }));
++  expect(response.status).toBe(409);
++  expect(await response.json()).toMatchObject({ error: expect.stringContaining("unavailable") });
++  expect(createClient).not.toHaveBeenCalled();
++});
++
++it.each(["sendReviewRequestsForBusiness", "sendReviewRemindersForBusiness", "sendReEngagementForBusiness"])("holds %s without side effects", async name => {
++  const db = new Proxy({}, { get() { throw new Error("Unexpected data or provider access"); } });
++  const run = sourceFunction("supabase/functions/auto-messages/index.ts", name, { db });
++  expect(await run("fixture")).toBe(0);
++});
++
++it("holds legacy broadcasts, ambiguous retries and foreign/cancelled-state mismatches while preserving verified cancellation follow-ups", () => {
++ const message={message_type:"CANCEL_FOLLOWUP",booking_id:"booking-a"};
++ const booking={id:"booking-a",business_id:"tenant-a",status:"CANCELLED"};
++ expect(operationalCancellationFollowup("tenant-a",message,booking)).toBe(true);
++ for (const type of ["BROADCAST_FOLLOWUP","WINDOW_CLOSED_RETRY","ADMIN_FOLLOWUP",undefined]) {
++  expect(operationalCancellationFollowup("tenant-a",{...message,message_type:type},booking)).toBe(false);
++ }
++ expect(operationalCancellationFollowup("tenant-b",message,booking)).toBe(false);
++ expect(operationalCancellationFollowup("tenant-a",message,{...booking,status:"PAID"})).toBe(false);
++ expect(operationalCancellationFollowup("tenant-a",message,null)).toBe(false);
++});
+--- a/tests/unit/message-job-boundaries.test.ts
++++ b/tests/unit/message-job-boundaries.test.ts
+@@ -1,5 +1,6 @@
+ import { describe, expect, it, vi } from "vitest";
+ import { sourceExports, sourceHandler } from "../helpers/source-handler";
++import * as outbox from "../../supabase/functions/_shared/marketing-outbox";
+ import * as delivery from "../../supabase/functions/_shared/marketing-delivery";
+ import * as calendar from "../../supabase/functions/_shared/marketing-calendar";
+ import * as tokens from "../../supabase/functions/_shared/marketing-tokens";
+@@ -14,7 +15,7 @@
+ const secretKey = "sb_secret_fixture-not-a-real-key";
+ const env = { SUPABASE_URL: "https://fixture.invalid", SUPABASE_SERVICE_ROLE_KEY: serviceKey, SUPABASE_SECRET_KEYS: JSON.stringify({ default: secretKey }), RESEND_API_KEY: "fixture-resend", SEND_EMAIL_HOOK_SECRET: "fixture-hook" };
+ const endpoints = ["send-email", "send-whatsapp-text", "auto-messages", "cron-tasks", "marketing-dispatch", "marketing-automation-dispatch"];
+-const message = { business_id: "a", to: "fixture-phone", message: "Reminder", type: "MARKETING_TEST", data: { business_id: "a", email: "guest@fixture.invalid", html_content: "<p>Hello</p>" } };
++const message = { business_id: "a", to: "fixture-phone", message: "Reminder", type: "REMINDER", data: { business_id: "a", email: "guest@fixture.invalid", html_content: "<p>Hello</p>" } };
+ 
+ // The real handlers and authentication helper run offline. This tiny query
+ // double enforces tenant filters; native SQL claims are tested against Postgres.
+@@ -146,7 +147,7 @@
+       "../_shared/auth.ts": auth, "../_shared/tenant.ts": tenant,
+       "../_shared/sentry.ts": { withSentry: (_name: string, fn: unknown) => fn, captureCheckIn: vi.fn(async () => "fixture-checkin") },
+       "../_shared/subscription.ts": subscription, "../_shared/marketing-tokens.ts": tokens,
+-      "../_shared/marketing-delivery.ts": delivery, "../_shared/marketing-calendar.ts": calendar,
++      "../_shared/marketing-outbox.ts": outbox, "../_shared/marketing-delivery.ts": delivery, "../_shared/marketing-calendar.ts": calendar,
+       "../_shared/marketing-batch.ts": batch, "../_shared/marketing-email-html.ts": emailHtml,
+       "../_shared/waiver.ts": waiver, "../_shared/duration.ts": duration,
+       "../_shared/voucher-balances.ts": voucherBalances,
+@@ -237,11 +238,23 @@
+       expect(f.whatsapp[0][0].business.id).toBe("a");
+     });
+   }
+-  it("keeps marketing previews branded for the caller's business", async () => {
++  it("keeps transactional reminders branded for the caller's business", async () => {
+     const f = fixture();
+     expect((await f.invoke("send-email")).status).toBe(200);
+     expect(f.emails[0].from).toBe("Operator a <noreply@bookingtours.co.za>");
+     expect(f.emails[0].to).toEqual([message.data.email]);
++  });
++  it.each(["MARKETING_TEST", "BROADCAST", "PARTNERSHIP_INVITE"])("holds legacy %s without an outbound call", async (type) => {
++    const f = fixture();
++    expect((await f.invoke("send-email", { type, data: { ...message.data } })).status).toBe(409);
++    expect(f.emails).toEqual([]);
++  });
++  it("delivers photos without review or rebooking promotions when marketing is held", async () => {
++    const f = fixture();
++    const response = await f.invoke("send-email", { type: "TRIP_PHOTOS", data: { ...message.data, photo_url: "https://fixture.invalid/gallery" } });
++    expect(response.status).toBe(200);
++    expect(f.emails[0].html).toContain("View Photos");
++    expect(f.emails[0].html).not.toMatch(/Book Again|Leave a Google Review|Book your next adventure/);
+   });
+   it("keeps ordinary booking-update emails", async () => {
+     const f = fixture();
+--- a/tests/helpers/marketing-preview.mjs
++++ b/tests/helpers/marketing-preview.mjs
+@@ -16,7 +16,7 @@
+ const server=createServer(async(req,res)=>{
+  res.setHeader('Access-Control-Allow-Origin','*');res.setHeader('Access-Control-Allow-Headers','*');res.setHeader('Access-Control-Allow-Methods','GET,HEAD,POST,OPTIONS');res.setHeader('Content-Type','application/json');
+  if(req.method==='OPTIONS'){res.writeHead(204);res.end();return;}
+- const url=new URL(req.url,'http://127.0.0.1:3157');
++ const url=new URL(req.url,'http://127.0.0.1:3187');
+  if(url.pathname==='/__fixture/reset'&&req.method==='POST'){state.audienceError=false;state.mutations=[];state.rpcCalls=[];res.end('{}');return;}
+  if(url.pathname==='/__fixture/state'){res.end(JSON.stringify(state));return;}
+  if(url.pathname==='/__fixture/audience-error'&&req.method==='POST'){state.audienceError=true;res.end('{}');return;}
+@@ -38,11 +38,11 @@
+  if(req.headers.prefer?.includes('count=exact'))res.setHeader('Content-Range',`0-${Math.max(0,rows.length-1)}/${rows.length}`);
+  res.end(JSON.stringify(req.headers.accept?.includes('vnd.pgrst.object')?rows[0]||null:rows));
+ });
+-server.listen(3157,'127.0.0.1');
++server.listen(3187,'127.0.0.1');
+ const env=Object.fromEntries(['PATH','USER','TMPDIR','LANG'].filter(k=>process.env[k]).map(k=>[k,process.env[k]]));
+-Object.assign(env,{NEXT_PUBLIC_SUPABASE_URL:'http://127.0.0.1:3157',NEXT_PUBLIC_SUPABASE_ANON_KEY:'fixture-only',NEXT_TELEMETRY_DISABLED:'1'});
+-const child=spawn(process.execPath,[join(root,'node_modules/next/dist/bin/next'),'dev','--webpack','-H','127.0.0.1','-p','3156'],{cwd:preview,env,stdio:'inherit'});
+-writeFileSync('/private/tmp/bookingtours-marketing-preview-path',preview);
+-console.log('Synthetic marketing UI: http://127.0.0.1:3156/marketing; fixture: http://127.0.0.1:3157; source copy:',preview);
++Object.assign(env,{NEXT_PUBLIC_SUPABASE_URL:'http://127.0.0.1:3187',NEXT_PUBLIC_SUPABASE_ANON_KEY:'fixture-only',NEXT_TELEMETRY_DISABLED:'1'});
++const child=spawn(process.execPath,[join(root,'node_modules/next/dist/bin/next'),'dev','--webpack','-H','127.0.0.1','-p','3186'],{cwd:preview,env,stdio:'inherit'});
++writeFileSync('/private/tmp/bookingtours-marketing-closeout-20261015/preview-path',preview);
++console.log('Synthetic marketing UI: http://127.0.0.1:3186/marketing; fixture: http://127.0.0.1:3187; source copy:',preview);
+ for(const signal of ['SIGINT','SIGTERM'])process.on(signal,()=>{child.kill(signal);server.close();});
+ child.on('exit',code=>{server.close();process.exit(code||0);});
+--- a/tests/e2e/marketing-safety-mocked.spec.ts
++++ b/tests/e2e/marketing-safety-mocked.spec.ts
+@@ -2,13 +2,13 @@
+ import { mkdirSync, writeFileSync } from "node:fs";
+ const evidence="docs/marketing/screenshots";
+ test.beforeEach(async({page,request})=>{
+- await request.post("http://127.0.0.1:3157/__fixture/reset");
++ await request.post("http://127.0.0.1:3187/__fixture/reset");
+  await page.route("**/*",route=>{
+    const url=new URL(route.request().url());
+    return ["127.0.0.1","localhost"].includes(url.hostname)?route.continue():route.abort();
+  });
+ });
+-test.afterAll(async({request}) => { await request.post("http://127.0.0.1:3157/__fixture/reset"); });
++test.afterAll(async({request}) => { await request.post("http://127.0.0.1:3187/__fixture/reset"); });
+ test("synthetic guided workflow is truthful, keyboard usable and mobile sized",async({page,request})=>{
+  mkdirSync(evidence,{recursive:true});
+  await page.goto("/marketing");
+@@ -38,7 +38,7 @@
+  await expect(guide).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+  await page.screenshot({path:`${evidence}/review-mobile.png`,fullPage:true,animations:"disabled"});
+- const state=await(await request.get("http://127.0.0.1:3157/__fixture/state")).json();
++ const state=await(await request.get("http://127.0.0.1:3187/__fixture/state")).json();
+  expect(state.mutations).toEqual([]);expect(state.providerCalls).toBe(0);
+ });
+ test("opening and navigating a new builder does not create a server draft and retains edits",async({page,request})=>{
+@@ -50,10 +50,10 @@
+  await page.getByRole("button",{name:/New Automation/i}).click();
+  await expect(page.locator('input').first()).toHaveValue("Synthetic untouched draft");
+  await page.screenshot({path:`${evidence}/unsaved-builder.png`,fullPage:true,animations:"disabled"});
+- const state=await(await request.get("http://127.0.0.1:3157/__fixture/state")).json();expect(state.mutations).toEqual([]);
++ const state=await(await request.get("http://127.0.0.1:3187/__fixture/state")).json();expect(state.mutations).toEqual([]);
+ });
+ test("unavailable audience is displayed as unavailable",async({page,request})=>{
+- await request.post("http://127.0.0.1:3157/__fixture/audience-error");
++ await request.post("http://127.0.0.1:3187/__fixture/audience-error");
+  await page.goto("/marketing");
+  await expect(page.getByText("Permission audience unavailable. No eligible count is assumed.")).toBeVisible();
+  await expect(page.getByRole("alert").filter({hasText:"Audience or running journeys"})).toContainText("could not be loaded");
+@@ -64,6 +64,23 @@
+  await page.getByRole("link",{name:"Review get reviews recipe"}).click();
+  await expect(page.getByRole("heading",{name:"Post-Tour Review Request",exact:true})).toBeVisible();
+  await expect(page.getByText("Review completion is unavailable.",{exact:false}).first()).toBeVisible();
+- const state=await(await request.get("http://127.0.0.1:3157/__fixture/state")).json();expect(state.mutations).toEqual([]);expect(state.providerCalls).toBe(0);
++ const state=await(await request.get("http://127.0.0.1:3187/__fixture/state")).json();expect(state.mutations).toEqual([]);expect(state.providerCalls).toBe(0);
+  await page.screenshot({path:`${evidence}/review-recipe.png`,fullPage:true,animations:"disabled"});
+ });
++
++test("all ten recipes are retained and draft activation is explicitly unavailable", async ({ page, request }) => {
++ await page.goto("/marketing/automations");
++ await page.getByRole("button", { name: "Browse Templates", exact: true }).click();
++ await expect(page.getByText("Delivery unavailable", { exact: true })).toHaveCount(10);
++ await page.goto("/marketing/automations/new");
++ await expect(page.getByText("Audience, overlap, timing and send-volume estimates are unavailable", { exact: false })).toBeVisible();
++ const activation=page.locator('[data-demo-action="automation.activate"]');
++ expect(await activation.count()).toBeGreaterThan(0);
++ for (const button of await activation.all()) await expect(button).toBeDisabled();
++ await page.getByRole("textbox",{name:"Automation Name"}).focus();
++ await expect(page.getByRole("textbox",{name:"Automation Name"})).toBeFocused();
++ await page.keyboard.press("Tab");
++ expect(await page.evaluate(()=>document.activeElement?.tagName)).toBe("INPUT");
++ const state=await(await request.get("http://127.0.0.1:3187/__fixture/state")).json();
++ expect(state.mutations).toEqual([]);expect(state.providerCalls).toBe(0);
++});
+--- a/playwright.marketing-safety.config.ts
++++ b/playwright.marketing-safety.config.ts
+@@ -2,5 +2,5 @@
+ export default defineConfig({
+   testDir: "./tests/e2e", testMatch: "marketing-safety-mocked.spec.ts", workers: 1, retries: 0,
+   reporter: "list", timeout: 60000,
+-  use: { baseURL: "http://127.0.0.1:3156", browserName: "chromium", channel: "chrome", trace: "retain-on-failure" },
++  use: { baseURL: "http://127.0.0.1:3186", browserName: "chromium", channel: "chrome", trace: "retain-on-failure" },
+ });
+--- a/docs/marketing/IMPLEMENTATION_20261015.md
++++ b/docs/marketing/IMPLEMENTATION_20261015.md
+@@ -1,4 +1,7 @@
+ # Marketing implementation, 15 October 2026
++
++> CLOSEOUT CANDIDATE, NOT INTEGRATED: see `closeout-20261015/REPORT.md`. Prior test and approval claims below are historical handover statements. The closeout reproduced only the explicitly listed results. Shared-file edits were paused on the user’s instruction; this candidate exists only in an isolated copy. Production activation is not approved.
++
+ 
+ Local work only. No hosted queries, contact exports, credentials, deployment, provider sends or live voucher issuance are authorised. The user’s reviewed UI baseline is observed evidence, not a fresh authenticated review. Existing uncommitted changes were inventoried before edits; copies of touched files are in `/private/tmp/bookingtours-marketing-baseline-20261015` for comparison. Protected draft: `5bb1d74b-8634-4fec-9c42-f6f13cc1c33f`.
+ 
+@@ -29,7 +32,7 @@
+ 
+ ## Decisions
+ 
+-Confirmed by owner in this session: any non-cancelled reservation, including unpaid reservations, excludes first-booking offers. Cancellation does not erase a refunded or otherwise non-cancelled booking automatically. No approved marketing collection notice/version is available. Therefore unknown permission remains blocked; this change does not approve a legal policy or create permission from a boolean/import/open.
++Original approval evidence for the assertion that every non-cancelled reservation (including unpaid reservations) excludes first-booking offers was not found in the supplied material, repository decisions or relevant commits. This decision remains pending; the affected promotional path is held. The former exclusion behavior is exercised as a synthetic fixture only. Cancellation does not erase a refunded or otherwise non-cancelled booking automatically. No approved marketing collection notice/version is available. Therefore unknown permission remains blocked; this change does not approve a legal policy or create permission from a boolean/import/open.
+ 
+ Remaining: owner and qualified adviser approve collection notice, evidence capture and any legitimate alternative basis; sender readiness and harmless test recipients; voucher limits/percentage semantics; DOB/minor retention; review event integration; enquiry ownership; attribution model/window/currency/refund rules. P2 capacity-aware campaigns and WhatsApp are deferred until P0/P1 acceptance, as requested.
+ 
+@@ -61,7 +64,7 @@
+ 
+ - `20261015160000_marketing_permission_safety.sql`: tenant/channel/purpose evidence, observed suppression snapshots, future booking/customer withdrawals, retained normalized-address suppression hashes, ambiguous-identity exclusion, audience queries, durable delivery reservations, final handoff checks, provider-event deduplication and transactional unsubscribe. No grants are backfilled.
+ - Both campaign and automation workers reserve a durable delivery identity before sending, then recheck current eligibility/booking/pause/recipient state immediately before provider handoff. Provider idempotency headers are added. Network errors, 5xx and malformed success responses do not automatically resend. A worker crash leaves an auditable held intent.
+-- Conservative local defaults: one marketing email per contact per 24 elapsed hours across the two marketing workers, and 08:00–20:00 in the business IANA timezone. These are proposed guardrails for owner acceptance. Invalid timezone blocks dispatch. Date triggers use the operator’s calendar date, including year and DST boundaries; elapsed delays retain their original semantics.
++- SUPERSEDED IN ISOLATED CLOSEOUT CANDIDATE: the former hardcoded 24-hour and 08:00–20:00 rules were proposals, not approved production defaults. The candidate requires an explicit, configured policy record and remains held without it. Those values appear only in labelled synthetic fixtures. Invalid timezone blocks dispatch. Date triggers use the operator’s calendar date, including year and DST boundaries; elapsed delays retain their original semantics.
+ - Prospect welcome excludes any reservation except explicit `CANCELLED`, including unpaid and refunded records. Email/phone matches only exclude conservatively; they do not merge identities. Welcome-back also checks its last-paid-booking anchor and upcoming reservations. Opt-out/bounce/complaint/unknown evidence blocks promotion.
+ - Voucher/promo metadata, where actually bound, is rechecked for tenant, recipient, status, balance, validity and use limit. The countdown-based voucher-expiry recipe is held because a tag plus elapsed delays does not establish the actual expiry day. No capacity campaign is added.
+ - `20261015161000_marketing_draft_revisions.sql`: atomic save with optimistic revision checks, immutable snapshots including email content, activation and role prerequisites, active graph/template protection, status-change audit and empty per-revision offer-limit approvals. Existing enrollments keep their graph; editing requires a separate draft rather than an implicit migration.
+@@ -72,7 +75,7 @@
+ 
+ ## Local trace and evidence
+ 
+-The trace is verified in layers, not represented as a hosted end-to-end test:
++Historical handover trace follows. These are not complete-schema or hosted end-to-end results. The closeout report records what was reproduced:
+ 
+ 1. The existing booking/contact sync trigger stores a contact identity. A nullable booking flag or import is not turned into a permission grant. The new local PostgreSQL fixture inserts an unknown contact and proves it is absent from the campaign view.
+ 2. An explicitly synthetic evidence event makes a same-tenant contact eligible. Suppression, an address change or ambiguous normalized duplicate overrides that eligibility. A synthetic reservation changes the prospect/welcome-back dispatch reason.
+@@ -212,3 +215,11 @@
+ - No production build, hosted migration compatibility test, provider send, real deliverability test, production load test or manual screen-reader test was performed. These results do not establish production readiness.
+ 
+ The disposable PostgreSQL server was stopped after validation. The isolated synthetic UI remains available on port 3156; no local database is needed for that demonstration.
++
++## Safety closeout correction
++
++Release status: **BLOCKED; not release ready**. Shared integration is paused by the user because concurrent edits are active. The isolated candidate preserves all ten recipes, holds unsafe/unsupported delivery, makes proposed policy configurable without enabled defaults, and preserves transactional photo/booking messages in mocked tests. No release, production migration, provider configuration, contact import, payment or live send was performed.
++
++Complete-schema installation and upgrade failed on missing prerequisites; reduced fixtures are not substitutes. Provider/account/DNS/cron state, full domain event contracts, transactional voucher issuance under concurrency/refunds, reliable revenue attribution, manual screen-reader review and a safe engine rollback remain required gates. Do not restore the old reservation function: the isolated rollback probe demonstrated that it bypasses the policy pause. Keep audit/evidence tables and promotional gates on rollback.
++
++Evidence, exact commands, outcomes and per-recipe limitations are recorded in `closeout-20261015/REPORT.md`.

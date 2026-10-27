@@ -1,0 +1,98 @@
+{
+  "date": "2026-10-16",
+  "verified_at": "2026-10-16T07:05:14.420607+00:00",
+  "status": "DEPLOYED_AND_VERIFIED",
+  "reason": "Owner explicitly requested removal of all MFA; previous release incorrectly retained it for SUPER_ADMIN.",
+  "admin": {
+    "id": "dpl_45o3HogLgGoNEsuQoQUXaE7nLxFx",
+    "url": "caepweb-admin-at85vbtpi-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 484,
+    "production_url": "https://admin.bookingtours.co.za"
+  },
+  "baseline": "dpl_HyUe8UGUfYHyrdDrVCCRQB4czYVS",
+  "scope": [
+    "Removed all authenticator setup, QR codes, six-digit challenges and MFA status prompts from Settings, Super Admin onboarding, platform settings and operator support.",
+    "Removed Super Admin MFA enforcement from the shared server settings boundary, tenant banking and credential-bearing onboarding. Verified sign-in, role, suspension, read-only, tenant/target binding, encryption and audited setters remain.",
+    "Retired factor-reset endpoint with HTTP 410. The legacy status endpoint returns ready after normal identity verification, so cached clients do not start MFA setup.",
+    "Disabled hosted TOTP enrollment/verification; phone and WebAuthn MFA enrollment/verification remain disabled. Unrelated authentication configuration is unchanged.",
+    "Updated native help instructions and Settings/Super Admin knowledge; preserved unrelated invoicing and monitoring guidance."
+  ],
+  "functions": [
+    {
+      "slug": "super-admin-onboard",
+      "version": 73,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "bank-details",
+      "version": 30,
+      "verify_jwt": true,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "admin-help-chat",
+      "version": 28,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    }
+  ],
+  "backend_source_files_verified": 12,
+  "auth_configuration": {
+    "at": "2026-10-16T07:02:36.817Z",
+    "before": {
+      "mfa_totp_enroll_enabled": true,
+      "mfa_totp_verify_enabled": true,
+      "mfa_phone_enroll_enabled": false,
+      "mfa_phone_verify_enabled": false,
+      "mfa_web_authn_enroll_enabled": false,
+      "mfa_web_authn_verify_enabled": false
+    },
+    "after": {
+      "mfa_totp_enroll_enabled": false,
+      "mfa_totp_verify_enabled": false,
+      "mfa_phone_enroll_enabled": false,
+      "mfa_phone_verify_enabled": false,
+      "mfa_web_authn_enroll_enabled": false,
+      "mfa_web_authn_verify_enabled": false
+    },
+    "unrelated_config_unchanged": true,
+    "source": "https://supabase.com/docs/reference/api/v1-update-auth-service-config"
+  },
+  "knowledge": {
+    "at": "2026-10-16T07:02:56.225Z",
+    "articles": 30,
+    "chunks": 176,
+    "changed": 2,
+    "result": {
+      "ok": true,
+      "total": 176,
+      "embedded": 2,
+      "skipped": 174,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    }
+  },
+  "validation": {
+    "unit_files_passed": 144,
+    "unit_files_skipped": 2,
+    "unit_cases_passed": 2383,
+    "unit_cases_skipped": 58,
+    "focused_cases_passed": 50,
+    "typescript": "PASS",
+    "edge_typecheck": "PASS",
+    "production_build": "PASS",
+    "local_owner_and_super_admin_browser_cases": 2,
+    "live_owner_and_super_admin_browser_cases": 2,
+    "live_browser_seconds": 14.2,
+    "live_http_and_access_checks": 10,
+    "internal_live_help_answers": 2,
+    "source_files_verified": 484
+  },
+  "real_credentials_or_payments_changed": false,
+  "existing_factor_records_deleted": false,
+  "database_migration": false,
+  "evidence_directory": "docs/production-readiness/evidence/mfa-removal-20261016"
+}

@@ -1,0 +1,289 @@
+ M .vercelignore
+ M CLAUDE.md
+ M app/bookings/[id]/page.tsx
+ M app/bookings/page.tsx
+ M app/guide/slot/[slotId]/page.tsx
+ M app/lib/automation-copy.ts
+ M app/lib/customer-notes.ts
+ M app/lib/duration.ts
+ M app/lib/simple-view.ts
+ M app/lib/theme-engine.ts
+ M app/marketing/automations/[id]/page.tsx
+ M app/marketing/automations/page.tsx
+ M app/marketing/contacts/page.tsx
+ M app/marketing/page.tsx
+ M app/marketing/promotions/page.tsx
+ M app/marketing/templates/page.tsx
+ M app/page.tsx
+ M app/reports/page.tsx
+ M app/reviews/page.tsx
+ M app/settings/page.tsx
+ M app/simple/calendar/page.tsx
+ M app/simple/check-ins/page.tsx
+ M app/simple/page.tsx
+ M app/simple/simple-data.ts
+ M app/simple/use-simple-day.ts
+ M app/super-admin/page.tsx
+ M components/AppShell.tsx
+ M components/DatePicker.tsx
+ M components/HelpChat.tsx
+ M components/InlineSlotManager.tsx
+ M components/SectionTabs.tsx
+ M components/SimpleViewShell.tsx
+ M components/marketing/starter-templates.ts
+ M components/simple/DepartureCard.tsx
+ M components/simple/simple-view.css
+ M docs/OTA_DIRECT_CONNECTIVITY.md
+ M docs/admin-help/billing.md
+ M docs/admin-help/booking-lifecycle.md
+ M docs/admin-help/bookings.md
+ M docs/admin-help/broadcasts.md
+ M docs/admin-help/chat-faq.md
+ M docs/admin-help/dashboard.md
+ M docs/admin-help/guide.md
+ M docs/admin-help/inbox.md
+ M docs/admin-help/invoices.md
+ M docs/admin-help/marketing.md
+ M docs/admin-help/navigation.md
+ M docs/admin-help/new-booking.md
+ M docs/admin-help/notifications.md
+ M docs/admin-help/payment-reminders.md
+ M docs/admin-help/photos.md
+ M docs/admin-help/pricing.md
+ M docs/admin-help/refunds.md
+ M docs/admin-help/reports.md
+ M docs/admin-help/reviews.md
+ M docs/admin-help/settings.md
+ M docs/admin-help/slots.md
+ M docs/admin-help/super-admin.md
+ M docs/admin-help/vouchers.md
+ M docs/admin-help/whatsapp-and-automessages.md
+ M docs/production-readiness/STATE.md
+ M eslint.config.mjs
+ M instrumentation-client.ts
+ M landing-pages/generator/build.mjs
+ M next.config.ts
+ M package-lock.json
+ M package.json
+ M public/landing-pages/templates/alpine.html
+ M scripts/sync-admin-help.mjs
+ M sentry.edge.config.ts
+ M sentry.server.config.ts
+ M supabase/config.toml
+ M supabase/functions/_shared/bot-guards.ts
+ M supabase/functions/_shared/chat-booking-pricing.ts
+ M supabase/functions/_shared/demo-guide.ts
+ M supabase/functions/_shared/getyourguide.ts
+ M supabase/functions/_shared/intent.ts
+ M supabase/functions/_shared/platform-invariants.ts
+ M supabase/functions/_shared/viator.ts
+ M supabase/functions/admin-help-chat/index.ts
+ M supabase/functions/auto-messages/index.ts
+ M supabase/functions/broadcast/index.ts
+ M supabase/functions/create-checkout/index.ts
+ M supabase/functions/cron-tasks/index.ts
+ M supabase/functions/getyourguide-availability-sync/index.ts
+ M supabase/functions/getyourguide-webhook/index.ts
+ M supabase/functions/marketing-automation-dispatch/index.ts
+ M supabase/functions/marketing-dispatch/index.ts
+ M supabase/functions/marketing-track/index.ts
+ M supabase/functions/marketing-unsubscribe/index.ts
+ M supabase/functions/ota-reconcile/index.ts
+ M supabase/functions/send-email/index.ts
+ M supabase/functions/viator-availability-sync/index.ts
+ M supabase/functions/viator-webhook/index.ts
+ M supabase/functions/wa-webhook/index.ts
+ M supabase/functions/web-chat/index.ts
+ M supabase/functions/yoco-webhook/index.ts
+ M supabase/security-baseline.json
+ M tests/e2e/simple-view-mocked.spec.ts
+ M tests/fixtures/db-columns.json
+ M tests/unit/automation-copy.test.ts
+ M tests/unit/booking-success-access.test.ts
+ M tests/unit/bot-guards.test.ts
+ M tests/unit/bot-hardening.test.ts
+ M tests/unit/bot-refund-policy.test.ts
+ M tests/unit/campaign-audience.test.ts
+ M tests/unit/db-column-refs.test.ts
+ M tests/unit/demo-account-read-only.test.ts
+ M tests/unit/duration.test.ts
+ M tests/unit/external-integration-readiness.test.ts
+ M tests/unit/help-chat-navigation.test.ts
+ M tests/unit/marketing-template-materialization.test.ts
+ M tests/unit/marketing-throughput.test.ts
+ M tests/unit/marketing-unsubscribe.test.ts
+ M tests/unit/message-job-boundaries.test.ts
+ M tests/unit/mobile-first-implementation.test.ts
+ M tests/unit/payment-accounting-runtime.test.ts
+ M tests/unit/payment-link-optin.test.ts
+ M tests/unit/rollout-pagination.test.ts
+ M tests/unit/runtime-dependency-floors.test.ts
+ M tests/unit/storefront-checkout-updates.test.ts
+ M tests/unit/theme-engine.test.ts
+ M tests/unit/web-chat-identity.test.ts
+?? app/.well-known/
+?? app/api/agent/
+?? app/api/mcp/
+?? app/dashboard.module.css
+?? app/lib/agent-config.ts
+?? app/lib/agent-db.ts
+?? app/lib/agent-mcp.ts
+?? app/lib/agent-oauth.ts
+?? app/lib/agent-read-service.ts
+?? app/lib/agent-telemetry.ts
+?? app/lib/agent-tools.ts
+?? app/lib/booking-discounts.ts
+?? app/lib/booking-palettes.ts
+?? app/lib/contact-links.ts
+?? app/lib/marketing-journey.ts
+?? app/lib/operator-day.ts
+?? app/lib/tour-slot-generation.ts
+?? app/marketing/contacts/[id]/
+?? app/settings/agent-connections/
+?? components/PaymentRecoveryPanel.tsx
+?? components/ReportsLayout.tsx
+?? components/booking/
+?? components/marketing/BookingDiscountSettings.tsx
+?? components/marketing/GuidedMarketing.tsx
+?? components/simple/BookingContact.tsx
+?? components/simple/DayFreshness.tsx
+?? docs/admin-help/ai-usage.md
+?? docs/admin-help/data-requests.md
+?? docs/admin-help/partnerships.md
+?? docs/admin-help/simple-view.md
+?? docs/ai/
+?? docs/marketing/
+?? docs/production-readiness/OTA_FIX_IMPLEMENTATION_PROMPT_20261008.txt
+?? docs/production-readiness/WEB_CHAT_QA_20261001.json
+?? docs/production-readiness/evidence/AGENT_FOUNDATION_DEPLOYMENT_20261002.json
+?? docs/production-readiness/evidence/AGENT_FOUNDATION_DEPLOYMENT_20261003.json
+?? docs/production-readiness/evidence/AGENT_INTEGRATION_RECOVERY_REVIEW_20261002.json
+?? docs/production-readiness/evidence/AGENT_PARTICIPANT_DEPLOYMENT_20261003.json
+?? docs/production-readiness/evidence/ALL_CHANGES_DEPLOYMENT_20261004.json
+?? docs/production-readiness/evidence/ALL_EXCEPT_AGENT_SERVICE_DEPLOYMENT_20261003.json
+?? docs/production-readiness/evidence/BOOKING_WHITE_PANELS_20261002.json
+?? docs/production-readiness/evidence/CALENDAR_REDESIGN_20261001.json
+?? docs/production-readiness/evidence/CATALOGUE_POLISH_20261001.json
+?? docs/production-readiness/evidence/DASHBOARD_HELP_REFRESH_20261004.json
+?? docs/production-readiness/evidence/KAYAK_DAILY_DEMO_20261001.json
+?? docs/production-readiness/evidence/KAYAK_LAYOUT_RESTORED_20261001.json
+?? docs/production-readiness/evidence/OTA_FIXES_DEPLOYMENT_20261008.json
+?? docs/production-readiness/evidence/OTA_FIXES_LOCAL_VERIFICATION_20261008.json
+?? docs/production-readiness/evidence/TODAYS_CHANGES_DEPLOYMENT_20261008.json
+?? docs/production-readiness/evidence/WEB_CHAT_LOCAL_QA_FIXES_20261005.json
+?? docs/production-readiness/evidence/WEB_CHAT_REQUESTED_SCHEDULE_20261005.json
+?? docs/production-readiness/evidence/WIDGET_COMPACT_DEFAULT_20261012.json
+?? docs/production-readiness/evidence/YESTERDAY_CHANGES_DEPLOYMENT_20261003.json
+?? docs/production-readiness/evidence/agent-foundation-deployment-20261002/
+?? docs/production-readiness/evidence/agent-foundation-deployment-20261003/
+?? docs/production-readiness/evidence/agent-participant-deployment-20261003/
+?? docs/production-readiness/evidence/all-except-agent-service-20261003/
+?? docs/production-readiness/evidence/booking-white-panels-20261002/
+?? docs/production-readiness/evidence/calendar-redesign-20261001/
+?? docs/production-readiness/evidence/catalogue-polish-20261001/
+?? docs/production-readiness/evidence/dashboard-tablet-20261001/
+?? docs/production-readiness/evidence/todays-changes-deployment-20261008/
+?? docs/production-readiness/evidence/web-chat-local-qa-20261005/
+?? docs/production-readiness/evidence/yesterday-release-20261003/
+?? landing-pages/samples/claires-hiking.sample.json
+?? playwright.booking-guest.config.ts
+?? playwright.catalogue.config.ts
+?? playwright.claires-hiking.config.ts
+?? playwright.custom-questions.config.ts
+?? playwright.kayak-demo-hosted.config.ts
+?? playwright.kayak-demo.config.ts
+?? playwright.marketing-safety.config.ts
+?? playwright.web-chat.config.ts
+?? public/claires-hiking.html
+?? public/demo/claires-hiking/assets/
+?? public/demo/claires-hiking/index.html
+?? scripts/apply-daily-demos.mjs
+?? scripts/operator-acquisition-report.mjs
+?? supabase/agent-foundation.local.sql
+?? supabase/agent-mcp.local.sql
+?? supabase/functions/_shared/booking-custom-fields.ts
+?? supabase/functions/_shared/chat-contact.ts
+?? supabase/functions/_shared/marketing-calendar.ts
+?? supabase/functions/_shared/marketing-delivery.ts
+?? supabase/functions/_shared/ota-availability.ts
+?? supabase/functions/_shared/ota-backend.ts
+?? supabase/functions/_shared/ota-runtime.ts
+?? supabase/functions/_shared/ota-supplier.ts
+?? supabase/functions/resend-webhook/
+?? supabase/migrations/20261001090000_repair_claires_demo_refresh.sql
+?? supabase/migrations/20261001091000_kayak_daily_demo.sql
+?? supabase/migrations/20261001131000_restore_kayak_storefront_layout.sql
+?? supabase/migrations/20261003160000_agent_read_foundation.sql
+?? supabase/migrations/20261008120000_ota_transactions.sql
+?? supabase/migrations/20261015120000_payment_recovery.sql
+?? supabase/migrations/20261015140000_customer_return_history.sql
+?? supabase/migrations/20261015150000_welcome_back_email_sequences.sql
+?? supabase/migrations/20261015160000_marketing_permission_safety.sql
+?? supabase/migrations/20261015161000_marketing_draft_revisions.sql
+?? supabase/migrations/20261015170000_operator_daily_consistency.sql
+?? tests/agent-foundation-local.mjs
+?? tests/agent-mcp-disabled-http.mjs
+?? tests/customer-return-history-local.mjs
+?? tests/demo-refresh-local.mjs
+?? tests/e2e/booking-catalogue.spec.ts
+?? tests/e2e/booking-custom-questions.spec.ts
+?? tests/e2e/booking-guest.spec.ts
+?? tests/e2e/claires-hiking-landing.spec.ts
+?? tests/e2e/kayak-demo-hosted.spec.ts
+?? tests/e2e/kayak-demo.spec.ts
+?? tests/e2e/marketing-safety-mocked.spec.ts
+?? tests/e2e/web-chat-production.spec.ts
+?? tests/fixtures/agent-columns.local.json
+?? tests/fixtures/catalogue-current.json
+?? tests/fixtures/marketing-columns.local.json
+?? tests/fixtures/ota-columns.local.json
+?? tests/helpers/agent-read-fixture.ts
+?? tests/helpers/booking-guest-fixture.cjs
+?? tests/helpers/booking-guest-preview.mjs
+?? tests/helpers/catalogue-photos.mjs
+?? tests/helpers/catalogue-preview.mjs
+?? tests/helpers/catalogue-server.mjs
+?? tests/helpers/chatgpt-mcp-fixture.ts
+?? tests/helpers/custom-questions-preview.mjs
+?? tests/helpers/custom-questions-server.ts
+?? tests/helpers/kayak-demo-preview.mjs
+?? tests/helpers/kayak-demo-server.mjs
+?? tests/helpers/marketing-preview.mjs
+?? tests/helpers/ota-module.cjs
+?? tests/helpers/ota-postgres.cjs
+?? tests/helpers/web-chat-fixture.ts
+?? tests/helpers/web-chat-preview.ts
+?? tests/helpers/web-chat-server.ts
+?? tests/marketing-safety-local.mjs
+?? tests/ota-transactions-local.mjs
+?? tests/payment-recovery-local.mjs
+?? tests/tsconfig.agent-mcp.json
+?? tests/unit/admin-help-current-guide.test.ts
+?? tests/unit/agent-db-tls.test.ts
+?? tests/unit/agent-mcp-backend.test.ts
+?? tests/unit/agent-native-auth.test.ts
+?? tests/unit/agent-read-service.test.ts
+?? tests/unit/agent-runtime.test.ts
+?? tests/unit/booking-custom-questions.test.ts
+?? tests/unit/booking-discounts.test.ts
+?? tests/unit/booking-guest-disclosure.test.ts
+?? tests/unit/chat-contact.test.ts
+?? tests/unit/chat-faq-matching.test.ts
+?? tests/unit/chatgpt-mcp-fixture.test.ts
+?? tests/unit/contact-links.test.ts
+?? tests/unit/marketing-campaign-permission.test.ts
+?? tests/unit/marketing-dispatch-safety.test.ts
+?? tests/unit/marketing-journey-safety.test.ts
+?? tests/unit/operator-acquisition.test.ts
+?? tests/unit/ota-runtime.test.ts
+?? tests/unit/ota-supplier-contracts.test.ts
+?? tests/unit/super-admin-activation.test.ts
+?? tests/unit/tour-duration-form.test.ts
+?? tests/unit/tour-slot-generation.test.ts
+?? tests/unit/tour-time-input.test.ts
+?? tests/unit/web-chat-conversation-quality.test.ts
+?? tests/unit/web-chat-edge-cases.test.ts
+?? tests/unit/web-chat-production.test.ts
+?? tests/unit/web-chat-requested-schedule.test.ts
+?? tests/unit/web-chat-selection-regressions.test.ts
+?? tests/unit/web-chat-widget-regressions.test.ts

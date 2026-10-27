@@ -8,15 +8,18 @@ Reports gives you filterable, exportable views of your operation for bookkeeping
 
 ## Report tabs
 
-- **Bookings** — booking volumes and details.
+- **Bookings** — booking and guest totals grouped by **Days**, **Weeks** or **Months**. Weeks start on Monday. The groups follow the selected tour-date or booking-date filter, in the business timezone.
 - **Financials** — accounting view: gross booked, amount actually received, refunds, net received, and outstanding balances, with a per-booking payment method and payment reference.
-- **Marketing** — email performance.
+- **Marketing** — bookings, guests and revenue by booking source.
 - **Attendance** — who showed up.
 - **Waivers** — waiver completion.
+- **Reviews** — moderate customer reviews by status. This uses the same Reports navigation, with **Pending**, **Approved**, **Hidden**, and **Spam** filters.
 
 ## Financials for accounting
 
 The Financials tab reconciles money movement, not just booked totals: **Gross Booked** (what live bookings owe), **Received** (cash and voucher value actually captured), **Refunded** (processed refunds), **Net Received**, and **Outstanding** (due but unpaid). Payments received with no gateway reference are flagged for audit. The Financials CSV is a full transaction ledger with every money column, payment references, voucher and promo details, OTA amounts, refund history, cancellation details and who took the booking.
+
+**Revenue over time** appears only in Financials. It shows amounts actually received for bookings in the selected date range, grouped by the selected tour date or booking date. It is not a payment-date ledger.
 
 ## Accounting registers
 
@@ -29,8 +32,10 @@ On the Financials tab you can also export four registers for your accountant or 
 
 ## Filtering and exporting
 
-Filter every report by date range, and choose whether the range applies to the **tour date** or the **booking date** — revenue by trip day and revenue by sale day are different views, pick the one your accountant wants. Export the filtered data as **CSV** (for spreadsheets) or **PDF**.
+Filter the booking-based reports by date range, and choose whether the range applies to the **tour date** or the **booking date** — revenue by trip day and revenue by sale day are different views, pick the one your accountant wants. Export the filtered data as **CSV** (for spreadsheets) or **PDF**. Reviews uses status filters instead of date ranges and exports.
+
+The Bookings CSV and PDF use the same day, week or month summary shown on screen. Use Financials for the detailed transaction ledger.
 
 ## During suspension
 
-Reports stays accessible even if your subscription is suspended, so you can always get your data out.
+The current sign-in gate can block Reports when a subscription is paused or suspended. MAIN_ADMIN can reach Billing; contact BookingTours support if you need an export while operational access is blocked. Do not assume an export is available simply because the report itself has download controls.

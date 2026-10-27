@@ -1,0 +1,1255 @@
+[
+  {
+    "chunk_key": "help:ai-usage:0",
+    "title": "AI usage and customer chatbot allowance",
+    "route": "/ai-usage",
+    "required_role": "MAIN_ADMIN",
+    "content": "AI usage and customer chatbot allowance\nOpen **AI** in the Growth group, then the **AI Usage** tab. MAIN_ADMIN and SUPER_ADMIN can view customer chatbot usage and open the **Chat FAQ** tab from here."
+  },
+  {
+    "chunk_key": "help:ai-usage:1",
+    "title": "AI usage and customer chatbot allowance — Replies, allowance and overage",
+    "route": "/ai-usage",
+    "required_role": "MAIN_ADMIN",
+    "content": "AI usage and customer chatbot allowance — Replies, allowance and overage\n## Replies, allowance and overage\n\nThe page shows this month's billable **Replies**, **Balance**, **Allowance used**, **Overage** and **Cache hits**, plus activity by surface. It refreshes every 30 seconds. The included reply allowance and per-reply overage rate come from your business's current configuration; read the displayed values instead of assuming every operator has the same plan or rate.\n\nCustomer WhatsApp and website AI replies count toward the allowance. Dashboard **Admin help chat**, intent/date parsing and shadow activity are labelled not billed. Quick Answers and the dashboard product guide are separate from each other."
+  },
+  {
+    "chunk_key": "help:ai-usage:2",
+    "title": "AI usage and customer chatbot allowance — When the included allowance is used",
+    "route": "/ai-usage",
+    "required_role": "MAIN_ADMIN",
+    "content": "AI usage and customer chatbot allowance — When the included allowance is used\n## When the included allowance is used\n\nThe customer assistant can continue beyond its included replies at the displayed overage rate, until the configured hard ceiling shown on the page. At that ceiling, AI replies pause; existing bookings, reminders and payments are unaffected. Contact BookingTours to discuss an allowance change. Usage belongs in the platform subscription invoice, not a guest booking invoice."
+  },
+  {
+    "chunk_key": "help:ai-usage:3",
+    "title": "AI usage and customer chatbot allowance — Updating what the guest bot knows",
+    "route": "/ai-usage",
+    "required_role": "MAIN_ADMIN",
+    "content": "AI usage and customer chatbot allowance — Updating what the guest bot knows\n## Updating what the guest bot knows\n\nUse [Chat FAQ](/settings/chat-faq) for enabled keyword/intent rules and exact approved replies. Use [Operations & AI Configuration](/settings#operations) for FAQs, guest arrival/packing instructions and the chatbot's personality and business knowledge. Those settings feed the customer website and WhatsApp bot, not the dashboard help assistant."
+  },
+  {
+    "chunk_key": "help:ai-usage:4",
+    "title": "AI usage and customer chatbot allowance — ChatGPT, MCP and Meta Muse",
+    "route": "/ai-usage",
+    "required_role": "MAIN_ADMIN",
+    "content": "AI usage and customer chatbot allowance — ChatGPT, MCP and Meta Muse\n## ChatGPT, MCP and Meta Muse\n\nExternal operator AI connections are not customer-available. A local implementation or an AI agent connections screen is not evidence that a live connection is enabled. There is no verified working live Server URL to recommend, and Meta Muse compatibility is not verified. Ask platform support about availability; do not provide connection or credential setup steps as if this feature were live."
+  },
+  {
+    "chunk_key": "help:billing:0",
+    "title": "Billing",
+    "route": "/billing",
+    "required_role": "MAIN_ADMIN",
+    "content": "Billing\nBilling manages your BookingTours subscription — your plan, seats, and payment history. (Customer invoices live on the Invoices page; this is what you pay, not what customers pay.) Visible to MAIN_ADMIN and above."
+  },
+  {
+    "chunk_key": "help:billing:1",
+    "title": "Billing — Your plan",
+    "route": "/billing",
+    "required_role": "MAIN_ADMIN",
+    "content": "Billing — Your plan\n## Your plan\n\nThe plan card shows your plan name, base price plus per-seat price, seats purchased versus admins actually active, this month's total, billing cycle, and status (Active, Paused, Cancelled, Suspended, or Trial)."
+  },
+  {
+    "chunk_key": "help:billing:2",
+    "title": "Billing — Seats",
+    "route": "/billing",
+    "required_role": "MAIN_ADMIN",
+    "content": "Billing — Seats\n## Seats\n\nEach additional admin user seat costs **R500/month**.\n\n**Add seat** or **Remove seat** adjusts how many admin users you're paying for, with a prorated charge or credit estimate shown before you confirm. You can't remove seats below the number of admins currently active — remove the admin user first under Settings → Admin Users."
+  },
+  {
+    "chunk_key": "help:billing:3",
+    "title": "Billing — Pausing for the off-season",
+    "route": "/billing",
+    "required_role": "MAIN_ADMIN",
+    "content": "Billing — Pausing for the off-season\n## Pausing for the off-season\n\n**Pause for off-season** stops normal billing and trading. The current sign-in gate shows **Your account is paused** and blocks normal dashboard pages; a MAIN_ADMIN can follow **Go to Billing** and use **Resume now**. Staff should ask their main admin to resume the subscription. Do not assume all dashboard pages remain readable during a pause."
+  },
+  {
+    "chunk_key": "help:billing:4",
+    "title": "Billing — Plan changes and suspension",
+    "route": "/billing",
+    "required_role": "MAIN_ADMIN",
+    "content": "Billing — Plan changes and suspension\n## Plan changes and suspension\n\nIf more than one plan is offered, use **Change plan** and review the new included seats and proration before confirming. The plan card shows the actual configured rates. A suspended account also blocks normal dashboard access; its main admin can reach Billing, but operational suspension may need BookingTours support to resolve. Paying an invoice does not by itself guarantee that an operational suspension is lifted."
+  },
+  {
+    "chunk_key": "help:billing:5",
+    "title": "Billing — Email usage",
+    "route": "/billing",
+    "required_role": "MAIN_ADMIN",
+    "content": "Billing — Email usage\n## Email usage\n\nThe marketing email meter shows emails sent against your plan's included quota and any overage charges.\n\nCustomer chatbot reply usage is shown under [AI Usage](/ai-usage). AI and email overage belong to the platform subscription invoice. Dashboard help does not count toward the customer AI reply allowance."
+  },
+  {
+    "chunk_key": "help:billing:6",
+    "title": "Billing — History and payment method",
+    "route": "/billing",
+    "required_role": "MAIN_ADMIN",
+    "content": "Billing — History and payment method\n## History and payment method\n\nYour payment method on file and billing history are at the bottom of the page."
+  },
+  {
+    "chunk_key": "help:booking-lifecycle:0",
+    "title": "How bookings work (statuses, payments, changes)",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "How bookings work (statuses, payments, changes)\nA quick reference for the booking lifecycle across the whole dashboard."
+  },
+  {
+    "chunk_key": "help:booking-lifecycle:1",
+    "title": "How bookings work (statuses, payments, changes) — Booking statuses",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "How bookings work (statuses, payments, changes) — Booking statuses\n## Booking statuses\n\n- **Held / Pending** — seats reserved, payment not yet received. Online checkouts hold seats for about 15 minutes; manual bookings hold for the duration you set (default 7 days). Unpaid holds release automatically.\n- **Paid** — payment confirmed (card payment webhook, or marked paid manually for EFT/cash).\n- **Confirmed** — confirmed to run.\n- **Completed** — the trip happened.\n- **Cancelled** — cancelled by you or the customer; seats returned to the slot."
+  },
+  {
+    "chunk_key": "help:booking-lifecycle:2",
+    "title": "How bookings work (statuses, payments, changes) — How online payment works",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "How bookings work (statuses, payments, changes) — How online payment works\n## How online payment works\n\nAt checkout the customer gets a secure card-payment page. Payment confirmation arrives from the payment provider and flips the booking to PAID automatically — you don't need to do anything. If a customer pays by EFT, mark the booking paid yourself on the Bookings page."
+  },
+  {
+    "chunk_key": "help:booking-lifecycle:3",
+    "title": "How bookings work (statuses, payments, changes) — Rescheduling (rebooking)",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "How bookings work (statuses, payments, changes) — Rescheduling (rebooking)\n## Rescheduling (rebooking)\n\nMoving a booking to a different slot or tour checks availability and the price difference. A same-price move can complete immediately. For a more expensive departure, the original booking stays in place until the customer pays the extra amount. A cheaper move can require a choice between voucher credit and a refund; follow the options shown rather than assuming money has already been returned. Customers can also use My Bookings or the customer chatbot.\n\nLast-minute prices sell unsold seats. An existing paid booking does not automatically get that discount when rescheduling."
+  },
+  {
+    "chunk_key": "help:booking-lifecycle:4",
+    "title": "How bookings work (statuses, payments, changes) — Guest count changes",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "How bookings work (statuses, payments, changes) — Guest count changes\n## Guest count changes\n\nIncreasing guests on a paid booking reserves extra seats pending payment and can require new waiver information. Decreasing guests releases capacity and handles any excess value through the available voucher/refund options. An unpaid booking is repriced without returning money that was never received."
+  },
+  {
+    "chunk_key": "help:booking-lifecycle:5",
+    "title": "How bookings work (statuses, payments, changes) — Cancellations and refunds",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "How bookings work (statuses, payments, changes) — Cancellations and refunds\n## Cancellations and refunds\n\nCancelling a booking releases its reserved seats. Customer cancellations follow the configured time-based policy. Operator/weather cancellation can offer eligible paid guests reschedule, voucher or refund choices. Voucher-funded value is returned as voucher credit rather than a card refund. See [Refunds](/refunds) for requested refunds and pending provider outcomes; submitting a refund is not the same as completing one."
+  },
+  {
+    "chunk_key": "help:booking-lifecycle:6",
+    "title": "How bookings work (statuses, payments, changes) — Customer self-service",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "How bookings work (statuses, payments, changes) — Customer self-service\n## Customer self-service\n\nCustomers manage their own bookings at your booking site's My Bookings page, logging in with a one-time email code. They can view bookings, reschedule, and request cancellations there — those requests flow into your dashboard."
+  },
+  {
+    "chunk_key": "help:bookings:0",
+    "title": "Bookings",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "Bookings\nThe Bookings page is the master ledger of every booking, grouped by day and slot."
+  },
+  {
+    "chunk_key": "help:bookings:1",
+    "title": "Bookings — Filtering and finding a booking",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "Bookings — Filtering and finding a booking\n## Filtering and finding a booking\n\n**Today** shows only today’s bookings in the business timezone. **Day** shows the selected date; **Week** shows Monday through Sunday for that date. Use the arrows to move by a day or a week. The month filter still shows a full month, and selecting a calendar date returns to Day.\n\nUse the status filter across the top: **Pending, Paid, Confirmed, Completed, Cancelled** — each shows a live count. The Pending bucket includes bookings still awaiting payment and temporary holds. Use the search box to find a booking by customer name, email, or phone. Day and slot sections expand and collapse."
+  },
+  {
+    "chunk_key": "help:bookings:2",
+    "title": "Bookings — Actions on a single booking",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "Bookings — Actions on a single booking\n## Actions on a single booking\n\nOpen a booking's action menu to:\n\n- **Edit Booking** — change status or details. Marking a booking PAID by hand is treated as a manual payment (for example EFT or cash).\n- **Rebook** — move the booking to another slot or tour. Equal-price moves can complete immediately. A more expensive slot requires payment of the difference before the move; a cheaper slot uses the available credit-voucher or refund options.\n- **Refund** — start a refund for a paid booking.\n- **WhatsApp** — compose a message through the business messaging service.\n- **WhatsApp on device** — copy the guest’s international phone number and open a chat in WhatsApp on your device. Write and send the message there. If clipboard access is blocked, the number is shown so you can copy it manually.\n- **Resend payment link or invoice** — for unpaid bookings or when the customer lost the email.\n- **Payment Reminder** — sends the existing checkout link again; send a payment link first if none exists.\n- **Allow Without Payment** — keeps an unpaid reservation valid for pay on arrival and exempts it from reminders and automatic expiry. **Require Payment** restores the normal payment rules.\n\nOpen the booking's detail page to review its payment, waiver and customer notes. Marking a booking paid records money you have already received; select the actual cash, EFT, card-terminal or other payment method and add the reference where available."
+  },
+  {
+    "chunk_key": "help:bookings:3",
+    "title": "Bookings — Bulk actions",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "Bookings — Bulk actions\n## Bulk actions\n\nTick multiple bookings and a sticky action bar appears:\n\n- **Check in** — for eligible paid bookings; payment and waiver checks still apply when saving arrivals.\n- **Mark paid (EFT)** — only when all selected are unpaid.\n- **Cancel** — when none are already cancelled.\n- **Refund** — when all selected are paid.\n\nBulk runs show per-row progress so you can see exactly which succeeded."
+  },
+  {
+    "chunk_key": "help:bookings:4",
+    "title": "Bookings — Partial arrivals and customer notes",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "Bookings — Partial arrivals and customer notes\n## Partial arrivals and customer notes\n\nArrival counts record how many guests in a group are actually present. [Simple View Check-ins](/simple/check-ins) lets you increase or decrease the count without marking the whole party arrived. Correcting an arrival count does not cancel the booking or refund it. Customer notes and custom-question answers stay attached to the booking for operational reference."
+  },
+  {
+    "chunk_key": "help:bookings:5",
+    "title": "Bookings — Cancelling a paid booking",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "Bookings — Cancelling a paid booking\n## Cancelling a paid booking\n\nCancelling a paid booking releases the seats back to the slot and emails the customer so **they choose** how to handle it: reschedule, voucher, or full refund (managed from their My Bookings page) — the same workflow as an operator/weather cancellation.\n\n**Within 24 hours of the trip start** the booking is forfeited instead: the customer is notified but gets no refund options. When you cancel inside that window, the confirm dialog lets you override this and still offer the reschedule/voucher/refund choice — use it for goodwill cases.\n\nVoucher-paid bookings are the exception: cancelling one re-issues a voucher for the full amount rather than offering the three options."
+  },
+  {
+    "chunk_key": "help:bookings:6",
+    "title": "Bookings — Exporting",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "Bookings — Exporting\n## Exporting\n\nOpen [Reports](/reports) for reports and exports. The Bookings page has no Export control."
+  },
+  {
+    "chunk_key": "help:bookings:7",
+    "title": "Bookings — Returning guests",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "Bookings — Returning guests\n## Returning guests\n\nExpand a departure to see its guests. A small number to the left of a returning guest's name counts their earlier paid bookings, excluding the booking being viewed. Hover over the number, focus it with the keyboard, or tap it to see the count and latest previous paid/completed booking date. Guests with no earlier paid bookings have no number or history label. History matches saved email addresses or phone numbers within your own business. Failed, pending and cancelled bookings do not count. Returning guests also receive a welcome-back greeting in their booking confirmation email.\n\nConfigure repeat-booking, return-time and group-size offers under [Marketing → Promotions](/marketing/promotions)."
+  },
+  {
+    "chunk_key": "help:broadcasts:0",
+    "title": "Broadcasts",
+    "route": "/broadcasts",
+    "required_role": "OPERATOR",
+    "content": "Broadcasts\nBroadcasts sends a message to every guest booked on the slots you select — by WhatsApp and email at once. It's the fastest way to reach \"everyone on tomorrow's 9am\"."
+  },
+  {
+    "chunk_key": "help:broadcasts:1",
+    "title": "Broadcasts — Sending a broadcast",
+    "route": "/broadcasts",
+    "required_role": "OPERATOR",
+    "content": "Broadcasts — Sending a broadcast\n## Sending a broadcast\n\n1. Pick a date on the calendar (days with slots are highlighted, with booked-guest counts).\n2. Tick the slots you want, or Select All. A summary shows how many customers will be notified.\n3. Compose your message — use the {name} tag to personalise with the guest's name.\n4. Send. The result reports how many were delivered per channel, with a failure breakdown.\n\nWhatsApp delivery depends on the customer's number, credentials and service window. Where configured, a pre-approved reply-request template can reopen the conversation and queued text can send after the customer responds. Email is attempted for guests with an email address. Check the returned per-channel results and failures; a send attempt does not guarantee everyone received the notice."
+  },
+  {
+    "chunk_key": "help:broadcasts:2",
+    "title": "Broadcasts — Weather Mode — cancelling slots",
+    "route": "/broadcasts",
+    "required_role": "OPERATOR",
+    "content": "Broadcasts — Weather Mode — cancelling slots\n## Weather Mode — cancelling slots\n\nMAIN_ADMIN or SUPER_ADMIN can use **Weather Mode** to cancel selected departures through the cancellation service. Affected bookings are cancelled and notification attempts offer eligible paid guests **reschedule, voucher or refund** choices. No refund completes merely because the slots were cancelled. Operations staff should ask their main admin to perform the cancellation. Sending a normal broadcast does not cancel bookings."
+  },
+  {
+    "chunk_key": "help:broadcasts:3",
+    "title": "Broadcasts — History",
+    "route": "/broadcasts",
+    "required_role": "OPERATOR",
+    "content": "Broadcasts — History\n## History\n\nThe history list shows past sends, marked BC for normal broadcasts and WX for weather cancellations."
+  },
+  {
+    "chunk_key": "help:chat-faq:0",
+    "title": "Chat FAQ (Quick Answers)",
+    "route": "/settings/chat-faq",
+    "required_role": "MAIN_ADMIN",
+    "content": "Chat FAQ (Quick Answers)\nOpen [AI](/ai-usage) in the Growth group, then choose the **Chat FAQ** tab. The page is at /settings/chat-faq; it is not a section inside Settings or a standalone sidebar item.\n\nHere you maintain Quick Answers for the customer WhatsApp bot and website chat. These are separate from the dashboard help assistant's product guide. Keep answers accurate and disable outdated rules."
+  },
+  {
+    "chunk_key": "help:chat-faq:1",
+    "title": "Chat FAQ (Quick Answers) — Adding a Quick Answer",
+    "route": "/settings/chat-faq",
+    "required_role": "MAIN_ADMIN",
+    "content": "Chat FAQ (Quick Answers) — Adding a Quick Answer\n## Adding a Quick Answer\n\nChoose **Add Quick Answer**, select the intent, enter a question pattern, comma-separated matching keywords and the approved answer, then save. Enabled rules can answer matching customer questions using that wording."
+  },
+  {
+    "chunk_key": "help:chat-faq:2",
+    "title": "Chat FAQ (Quick Answers) — Editing and removing",
+    "route": "/settings/chat-faq",
+    "required_role": "MAIN_ADMIN",
+    "content": "Chat FAQ (Quick Answers) — Editing and removing\n## Editing and removing\n\nEdit a rule to update its question, keywords, intent or answer. Toggle it off to stop using it without deleting it, or delete it with confirmation. The table shows usage count and last-used time, which help identify rules customers actually use."
+  },
+  {
+    "chunk_key": "help:chat-faq:3",
+    "title": "Chat FAQ (Quick Answers) — Who can manage Quick Answers",
+    "route": "/settings/chat-faq",
+    "required_role": "MAIN_ADMIN",
+    "content": "Chat FAQ (Quick Answers) — Who can manage Quick Answers\n## Who can manage Quick Answers\n\nOnly a main admin can open this page. Operations admins who spot a wrong bot answer should tell their main admin what to change."
+  },
+  {
+    "chunk_key": "help:customers:0",
+    "title": "Customers",
+    "route": "/customers",
+    "required_role": "OPERATOR",
+    "content": "Customers\nThe Customers page (at /customers — reached by link, it's not in the sidebar) is a read-only directory of everyone who has booked with you, ranked by lifetime trips."
+  },
+  {
+    "chunk_key": "help:customers:1",
+    "title": "Customers — What it shows",
+    "route": "/customers",
+    "required_role": "OPERATOR",
+    "content": "Customers — What it shows\n## What it shows\n\nHeader cards give your **total customer count** and how many are **opted in** to marketing. The table lists name, email, phone, number of trips, total spent, last trip date, and marketing consent. Search by name, email, or phone."
+  },
+  {
+    "chunk_key": "help:customers:2",
+    "title": "Customers — What it's for",
+    "route": "/customers",
+    "required_role": "OPERATOR",
+    "content": "Customers — What it's for\n## What it's for\n\nIt's informational — there are no edit actions here. To email customers, use Marketing (contacts are managed there); to message an individual, find their booking and use the WhatsApp action, or search for them in the Inbox."
+  },
+  {
+    "chunk_key": "help:dashboard:0",
+    "title": "Dashboard home",
+    "route": "/",
+    "required_role": "OPERATOR",
+    "content": "Dashboard home\nThe Dashboard is your at-a-glance cockpit for today: guests, booking value, and anything needing attention."
+  },
+  {
+    "chunk_key": "help:dashboard:1",
+    "title": "Dashboard home — Arrange your dashboard",
+    "route": "/",
+    "required_role": "OPERATOR",
+    "content": "Dashboard home — Arrange your dashboard\n## Arrange your dashboard\n\n**Main admins and super admins** can choose the sliders icon labelled **Edit dashboard** to move or hide tiles. Drag a handle, use the up/down buttons, or focus a handle and press the arrow keys. **Hide** moves a tile into **Hidden tiles**; choose **Show** to add it back.\n\nChoose **Save layout** to keep the arrangement for this operator across devices and for the whole team. Hidden tiles stay hidden until a main or super admin restores them and saves. **Cancel** discards unsaved changes. Other admin roles can use the saved dashboard but cannot edit its layout. Read-only accounts cannot change it, and tile visibility does not change access to reports or other pages.\n\nTo return to the original dashboard, choose **Restore default layout**, then **Save layout**. This restores the original tile order and shows all tiles available to each user's permissions. You can choose **Cancel** before saving to keep the current arrangement.\n\nIf another admin saves while you are editing, reload their saved layout before making further changes."
+  },
+  {
+    "chunk_key": "help:dashboard:2",
+    "title": "Dashboard home — Today's numbers",
+    "route": "/",
+    "required_role": "OPERATOR",
+    "content": "Dashboard home — Today's numbers\n## Today's numbers\n\nThe hero band shows **Today's guests** (guests departing today — click it to open Bookings) and a **Booking value** card with today, last-7-days, and this-month totals plus a daily sparkline (click through to Reports for detail). Booking value means confirmed bookings by their creation date, before refunds; it is not cash received. Open Reports for payments received and balances due. All dates use your business's timezone."
+  },
+  {
+    "chunk_key": "help:dashboard:3",
+    "title": "Dashboard home — Action cards",
+    "route": "/",
+    "required_role": "OPERATOR",
+    "content": "Dashboard home — Action cards\n## Action cards\n\nThree cards surface work needing attention, each linking to the right page:\n\n- **Pending Refunds** — count and total value of refund requests waiting for a decision. Click to open the Refund Queue.\n- **Inbox Action** — conversations where a customer is waiting for a human reply. Click to open the Inbox.\n- **Photo upload backlog** — booked trips from the last 7 days with no saved photo links. Click to open Trip Photos. Saving links and sending them to guests are separate steps; this count is not proof that a photo email was delivered."
+  },
+  {
+    "chunk_key": "help:dashboard:4",
+    "title": "Dashboard home — Manifest and roll call",
+    "route": "/",
+    "required_role": "OPERATOR",
+    "content": "Dashboard home — Manifest and roll call\n## Manifest and roll call\n\nThe **Manifest** and **Roll Call** panels sit below Today's guests and Booking value. Manifest lists each departure's guest count and attendance for today or tomorrow using the Today/Tomorrow toggle. Select a departure to show its guests in Roll Call. The selection stays on that departure until you change it. The next-departure summary helps you see what is coming up. The dashboard refreshes automatically every minute, when bookings change and when the connection returns; the last-updated time remains visible.\n\nRoll Call shows arrivals as a count out of the booking's group size. A **WhatsApp** button opens the guest’s chat on your device when a valid phone number is available; you can message or call from WhatsApp. Its checkbox marks the whole group as arrived; use **edit arrival counts** for a partial arrival or correction. Arrival recording still requires the booking to meet its payment and waiver checks. **Review booking status**, **Review payment**, and **Resolve waiver** open the section needed for the current blocker. [Simple View Check-ins](/simple/check-ins) provides the count editor. Use **Add Booking** at the top of the dashboard for a walk-in."
+  },
+  {
+    "chunk_key": "help:dashboard:5",
+    "title": "Dashboard home — Simple View",
+    "route": "/",
+    "required_role": "OPERATOR",
+    "content": "Dashboard home — Simple View\n## Simple View\n\nChoose **Simple View** in the dashboard header for the phone and tablet workflow. [Today](/simple) and [Calendar](/simple/calendar) show booked sessions and their roll calls. **Edit arrival counts** opens [Check-ins](/simple/check-ins), where you can record money already received and partial group arrivals. **Full dashboard** brings you back here.\n\nFor guides who only need passenger totals and trip photos, the main admin creates a shared guide login under [Settings → Admin Users → Guide login](/settings#admins). It opens the restricted guide version of Simple View directly."
+  },
+  {
+    "chunk_key": "help:dashboard:6",
+    "title": "Dashboard home — Failed payment follow-up",
+    "route": "/",
+    "required_role": "OPERATOR",
+    "content": "Dashboard home — Failed payment follow-up\n## Failed payment follow-up\n\n**Payment recovery** sits just above Weather on the Dashboard and is also available below booked sessions in operator Simple View. It lists unpaid bookings, including failed Yoco payments, unfinished checkouts and unpaid manual bookings. The nearest upcoming departures appear first, followed by past trips. Expand or collapse a date or trip heading; each trip shows its departure time. Use **Email payment link** to send the secure Yoco checkout link. A rejection explanation is included only for a recorded payment failure. Availability and booking checks still apply. After Yoco confirms payment, the booking leaves Payment recovery; its payment status remains available in Bookings. Use **Refresh** for the latest result. The email's sent time records service acceptance, not a delivery receipt. Shared guide logins cannot use this panel.\n\nFor a direct client conversation, **WhatsApp** in Simple View's roll-call and payment-recovery rows opens your own WhatsApp. You write and send the message yourself."
+  },
+  {
+    "chunk_key": "help:dashboard:7",
+    "title": "Dashboard home — Weather",
+    "route": "/",
+    "required_role": "OPERATOR",
+    "content": "Dashboard home — Weather\n## Weather\n\nThe Weather panel shows conditions for your location — useful when deciding whether to run, and pairs with the weather-cancel tools under Slots and Broadcasts."
+  },
+  {
+    "chunk_key": "help:dashboard:8",
+    "title": "Dashboard home — Welcome tour",
+    "route": "/",
+    "required_role": "OPERATOR",
+    "content": "Dashboard home — Welcome tour\n## Welcome tour\n\nOn your first login a welcome tour walks through the dashboard. Main admins also get a getting-started checklist that responds as tours, slots and bookings are created. You can replay the tour from **AI help** in the dashboard header using **Show me around the dashboard**."
+  },
+  {
+    "chunk_key": "help:dashboard:9",
+    "title": "Dashboard home — Dashboard assistant and guest chatbot",
+    "route": "/",
+    "required_role": "OPERATOR",
+    "content": "Dashboard home — Dashboard assistant and guest chatbot\n## Dashboard assistant and guest chatbot\n\nThe dashboard assistant explains where features are and how to use them. It uses the platform guide, not your live business records, so open the relevant page to read current totals or inspect a booking. In the live dashboard it can open pages and fill supported voucher or slot fields using values you provide. In the shared demo it explains actions and opens included pages without saving changes.\n\nThe customer website and WhatsApp chatbot is configured separately under Settings → Operations & AI Configuration and AI → Chat FAQ. Dashboard help is not billed against the customer chatbot's reply allowance."
+  },
+  {
+    "chunk_key": "help:data-requests:0",
+    "title": "Customer privacy data requests",
+    "route": "/privacy/data-requests",
+    "required_role": "MAIN_ADMIN",
+    "content": "Customer privacy data requests\nOpen [Settings](/settings), then **Data Requests** to reach **POPIA Data Requests**. MAIN_ADMIN and SUPER_ADMIN manage these requests for the selected business. This page is excluded from the shared demo."
+  },
+  {
+    "chunk_key": "help:data-requests:1",
+    "title": "Customer privacy data requests — Confirmation and review",
+    "route": "/privacy/data-requests",
+    "required_role": "MAIN_ADMIN",
+    "content": "Customer privacy data requests — Confirmation and review\n## Confirmation and review\n\nRequests are grouped by their status, including those awaiting customer confirmation, actionable requests and completed history. Pending requests need the customer's email confirmation before actions become available. Use the request's dates and status to determine the next available action."
+  },
+  {
+    "chunk_key": "help:data-requests:2",
+    "title": "Customer privacy data requests — Access exports",
+    "route": "/privacy/data-requests",
+    "required_role": "MAIN_ADMIN",
+    "content": "Customer privacy data requests — Access exports\n## Access exports\n\nFor a confirmed access request, **Export** creates the customer's data export and emails a download link. Generating an export is a real customer communication; review the selected request and reported result."
+  },
+  {
+    "chunk_key": "help:data-requests:3",
+    "title": "Customer privacy data requests — Deletion and rejection",
+    "route": "/privacy/data-requests",
+    "required_role": "MAIN_ADMIN",
+    "content": "Customer privacy data requests — Deletion and rejection\n## Deletion and rejection\n\nDeletion is available only after the dashboard's cooling-off date and checks permit it. **Fulfill** permanently anonymises the customer's personal data while retaining anonymised financial records; review the confirmation carefully. **Reject** requires a reason and records the decision. These actions apply to the selected request, not every customer in the business."
+  },
+  {
+    "chunk_key": "help:guide:0",
+    "title": "Guide access and the Guide app",
+    "route": "/guide",
+    "required_role": "OPERATOR",
+    "content": "Guide access and the Guide app\nFor guides who need client contacts, check-ins and trip photos, use the operator's **shared guide login**, which opens [Guide Simple View](/simpleguide) directly. The existing [Guide app](/guide) is a separate check-in workflow for dashboard staff; it is not the destination for a shared guide login."
+  },
+  {
+    "chunk_key": "help:guide:1",
+    "title": "Guide access and the Guide app — Existing Guide app for dashboard staff",
+    "route": "/guide",
+    "required_role": "OPERATOR",
+    "content": "Guide access and the Guide app — Existing Guide app for dashboard staff\n## Existing Guide app for dashboard staff\n\nPick a date to see departures, guest and booking counts, and capacity. Tap a slot for its passenger list, customer notes, waiver status and arrival counts. **Check in** marks an eligible group present; **Check in rest** marks the remaining members of a partially arrived group. Payment and waiver checks apply. For entering or correcting a specific partial count, use [Simple View Check-ins](/simple/check-ins). Trip photos has its own link from the departure screen."
+  },
+  {
+    "chunk_key": "help:guide:2",
+    "title": "Guide access and the Guide app — Existing Guide app access",
+    "route": "/guide",
+    "required_role": "OPERATOR",
+    "content": "Guide access and the Guide app — Existing Guide app access\n## Existing Guide app access\n\nAny dashboard account (OPERATOR role or above) can use the Guide app. Add it to the phone's home screen for app-like access — it works as a PWA."
+  },
+  {
+    "chunk_key": "help:guide:3",
+    "title": "Guide access and the Guide app — Check-ins and the office",
+    "route": "/guide",
+    "required_role": "OPERATOR",
+    "content": "Guide access and the Guide app — Check-ins and the office\n## Check-ins and the office\n\nSaved check-ins update the main dashboard so the office sees who arrived. Offline operations can be queued, but must sync and pass the server's current checks; a queued local change is not confirmation that the office has received it. If a queued update conflicts with newer data, review the current count before retrying."
+  },
+  {
+    "chunk_key": "help:guide:4",
+    "title": "Guide access and the Guide app — Shared guide login for Simple View",
+    "route": "/guide",
+    "required_role": "OPERATOR",
+    "content": "Guide access and the Guide app — Shared guide login for Simple View\n## Shared guide login for Simple View\n\nThe operator owner (MAIN_ADMIN or SUPER_ADMIN) creates **Guide login** under [Settings → Admin Users](/settings#admins). There is one shared login per operator, such as `guide@cape-kayak`, based on the operator's subdomain. The login stays the same if the operator later renames the subdomain. Ordinary dashboard staff must ask their main admin to manage this access.\n\nChoose **Create guide login**, copy the private password setup link and share it with your guides. The guide follows the link and chooses a password of at least eight characters. The link expires after 48 hours and works once. Password setup signs the guide straight into Simple View. Afterwards they use the same shared login and chosen password at [Guide sign in](/simpleguide). The operator dashboard and Guide Simple View use separate logins, so both can stay open in the same browser. Signing out of one leaves the other signed in. Use **Operator sign in** to return to the dashboard login.\n\nGuides see the same roll-call layout as admin Simple View, with each client's name, group size, phone number and email on their operator's selected day. Use **Collapse** or **Expand** on a booked session to hide or show its guests; the session time, PAX totals, Trip photos and Check-ins stay visible. **Call**, **WhatsApp** and email links open the client's contact details. Use the date arrows/date picker and **Refresh day** to check another day or update the roster. Mark a group present from Roll call, or open **Check-ins** to enter or correct partial arrivals. Payment and signed-waiver checks still apply; ask the operator to resolve a blocked booking. **Trip photos** opens the same Photos workspace used by the main dashboard at /simpleguide/photos/<departure-id>, inside the simple-view layout. It includes images/videos, individual and bulk photo links, recent galleries and **Send photos and thank you email**. After confirmation, the trip's lead bookers receive the same photo/thank-you email and WhatsApp photo message as the main Photos page. Uploads use the operator's existing Google Drive connection. Guides do not need to connect a separate Google account. The shared login has no office dashboard, booking creation, payment recording, marketing or customer-email campaign controls. It cannot access another operator's trips.\n\nThe owner can disable guide access here. **Get fresh password setup link** replaces the previous link and requires the shared password to be set again. No password is displayed to the owner and no setup email is automatically sent to the guide username. Share setup links privately.\n\nIf the link expires or the shared password is forgotten, ask the owner for a fresh link. If access is disabled, ask the owner to enable it. Never paste a password or private setup link into AI help."
+  },
+  {
+    "chunk_key": "help:inbox:0",
+    "title": "Inbox",
+    "route": "/inbox",
+    "required_role": "OPERATOR",
+    "content": "Inbox\nThe Inbox is the unified conversation console for WhatsApp and website chat. The AI assistant answers routine questions automatically; conversations that need a human float to the top with a \"Needs reply\" pill."
+  },
+  {
+    "chunk_key": "help:inbox:1",
+    "title": "Inbox — How bot and human handoff works",
+    "route": "/inbox",
+    "required_role": "OPERATOR",
+    "content": "Inbox — How bot and human handoff works\n## How bot and human handoff works\n\nThe assistant handles routine conversations until the customer asks for a person or a handoff is needed. Sending an admin reply moves the conversation to human handling. Use **Return to Bot** when the human exchange is complete; bot replies still follow the saved mode, business hours and reply allowance. Check the returned result if handoff cannot complete.\n\nFor website conversations, **End Chat** ends the active human chat and asks the visitor to rate it. Ending a chat does not cancel a booking or process a refund."
+  },
+  {
+    "chunk_key": "help:inbox:2",
+    "title": "Inbox — Replying",
+    "route": "/inbox",
+    "required_role": "OPERATOR",
+    "content": "Inbox — Replying\n## Replying\n\nSelect a conversation to see the full thread — bot, customer, and admin messages are visually distinct, grouped by day, and update in real time. Type your reply and send; it goes out on the same channel the customer used (WhatsApp or web chat)."
+  },
+  {
+    "chunk_key": "help:inbox:3",
+    "title": "Inbox — The WhatsApp 24-hour window",
+    "route": "/inbox",
+    "required_role": "OPERATOR",
+    "content": "Inbox — The WhatsApp 24-hour window\n## The WhatsApp 24-hour window\n\nWhatsApp only allows businesses to send free-form messages within 24 hours of the customer's last message. This is a WhatsApp platform rule, not a BookingTours limitation.\n\nIf the window has closed, your message isn't lost: the system automatically sends the customer a pre-approved \"please reply\" template, and your message is queued (marked with ⏳ in the thread). The moment they reply, the queued message is delivered and the window reopens — from then on you can chat live in the Inbox as normal."
+  },
+  {
+    "chunk_key": "help:inbox:4",
+    "title": "Inbox — Finding a conversation",
+    "route": "/inbox",
+    "required_role": "OPERATOR",
+    "content": "Inbox — Finding a conversation\n## Finding a conversation\n\nSearch by name, phone number, or email. Conversations needing attention sort first, then by recency. Opening the Inbox from a booking's WhatsApp action jumps straight to that customer."
+  },
+  {
+    "chunk_key": "help:inbox:5",
+    "title": "Inbox — WhatsApp not configured?",
+    "route": "/inbox",
+    "required_role": "OPERATOR",
+    "content": "Inbox — WhatsApp not configured?\n## WhatsApp not configured?\n\nIf replies fail with a credentials message, your WhatsApp integration isn't set up. A MAIN_ADMIN can add the WhatsApp token and phone number ID under Settings → Integration Credentials."
+  },
+  {
+    "chunk_key": "help:invoices:0",
+    "title": "Invoices",
+    "route": "/invoices",
+    "required_role": "OPERATOR",
+    "content": "Invoices\nThe Invoices page holds the pro forma invoices generated for customer bookings. This is customer paperwork — for your own BookingTours subscription billing, see the Billing page."
+  },
+  {
+    "chunk_key": "help:invoices:1",
+    "title": "Invoices — Browsing and printing",
+    "route": "/invoices",
+    "required_role": "OPERATOR",
+    "content": "Invoices — Browsing and printing\n## Browsing and printing\n\nInvoices are grouped by day; filter by date to find a specific one. Each invoice can be **printed or saved as PDF** (a print-ready document opens) or downloaded as HTML. Invoice numbers are assigned automatically and stay stable once generated."
+  },
+  {
+    "chunk_key": "help:invoices:2",
+    "title": "Invoices — Company details on invoices",
+    "route": "/invoices",
+    "required_role": "OPERATOR",
+    "content": "Invoices — Company details on invoices\n## Company details on invoices\n\nCompany and EFT banking details come from [Invoice & Banking Details](/settings#invoice). A MAIN_ADMIN can manage both. Staff granted **Invoice Details** can edit the permitted company fields; banking details still require MAIN_ADMIN or SUPER_ADMIN."
+  },
+  {
+    "chunk_key": "help:invoices:3",
+    "title": "Invoices — Resending an invoice",
+    "route": "/invoices",
+    "required_role": "OPERATOR",
+    "content": "Invoices — Resending an invoice\n## Resending an invoice\n\nTo resend an invoice to a customer, use the resend action on the booking itself on the Bookings page."
+  },
+  {
+    "chunk_key": "help:marketing:0",
+    "title": "Marketing",
+    "route": "/marketing",
+    "required_role": "OPERATOR",
+    "content": "Marketing\nMarketing is your email-marketing hub: contacts, templates, campaigns, automations, and promotions, with an analytics overview."
+  },
+  {
+    "chunk_key": "help:marketing:1",
+    "title": "Marketing — Setting up email sending",
+    "route": "/marketing",
+    "required_role": "OPERATOR",
+    "content": "Marketing — Setting up email sending\n## Setting up email sending\n\nMarketing checks email setup for the selected operator. **Marketing emails need setup** lists the remaining work for BookingTours: the email connection, bounced-email and spam reports, the operator’s local time zone if missing, and enabling sending for the operator. **Email BookingTours** opens a support email with the operator and current setup steps; review and send it yourself. **Review contacts** opens customer permission records. You can still save and preview drafts.\n\nWhen setup is ready, Main Admin and Super Admin can activate email-only welcome and welcome-back sequences after reviewing them. Sending uses the operator’s local hours (currently 08:00–20:00) and at least 24 hours between marketing emails to the same contact across campaigns and sequences. If setup cannot be checked, choose **Check again**; the dashboard does not assume your setup is incomplete.\n\nSelect **Review contacts** to open the contact list. A contact who needs permission checked does not yet have a confirmed record of agreeing to marketing emails. Adding or importing their email address is not enough. Main Admin or Super Admin can open the contact’s history, choose **Record existing permission**, and enter when permission was given, the wording shown and an evidence reference. This records existing permission; it does not obtain permission for you. Unsubscribes, bounces and spam reports remain excluded."
+  },
+  {
+    "chunk_key": "help:marketing:2",
+    "title": "Marketing — The overview page",
+    "route": "/marketing",
+    "required_role": "OPERATOR",
+    "content": "Marketing — The overview page\n## The overview page\n\nThe landing page shows Active Contacts, Templates, Emails Sent, and Campaigns, an **Email Usage This Month** meter (emails sent versus your plan's included quota, with overage cost projection), and charts for engagement (open, click, unsubscribe, bounce rates), campaign performance, audience breakdown, and open-rate trend."
+  },
+  {
+    "chunk_key": "help:marketing:3",
+    "title": "Marketing — Contacts",
+    "route": "/marketing",
+    "required_role": "OPERATOR",
+    "content": "Marketing — Contacts\n## Contacts\n\nUse the **Contacts** tab to manage your audience. **Templates**, **Automations**, **Promos** and **Vouchers** are the other tabs in Marketing. Automatic tag rules in Settings can segment contacts based on booking behaviour. Campaign sending requires eligible active contacts with marketing consent; unsubscribed contacts are excluded."
+  },
+  {
+    "chunk_key": "help:marketing:4",
+    "title": "Marketing — Templates and campaigns",
+    "route": "/marketing",
+    "required_role": "OPERATOR",
+    "content": "Marketing — Templates and campaigns\n## Templates and campaigns\n\nDesign reusable email templates under Marketing → Templates and preview them before preparing a campaign. Campaign delivery requires configured sending and contacts with recorded marketing permission. Promotional test sends remain unavailable; use the on-screen preview. A scheduled campaign can be **cancelled** and a sending campaign **paused** from Recent Campaigns on the overview. These controls stop remaining sends; emails already delivered cannot be recalled."
+  },
+  {
+    "chunk_key": "help:marketing:5",
+    "title": "Marketing — Automations",
+    "route": "/marketing",
+    "required_role": "OPERATOR",
+    "content": "Marketing — Automations\n## Automations\n\nIn **Automations → Suggested email sequences**, choose **Ask for reviews**, **Welcome new enquiries** or **Invite customers back**, then **Preview sequence** to see the emails and timing before creating a draft. The count shows matching contacts, not emails sent or an active automation. The initial Invite customers back count uses 90 days since the last paid booking; adjust timing in the saved draft. **Voucher expiry reminders** are listed here as unavailable. **View vouchers** opens the voucher list for manual review.\n\nUnder Marketing → Automations you can draft triggered emails, for example a message a number of days before or after a booking date, birthday offers, or win-back campaigns. Browse Templates for ready-made flows (welcome series, post-tour review requests, win-back campaigns and more) that come with designed emails already linked, or start from scratch. Automatic voucher/promo issuance, date-based triggers and event-tag journeys remain unavailable. Welcome and welcome-back starter drafts contain emails and delays without automatically created discounts.\n\nEvery step in a workflow is shown as a plain sentence (for example \"Immediately: send Welcome Email\" or \"Wait 3 days\") instead of raw configuration, consistently on the editor, the automations list, and the template gallery preview. Click a Send Email step's **Edit details** to change its settings, or **Preview** to see the actual email that will go out.\n\nNew automations start as drafts. Review the linked emails and trigger in the editor. Choose **Activate** for a supported sequence, review the confirmation, and activate it when ready. Existing journeys can be paused. Promotional test sends remain unavailable; use email previews. Audience, overlap, timing and send-volume estimates are shown as unavailable when they cannot be verified."
+  },
+  {
+    "chunk_key": "help:marketing:6",
+    "title": "Marketing — Promotions",
+    "route": "/marketing",
+    "required_role": "OPERATOR",
+    "content": "Marketing — Promotions\n## Promotions\n\nMarketing → Promotions manages promo codes that customers can apply at checkout and that you can apply on manual bookings."
+  },
+  {
+    "chunk_key": "help:marketing:7",
+    "title": "Marketing — Sending quota",
+    "route": "/marketing",
+    "required_role": "OPERATOR",
+    "content": "Marketing — Sending quota\n## Sending quota\n\nEmail sending draws from your plan's monthly included quota; the usage meter warns before you go into overage. Details of your plan are on the Billing page."
+  },
+  {
+    "chunk_key": "help:marketing:8",
+    "title": "Marketing — Automatic chat booking offers",
+    "route": "/marketing",
+    "required_role": "OPERATOR",
+    "content": "Marketing — Automatic chat booking offers\n## Automatic chat booking offers\n\n[Promotions](/marketing/promotions) includes **Automatic chat discounts**. Set the bookings required within a number of days, days since the last paid booking, and minimum/maximum group sizes. Add rules for different thresholds, choose a whole percentage from 0 to 100, or disable a rule. All configured conditions on a rule must match. Only paid and completed bookings count; the largest matching offer applies, without stacking automatic discounts. WhatsApp and web chat use the same saved rules and recheck them before checkout. Returning-guest offers are checked using the supplied phone number. Website checkout promo codes remain separate.\n\nChoose **Add discount rule**, select **Bookings within a period**, **Time since last booking** or **Group size** under **Qualify by**, enter the thresholds and discount, enable the rule, then select **Save automatic discounts**. Saving an offer changes WhatsApp and web chat's eligibility rules for new quotes; it does not send an unsolicited promotional message."
+  },
+  {
+    "chunk_key": "help:marketing:9",
+    "title": "Marketing — Welcome-back email sequences",
+    "route": "/marketing",
+    "required_role": "OPERATOR",
+    "content": "Marketing — Welcome-back email sequences\n## Welcome-back email sequences\n\nIn [Automations](/marketing/automations), use **Welcome-back email sequence** or select **Welcome back — time since last booking** in the builder. Set **Days since last paid booking**, then edit the email templates and delays. Save and preview the draft before activating. The starter sends an invitation followed by two optional follow-ups, without an automatically issued offer.\n\nThese sequences use verified paid booking history, including completed bookings with payment evidence. Unpaid completed bookings and refunded bookings do not qualify. Each cycle uses one last-booking date and rechecks permission, rebooking and upcoming reservations before sending. Legacy promotional WhatsApp win-back messages are also held. Transactional booking and payment emails continue separately."
+  },
+  {
+    "chunk_key": "help:navigation:0",
+    "title": "Finding your way around",
+    "route": "/",
+    "required_role": "OPERATOR",
+    "content": "Finding your way around\nThe dashboard sidebar is organised into groups. Click a group label to collapse or expand it — the dashboard remembers your layout."
+  },
+  {
+    "chunk_key": "help:navigation:1",
+    "title": "Finding your way around — Where to find each feature",
+    "route": "/",
+    "required_role": "OPERATOR",
+    "content": "Finding your way around — Where to find each feature\n## Where to find each feature\n\n- **Operations**: [Bookings](/bookings), [New Booking](/new-booking), and [Slots](/slots). Payment Reminder, Allow Without Payment and Require Payment are actions on a booking, not a separate Payment Reminders page.\n- **Guest care**: [Inbox](/inbox) and [Refunds](/refunds).\n- **Revenue**: [Invoices](/invoices), [Peak Pricing](/pricing), [Reports](/reports), and [Billing](/billing). Billing requires MAIN_ADMIN or SUPER_ADMIN. Reviews is a tab under Reports, at /reviews.\n- **Growth**: [Marketing](/marketing), [Broadcasts](/broadcasts), [Partners](/partnerships), and [AI](/ai-usage). Partners and AI require MAIN_ADMIN or SUPER_ADMIN. Vouchers is a tab under Marketing, at /vouchers. Chat FAQ is a tab under AI, at /settings/chat-faq. Failed Notifications is a main-admin-only tab under Broadcasts, at /notifications.\n- **Admin**: [Settings](/settings) and, for platform staff only, [Super Admin](/super-admin). Data Requests is reached from Settings, at /privacy/data-requests.\n\nUse **Simple View** in the dashboard header to open the phone and tablet workflow at /simple. Use **Today** for booked sessions and arrivals, **Add walk-in** for a new booking, and **Full dashboard** to return to /.\n\nOther direct links include [Customers](/customers), [Trip Photos](/photos) from the Dashboard's **Photo upload backlog** card, [Operators](/operators), and the [Guide app](/guide)."
+  },
+  {
+    "chunk_key": "help:navigation:2",
+    "title": "Finding your way around — Roles and what you can see",
+    "route": "/",
+    "required_role": "OPERATOR",
+    "content": "Finding your way around — Roles and what you can see\n## Roles and what you can see\n\nThere are four roles, lowest to highest: OPERATOR, ADMIN, MAIN_ADMIN, SUPER_ADMIN.\n\n- OPERATOR and ADMIN handle day-to-day operations: bookings, inbox, slots, refunds, broadcasts and the reporting or marketing areas their main admin has left available.\n- MAIN_ADMIN additionally manages Billing, AI, Chat FAQ, Partners, Data Requests, Failed Notifications, admin users and integration credentials.\n- SUPER_ADMIN is platform-level and can manage all operator businesses.\n- An operations admin can be granted individual Settings sections: Tours & Activities, Booking Add-Ons, External Booking, Booking Site Config, Email Customisation and Invoice Details. Booking Site Config also grants Embed Widget and Operations & AI Configuration. Integration credentials and banking details remain main-admin-only.\n\nMain admins can hide the dashboard revenue panel, Reports, Marketing and Reviews for individual staff members. A missing page can reflect these permissions as well as the account's role.\n\nIf you can't see a page mentioned in this help, your role doesn't include it — ask your main admin."
+  },
+  {
+    "chunk_key": "help:navigation:3",
+    "title": "Finding your way around — The sidebar collapsed to icons",
+    "route": "/",
+    "required_role": "OPERATOR",
+    "content": "Finding your way around — The sidebar collapsed to icons\n## The sidebar collapsed to icons\n\nOn desktop, use the collapse control beside the business name at the top of the sidebar to switch to an icon rail. On phones and tablets, use the bottom Dashboard, Bookings, New Booking and Inbox navigation, and **More** for the remaining pages.\n\nThe help assistant is opened from **AI help** in the dashboard header. In the shared demo the control is named **AI bot**. The assistant explains the product and can open pages; it does not read your bookings or account totals."
+  },
+  {
+    "chunk_key": "help:navigation:4",
+    "title": "Finding your way around — Integrations that are not available yet",
+    "route": "/",
+    "required_role": "OPERATOR",
+    "content": "Finding your way around — Integrations that are not available yet\n## Integrations that are not available yet\n\nDirect Viator and GetYourGuide connections are not available yet. Settings shows this status; /settings/ota and /ota-drift are not available operational pages. ChatGPT/MCP and Meta Muse operator connections are not customer-available either. Do not treat locally developed connection screens as a working live integration."
+  },
+  {
+    "chunk_key": "help:navigation:5",
+    "title": "Finding your way around — Suspended subscription",
+    "route": "/",
+    "required_role": "OPERATOR",
+    "content": "Finding your way around — Suspended subscription\n## Suspended subscription\n\nIf the subscription is PAUSED or SUSPENDED, the current sign-in gate blocks normal dashboard pages. A MAIN_ADMIN can use **Go to Billing** to reach /billing; other staff should ask their main admin. SUPER_ADMIN support access is separate. For exports or outstanding refunds that cannot be reached while blocked, contact BookingTours support instead of assuming Reports, Invoices or Refunds remain accessible."
+  },
+  {
+    "chunk_key": "help:new-booking:0",
+    "title": "New Booking",
+    "route": "/new-booking",
+    "required_role": "OPERATOR",
+    "content": "New Booking\nNew Booking creates a booking on behalf of a customer — walk-ins, phone bookings, or corporate groups."
+  },
+  {
+    "chunk_key": "help:new-booking:1",
+    "title": "New Booking — Creating a booking",
+    "route": "/new-booking",
+    "required_role": "OPERATOR",
+    "content": "New Booking — Creating a booking\n## Creating a booking\n\n1. **Departure and party** — choose the activity, date, departure time and number of guests. Open **Compare nearby dates** to check other departures.\n2. **Guest and contact details** — the full name and a valid email address are required. Mobile number is optional. Payment notices and waiver requests use the guest’s saved email address.\n3. **Optional extras** — extras like photo packages or equipment, with quantities; these add to the total.\n\nComplete the custom booking questions configured for the activity and review the total before saving. Questions are maintained under Settings → Tours & Activities, not Booking Site Configuration."
+  },
+  {
+    "chunk_key": "help:new-booking:2",
+    "title": "New Booking — Discounts and promo codes",
+    "route": "/new-booking",
+    "required_role": "OPERATOR",
+    "content": "New Booking — Discounts and promo codes\n## Discounts and promo codes\n\nUnder **Price Adjustment** you can apply:\n\n- **Manual discount** — reduce the price by an amount; a reason is required and recorded against the booking.\n- **Promo code** — validated live; supports percentage or fixed-amount codes.\n\nAdd-on revenue is preserved even when a manual discount is applied — the discount applies to the tour price."
+  },
+  {
+    "chunk_key": "help:new-booking:3",
+    "title": "New Booking — Taking payment",
+    "route": "/new-booking",
+    "required_role": "OPERATOR",
+    "content": "New Booking — Taking payment\n## Taking payment\n\nChoose **Payment action**:\n\n- **Request payment** sends the customer a payment request; money is still due until payment is confirmed.\n- **Hold places, no immediate message** reserves places until the hold deadline without an immediate notification.\n- **Confirm booking, money still due** confirms the reservation without recording a payment. Check-in still requires payment and a signed waiver, or an explicit account/reseller approval plus the waiver.\n- **Record payment already received** records money actually collected, with its method and reference. It does not charge a card through Yoco.\n\nUse **Review booking** to check the selected departure, adult/child counts, extras, required participant answers and final total, then **Create Booking**. The receipt distinguishes total, paid and due amounts and reports the notification result. A lost response is not proof that saving failed; use the save reference to inspect the booking before starting another one."
+  },
+  {
+    "chunk_key": "help:new-booking:4",
+    "title": "New Booking — Price unavailable",
+    "route": "/new-booking",
+    "required_role": "OPERATOR",
+    "content": "New Booking — Price unavailable\n## Price unavailable\n\nA missing, negative or invalid configured tour/departure price blocks booking creation and shows **Price unavailable**. Ask an admin to correct the configured pricing, then refresh. Do not treat missing pricing as a free booking."
+  },
+  {
+    "chunk_key": "help:new-booking:5",
+    "title": "New Booking — Hold duration",
+    "route": "/new-booking",
+    "required_role": "OPERATOR",
+    "content": "New Booking — Hold duration\n## Hold duration\n\nA pending manual booking holds its seats for the **Payment due within** duration you select (default 7 days). If payment is not received by the deadline, it can expire and release the seats. On [Bookings](/bookings), use **Allow Without Payment** for an approved pay-on-arrival exception, or **Require Payment** to restore normal expiry and reminders."
+  },
+  {
+    "chunk_key": "help:new-booking:6",
+    "title": "New Booking — Walk-ins from Simple View",
+    "route": "/new-booking",
+    "required_role": "OPERATOR",
+    "content": "New Booking — Walk-ins from Simple View\n## Walk-ins from Simple View\n\nUse **Add walk-in** in Simple View or on a departure to open /simple/new-booking. The form uses the selected date or departure where provided and can return to the original Simple View screen after saving. Admins can use **Override departure and capacity** to add guests to a full or closed departure."
+  },
+  {
+    "chunk_key": "help:new-booking:7",
+    "title": "New Booking — Extra pax and departure overrides",
+    "route": "/new-booking",
+    "required_role": "OPERATOR",
+    "content": "New Booking — Extra pax and departure overrides\n## Extra pax and departure overrides\n\nAdmins can always choose **Extra pax** under **Activity**. Enter the number of adults and children, any departure date and time, and the **Total price (R)** for the group. There is no 50-guest limit in this mode. Zero is accepted for a complimentary booking. Optional extras are added to that price.\n\nFor an existing activity, tick **Override departure and capacity** to enter the date, time and agreed price yourself. A matching departure receives the extra guests even if full or closed; otherwise a departure is created. Existing guests keep their booking details. Times use the operator’s timezone, including when recording a past departure.\n\nChoose **Confirm booking, money still due** or **Record payment already received**, then review and create. The booking appears in Bookings, the dashboard manifest and Simple View (including guide access) on its departure date. Required booking questions, payment and waiver checks still apply. Extra pax is an internal activity and is not added to the public activity catalogue. Newly created bespoke departures are closed to online bookings.\n\nManual bookings default to a seven-day payment window. You can choose 2, 6, 12, 24, 48, 72 or 168 hours. Payment holds end at least one hour before departure; confirmed bookings are due by departure if sooner. Admin departure overrides use the selected window. Payment emails show the saved deadline in the operator’s timezone.\n\nFor unpaid manual bookings with a payment link and a window longer than 24 hours, a single email reminder is queued 24 hours before payment is due. It warns that the emailed payment link will expire. Paid, cancelled, expired and pay-on-arrival bookings are excluded; each delivery attempt rechecks the saved booking. Shorter windows cannot receive a reminder 24 hours in advance.\n\nTo request the waiver manually, open the booking, go to **Waiver & Intake**, and choose **Send waiver by email**. The request goes to the saved guest email and uses the booking-specific waiver link. Already signed waivers do not need another request."
+  },
+  {
+    "chunk_key": "help:notifications:0",
+    "title": "Failed Notifications",
+    "route": "/notifications",
+    "required_role": "MAIN_ADMIN",
+    "content": "Failed Notifications\nOpen [Broadcasts](/broadcasts), then the **Failed Notifications** tab at /notifications. MAIN_ADMIN and SUPER_ADMIN can inspect both WhatsApp outbox messages and transactional email jobs here."
+  },
+  {
+    "chunk_key": "help:notifications:1",
+    "title": "Failed Notifications — The tabs",
+    "route": "/notifications",
+    "required_role": "MAIN_ADMIN",
+    "content": "Failed Notifications — The tabs\n## The tabs\n\n- **Failed** — failed or expired messages. Each row shows the destination, channel, message type, attempts, error and expandable message body.\n- **Waiting for window** — messages queued until WhatsApp's 24-hour window reopens (they send automatically once the customer messages in or a template becomes applicable).\n- **Recent sent** — recently delivered messages, for confirmation."
+  },
+  {
+    "chunk_key": "help:notifications:2",
+    "title": "Failed Notifications — Retrying",
+    "route": "/notifications",
+    "required_role": "MAIN_ADMIN",
+    "content": "Failed Notifications — Retrying\n## Retrying\n\n**Retry** attempts WhatsApp delivery immediately. If the service window is closed, the message stays queued until the customer messages again. Email retries are queued for the next notification worker run. Check whether the result says sent, queued or failed instead of assuming every retry delivered immediately."
+  },
+  {
+    "chunk_key": "help:notifications:3",
+    "title": "Failed Notifications — Common failure causes",
+    "route": "/notifications",
+    "required_role": "MAIN_ADMIN",
+    "content": "Failed Notifications — Common failure causes\n## Common failure causes\n\nThe customer's number not being on WhatsApp, the 24-hour messaging window being closed with no approved template available, or WhatsApp credentials being missing or expired (check Settings → Integration Credentials). When WhatsApp fails permanently, important messages fall back to email where possible."
+  },
+  {
+    "chunk_key": "help:operators:0",
+    "title": "Operators",
+    "route": "/operators",
+    "required_role": "OPERATOR",
+    "content": "Operators\nThe Operators page (at /operators) controls which business your dashboard is currently showing, for admins who manage more than one operator."
+  },
+  {
+    "chunk_key": "help:operators:1",
+    "title": "Operators — Switching operator",
+    "route": "/operators",
+    "required_role": "OPERATOR",
+    "content": "Operators — Switching operator\n## Switching operator\n\nIf your account has access to multiple operators, each is listed with a **Switch** button. Switching re-scopes the entire dashboard — bookings, refunds, pricing, reports, media — to the chosen operator. If you only have one operator, it shows as locked and there's nothing to switch."
+  },
+  {
+    "chunk_key": "help:operators:2",
+    "title": "Operators — Data isolation",
+    "route": "/operators",
+    "required_role": "OPERATOR",
+    "content": "Operators — Data isolation\n## Data isolation\n\nEach operator's data is fully isolated. Switching context is the only way to see another operator's bookings, and only if your account has been granted access to that operator."
+  },
+  {
+    "chunk_key": "help:partnerships:0",
+    "title": "Partners and combo offers",
+    "route": "/partnerships",
+    "required_role": "MAIN_ADMIN",
+    "content": "Partners and combo offers\nOpen **Partners** in the Growth group to reach **Partners & Combos**. This area requires MAIN_ADMIN or SUPER_ADMIN."
+  },
+  {
+    "chunk_key": "help:partnerships:1",
+    "title": "Partners and combo offers — Partnerships",
+    "route": "/partnerships",
+    "required_role": "MAIN_ADMIN",
+    "content": "Partners and combo offers — Partnerships\n## Partnerships\n\nEnter another operator's admin email and choose **Invite Partner**. Only the invited operator can accept an incoming invitation. The email link opens a confirmation page; enter the email address that received it and choose **Accept partnership**. Opening the link alone does not accept it. If email delivery fails, the page says so and the invitation remains available on the partner's dashboard.\n\nEither operator can **Revoke** the partnership, which deactivates its shared combo offers and stops new combo checkouts. Existing bookings and settlement records are kept. You can invite the same operator again after revocation; the new invitation needs fresh acceptance, and old email links no longer work. Offers remain inactive until deliberately activated again. A partnership does not give either operator unrestricted access to the other's customer records."
+  },
+  {
+    "chunk_key": "help:partnerships:2",
+    "title": "Partners and combo offers — Combo offers",
+    "route": "/partnerships",
+    "required_role": "MAIN_ADMIN",
+    "content": "Partners and combo offers — Combo offers\n## Combo offers\n\nChoose **New Combo Offer**, name the offer, set its per-person price, select the participating tours and enter their shares. You can bundle your own tours without another operator, or combine your tours with an active partner's tours. Review the included activities, shares and guest timing before activating an offer.\n\nIf the page says **Combo deals are not switched on yet**, you can prepare partnerships and offers, but customers will not see combo sales until the platform enables the feature. A saved offer alone does not confirm customer availability."
+  },
+  {
+    "chunk_key": "help:partnerships:3",
+    "title": "Partners and combo offers — Settlements",
+    "route": "/partnerships",
+    "required_role": "MAIN_ADMIN",
+    "content": "Partners and combo offers — Settlements\n## Settlements\n\nThe settlement area lists combo amounts payable to or receivable from each partner. **Mark Settled** records a settlement already made; it does not transfer money. Add a reference or note so the record can be reconciled. Where offered, generating a settlement payment link can email the partner a checkout link; paid status updates when payment is confirmed. Review the result before assuming the partner received a link.\n\nThe [Reports](/reports) Financials tab also offers **Combo Settlements CSV** for accounting."
+  },
+  {
+    "chunk_key": "help:payment-reminders:0",
+    "title": "Payment reminders and unpaid bookings",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "Payment reminders and unpaid bookings\nPayment reminders are managed through actions on [Bookings](/bookings). There is no separate /payment-reminders dashboard page."
+  },
+  {
+    "chunk_key": "help:payment-reminders:1",
+    "title": "Payment reminders and unpaid bookings — Sending a payment reminder",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "Payment reminders and unpaid bookings — Sending a payment reminder\n## Sending a payment reminder\n\nFind the unpaid booking and open its action menu. **Payment Reminder** resends its existing checkout link. If that action is unavailable because no link exists, use **Payment Link** first. Verify the reported result before assuming a message was delivered."
+  },
+  {
+    "chunk_key": "help:payment-reminders:2",
+    "title": "Payment reminders and unpaid bookings — Deadlines and automatic reminders",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "Payment reminders and unpaid bookings — Deadlines and automatic reminders\n## Deadlines and automatic reminders\n\nManual bookings use **Payment due within** in New Booking, which defaults to seven days and is shortened when departure is sooner. Payment emails include the exact due date and time. For payment windows longer than 24 hours, an automatic email warns the guest 24 hours before the deadline that their payment link will expire, provided payment remains outstanding. Paid, cancelled and approved pay-on-arrival bookings are excluded.\n\nOnline checkout holds have a shorter expiry. Other scheduled reminders and pre-trip auto-cancel behaviour depend on the business's automation configuration; the current dashboard does not expose a separate global reminder settings page. Ask BookingTours support if that configuration needs changing."
+  },
+  {
+    "chunk_key": "help:payment-reminders:3",
+    "title": "Payment reminders and unpaid bookings — Letting a specific booking through",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "Payment reminders and unpaid bookings — Letting a specific booking through\n## Letting a specific booking through\n\nFor an approved pay-on-arrival or invoice arrangement, use **Allow Without Payment** on the booking. It is excluded from reminders and automatic expiry, and its seats stay reserved. **Require Payment** restores the normal rules. This exception does not record a payment or bypass check-in eligibility; confirm the actual payment before checking in."
+  },
+  {
+    "chunk_key": "help:payment-reminders:4",
+    "title": "Payment reminders and unpaid bookings — Following up an unpaid booking",
+    "route": "/bookings",
+    "required_role": "OPERATOR",
+    "content": "Payment reminders and unpaid bookings — Following up an unpaid booking\n## Following up an unpaid booking\n\nThe **Payment recovery** panel on the Dashboard and Simple View lists bookings with an outstanding balance, including manually created bookings, confirmed bookings with money still due, unfinished checkouts and failed Yoco payments. Only bookings needing payment appear, with their remaining amount due. **Email payment link** sends the guest their existing secure Yoco checkout link. A failed-payment explanation is included only when a payment failure was recorded. The panel records when the email service accepts the email; this is not a delivery receipt.\n\nOn the Dashboard, Payment recovery is just above Weather. Bookings are ordered by departure, with the nearest upcoming trips first and past trips afterwards. Each date and trip can be expanded or collapsed; the trip heading shows its departure time in the operator's timezone. **Previous** and **Next** move through the bookings when there is more than one page.\n\nThe action checks availability and preserves a manual booking's existing future deadline. When a new deadline is needed, manual bookings get up to seven days and online bookings up to 24 hours, ending at least an hour before departure. Confirmed bookings retain their existing reserved places. Missing contact details, missing payment links, unavailable seats, or expired voucher funding must be reviewed in the booking first. Part-paid bookings show the remaining balance but require review in the booking before sending a payment link, so an existing full-amount link is not resent. Cancelled and paid bookings cannot receive recovery emails.\n\nWhen Yoco confirms successful payment, the booking leaves **Payment recovery**; its payment status remains available in **Bookings**. The panel refreshes automatically; **Refresh** checks immediately. A duplicate or delayed failure event cannot turn a paid booking back into an unpaid booking."
+  },
+  {
+    "chunk_key": "help:photos:0",
+    "title": "Trip Photos",
+    "route": "/photos",
+    "required_role": "OPERATOR",
+    "content": "Trip Photos\nTrip Photos prepares and shares a trip's photos and videos with its lead bookers. Reach [Trip Photos](/photos) from the Dashboard's **Photo upload backlog** card or open /photos directly."
+  },
+  {
+    "chunk_key": "help:photos:1",
+    "title": "Trip Photos — Sending photos",
+    "route": "/photos",
+    "required_role": "OPERATOR",
+    "content": "Trip Photos — Sending photos\n## Sending photos\n\n1. Select a recent trip (bookings from the last 7 days, grouped by date).\n2. Upload images or videos to the connected **Google Drive**, or paste photo URLs individually or as a batch separated by newlines or commas. Uploading creates a trip folder and prepares its link; it does not notify guests. Failed uploads remain selected for retry.\n3. Review the gallery and choose **Send photos and thank you email**, then confirm. Photo links are saved for My Bookings and sent in the thank-you email and WhatsApp message where those contact details are available. The WhatsApp message includes the trip's links directly; there is no separate YES-reply step for identifying the trip.\n\nA progress bar and returned results show sending status and failures per channel. WhatsApp delivery follows the normal service-window rules. The dashboard backlog counts trips without saved photo links, so it can clear after upload/link preparation before notification delivery is complete."
+  },
+  {
+    "chunk_key": "help:photos:2",
+    "title": "Trip Photos — Recent photo links",
+    "route": "/photos",
+    "required_role": "OPERATOR",
+    "content": "Trip Photos — Recent photo links\n## Recent photo links\n\n**Recent Photo Links** shows saved galleries and folders. A saved link is available for review and guest access; it does not prove an email or WhatsApp notification was delivered. A MAIN_ADMIN connects Google Drive under [Integration Credentials](/settings#credentials)."
+  },
+  {
+    "chunk_key": "help:photos:3",
+    "title": "Trip Photos — Photos through the shared guide login",
+    "route": "/photos",
+    "required_role": "OPERATOR",
+    "content": "Trip Photos — Photos through the shared guide login\n## Photos through the shared guide login\n\nGuides signed in as `guide@operator-name` choose **Trip photos** from a departure in [Guide Simple View](/simpleguide). This opens the same Photos workspace as the main dashboard, with that departure selected. Guides can choose recent trips, upload images and videos to the operator's connected Google Drive, add or bulk-import photo links, review recent photo links, and choose **Send photos and thank you email**. Confirming sends the same photo/thank-you email and WhatsApp photo message to the trip's eligible lead bookers, using the operator's existing templates and contact details. Uploading alone does not notify guests.\n\nFailed uploads remain selected for retry; earlier successful folder links are retained. Partial message failures remain visible so the guide can correct them before another send. Trip selection clears the previous trip's editable links. Guides can only view, upload and send for their own operator; they cannot connect/disconnect Drive, choose arbitrary recipients or open office/marketing settings. If Google Drive is disconnected, paste photo links or ask the main admin to connect it in Settings."
+  },
+  {
+    "chunk_key": "help:pricing:0",
+    "title": "Peak Pricing",
+    "route": "/pricing",
+    "required_role": "OPERATOR",
+    "content": "Peak Pricing\nPeak Pricing manages what each tour costs, including seasonal (peak) rates."
+  },
+  {
+    "chunk_key": "help:pricing:1",
+    "title": "Peak Pricing — Base and peak rates",
+    "route": "/pricing",
+    "required_role": "OPERATOR",
+    "content": "Peak Pricing — Base and peak rates\n## Base and peak rates\n\nThe tour rate table shows each tour's **base price** and **peak price** — edit and save directly. The peak price is what applies during peak periods."
+  },
+  {
+    "chunk_key": "help:pricing:2",
+    "title": "Peak Pricing — Setting a peak period",
+    "route": "/pricing",
+    "required_role": "OPERATOR",
+    "content": "Peak Pricing — Setting a peak period\n## Setting a peak period\n\n**Set Peak Period** creates a seasonal rule: a date range, a label, per-tour peak prices, and a **priority**. Existing slots in the range get flagged as peak with the override price; slots created later inside the range pick the rule up automatically. If two periods overlap, the higher priority wins — the page warns you about overlaps."
+  },
+  {
+    "chunk_key": "help:pricing:3",
+    "title": "Peak Pricing — What gets skipped (grandfathering)",
+    "route": "/pricing",
+    "required_role": "OPERATOR",
+    "content": "Peak Pricing — What gets skipped (grandfathering)\n## What gets skipped (grandfathering)\n\nSlots you've manually re-priced, and slots that already have paid or confirmed bookings, are **not** changed by a peak rule — existing customers keep the price they booked at."
+  },
+  {
+    "chunk_key": "help:pricing:4",
+    "title": "Peak Pricing — Removing a peak period",
+    "route": "/pricing",
+    "required_role": "OPERATOR",
+    "content": "Peak Pricing — Removing a peak period\n## Removing a peak period\n\nRemove a rule from the **Peak Period Rules** list; affected slots revert to the base price (with the same grandfathering protections)."
+  },
+  {
+    "chunk_key": "help:pricing:5",
+    "title": "Peak Pricing — Last-minute pricing",
+    "route": "/pricing",
+    "required_role": "OPERATOR",
+    "content": "Peak Pricing — Last-minute pricing\n## Last-minute pricing\n\nTime-limited last-minute deals are configured under [Settings → Tours & Activities](/settings#tours), by a main admin or staff granted Tours access. Set a deal price and its hours-before-departure window. These deals apply to eligible unsold departures; existing paid bookings do not automatically get a discount or refund by rescheduling into the deal."
+  },
+  {
+    "chunk_key": "help:refunds:0",
+    "title": "Refunds",
+    "route": "/refunds",
+    "required_role": "OPERATOR",
+    "content": "Refunds\nThe Refund Queue lists customer refund requests waiting for your decision, with the pending count and total value at the top."
+  },
+  {
+    "chunk_key": "help:refunds:1",
+    "title": "Refunds — What appears here",
+    "route": "/refunds",
+    "required_role": "OPERATOR",
+    "content": "Refunds — What appears here\n## What appears here\n\nThe queue includes requested refunds, failed attempts, pending provider refunds and refunds requiring a bank transfer. A cancellation awaiting the customer's choice of refund, voucher or reschedule is not yet a refund request. That booking remains action required until they choose."
+  },
+  {
+    "chunk_key": "help:refunds:2",
+    "title": "Refunds — Processing a refund",
+    "route": "/refunds",
+    "required_role": "OPERATOR",
+    "content": "Refunds — Processing a refund\n## Processing a refund\n\nFor each request you can:\n\n- **Submit refund** submits the eligible refundable card amount to Yoco. Submission can leave the booking **Refund pending**; it does not mean the customer has already received money.\n- **Check status** reconciles an already pending refund with the provider. Use this to check the existing attempt rather than submitting another refund.\n- **Confirm bank transfer** records a transfer you have already made outside BookingTours. It appears when a manual refund is required. Transfer and verify the money before confirming; this button does not move money from your bank.\n- **Decline** rejects a requested or failed refund and notifies the customer by email. It is unavailable while a provider refund is pending or a bank transfer awaits confirmation.\n\nBefore submission, the **Refund amount** field allows a partial refund within the remaining captured balance. Pending refunds and manual-transfer confirmations have locked amounts. Review the confirmation and the returned outcome: completed, pending, manual action required, failed, unknown or not submitted. An unknown result needs reconciliation before retrying."
+  },
+  {
+    "chunk_key": "help:refunds:3",
+    "title": "Refunds — Submitting the queue",
+    "route": "/refunds",
+    "required_role": "OPERATOR",
+    "content": "Refunds — Submitting the queue\n## Submitting the queue\n\n**Submit All** attempts queued refunds one at a time and records the result of each. Keep the page open until submission finishes. Card refunds can remain pending and bank transfers still need manual handling. Leaving the page or changing operator stops further submissions; a batch is not proof that every refund completed."
+  },
+  {
+    "chunk_key": "help:refunds:4",
+    "title": "Refunds — History",
+    "route": "/refunds",
+    "required_role": "OPERATOR",
+    "content": "Refunds — History\n## History\n\nExpand **Processed Refunds** to see recent completed, failed, and declined refunds."
+  },
+  {
+    "chunk_key": "help:refunds:5",
+    "title": "Refunds — Where refund amounts come from",
+    "route": "/refunds",
+    "required_role": "OPERATOR",
+    "content": "Refunds — Where refund amounts come from\n## Where refund amounts come from\n\nRefund amounts follow the configured cancellation tiers and remaining captured balance. Weather cancellation offers eligible paid guests a full refund, voucher or reschedule; the guest chooses first. Voucher-funded amounts return as voucher credit rather than a card refund. Mixed payments are handled according to their paid portions."
+  },
+  {
+    "chunk_key": "help:reports:0",
+    "title": "Reports",
+    "route": "/reports",
+    "required_role": "OPERATOR",
+    "content": "Reports\nReports gives you filterable, exportable views of your operation for bookkeeping, tax, and planning."
+  },
+  {
+    "chunk_key": "help:reports:1",
+    "title": "Reports — Report tabs",
+    "route": "/reports",
+    "required_role": "OPERATOR",
+    "content": "Reports — Report tabs\n## Report tabs\n\n- **Bookings** — booking volumes and details.\n- **Financials** — accounting view: gross booked, amount actually received, refunds, net received, and outstanding balances, with a per-booking payment method and payment reference.\n- **Marketing** — email performance.\n- **Attendance** — who showed up.\n- **Waivers** — waiver completion.\n- **Reviews** — moderate customer reviews by status. This uses the same Reports navigation, with **Pending**, **Approved**, **Hidden**, and **Spam** filters."
+  },
+  {
+    "chunk_key": "help:reports:2",
+    "title": "Reports — Financials for accounting",
+    "route": "/reports",
+    "required_role": "OPERATOR",
+    "content": "Reports — Financials for accounting\n## Financials for accounting\n\nThe Financials tab reconciles money movement, not just booked totals: **Gross Booked** (what live bookings owe), **Received** (cash and voucher value actually captured), **Refunded** (processed refunds), **Net Received**, and **Outstanding** (due but unpaid). Payments received with no gateway reference are flagged for audit. The Financials CSV is a full transaction ledger with every money column, payment references, voucher and promo details, OTA amounts, refund history, cancellation details and who took the booking."
+  },
+  {
+    "chunk_key": "help:reports:3",
+    "title": "Reports — Accounting registers",
+    "route": "/reports",
+    "required_role": "OPERATOR",
+    "content": "Reports — Accounting registers\n## Accounting registers\n\nOn the Financials tab you can also export four registers for your accountant or an audit:\n\n- **Refunds CSV** — every processed refund in the period with amounts, reasons and payment references.\n- **Invoices CSV** — the invoice register in invoice-number order, with VAT numbers, payment method and reference per invoice.\n- **Vouchers CSV** — vouchers sold in the period, vouchers redeemed in the period, and the open voucher balance (your outstanding liability).\n- **Combo Settlements CSV** — amounts payable to and receivable from partner operators on combo bookings."
+  },
+  {
+    "chunk_key": "help:reports:4",
+    "title": "Reports — Filtering and exporting",
+    "route": "/reports",
+    "required_role": "OPERATOR",
+    "content": "Reports — Filtering and exporting\n## Filtering and exporting\n\nFilter the booking-based reports by date range, and choose whether the range applies to the **tour date** or the **booking date** — revenue by trip day and revenue by sale day are different views, pick the one your accountant wants. Export the filtered data as **CSV** (for spreadsheets) or **PDF**. Reviews uses status filters instead of date ranges and exports."
+  },
+  {
+    "chunk_key": "help:reports:5",
+    "title": "Reports — During suspension",
+    "route": "/reports",
+    "required_role": "OPERATOR",
+    "content": "Reports — During suspension\n## During suspension\n\nThe current sign-in gate can block Reports when a subscription is paused or suspended. MAIN_ADMIN can reach Billing; contact BookingTours support if you need an export while operational access is blocked. Do not assume an export is available simply because the report itself has download controls."
+  },
+  {
+    "chunk_key": "help:reviews:0",
+    "title": "Reviews",
+    "route": "/reviews",
+    "required_role": "OPERATOR",
+    "content": "Reviews\nOpen [Reports](/reports), then its **Reviews** tab at /reviews to moderate customer reviews before they appear publicly. Your main admin can hide Reviews for individual staff. Reviews is excluded from the shared demo."
+  },
+  {
+    "chunk_key": "help:reviews:1",
+    "title": "Reviews — Moderating",
+    "route": "/reviews",
+    "required_role": "OPERATOR",
+    "content": "Reviews — Moderating\n## Moderating\n\nFilter by status: **Pending** (submitted, awaiting moderation), **Approved**, **Hidden**, and **Spam**. Each review shows its source, star rating, comment, reviewer, and tour. Use **Approve** to publish, **Hide** to remove from public view, or **Spam** to mark junk. Acting on a review moves it out of the current filter view."
+  },
+  {
+    "chunk_key": "help:reviews:2",
+    "title": "Reviews — Where reviews come from",
+    "route": "/reviews",
+    "required_role": "OPERATOR",
+    "content": "Reviews — Where reviews come from\n## Where reviews come from\n\nReviews arrive from customer review requests (sent automatically after trips by the auto-message system) and other configured sources such as Google reviews, which sync daily."
+  },
+  {
+    "chunk_key": "help:settings:0",
+    "title": "Settings",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings\nMain admins can choose **Add admin** at the top of Settings to open the invitation form inside **Admin Users**. Enter the admin's name and email, then choose **Add Admin and Send Setup Link**. The plan's seat limit still applies.\n\nSettings is one page of collapsible sections covering your whole configuration. It's visible to MAIN_ADMIN and above — though a MAIN_ADMIN can grant a regular admin access to specific sections (per-section settings permissions), in which case that admin sees only their granted sections."
+  },
+  {
+    "chunk_key": "help:settings:1",
+    "title": "Settings — Admin Users",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings — Admin Users\n## Admin Users\n\nAdd dashboard users (they receive a password-setup email), resend setup links, remove admins, and grant per-section settings permissions. The Main Admin account can't be deleted. This section also lets you suspend or reactivate the subscription.\n\nMain Admins and Super Admins can select **Edit contact details** under an administrator to change their **Name**, **Email address** and optional **Phone number**. Main Admins can edit their own account and other admins within their business; platform Super Admin accounts remain restricted. **Save contact details** keeps the same account and permissions. A new email becomes the sign-in and account email immediately, with the existing password. Old password setup links expire; for an account still awaiting password setup, choose **Send setup link** after saving. The phone number is a contact field, not a phone sign-in. Customer-facing business contact details are edited separately under Booking Site Configuration.\n\nThe **Billing contact** selector chooses who receives BookingTours subscription invoices. By default they go to the first admin created on the account; pick any other admin to redirect them."
+  },
+  {
+    "chunk_key": "help:settings:10",
+    "title": "Settings — Dashboard Preferences",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings — Dashboard Preferences\n## Dashboard Preferences\n\nShow or hide **Help assistant bubble** for your own admin account. This preference follows your account across devices and does not change another staff member's preference or disable the customer chatbot. In the current dashboard, the assistant opens from the header's AI help control."
+  },
+  {
+    "chunk_key": "help:settings:11",
+    "title": "Settings — Automation Tag Rules",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings — Automation Tag Rules\n## Automation Tag Rules\n\nRules that automatically tag marketing contacts based on booking behaviour (for example tag customers who booked a specific tour), for targeting campaigns."
+  },
+  {
+    "chunk_key": "help:settings:12",
+    "title": "Settings — Invoice & Banking Details",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings — Invoice & Banking Details\n## Invoice & Banking Details\n\nCompany information and EFT banking details printed on customer pro forma invoices. Staff granted **Invoice Details** can edit the permitted company fields. Banking details require MAIN_ADMIN or SUPER_ADMIN."
+  },
+  {
+    "chunk_key": "help:settings:13",
+    "title": "Settings — Integration Credentials",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings — Integration Credentials\n## Integration Credentials\n\nWhatsApp (access token and phone number ID), Yoco payments (live keys plus a test mode toggle), and Google Drive connection for trip photos. Credentials are encrypted at rest and can only ever be edited by MAIN_ADMIN and above — this section is never delegatable to sub-admins.\n\nTo change WhatsApp, Yoco live, or Yoco test credentials, enter both new values and save. To clear saved details, choose **Remove configuration** on that integration and confirm. Its status changes to **Not set**, and you can save new credentials afterward. Removal stops the affected messages or payments until you reconnect; existing bookings and payment records remain saved. Removing Yoco test credentials leaves the current payment mode unchanged, so it never switches you to live payments. Google Drive has its own **Disconnect Google Drive** button.\n\nBookingTours must first connect your WhatsApp Business Account to its shared Meta app. Ask the BookingTours onboarding team to do this with you; a token from a separate Meta app will not work with the bot. The Phone Number ID is the numeric ID shown for your number in WhatsApp Manager (or in the connected app's WhatsApp API Setup), not the displayed phone number or the WhatsApp Business Account ID. For production, BookingTours generates a system-user access token for its app with `whatsapp_business_messaging` and `whatsapp_business_management` access to your account. The token displayed in API Setup is temporary and should not be saved here."
+  },
+  {
+    "chunk_key": "help:settings:14",
+    "title": "Settings — Saving banking and integration settings",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings — Saving banking and integration settings\n## Saving banking and integration settings\n\nAll accounts, including platform Super Admins, use their normal sign-in to save banking details, WhatsApp credentials, Yoco credentials and Yoco test mode. No authenticator setup or code is required. Existing role permissions still apply: these settings are managed by the account owner (MAIN_ADMIN). Platform Super Admins do not need an authenticator either."
+  },
+  {
+    "chunk_key": "help:settings:15",
+    "title": "Settings — Chat FAQ (Quick Answers)",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings — Chat FAQ (Quick Answers)\n## Chat FAQ (Quick Answers)\n\nOpen [AI](/ai-usage) in the Growth group, then its **Chat FAQ** tab at /settings/chat-faq. Quick Answers are not a Settings section. This page requires a main admin."
+  },
+  {
+    "chunk_key": "help:settings:16",
+    "title": "Settings — Data Requests and unavailable connections",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings — Data Requests and unavailable connections\n## Data Requests and unavailable connections\n\nMain admins reach [Data Requests](/privacy/data-requests) from the link at the bottom of Settings. OTA Channels currently says direct Viator and GetYourGuide connections are not available yet. Do not try to configure them as live integrations. Operator ChatGPT/MCP and Meta Muse connections are also not customer-available; they are separate from the built-in dashboard and guest assistants."
+  },
+  {
+    "chunk_key": "help:settings:2",
+    "title": "Settings — Shared Guide login",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings — Shared Guide login\n## Shared Guide login\n\nUnder **Admin Users → Guide login**, a MAIN_ADMIN or SUPER_ADMIN selects **Create guide login**, then copies and privately shares the one-use password setup link. It expires after 48 hours. A guide opens it and chooses the shared password; there is no automatic setup email to the guide alias. One `guide@operator-name` login serves all guides for this operator, based on its subdomain, and stays the same after a subdomain rename.\n\nAfter setup, guides use that username and password on the normal sign-in screen and go directly to [Guide Simple View](/simpleguide). The roll call shows expected passenger totals, client contact links and check-ins. **Trip photos** on a departure opens the same Photos workspace as the full dashboard: image/video uploads through the operator's connected Google Drive, individual or bulk photo links, recent galleries, and **Send photos and thank you email**. Confirming sends the existing photo/thank-you email and WhatsApp photo message to eligible lead bookers for that trip. Guides cannot open office or marketing settings, create bookings, record payments, change the Drive connection or choose arbitrary recipients. This is separate from adding an ordinary dashboard admin and from the existing /guide check-in app.\n\nUse **Disable guide access** or **Enable guide access** to change availability. **Get fresh password setup link** replaces the prior link and requires the shared password to be set again, including when it is forgotten. Do not ask guides to share passwords or private setup tokens in chat."
+  },
+  {
+    "chunk_key": "help:settings:3",
+    "title": "Settings — Tours & Activities",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings — Tours & Activities\n## Tours & Activities\n\nCreate and edit tours, descriptions, duration, departure schedules, default capacity, base and peak prices, images and confirmation taglines. Drag to reorder the booking-site cards. Activate/deactivate and show/hide control sales and public visibility; neither action cancels existing bookings. Tours with booking history or linked active vouchers cannot be deleted.\n\nDeparture times use a **24-hour clock** in the operator’s saved timezone (SAST for South Africa). Type **1800** continuously to enter **18:00**, or **0930** for **09:30**, without selecting AM/PM. For a **2-hour, 30-minute** tour, select **hours**, enter **2**, and enter **30** in the adjacent minutes field. Existing durations load into the matching hours and minutes when edited; whole-day tours still support **days**.\n\nWhen generating slots, choose **Date range** for a repeating weekday schedule or **Specific dates** to pick individual tour dates. Add as many dates and departure times as needed. Each departure time is created on every selected date, and existing departures are skipped. For a new tour, the selected schedule is generated when you choose **Add Tour**; for an existing tour, choose **Generate Slots**.\n\n**Last-minute deals** have a deal price and a start/end window measured in hours before departure. They apply to eligible unsold availability, not refunds on an existing paid booking. Upcoming departure-time bundles can also be managed here; [Slots](/slots) has the full calendar and bulk tools.\n\n**Custom Booking Questions** is in [Tours & Activities](/settings#tours). Add a template or a question, choose its answer type, options and required status, then save. The answers are captured with the booking and shown to staff; these questions are not in Booking Site Configuration."
+  },
+  {
+    "chunk_key": "help:settings:4",
+    "title": "Settings — Booking Add-Ons",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings — Booking Add-Ons\n## Booking Add-Ons\n\nOptional extras customers can add at checkout (photo packages, equipment hire). Create, edit, and drag-reorder."
+  },
+  {
+    "chunk_key": "help:settings:5",
+    "title": "Settings — Booking Site Configuration",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings — Booking Site Configuration\n## Booking Site Configuration\n\nYour customer-facing booking site's policies, directions, branding, background and hero text, navigation, button and footer copy, theme colours, contact links, timezone, chatbot avatar and cancellation policy tiers. The booking-site preview shows the effect of the settings, including theme text contrast. Custom checkout questions are maintained under Tours & Activities."
+  },
+  {
+    "chunk_key": "help:settings:6",
+    "title": "Settings — Embed Widget",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings — Embed Widget\n## Embed Widget\n\nA copyable snippet to embed your booking widget on your own website."
+  },
+  {
+    "chunk_key": "help:settings:7",
+    "title": "Settings — Email Customisation",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings — Email Customisation\n## Email Customisation\n\nPer-email-type colour themes and banner images for the emails customers receive (confirmations, invoices, cancellations, photos, and so on)."
+  },
+  {
+    "chunk_key": "help:settings:8",
+    "title": "Settings — Operations & AI Configuration",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings — Operations & AI Configuration\n## Operations & AI Configuration\n\nArrival instructions, what to bring and wear, FAQ answers, and the AI chatbot's personality and business knowledge. This content feeds the customer website and WhatsApp assistant; arrival and packing instructions also feed guest emails. It does not change the dashboard help assistant's product guide. Staff with the **Booking Site Config** grant can also manage this section and Embed Widget."
+  },
+  {
+    "chunk_key": "help:settings:9",
+    "title": "Settings — WhatsApp Bot Mode",
+    "route": "/settings",
+    "required_role": "MAIN_ADMIN",
+    "content": "Settings — WhatsApp Bot Mode\n## WhatsApp Bot Mode\n\nControls WhatsApp auto-replies: **Always**, **Outside business hours**, or **Never**. Outside-hours mode uses the saved weekly schedule and business timezone. Human takeover on an individual conversation still takes precedence. This section requires a main admin; ordinary Settings grants do not unlock it."
+  },
+  {
+    "chunk_key": "help:simple-view:0",
+    "title": "Simple View, roll call and check-ins",
+    "route": "/simple",
+    "required_role": "OPERATOR",
+    "content": "Simple View, roll call and check-ins\nChoose **Simple View** in the full dashboard's header for the phone and tablet operations workflow. Its navigation has **Today**, **Add walk-in** and **Full dashboard**. **Full dashboard** returns to / for scheduling, refunds, marketing and configuration."
+  },
+  {
+    "chunk_key": "help:simple-view:1",
+    "title": "Simple View, roll call and check-ins — Today and Calendar",
+    "route": "/simple",
+    "required_role": "OPERATOR",
+    "content": "Simple View, roll call and check-ins — Today and Calendar\n## Today and Calendar\n\n[Today](/simple) opens **Roll call** for the current business date. Use the arrows or date picker for another day. [Calendar](/simple/calendar) also shows that selected day's booked sessions in time order. These screens show sessions with bookings, not every empty departure in the full Slots calendar.\n\nEach session shows its time, activity, booked and arrived guests, and available places or a Full, Closed, Cancelled or Departed label. Its roll call shows each lead booker and arrival count. The count appears beside the name as **2/2**, followed by **Edit**, which opens that session's check-ins to adjust arrivals. Contact details appear as **WhatsApp**, **Call** and **Email** buttons instead of phone numbers or email addresses. WhatsApp and Call require a valid phone number; Email requires a valid email address. The same buttons are available on payment-recovery rows. South African local numbers are converted to +27 automatically. You write and send the message yourself.\n\nSimple View updates automatically when bookings change, every minute, when the connection returns, and when you return to the browser window. There is no timezone/update row or Refresh day button."
+  },
+  {
+    "chunk_key": "help:simple-view:2",
+    "title": "Simple View, roll call and check-ins — Payment and waiver readiness",
+    "route": "/simple",
+    "required_role": "OPERATOR",
+    "content": "Simple View, roll call and check-ins — Payment and waiver readiness\n## Payment and waiver readiness\n\n[Check-ins](/simple/check-ins) shows the payment and waiver status before recording arrivals. If money has actually been received offline, choose **Cash**, **EFT**, **Card (terminal)** or **Other**, add a payment note or reference, and record it. Wait for the refreshed booking to confirm payment. A pay-on-arrival exception alone is not a recorded payment.\n\nA signed waiver and payment in full are required before adding arrivals in Simple View. Account/reseller approval and Allow Without Payment do not bypass this requirement. Check the displayed blocking reason if the control is unavailable. Correcting an existing arrival count downward remains possible. Recording a payment does not collect a card payment through Yoco."
+  },
+  {
+    "chunk_key": "help:simple-view:3",
+    "title": "Simple View, roll call and check-ins — Partial group arrivals",
+    "route": "/simple",
+    "required_role": "OPERATOR",
+    "content": "Simple View, roll call and check-ins — Partial group arrivals\n## Partial group arrivals\n\nUse the minus/plus controls to set the number actually present, from zero up to the booked group size, then save. For example, record 2 of 4 arrived when half the party is present. Correct a mistaken arrival count here as well. The Today/Calendar roll-call checkbox marks the whole eligible group present or resets a fully present group; use Check-ins for precise partial counts."
+  },
+  {
+    "chunk_key": "help:simple-view:4",
+    "title": "Simple View, roll call and check-ins — Walk-ins and the shared demo",
+    "route": "/simple",
+    "required_role": "OPERATOR",
+    "content": "Simple View, roll call and check-ins — Walk-ins and the shared demo\n## Walk-ins and the shared demo\n\nChoose **Add walk-in** in the header. The form at /simple/new-booking carries the selected date or departure. Use the **X** beside the Add walk-in heading to close the form and return to the screen and date you came from. Review the adult/child counts, extras, payment action and any required booking or participant questions before choosing Create. Draft details survive closing, Back and Cancel within the same authenticated browser tab. Capacity and normal booking checks still apply.\n\nThe shared demo explains operations without committing payments, arrivals or new bookings. Use the full dashboard's AI bot for its product tour."
+  },
+  {
+    "chunk_key": "help:simple-view:5",
+    "title": "Simple View, roll call and check-ins — Guide-only access",
+    "route": "/simple",
+    "required_role": "OPERATOR",
+    "content": "Simple View, roll call and check-ins — Guide-only access\n## Guide-only access\n\nGuides use the operator's shared `guide@operator-name` login and chosen password. This opens [Guide Simple View](/simpleguide) directly, with the roll call, client contact buttons, expected passenger counts and check-ins for the selected day. Use the date arrows or date picker to choose a day; its data refreshes automatically. **Trip photos** opens the same Photos workspace as the main dashboard, preselected for that departure. Guides can upload images/videos, paste or bulk-import links, review recent photo links, and confirm **Send photos and thank you email** to notify that trip's lead bookers. Access is limited to the guide's operator; Full dashboard, walk-ins, payment recording and marketing campaigns remain unavailable.\n\nThe operator owner sets up this login in [Settings → Admin Users → Guide login](/settings#admins), chooses **Create guide login**, and privately shares the one-use password setup link. It expires after 48 hours. A guide chooses the shared password once and is signed directly into Simple View. After that, all guides use the shared username and password on the normal sign-in screen. The owner can disable access or issue a fresh setup link when the password is forgotten. Shared guides can send trip photos and the existing thank-you email for their own operator's trips."
+  },
+  {
+    "chunk_key": "help:slots:0",
+    "title": "Slots",
+    "route": "/slots",
+    "required_role": "OPERATOR",
+    "content": "Slots\nSlots are your bookable departures: a tour at a time on a date with a capacity and price. Customers can only book where an OPEN slot exists."
+  },
+  {
+    "chunk_key": "help:slots:1",
+    "title": "Slots — Creating slots",
+    "route": "/slots",
+    "required_role": "OPERATOR",
+    "content": "Slots — Creating slots\n## Creating slots\n\nOpen [Slots](/slots) and choose **Add Slot**. The **Add New Slots** dialog asks for the tour, start time, one or more date ranges, capacity and an optional price override. Blank price uses the tour default. Existing departures at the same tour and time are skipped rather than duplicated.\n\nFor repeating schedules choose **Bulk Generate**: select one or more tours, date ranges, departure times, weekdays and capacity. Review the per-tour overrides and preview before generating. Results show created slots, skipped duplicates and errors for each tour.\n\nGenerating slots adds missing departures. Changing the weekday selection does not close or remove departures that were generated earlier."
+  },
+  {
+    "chunk_key": "help:slots:2",
+    "title": "Slots — Calendar views",
+    "route": "/slots",
+    "required_role": "OPERATOR",
+    "content": "Slots — Calendar views\n## Calendar views\n\nSwitch between **Week** and **Day**, use the arrows or date picker, or choose **Month** to open the monthly booking overview. Month helps you jump to a date; slot editing happens in the day or week calendar."
+  },
+  {
+    "chunk_key": "help:slots:3",
+    "title": "Slots — Editing a slot",
+    "route": "/slots",
+    "required_role": "OPERATOR",
+    "content": "Slots — Editing a slot\n## Editing a slot\n\nThe **Edit Slot** modal changes time, capacity, or price. It deliberately does not change status — opening, closing, and cancelling are separate actions so a price edit can never accidentally cancel a departure."
+  },
+  {
+    "chunk_key": "help:slots:4",
+    "title": "Slots — Open, close, cancel — the difference",
+    "route": "/slots",
+    "required_role": "OPERATOR",
+    "content": "Slots — Open, close, cancel — the difference\n## Open, close, cancel — the difference\n\n- **Close** — stops new bookings but keeps existing ones. Use when a departure is full enough or you want to pause sales.\n- **Reopen** — makes a closed slot bookable again.\n- **Cancel & notify** or **Weather cancel** in a slot's dialog cancels its active bookings and sends cancellation notices. Weather cancellation gives eligible paid guests reschedule, voucher or full-refund choices even at short notice. Refunds are not automatically completed by cancellation.\n- **Cancel Day(s)** applies weather cancellation across selected dates. Select the date headers in the calendar first, then review the confirmation and choose **Cancel Everything**.\n- **Reopen Day(s)** opens closed departures on selected dates for new bookings. Reopening a departure does not restore previously cancelled bookings.\n\nCancelling a whole departure or selected days uses the main-admin cancellation service and requires MAIN_ADMIN or SUPER_ADMIN. Operations staff should ask their main admin to perform it. Closing sales and editing a slot are separate actions."
+  },
+  {
+    "chunk_key": "help:slots:5",
+    "title": "Slots — Bulk edit",
+    "route": "/slots",
+    "required_role": "OPERATOR",
+    "content": "Slots — Bulk edit\n## Bulk edit\n\nChoose **Bulk Edit** to open **Bulk Edit Slots**. Apply a new capacity, price and/or time across a date range for one tour or all tours. Blank fields keep their existing values; enter **NULL** in the price field to reset to the tour default. Editing time, capacity or price does not cancel bookings.\n\nTo make existing availability **weekends only**, choose the tour (or **All Tours**) and the date range, then choose **Close weekday slots**. Review the number of future Monday–Friday slots and confirm. Weekdays use the operator's timezone. Saturday and Sunday slots, existing bookings and holds are preserved; this does not cancel trips, refund payments or message guests. The capacity, price and time fields are ignored by this action. For future slot generation, select only Saturday and Sunday."
+  },
+  {
+    "chunk_key": "help:slots:6",
+    "title": "Slots — Hidden slots",
+    "route": "/slots",
+    "required_role": "OPERATOR",
+    "content": "Slots — Hidden slots\n## Hidden slots\n\nBy default, CLOSED and zero-capacity slots are hidden from the list. Use the \"Show closed / 0-capacity\" toggle to reveal them."
+  },
+  {
+    "chunk_key": "help:slots:7",
+    "title": "Slots — Peak pricing on slots",
+    "route": "/slots",
+    "required_role": "OPERATOR",
+    "content": "Slots — Peak pricing on slots\n## Peak pricing on slots\n\nSlots carry peak flags and price overrides that are managed from the Peak Pricing page — a slot inside an active peak period shows its peak price automatically."
+  },
+  {
+    "chunk_key": "help:super-admin:0",
+    "title": "Super Admin",
+    "route": "/super-admin",
+    "required_role": "SUPER_ADMIN",
+    "content": "Super Admin\nSuper Admin is your platform control room. It can access every business. Never give this role to a client."
+  },
+  {
+    "chunk_key": "help:super-admin:1",
+    "title": "Super Admin — Before handing a client their booking link",
+    "route": "/super-admin",
+    "required_role": "SUPER_ADMIN",
+    "content": "Super Admin — Before handing a client their booking link\n## Before handing a client their booking link\n\nOpen **Client readiness & support** and expand their business. Automatic checks show whether the owner account, subscription, policies, activity, future availability and provider settings exist. “Saved” does not mean a payment or message worked.\n\nPerform the six client tests and record only what you actually verified. Every confirmation has an actor and timestamp in the audit trail. The checklist is not an automatic launch approval: unresolved support problems still need attention.\n\nIf billing or policies are missing, use **Complete missing setup** once. It creates only missing records from today, preserves existing records, and does not send an invoice or take money.\n\n**Add New Client** creates the business and Main Admin immediately. If that operator should finish the guided wizard, enter the same booking subdomain and Main Admin email under **Onboarding Invites**. The invite attaches to the existing business; it does not create a second one. The booking site pauses until the operator completes the wizard. Businesses with bookings cannot use this handoff; their owners finish setup in the admin dashboard. For a new operator, you can start directly with **Onboarding Invites**, which creates a fenced skeleton business. A retried assisted submission uses the same request ID to avoid duplicates.\n\nIn **Business Management**, an operator still marked **ONBOARDING** has an **Activate operator** action. Complete missing setup under **Client readiness & support**, check launch readiness, then activate and record a reason. This changes the operator and its subscription to **ACTIVE**, enables online bookings, and records the change in the audit trail. It does not complete the guided wizard or send the owner a password setup email; use **Send setup link** if needed.\n\nUnder a business's **Admin Users**, choose **Edit contact details** to update an administrator's name, email and optional phone number, including the Main Admin. Saving an email changes the existing account's sign-in address immediately and expires old setup links. The account, password and permissions are kept. Use **Send setup link** afterward if password setup is still pending. Main Admins have the same contact editor for their own business in **Settings → Admin Users**."
+  },
+  {
+    "chunk_key": "help:super-admin:2",
+    "title": "Super Admin — Support and staff access",
+    "route": "/super-admin",
+    "required_role": "SUPER_ADMIN",
+    "content": "Super Admin — Support and staff access\n## Support and staff access\n\nSelect the client before opening their settings, billing, privacy requests or notifications. The server verifies the selected business against your sign-in; ordinary clients cannot switch into another business by editing a request.\n\nIn the client's detail panel, **Send setup link** emails a secure password link. Let the owner choose their password. **Suspend** blocks staff access and revokes refresh sessions without deleting records. **Reactivate** requires an available seat. You cannot suspend yourself, another platform account, or the last active Main Admin. Increase seats or promote another active Main Admin first, as appropriate.\n\nBusiness suspension requires confirmation and an audit reason. It stops trading and is not automatically lifted just because an invoice is paid. Pausing/resuming billing and changing seats update billing records atomically. Seat reductions cannot fall below active staff."
+  },
+  {
+    "chunk_key": "help:super-admin:3",
+    "title": "Super Admin — Operator settings support",
+    "route": "/super-admin",
+    "required_role": "SUPER_ADMIN",
+    "content": "Super Admin — Operator settings support\n## Operator settings support\n\nOpen **Operator settings support** at /super-admin/sensitive-actions. Select the operator first to change its banking, WhatsApp or Yoco settings. Changes use your signed-in Super Admin account and are recorded in the audit trail. Credential status does not expose saved secret values.\n\nMFA has been removed for all accounts, including Super Admins. Banking, integration credentials, platform settings and client onboarding use normal sign-in with the existing role permissions. No authenticator setup, QR code or six-digit authenticator code is required."
+  },
+  {
+    "chunk_key": "help:super-admin:4",
+    "title": "Super Admin — Monthly invoices",
+    "route": "/super-admin",
+    "required_role": "SUPER_ADMIN",
+    "content": "Super Admin — Monthly invoices\n## Monthly invoices\n\nUse **Platform Invoices** for operator billing. The email usage panel is a usage/pricing view; email overage is included once in the platform invoice, not in a second customer invoice.\n\nThe preview and generated invoice share one calculation: plan, seat history, active days, email overage and AI overage. Review a draft before sending it. Generating a draft does not charge a card; sending it sends a real email and can create a payment link.\n\nFor a wrong unpaid draft without a payment link, use **Void draft**, give a reason, correct the source settings, then generate a replacement for the same month. The old document stays in **Voided history**. Paid documents are not editable or voidable here.\n\nIf a payment link exists or checkout creation started, correction is blocked until provider cancellation is verified. The Checkout API does not expose a documented cancellation operation in the reviewed API reference. Do not create a second payable invoice or delete the first to get around this protection; arrange cancellation/reconciliation with Yoco and platform support.\n\n**Mark Paid** is for money you have actually received. Check the amount and reference in your bank first. If an old payment link has already been shared, arrange its cancellation as well so the client cannot accidentally pay twice."
+  },
+  {
+    "chunk_key": "help:super-admin:5",
+    "title": "Super Admin — Daily monitoring in plain English",
+    "route": "/super-admin",
+    "required_role": "SUPER_ADMIN",
+    "content": "Super Admin — Daily monitoring in plain English\n## Daily monitoring in plain English\n\nSentry tells you when software reports a problem. It does not replace checking that customers actually received messages or money.\n\n1. Open [Sentry errors](https://bookingtours.sentry.io/issues/?environment=production). Select **production**, **Unresolved** and the last 24 hours.\n2. Open new or repeating issues. Copy the issue link; note first/last seen, event count and tags. **app** identifies admin, booking or edge. **business_id** identifies a client when available; **function.name** identifies an edge service.\n3. Prioritise payment/refund failures, sign-in failures, any wrong-client information and missed scheduled jobs. Use this page's support counts to find the affected client. Do not blindly repeat a payment, refund or message.\n4. Send the issue link, client name and a plain-English description to your developer. Resolve the issue only after a deployed fix has been checked. “Regressed” means a previously resolved problem returned.\n\nOpen [Sentry monitors](https://bookingtours.sentry.io/monitors/) and check **Booking cleanup and reminders**. It should start every five minutes and report completion. A missed/failed run needs investigation even if customers have not complained.\n\nCheck the control room and Sentry at the start and end of every day, after each onboarding, and after a release. Production new/regressed-error and error-spike rules route to the platform owner's Sentry account. A test alert must actually arrive before email monitoring is considered proven.\n\nThe included cron monitor covers cleanup/reminders. Marketing functions report returned failures to Sentry, but have no separate missed-run monitor in this release. Sentry is not an independent website uptime check; if the whole site or telemetry is unavailable, inspect the hosting dashboard and public booking page.\n\nSources: [Sentry cron monitoring](https://docs.sentry.io/product/monitors-and-alerts/monitors/crons/), [Sentry issue triage](https://docs.sentry.io/product/issues/states-triage/), [Yoco Checkout API](https://developer.yoco.com/api-reference/checkout-api/checkout/create-checkout)."
+  },
+  {
+    "chunk_key": "help:vouchers:0",
+    "title": "Vouchers",
+    "route": "/vouchers",
+    "required_role": "OPERATOR",
+    "content": "Vouchers\nOpen [Marketing](/marketing), then the **Vouchers** tab at /vouchers. Vouchers cover gifts, credits and tour redemption. Each has a code the customer uses when booking with your business. The create form generates an 8-character code and lets you regenerate or edit it."
+  },
+  {
+    "chunk_key": "help:vouchers:1",
+    "title": "Vouchers — Creating a voucher",
+    "route": "/vouchers",
+    "required_role": "OPERATOR",
+    "content": "Vouchers — Creating a voucher\n## Creating a voucher\n\nFill in the recipient and buyer details, choose the tour, and pick the type:\n\n- **Gift** — bought by one person for another, with an optional gift message.\n- **Credit** — a monetary amount the recipient can spend on a booking.\n- **Free Trip** — a voucher for tour redemption. The dashboard create form still sells it by payment link; selecting this type does not grant unpaid complimentary credit.\n\nEnter a positive rand value and a buyer email, choose the type, and review the buyer, recipient, tour and optional gift message. **Send payment link** emails the buyer a checkout link. Every voucher sold through this form remains PENDING until payment is confirmed. Expiry is set to three years automatically, and the list shows its date.\n\nRecipient email is optional and controls gift delivery. Credit vouchers arising from cancellations or booking changes are a separate recovery flow; creating an order here does not complete a refund."
+  },
+  {
+    "chunk_key": "help:vouchers:2",
+    "title": "Vouchers — Gift voucher photos and messages",
+    "route": "/vouchers",
+    "required_role": "OPERATOR",
+    "content": "Vouchers — Gift voucher photos and messages\n## Gift voucher photos and messages\n\n1. Open **Settings → Tours & Activities** and edit the experience.\n2. Under **Gift voucher photo**, choose **Upload voucher photo** and select a JPG, PNG or WebP up to 5 MB.\n3. Open **Preview gift voucher** to check the photo with sample details, then save the tour. **Use tour image** removes the separate voucher photo; if neither photo is set, the gift voucher default photo is used.\n\nWhen creating a voucher, choose the experience under **Gift voucher photo**, enter the recipient and buyer names, and add a **Gift message**. Check the preview before sending the payment link: the names, amount, experience and personal message appear on the photo, with message line breaks preserved. Customers buying online can also choose an experience photo and preview their personal message.\n\nThe selected design appears on the confirmation page and gift emails, with the voucher code and expiry after payment. Choosing a photo changes the appearance only; it does not change where the voucher can be redeemed. Updating an experience’s photo affects new vouchers; existing purchases keep their selected photo."
+  },
+  {
+    "chunk_key": "help:vouchers:3",
+    "title": "Vouchers — Voucher statuses",
+    "route": "/vouchers",
+    "required_role": "OPERATOR",
+    "content": "Vouchers — Voucher statuses\n## Voucher statuses\n\n- **Pending** — created but not yet paid for.\n- **Active** — paid and ready to redeem.\n- **Redeemed** — used on a booking.\n- **Expired** — past its expiry date.\n\nThe status tiles at the top show counts for each."
+  },
+  {
+    "chunk_key": "help:vouchers:4",
+    "title": "Vouchers — Finding a voucher",
+    "route": "/vouchers",
+    "required_role": "OPERATOR",
+    "content": "Vouchers — Finding a voucher\n## Finding a voucher\n\nThe list is grouped by creation date, with filters for date and status plus free-text search — search by code when a customer calls to redeem or asks about their gift."
+  },
+  {
+    "chunk_key": "help:whatsapp-and-automessages:0",
+    "title": "WhatsApp and automatic messages",
+    "route": "/inbox",
+    "required_role": "OPERATOR",
+    "content": "WhatsApp and automatic messages\nBookingTours messages your customers automatically at the right moments — this explains what goes out, when, and the WhatsApp rules that govern it."
+  },
+  {
+    "chunk_key": "help:whatsapp-and-automessages:1",
+    "title": "WhatsApp and automatic messages — What's sent automatically",
+    "route": "/inbox",
+    "required_role": "OPERATOR",
+    "content": "WhatsApp and automatic messages — What's sent automatically\n## What's sent automatically\n\n- **Booking confirmation** — on successful payment, with the invoice.\n- **Payment link follow-up** — if an online checkout was started but not paid, the customer is emailed their payment link after the hold lapses.\n- **Trip reminders** — before the trip, WhatsApp-first with waiver links bundled where applicable, falling back to email.\n- **Review requests** — after the trip.\n- **Cancellation notices** — when you cancel slots (weather or otherwise), with self-service reschedule/voucher/refund options.\n\nAutomatic jobs track sent messages and retries to avoid duplicate scheduled delivery. A queued job or successful submission is not proof of delivery; failed WhatsApp and transactional email jobs can be inspected in [Broadcasts → Failed Notifications](/notifications) by a main admin. Trip timing uses your business timezone."
+  },
+  {
+    "chunk_key": "help:whatsapp-and-automessages:2",
+    "title": "WhatsApp and automatic messages — The WhatsApp 24-hour rule",
+    "route": "/inbox",
+    "required_role": "OPERATOR",
+    "content": "WhatsApp and automatic messages — The WhatsApp 24-hour rule\n## The WhatsApp 24-hour rule\n\nWhatsApp allows free-form business messages only within 24 hours of the customer's last message. Outside that window, only pre-approved templates can be sent; other messages queue as \"waiting for window\" and send once the customer messages in. This is a WhatsApp platform rule that applies to every business."
+  },
+  {
+    "chunk_key": "help:whatsapp-and-automessages:3",
+    "title": "WhatsApp and automatic messages — The WhatsApp bot",
+    "route": "/inbox",
+    "required_role": "OPERATOR",
+    "content": "WhatsApp and automatic messages — The WhatsApp bot\n## The WhatsApp bot\n\nThe AI assistant can answer customer WhatsApp messages automatically — controlled by the WhatsApp Bot Mode section in Settings (always, outside business hours, or never). Conversations the bot can't handle land in your Inbox marked as needing a reply."
+  },
+  {
+    "chunk_key": "help:whatsapp-and-automessages:4",
+    "title": "WhatsApp and automatic messages — When WhatsApp fails",
+    "route": "/inbox",
+    "required_role": "OPERATOR",
+    "content": "WhatsApp and automatic messages — When WhatsApp fails\n## When WhatsApp fails\n\nThe Failed Notifications tab under Broadcasts tracks WhatsApp failures and transactional email jobs. Important workflows can fall back to email where configured and valid contact details exist. Review the returned outcome and failure log rather than assuming every guest was reached."
+  }
+]

@@ -1,0 +1,55 @@
+{
+  "scope": "Shared catalogue presentation and matching Booking Page Preview only",
+  "preserved_calendar_deployment": "dpl_HfxVu4rKbgP8YobipgnzU26SBzzs",
+  "admin_base_revision": "43304b65314c2b9974f939304e7b2ebae0a62c0c",
+  "database_changes": 0,
+  "environment_changes": 0,
+  "candidates": {
+    "booking": {
+      "source": "/private/tmp/bookingtours-catalogue-publish-20261001/booking",
+      "base_deployment": "dpl_HfxVu4rKbgP8YobipgnzU26SBzzs",
+      "changed_files": [
+        "app/components/Catalogue.tsx",
+        "app/components/Footer.tsx",
+        "app/components/GlassBackdrop.tsx",
+        "app/components/Header.tsx",
+        "app/components/catalogue.css",
+        "app/page.tsx",
+        "lib/theme-engine.ts"
+      ],
+      "file_hashes": {
+        "app/components/Catalogue.tsx": "a1f83bc85d3d33b3a72a1c5b705bd4c3188cea4d10c3b58761b9d859fcbaa216",
+        "app/components/Footer.tsx": "98f2aa0473bde54509c62b8f64e707dd5149068e1bdb5edc419a2a2b2934355a",
+        "app/components/GlassBackdrop.tsx": "1e34a201202a1f65f63bdbb8cfac6658d9e9a1b2c7b4307d4988ff6091603302",
+        "app/components/Header.tsx": "87bf945ee29fa4904cff6d1e2ed62d1a2868ac71017a4bb2d243c327dd6eb5be",
+        "app/components/catalogue.css": "08cbdf0056beb8841ffc223cbd5215aab83764e86d8bf033d2d4a7aadcd5b9a0",
+        "app/page.tsx": "704c0747886c2baed957422d016406ea80805b176a7ebd48465c3383f581bbd4",
+        "lib/theme-engine.ts": "2c4b179dceef170097ac92905da82402d95ef4c0ddce7ac1f7237fdbfdf79e41"
+      },
+      "unchanged_files": 156
+    },
+    "admin": {
+      "source": "/private/tmp/bookingtours-catalogue-publish-20261001/admin",
+      "base_deployment": "dpl_eyvMNQvxeXN89b7wJbBqt9ev2Z8v",
+      "changed_files": [
+        ".vercelignore",
+        "app/lib/theme-engine.ts",
+        "app/settings/page.tsx",
+        "components/booking/BookingSitePreview.tsx",
+        "components/booking/Catalogue.tsx",
+        "components/booking/catalogue.css"
+      ],
+      "file_hashes": {
+        "app/lib/theme-engine.ts": "c671d97463380fea2d8338c2b46481bf627d01f3278f31baf6f99fa97573424b",
+        "app/settings/page.tsx": "a8b6e73ae72dc54b52af46e5dd9660451fdeb6ab6368b51f9f21467ba0cd01ed",
+        "components/booking/BookingSitePreview.tsx": "4247b186e76a23a35ef726acade0fbf33e24fd954cca82fdd5e9f83318e5e106",
+        "components/booking/Catalogue.tsx": "a1f83bc85d3d33b3a72a1c5b705bd4c3188cea4d10c3b58761b9d859fcbaa216",
+        "components/booking/catalogue.css": "08cbdf0056beb8841ffc223cbd5215aab83764e86d8bf033d2d4a7aadcd5b9a0",
+        ".vercelignore": "e0428dde45642ef5c6cc9131ebe4f413634b92003ab9bcd20c44d82735f81c67"
+      },
+      "unchanged_files": 1081
+    }
+  },
+  "deployment_packaging_fix": "Anchor /booking/ ignore rule so components/booking is included",
+  "mobile_launcher_fix": "At widths below 480px, reserve catalogue header space for the existing chat launcher so it cannot cover card prices or booking actions. Chat behavior and non-catalogue pages are unchanged."
+}

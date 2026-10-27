@@ -1,0 +1,21 @@
+{
+  "at": "2026-10-20T04:56:54.766Z",
+  "origin": "https://admin.bookingtours.co.za",
+  "checks": [
+    {
+      "path": "/marketing",
+      "width": 390,
+      "passed": true,
+      "page_errors": 0,
+      "customer_writes": 0
+    },
+    {
+      "path": "/marketing",
+      "width": 1280,
+      "passed": true,
+      "page_errors": 0,
+      "customer_writes": 0
+    }
+  ],
+  "live_account_writes": 0
+}

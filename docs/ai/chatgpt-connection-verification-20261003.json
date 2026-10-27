@@ -1,0 +1,141 @@
+{
+  "verified_at": "2026-10-03T15:32:40.239408+00:00",
+  "repository": "/Users/gideonlangenhoven/dev/capekayak",
+  "branch": "feature/simple-view-2026-09-20",
+  "commit": "43304b65314c2b9974f939304e7b2ebae0a62c0c",
+  "environment": {
+    "node": "22.23.3",
+    "fixture_auth": "Mocked Supabase claims/user/grant responses; no real OAuth flow",
+    "data": "labelled synthetic local fixtures",
+    "build": "isolated latest deployed Admin source baseline plus task files; dummy Supabase values only"
+  },
+  "files_changed": [
+    "package.json",
+    "package-lock.json",
+    "app/lib/agent-read-service.ts",
+    "tests/helpers/agent-read-fixture.ts",
+    "tests/helpers/chatgpt-mcp-fixture.ts",
+    "tests/unit/agent-read-service.test.ts",
+    "tests/unit/chatgpt-mcp-fixture.test.ts",
+    "tests/tsconfig.agent-mcp.json",
+    "docs/ai/agent-read-foundation.md",
+    "docs/ai/website-handoff.public.md",
+    "docs/ai/chatgpt-connection-setup.md",
+    "docs/ai/chatgpt-connection-verification-20261003.json"
+  ],
+  "checks": [
+    {
+      "command": "npm run test:unit -- tests/unit/chatgpt-mcp-fixture.test.ts tests/unit/agent-read-service.test.ts tests/unit/operator-acquisition.test.ts",
+      "result": "PASS",
+      "tests": {
+        "mcp_fixture": 36,
+        "agent_service_fixture": 138,
+        "acquisition_fixture": 17,
+        "total": 191
+      }
+    },
+    {
+      "command": "npm run lint -- app/lib/agent-read-service.ts tests/helpers/agent-read-fixture.ts tests/helpers/chatgpt-mcp-fixture.ts tests/unit/chatgpt-mcp-fixture.test.ts tests/unit/agent-read-service.test.ts",
+      "result": "PASS focused lint"
+    },
+    {
+      "command": "./node_modules/.bin/tsc --noEmit",
+      "result": "PASS isolated whole application"
+    },
+    {
+      "command": "./node_modules/.bin/tsc --noEmit --project tests/tsconfig.agent-mcp.json",
+      "result": "PASS including fixture and test types excluded from production tsconfig"
+    },
+    {
+      "command": "NEXT_PUBLIC_SUPABASE_URL=https://fixture.example.invalid NEXT_PUBLIC_SUPABASE_ANON_KEY=labelled-local-build-fixture SUPABASE_SERVICE_ROLE_KEY=labelled-local-build-fixture npm run build",
+      "result": "PASS; 94 static pages; existing Sentry config import deprecation warning; nonproduction email authorization probe skipped"
+    },
+    {
+      "command": "curl -sSI https://admin.bookingtours.co.za/api/agent/read",
+      "result": "PASS live guard: HTTP 503 and Cache-Control no-store; no authentication or customer query"
+    },
+    {
+      "command": "npm audit --json; existing application npm audit --json --package-lock-only",
+      "result": "FAIL existing advisories in both locks",
+      "advisories": {
+        "low": 1,
+        "high": 7,
+        "critical": 1,
+        "total": 9
+      },
+      "critical": "Next.js 16.3.3 next/og ImageResponse GHSA-vcvr-r3jv-pc5j; application exploitability not established; remediation remains outstanding",
+      "new_mcp_package_advisories": 0
+    }
+  ],
+  "initial_failures": [
+    "Fixture type check rejected widened/readonly JSON schema types; fixed by serializing shared schemas into the SDK schema type; final fixture type check passes.",
+    "Sandbox build could not resolve Google Fonts; reran with approved network access.",
+    "Build then required a Supabase service key when loading an existing server route; supplied a labelled dummy value with a reserved invalid hostname; final build passes."
+  ],
+  "scope": {
+    "runtime_change": "Trusted adapter provider context guard, rechecked with existing authorization before and after reads",
+    "production_mcp_route_added": false,
+    "marketing_repository_changed": false,
+    "existing_dependency_versions_changed": false,
+    "new_development_packages": [
+      "@modelcontextprotocol/server@2.3.0",
+      "mcp-handler@2.2.0",
+      "zod@4.5.4 (existing transitive version made explicit)"
+    ],
+    "pushed": false,
+    "merged": false,
+    "deployed_this_turn": false,
+    "production_database_changed": false,
+    "external_access_enabled": false
+  },
+  "stages": {
+    "specified": true,
+    "implemented": "Shared read service plus local-only MCP fixture adapter; no OAuth issuer or consent/disconnect application flow",
+    "tested": "191 fixtures, focused lint, application and fixture TypeScript, isolated build and anonymous live disabled-route HEAD",
+    "deployed": "Previously deployed disabled foundation only; new provider guard and fixture changes are local",
+    "platform_approved": false,
+    "available_to_customers": false
+  },
+  "not_tested": [
+    "Real cryptographic token validation journey",
+    "Real OAuth discovery/PKCE/client registration/redirects/token confinement",
+    "Real ChatGPT account linking, tool selection, model intent and disconnection/expiry",
+    "Real Muse interoperability",
+    "Local PostgreSQL candidate regression not rerun this turn",
+    "Current unrelated dirty working-tree changes are outside the isolated build"
+  ],
+  "blockers": [
+    "No hosted HTTPS MCP endpoint and protected-resource metadata",
+    "No confined OAuth issuer/token strategy preserving Supabase RLS",
+    "Consent/grant issuance/disconnect/refresh revocation not implemented; SQL candidate remains unapplied",
+    "Distributed fail-closed limiter not implemented",
+    "Nine existing dependency advisories",
+    "Paused production qualification and unchanged FAILED_GATE",
+    "Separate Muse developer access and exact auth/transport contract",
+    "Real platform tests and any public directory approval"
+  ],
+  "candidate_sha256": {
+    "package.json": "972c713148745b30e466e0d7b032c632f95382692b2ac12363a466fb2f4c48a9",
+    "package-lock.json": "d00930cb5fd18b9674e49231d24e7948fabbf94206945a202f82b14edfe25e20",
+    "app/lib/agent-read-service.ts": "a92763a20e6c9f2678ec00f45895df65286b6a96d707c5802d5ced0fb524f25e",
+    "tests/helpers/agent-read-fixture.ts": "ddc8e27d5a1dd12c2e93bb216bc13e5ad3baa0c3b9c41570ea8d273c7983b766",
+    "tests/helpers/chatgpt-mcp-fixture.ts": "177506f6cffae14ffc8e225e06c924fdfe47658cb49f7538d95efde6d393cfb9",
+    "tests/unit/agent-read-service.test.ts": "4e7844382de8ac70e617a38e9185437e2f3969c369ace10805237ab27f41af22",
+    "tests/unit/chatgpt-mcp-fixture.test.ts": "d63fcbec041855b2d6e4b1e184a12af43b987113172dcdffbd20f142ad8b735a",
+    "tests/tsconfig.agent-mcp.json": "0db04c80bafbf52c9e9149f601a607303029c9509ab761c3195cef24c24eb4e2",
+    "docs/ai/agent-read-foundation.md": "c0545a434e0899e1cfd6bcee4f1a01465cbee374a3949825f6e54ea7c5ed6bc8",
+    "docs/ai/website-handoff.public.md": "c661c7e06f4bf040f6380d5ef999a4a9c6df445e7f6f433e4304e8e4c8941f40",
+    "docs/ai/chatgpt-connection-setup.md": "88417dcf49c46889356f2c85236cea33c60cd8abf59bc639872c769a9aee61df"
+  },
+  "post_apply_verification": {
+    "repository": "/Users/gideonlangenhoven/dev/capekayak",
+    "task_files_match_tested_candidate": true,
+    "branch_and_commit_unchanged": true,
+    "npm_ci": "PASS; 800 packages installed from the reviewed lock; nine existing advisories remain",
+    "focused_tests": "PASS 191 tests (36 MCP, 138 read-service, 17 acquisition)",
+    "application_types": "PASS ./node_modules/.bin/tsc --noEmit --incremental false",
+    "fixture_types": "PASS ./node_modules/.bin/tsc --noEmit --project tests/tsconfig.agent-mcp.json",
+    "focused_lint": "PASS same five reviewed TypeScript files",
+    "build_boundary": "Build passed on the isolated deployed baseline plus task files; no production deployment"
+  }
+}

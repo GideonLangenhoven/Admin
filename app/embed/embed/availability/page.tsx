@@ -487,7 +487,7 @@ function AvailabilityWidget() {
             className="text-sm"
             style={{ color: "var(--ck-text-muted, #6b7280)" }}
           >
-            No availability in the next 5 days for this tour
+            No departures in the next 5 days.
           </p>
         </div>
       )}

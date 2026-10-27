@@ -1,0 +1,22 @@
+{
+  "verified_at": "2026-10-03T17:33:42.442839+00:00",
+  "deployments": {
+    "admin": {
+      "id": "dpl_5K9GzkGeVe3ChTZdCZdQWh7acw2n",
+      "archive_sha1": "2adfb7c1aaf8cd8c6c14144e8750b5abc7333987",
+      "source_files": 458,
+      "same_previously_verified_archive": true
+    },
+    "booking": {
+      "id": "dpl_7CVfGAyig6kjNGGTXf5qaYiX8kDC",
+      "archive_sha1": "49c8ff1e6a51c168a1ef9af4196279749afa553f",
+      "source_files": 169,
+      "same_previously_verified_archive": true
+    }
+  },
+  "agent_service": {
+    "published_sha256": "947041cfea9ad095dcab3d6d774780057af357ba48438aadd4fc4dddee6f7830",
+    "new_update_excluded": true,
+    "external_access_enabled": false
+  }
+}

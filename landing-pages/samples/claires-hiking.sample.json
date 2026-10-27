@@ -1,0 +1,84 @@
+{
+  "business_name": "Claire's Hiking",
+  "business_tagline": "Guided trails, clear views, unforgettable days out.",
+  "subdomain": "claires-hiking",
+  "booking_site_url": "https://claires-hiking.booking.bookingtours.co.za",
+  "my_bookings_url": "https://claires-hiking.booking.bookingtours.co.za",
+  "logo_url": "https://ukdsrndqhsatjkmxijuj.supabase.co/storage/v1/object/public/email-images/af17838c-fdd6-4b84-97c0-1cea39db7c0a/branding/claires-hiking-logo.png",
+  "hero_eyebrow": "Walk farther. Feel closer. · Cape Town",
+  "hero_title": "Cape trails made memorable",
+  "hero_subtitle": "Small-group guided hikes for curious people who want the story behind the view. Table Mountain, Lion's Head, and the Cape Peninsula with local guides.",
+  "hero_image": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1800&q=80&auto=format&fit=crop",
+  "color_main": "#173F35",
+  "color_secondary": "#D9822F",
+  "color_cta": "#0C8A59",
+  "color_bg": "#EEF1F4",
+  "color_nav": "#173F35",
+  "color_hover": "#10B981",
+  "currency": "R",
+  "directions": "Meet at Kloof Corner parking area, Tafelberg Road, Cape Town",
+  "what_to_bring": "Water, sun protection, a light snack, and your sense of adventure.",
+  "what_to_wear": "Comfortable hiking shoes and weather-ready layers.",
+  "footer_line_one": "Claire's Hiking — Table Mountain & Cape Peninsula",
+  "footer_line_two": "Guided departures daily, weather permitting · Cape Town, South Africa",
+  "widget_embed": "<div id=\"bookingtours-widget\" data-tenant=\"claires-hiking\"></div>\n<script src=\"https://booking.bookingtours.co.za/widget.js\" async></script>",
+  "tours": [
+    {
+      "name": "Table Mountain Sunrise Hike",
+      "description": "A quiet early-morning ascent with city and ocean views, reaching the summit plateau as the first light breaks over False Bay.",
+      "duration_minutes": 240,
+      "default_capacity": 8,
+      "base_price_per_person": 950,
+      "image_url": "https://claires-hiking.booking.bookingtours.co.za/stock/cape-town.jpg"
+    },
+    {
+      "name": "Lion's Head Sunset Walk",
+      "description": "A golden-hour guided climb finishing above the Atlantic Seaboard, with panoramic 360-degree sunset views of Camps Bay and the Twelve Apostles.",
+      "duration_minutes": 180,
+      "default_capacity": 10,
+      "base_price_per_person": 750,
+      "image_url": "https://claires-hiking.booking.bookingtours.co.za/stock/mountain.jpg"
+    },
+    {
+      "name": "Silvermine Fynbos Trail",
+      "description": "An easy-paced nature walk through indigenous fynbos, sandstone formations, and mountain reservoir pools with local botanical storytelling.",
+      "duration_minutes": 150,
+      "default_capacity": 12,
+      "base_price_per_person": 620,
+      "image_url": "https://claires-hiking.booking.bookingtours.co.za/stock/hike-alt.jpg"
+    },
+    {
+      "name": "Cape Point Coastal Hike",
+      "description": "A full-day coastal traverse with dramatic sheer sea cliffs, endemic wildlife, and a cliffside trail picnic above the Atlantic ocean.",
+      "duration_minutes": 300,
+      "default_capacity": 8,
+      "base_price_per_person": 1250,
+      "image_url": "https://claires-hiking.booking.bookingtours.co.za/stock/mountain.jpg"
+    },
+    {
+      "name": "Kirstenbosch Morning Walk",
+      "description": "A relaxed guided walk through the botanical gardens, Boomslang canopy walkway, and shaded lower contour trails of Table Mountain.",
+      "duration_minutes": 120,
+      "default_capacity": 14,
+      "base_price_per_person": 540,
+      "image_url": "https://claires-hiking.booking.bookingtours.co.za/stock/hike-alt.jpg"
+    }
+  ],
+  "reviews": [
+    {
+      "quote": "A brilliant guide and the best sunrise view in Cape Town. Watching the golden morning light break over the Atlantic from Table Mountain was unforgettable.",
+      "author": "Nandi A.",
+      "rating": 5
+    },
+    {
+      "quote": "Relaxed pace, thoughtful stories, and beautiful fynbos. Claire knows every trail and flower on the mountain.",
+      "author": "Peter M.",
+      "rating": 5
+    },
+    {
+      "quote": "Small groups, friendly atmosphere, and zero stress. The booking widget was super fast and seamless.",
+      "author": "Sarah L.",
+      "rating": 5
+    }
+  ]
+}

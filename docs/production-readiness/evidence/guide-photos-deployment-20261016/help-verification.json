@@ -1,0 +1,19 @@
+{
+  "at": "2026-10-16T05:40:42.968Z",
+  "articles": [
+    "guide",
+    "photos",
+    "simple-view"
+  ],
+  "chunks": 16,
+  "result": {
+    "ok": true,
+    "total": 176,
+    "embedded": 1,
+    "skipped": 175,
+    "removed": 0,
+    "failed": 0,
+    "errors": []
+  },
+  "unrelated_articles_unchanged": true
+}

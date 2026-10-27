@@ -1,0 +1,66 @@
+{
+  "checked_at": "2026-10-15T14:38:29.831Z",
+  "functions": [
+    {
+      "slug": "wa-webhook",
+      "version": 239,
+      "verify_jwt": false,
+      "sha256": "7a3e133126c01a41707f30c516ef8c82c3ce8f90f06d4a5ab4031b573c3609da"
+    },
+    {
+      "slug": "yoco-webhook",
+      "version": 133,
+      "verify_jwt": false,
+      "sha256": "51a7bf1f5ccb9f72ba8c5c165b94082cf472fd8ccbb2f44e85de23578432c16a"
+    },
+    {
+      "slug": "auto-messages",
+      "version": 98,
+      "verify_jwt": false,
+      "sha256": "bfef475d020ec7bf72f83592bbf1f3290c0c0263e4ee1c74cdb33f72bddb2db8"
+    },
+    {
+      "slug": "broadcast",
+      "version": 84,
+      "verify_jwt": true,
+      "sha256": "c6f4cc8dbb6a08935c33cd600367a93df3ce988299e1f167f17deeeb42033dc3"
+    },
+    {
+      "slug": "send-email",
+      "version": 188,
+      "verify_jwt": false,
+      "sha256": "2086046af5bc4ee47331f04f1ccf4db082bf275ace87e5effafd0f8296553249"
+    },
+    {
+      "slug": "marketing-dispatch",
+      "version": 64,
+      "verify_jwt": false,
+      "sha256": "7f5ff5bf77871dedb3a88f30c77c86da842e768ce8b0738e52a7001f8a87bc5f"
+    },
+    {
+      "slug": "marketing-track",
+      "version": 40,
+      "verify_jwt": false,
+      "sha256": "59dde630b8b52a5caa41af4c6ea0070f6717e0c36add3b9e9cc397d21993f5e4"
+    },
+    {
+      "slug": "marketing-unsubscribe",
+      "version": 45,
+      "verify_jwt": false,
+      "sha256": "d71e619069c12d2516541908fa0ab4edb83c2f13d25df13f6286a16a6cb7ab0a"
+    },
+    {
+      "slug": "marketing-automation-dispatch",
+      "version": 58,
+      "verify_jwt": false,
+      "sha256": "d9d793394f3c48c2db0e82753c0688acda8f7140e35effa2fdf4bf43617d54c2"
+    },
+    {
+      "slug": "resend-webhook",
+      "version": 1,
+      "verify_jwt": false,
+      "sha256": "af20ef10b72ad43e32f7724102c0234db67dcc6f61ad75d17c9555e1c1fe3f2f"
+    }
+  ],
+  "unrelatedFunctionsUnchanged": true
+}

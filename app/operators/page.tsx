@@ -19,7 +19,7 @@ function MarketingView() {
           <h1 className="font-display text-4xl font-semibold tracking-tight md:text-5xl" style={{ color: "var(--ck-text-strong)" }}>All features from day one. Scale only when your admin team grows.</h1>
           <p className="mx-auto max-w-3xl text-base md:text-lg" style={{ color: "var(--ck-text-muted)" }}>From inquiry to paid booking to operations in one system for activity operators.</p>
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <Link href="/case-study/cape-kayak" className="ui-btn ui-btn-primary !px-5">Read the Cape Kayak case study</Link>
+            <Link href="/case-study/cape-kayak" className="ui-btn ui-btn-primary !px-5">Cape Kayak case study</Link>
             <Link href="/compare/manual-vs-disconnected-tools" className="ui-btn ui-btn-ghost !px-5">See platform comparison</Link>
           </div>
         </header>
@@ -73,7 +73,7 @@ export default function OperatorsPage() {
             <p className="ui-mono-label" style={{ color: "var(--ck-accent)" }}>Operator Context</p>
             <h1 className="font-display mt-2 text-[26px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Switch active operator account</h1>
             <p className="mt-2 max-w-2xl text-sm" style={{ color: "var(--ck-text-muted)" }}>
-              The dashboard is scoped to one operator at a time. Switching here updates bookings, refunds, pricing, reports, and media views to the selected business only.
+              Switch operators to view that business's bookings, refunds, pricing, reports and photos.
             </p>
           </div>
           <div className="rounded-xl px-4 py-3 text-sm" style={{ background: "var(--ck-accent-soft)", border: "1px solid color-mix(in srgb, var(--ck-accent) 22%, transparent)", color: "var(--ck-accent)" }}>
@@ -126,15 +126,15 @@ export default function OperatorsPage() {
             <h2 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Isolation checks</h2>
             <ul className="mt-4 space-y-3 text-sm" style={{ color: "var(--ck-text)" }}>
               <li className="rounded-xl px-3 py-2" style={{ background: "var(--ck-surface-sunken)" }}>Bookings, invoices, refunds, vouchers, reports, and photos all follow the active operator context.</li>
-              <li className="rounded-xl px-3 py-2" style={{ background: "var(--ck-surface-sunken)" }}>The current operator name stays visible in the shell so admins can confirm they are working in the correct account.</li>
-              <li className="rounded-xl px-3 py-2" style={{ background: "var(--ck-surface-sunken)" }}>Only multi-operator admins can switch. Single-operator admins stay locked to their own business.</li>
+              <li className="rounded-xl px-3 py-2" style={{ background: "var(--ck-surface-sunken)" }}>Check the operator name before making changes.</li>
+              <li className="rounded-xl px-3 py-2" style={{ background: "var(--ck-surface-sunken)" }}>Switching is available to admins with multiple operators.</li>
             </ul>
           </div>
 
           <div className="rounded-2xl border border-dashed p-5 text-sm" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-sunken)", color: "var(--ck-text-muted)" }}>
             {canSwitch
-              ? "Switching operators updates the entire dashboard context immediately."
-              : "This account currently has access to one operator context only."}
+              ? "Switching updates the whole dashboard immediately."
+              : "This account has access to one operator."}
           </div>
         </div>
       </div>

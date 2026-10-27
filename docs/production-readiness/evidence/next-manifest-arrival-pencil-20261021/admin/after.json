@@ -1,0 +1,12 @@
+{
+  "id": "dpl_F9Gu4GcQHhe6rPaR1buU3aqkvsqV",
+  "url": "caepweb-admin-fn5sdmfmp-jerrys-projects-f4e4eaf9.vercel.app",
+  "files_verified": 517,
+  "changed": [
+    "app/page.tsx",
+    "app/lib/operator-day.ts",
+    "app/simple/check-ins/page.tsx",
+    "components/simple/DepartureCard.tsx",
+    "components/booking/ArrivalCountLink.tsx"
+  ]
+}

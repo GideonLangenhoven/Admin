@@ -1,6 +1,9 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { guideAuthEmail, isGuidePath } from "../app/lib/guide-access";
+import { guideSession, isGuideSessionPath, sessionKey, sessionCookie, authStorage } from "../app/lib/browser-session";
+import { GuideSignInContext } from "./GuideSignInContext";
 import { supabase } from "../app/lib/supabase";
 import { sendAdminSetupLink, sha256 } from "../app/lib/admin-auth";
 import {
@@ -17,7 +20,7 @@ import { BusinessProvider } from "./BusinessContext";
 import { BrandMark, BrandWordmark } from "./BrandLogo";
 import { fetchAllRows } from "../supabase/functions/_shared/pagination";
 
-const PUBLIC_PATHS = ["/change-password", "/google-callback", "/case-study/cape-kayak", "/compare/manual-vs-disconnected-tools", "/whatsapp-privacy"];
+const PUBLIC_PATHS = ["/guide-setup", "/change-password", "/google-callback", "/case-study/cape-kayak", "/compare/manual-vs-disconnected-tools", "/whatsapp-privacy"];
 const MARKETING_OPTIONAL_AUTH_PATHS = ["/operators"];
 const SESSION_TIMEOUT = 12 * 60 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -43,6 +46,7 @@ function isClaireDemoHost(hostname: string) {
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [authed, setAuthed] = useState(false);
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
@@ -81,11 +85,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     const authTransitionAbort = new AbortController();
     authTransitionAbortRef.current = authTransitionAbort;
     setClaireDemoHost(isClaireDemoHost(window.location.hostname));
-    setHasHint(document.cookie.includes("ck_session_hint=1"));
+    setHasHint(document.cookie.split("; ").includes(sessionCookie("ck_session_hint") + "=1"));
     validateSession(authTransitionAbort.signal).catch((error) => {
       if (authTransitionAbort.signal.aborted) return;
       console.error("Session validation failed:", error);
-      setError("We couldn't verify your account. Please try signing in again.");
+      setError("Account unverified. Sign in again.");
       setChecking(false);
     });
     checkLockout();
@@ -93,6 +97,21 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       authTransitionAbort.abort();
       if (authTransitionAbortRef.current === authTransitionAbort) authTransitionAbortRef.current = null;
     };
+  }, []);
+
+  useEffect(() => {
+    const onSessionChange = (event: StorageEvent) => {
+      // Another tab completed sign-in or sign-out; discard this tab's stale account context.
+      if (event.storageArea === localStorage && event.key === sessionKey("ck_admin_time")) window.location.reload();
+    };
+    window.addEventListener("storage", onSessionChange);
+    return () => window.removeEventListener("storage", onSessionChange);
+  }, []);
+
+  useEffect(() => {
+    const onContactUpdated = () => setStaffName(authStorage.getItem("ck_admin_name") || "");
+    window.addEventListener("ck-admin-contact-updated", onContactUpdated);
+    return () => window.removeEventListener("ck-admin-contact-updated", onContactUpdated);
   }, []);
 
   useEffect(() => {
@@ -119,22 +138,30 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checking, authed, demoLoginAttempted, claireDemoHost]);
 
+  useEffect(() => {
+    if (guideSession !== isGuideSessionPath(pathname)) { window.location.replace(window.location.href); return; }
+    if (authed && role === "GUIDE" && !isGuidePath(pathname) && !PUBLIC_PATHS.includes(pathname)) router.replace("/simpleguide");
+    if (authed && role && role !== "GUIDE" && (pathname === "/simpleguide" || pathname.startsWith("/simpleguide/"))) router.replace("/");
+  }, [authed, role, pathname, router]);
+
   function checkLockout() {
-    const lockUntil = Number(localStorage.getItem("ck_lock_until") || "0");
+    const lockUntil = Number(authStorage.getItem("ck_lock_until") || "0");
     if (lockUntil > Date.now()) {
       setLocked(true);
     } else if (lockUntil > 0) {
-      localStorage.removeItem("ck_lock_until");
-      localStorage.removeItem("ck_fail_count");
+      authStorage.removeItem("ck_lock_until");
+      authStorage.removeItem("ck_fail_count");
     }
   }
 
   async function loadBusinessContext(adminRole: string, defaultBusinessId: string) {
     const isMultiOperator = /super/i.test(adminRole);
-    const overrideBusinessId = localStorage.getItem("ck_operator_override_business_id") || "";
+    const overrideBusinessId = authStorage.getItem("ck_operator_override_business_id") || "";
     const targetBusinessId = isMultiOperator && overrideBusinessId ? overrideBusinessId : defaultBusinessId;
 
-    const businessRows = await fetchAllRows((from, to) => {
+    const guideBusiness = adminRole === "GUIDE" ? await supabase.rpc("guide_context") : null;
+    if (guideBusiness?.error) throw new Error("Guide access is unavailable. Ask your operator to check your access.");
+    const businessRows = adminRole === "GUIDE" ? [guideBusiness!.data] : await fetchAllRows((from, to) => {
       let query = supabase.from("businesses")
         .select("id, name, business_name, logo_url, timezone, subscription_status, yoco_test_mode, subdomain")
         .order("business_name", { ascending: true }).order("id").range(from, to);
@@ -213,8 +240,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     const expectedGuideEpoch = currentGuideQueueAuthGeneration();
     const { data: { session: observedSession } } = await supabase.auth.getSession();
     if (signal.aborted) return;
-    const savedEmail = localStorage.getItem("ck_admin_email");
-    const savedTime = localStorage.getItem("ck_admin_time");
+    const savedEmail = authStorage.getItem("ck_admin_email");
+    const savedTime = authStorage.getItem("ck_admin_time");
 
     if (!savedEmail || !savedTime || Date.now() - Number(savedTime) > SESSION_TIMEOUT || !observedSession) {
       if (signal.aborted) return;
@@ -224,12 +251,23 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const { data } = await supabase
+    const { data: adminData } = await supabase
       .from("admin_users")
-      .select("role, business_id, name, settings_permissions, read_only")
-      .eq("email", savedEmail)
+      .select("role, business_id, name, email, settings_permissions, read_only")
+      .eq("user_id", observedSession.user.id)
       .maybeSingle();
+    let data = adminData;
+    if (!data) {
+      const { data: guide } = await supabase.from("guide_accounts").select("id, business_id, login_name")
+        .eq("user_id", observedSession.user.id).maybeSingle();
+      if (guide) data = { role: "GUIDE", business_id: guide.business_id, name: "Guides", email: guide.login_name, settings_permissions: {}, read_only: false };
+    }
     if (signal.aborted) return;
+    if (data && (data.role === "GUIDE") !== guideSession) {
+      await clearSession(expectedGuideEpoch, observedSession);
+      if (!signal.aborted) setChecking(false);
+      return;
+    }
 
     let bound = false;
     if (data && data.business_id) {
@@ -253,15 +291,16 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           setYocoTestMode(context.yocoTestMode || false);
           setReadOnly(data.read_only === true);
           setHostMismatch(context.hostMismatch);
-          localStorage.setItem("ck_admin_role", data.role);
-          localStorage.setItem("ck_admin_business_id", context.businessId);
-          localStorage.setItem("ck_admin_timezone", context.timezone);
-          localStorage.setItem("ck_admin_name", data.name || "");
-          localStorage.setItem("ck_admin_settings_perms", JSON.stringify(data.settings_permissions || {}));
+          authStorage.setItem("ck_admin_role", data.role);
+          authStorage.setItem("ck_admin_business_id", context.businessId);
+          authStorage.setItem("ck_admin_timezone", context.timezone);
+          authStorage.setItem("ck_admin_name", data.name || "");
+          authStorage.setItem("ck_admin_email", data.email);
+          authStorage.setItem("ck_admin_settings_perms", JSON.stringify(data.settings_permissions || {}));
           setAuthed(true);
-          document.cookie = "ck_session_hint=1;path=/;max-age=86400;SameSite=Lax";
-          document.cookie = "ck_admin_role=" + encodeURIComponent(data.role) + ";path=/;max-age=43200;SameSite=Lax";
-          document.cookie = "ck_demo_read_only=" + (data.read_only === true ? "1;path=/;max-age=43200;SameSite=Lax" : ";path=/;max-age=0");
+          document.cookie = sessionCookie("ck_session_hint") + "=1;path=/;max-age=86400;SameSite=Lax";
+          document.cookie = sessionCookie("ck_admin_role") + "=" + encodeURIComponent(data.role) + ";path=/;max-age=43200;SameSite=Lax";
+          document.cookie = sessionCookie("ck_demo_read_only") + "=" + (data.read_only === true ? "1;path=/;max-age=43200;SameSite=Lax" : ";path=/;max-age=0");
         },
       );
     } else if (data) {
@@ -272,13 +311,14 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         setReadOnly(data.read_only === true);
         setTimezone("UTC");
         setOperators([]);
-        localStorage.setItem("ck_admin_role", data.role);
-        localStorage.setItem("ck_admin_name", data.name || "");
-        localStorage.setItem("ck_admin_settings_perms", JSON.stringify(data.settings_permissions || {}));
+        authStorage.setItem("ck_admin_role", data.role);
+        authStorage.setItem("ck_admin_name", data.name || "");
+        authStorage.setItem("ck_admin_email", data.email);
+        authStorage.setItem("ck_admin_settings_perms", JSON.stringify(data.settings_permissions || {}));
         setAuthed(true);
-        document.cookie = "ck_session_hint=1;path=/;max-age=86400;SameSite=Lax";
-        document.cookie = "ck_admin_role=" + encodeURIComponent(data.role) + ";path=/;max-age=43200;SameSite=Lax";
-        document.cookie = "ck_demo_read_only=" + (data.read_only === true ? "1;path=/;max-age=43200;SameSite=Lax" : ";path=/;max-age=0");
+        document.cookie = sessionCookie("ck_session_hint") + "=1;path=/;max-age=86400;SameSite=Lax";
+        document.cookie = sessionCookie("ck_admin_role") + "=" + encodeURIComponent(data.role) + ";path=/;max-age=43200;SameSite=Lax";
+        document.cookie = sessionCookie("ck_demo_read_only") + "=" + (data.read_only === true ? "1;path=/;max-age=43200;SameSite=Lax" : ";path=/;max-age=0");
       });
     } else {
       if (signal.aborted) return;
@@ -325,22 +365,22 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         if (!sameGuideAuthSession(observedSession, sessionBeforeSignOut)
             || !isCurrentGuideQueueAuthClear(clearedEpoch) || signal.aborted) return false;
         guideAuthorityEpochRef.current = clearedEpoch;
-        const signOutResult = await supabase.auth.signOut();
+        const signOutResult = await supabase.auth.signOut({ scope: "local" });
         if (signOutResult?.error) throw signOutResult.error;
         if (!isCurrentGuideQueueAuthClear(clearedEpoch) || signal.aborted) return false;
-        localStorage.removeItem("ck_admin_auth");
-        localStorage.removeItem("ck_admin_role");
-        localStorage.removeItem("ck_admin_email");
-        localStorage.removeItem("ck_admin_time");
-        localStorage.removeItem("ck_admin_business_id");
-        localStorage.removeItem("ck_admin_timezone");
-        localStorage.removeItem("ck_operator_override_business_id");
-        localStorage.removeItem("ck_admin_name");
-        localStorage.removeItem("ck_admin_settings_perms");
+        authStorage.removeItem("ck_admin_auth");
+        authStorage.removeItem("ck_admin_role");
+        authStorage.removeItem("ck_admin_email");
+        authStorage.removeItem("ck_admin_time");
+        authStorage.removeItem("ck_admin_business_id");
+        authStorage.removeItem("ck_admin_timezone");
+        authStorage.removeItem("ck_operator_override_business_id");
+        authStorage.removeItem("ck_admin_name");
+        authStorage.removeItem("ck_admin_settings_perms");
         authSessionRef.current = null;
-        document.cookie = "ck_session_hint=;path=/;max-age=0";
-        document.cookie = "ck_admin_role=;path=/;max-age=0";
-        document.cookie = "ck_demo_read_only=;path=/;max-age=0";
+        document.cookie = sessionCookie("ck_session_hint") + "=;path=/;max-age=0";
+        document.cookie = sessionCookie("ck_admin_role") + "=;path=/;max-age=0";
+        document.cookie = sessionCookie("ck_demo_read_only") + "=;path=/;max-age=0";
         setAuthed(false);
         setBusinessId("");
         setBusinessName("");
@@ -364,10 +404,15 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   async function login(loginEmail = email, loginPassword = pass) {
-    const lockUntil = Number(localStorage.getItem("ck_lock_until") || "0");
+    const lockUntil = Number(authStorage.getItem("ck_lock_until") || "0");
     if (lockUntil > Date.now()) {
       setLocked(true);
       setError("");
+      return;
+    }
+    const suppliedGuide = !!guideAuthEmail(loginEmail) || /^guide\+[^@]+@guides\.bookingtours\.co\.za$/i.test(loginEmail.trim());
+    if (suppliedGuide !== guideSession) {
+      setError(suppliedGuide ? "Use Guide sign in below." : "Use Operator sign in below.");
       return;
     }
     const expectedGuideEpoch = currentGuideQueueAuthGeneration();
@@ -377,7 +422,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     setNotice("");
 
     try {
-      const normalizedEmail = loginEmail.trim().toLowerCase();
+      const suppliedEmail = loginEmail.trim().toLowerCase();
+      const normalizedEmail = guideAuthEmail(suppliedEmail) || suppliedEmail;
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -395,21 +441,21 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
               "FIRST_LOGIN",
               data.business_id || "",
             );
-            setNotice("This admin account still needs a password. A secure setup link has been emailed.");
+            setNotice("Password required. Setup link emailed.");
           } catch (setupError) {
             console.error("Failed to send admin setup link:", setupError);
-            setError("This account still needs a password, but the setup email could not be sent.");
+            setError("Password required. Setup email failed.");
           }
           setLoading(false);
           return;
         }
 
         // Failed credentials — increment counter
-        const failCount = Number(localStorage.getItem("ck_fail_count") || "0") + 1;
-        localStorage.setItem("ck_fail_count", String(failCount));
+        const failCount = Number(authStorage.getItem("ck_fail_count") || "0") + 1;
+        authStorage.setItem("ck_fail_count", String(failCount));
 
         if (failCount >= MAX_ATTEMPTS) {
-          localStorage.setItem("ck_lock_until", String(Date.now() + LOCKOUT_DURATION));
+          authStorage.setItem("ck_lock_until", String(Date.now() + LOCKOUT_DURATION));
           setLocked(true);
           sendResetEmail(normalizedEmail);
         } else {
@@ -446,7 +492,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             const rateLimited = signInRes.error?.status === 429
               || /rate limit|too many requests/i.test(signInRes.error?.message || "");
             throw new Error(rateLimited
-              ? "Too many sign-in attempts from this network. Please wait a moment and try again."
+              ? "Too many sign-in attempts from this network. Wait, then retry."
               : "Failed to start session: " + (signInRes.error?.message || "missing session"));
           }
           establishedSession = signInRes.data.session;
@@ -470,6 +516,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             adminInfo = verified.admin;
           }
 
+          if ((adminInfo.role === "GUIDE") !== guideSession) throw new Error("Use the correct sign-in page for this account.");
+
           // This authenticated lookup must stay in the lock: releasing between sign-in and
           // queue activation would let stale validation sign out the newly established account.
           let context: Awaited<ReturnType<typeof loadBusinessContext>> | null = null;
@@ -487,24 +535,24 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           guideAuthorityEpochRef.current = guideEpoch;
           authSessionRef.current = currentSession;
 
-          localStorage.removeItem("ck_fail_count");
-          localStorage.removeItem("ck_lock_until");
-          localStorage.setItem("ck_admin_auth", "true");
-          localStorage.setItem("ck_admin_role", adminInfo.role);
-          localStorage.setItem("ck_admin_email", adminInfo.email);
-          localStorage.setItem("ck_admin_time", String(Date.now()));
-          localStorage.setItem("ck_admin_name", adminInfo.name || "");
-          localStorage.setItem("ck_admin_settings_perms", JSON.stringify(adminInfo.settings_permissions || {}));
+          authStorage.removeItem("ck_fail_count");
+          authStorage.removeItem("ck_lock_until");
+          authStorage.setItem("ck_admin_auth", "true");
+          authStorage.setItem("ck_admin_role", adminInfo.role);
+          authStorage.setItem("ck_admin_email", adminInfo.email);
+          authStorage.setItem("ck_admin_time", String(Date.now()));
+          authStorage.setItem("ck_admin_name", adminInfo.name || "");
+          authStorage.setItem("ck_admin_settings_perms", JSON.stringify(adminInfo.settings_permissions || {}));
 
           setRole(adminInfo.role);
           setStaffName(adminInfo.name || "");
           setReadOnly(adminInfo.read_only === true);
-          document.cookie = "ck_admin_role=" + encodeURIComponent(adminInfo.role) + ";path=/;max-age=43200;SameSite=Lax";
-          document.cookie = "ck_demo_read_only=" + (adminInfo.read_only === true ? "1;path=/;max-age=43200;SameSite=Lax" : ";path=/;max-age=0");
+          document.cookie = sessionCookie("ck_admin_role") + "=" + encodeURIComponent(adminInfo.role) + ";path=/;max-age=43200;SameSite=Lax";
+          document.cookie = sessionCookie("ck_demo_read_only") + "=" + (adminInfo.read_only === true ? "1;path=/;max-age=43200;SameSite=Lax" : ";path=/;max-age=0");
 
           if (context) {
-            localStorage.setItem("ck_admin_business_id", context.businessId);
-            localStorage.setItem("ck_admin_timezone", context.timezone);
+            authStorage.setItem("ck_admin_business_id", context.businessId);
+            authStorage.setItem("ck_admin_timezone", context.timezone);
             setBusinessId(context.businessId);
             setBusinessName(context.businessName);
             setLogoUrl(context.logoUrl);
@@ -525,7 +573,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
               if (cleanupEpoch === null || !isCurrentGuideQueueAuthClear(cleanupEpoch)) {
                 throw new Error("Login cleanup could not revoke offline guide authority. This session was kept active for safety.");
               }
-              try { await supabase.auth.signOut(); } catch { /* the queue authority is already durably clear */ }
+              try { await supabase.auth.signOut({ scope: "local" }); } catch { /* the queue authority is already durably clear */ }
               authSessionRef.current = null;
             }
           }
@@ -537,11 +585,14 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (new URLSearchParams(window.location.search).get("demo") === "1") {
+      if (adminInfo.role === "GUIDE") {
+        window.history.replaceState({}, "", "/simpleguide");
+        window.location.reload();
+      } else if (new URLSearchParams(window.location.search).get("demo") === "1") {
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete("demo");
         window.history.replaceState({}, "", cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
-      } else if (!claireDemoHost && (pathname === "/simple" || pathname.startsWith("/simple/"))) {
+      } else if (!claireDemoHost && (pathname === "/simple" || pathname.startsWith("/simple/") || isGuidePath(pathname))) {
         // Normal fresh sign-ins start on the full dashboard. Claire's public
         // demo keeps a Simple view deep link for tablet and phone visitors.
         window.history.replaceState({}, "", "/");
@@ -556,6 +607,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   async function sendResetEmail(targetEmail: string) {
+    if (guideAuthEmail(targetEmail) || targetEmail.endsWith("@guides.bookingtours.co.za")) {
+      setNotice("Ask your operator for a fresh private guide password setup link.");
+      return;
+    }
     const { data: admin } = await supabase
       .from("admin_users")
       .select("id, email, name")
@@ -596,15 +651,15 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       guideAuthorityEpochRef.current = guideEpoch;
       authSessionRef.current = session;
       contextRequestRef.current++;
-      localStorage.setItem("ck_operator_override_business_id", nextBusinessId);
-      localStorage.setItem("ck_admin_business_id", nextBusinessId);
+      authStorage.setItem("ck_operator_override_business_id", nextBusinessId);
+      authStorage.setItem("ck_admin_business_id", nextBusinessId);
       setBusinessId(nextOperator.id);
       setBusinessName(nextOperator.name);
       setLogoUrl(nextOperator.logoUrl || "");
       setTimezone(nextOperator.timezone || "UTC");
       setSubscriptionStatus(nextOperator.subscriptionStatus || "ACTIVE");
       setYocoTestMode(nextOperator.yocoTestMode || false);
-      localStorage.setItem("ck_admin_timezone", nextOperator.timezone || "UTC");
+      authStorage.setItem("ck_admin_timezone", nextOperator.timezone || "UTC");
       return true;
     }, signal).catch(() => false);
     if (!switched) {
@@ -612,8 +667,10 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     }
   }
 
+  if (typeof window !== "undefined" && guideSession !== isGuideSessionPath(pathname)) return <p role="status" className="p-6">Opening sign in…</p>;
+
   if (PUBLIC_PATHS.includes(pathname)) {
-    return <BusinessProvider value={{ businessId: "", businessName: "", role: "", logoUrl: "", timezone: "UTC", operators: [] }}>{children}</BusinessProvider>;
+    return <BusinessProvider value={{ businessId: "", businessName: "", role: "", logoUrl: "", timezone: "UTC", operators: [] }}><GuideSignInContext.Provider value={{ signIn: login, error }}>{children}</GuideSignInContext.Provider></BusinessProvider>;
   }
 
   if (checking) {
@@ -685,7 +742,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             <h1 className="font-display text-[26px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>
               <BrandWordmark />
             </h1>
-            <p className="mt-1.5 text-sm ui-text-muted">Sign in to your operator dashboard</p>
+            <p className="mt-1.5 text-sm ui-text-muted">{isGuideSessionPath(pathname) ? "Guide sign in" : "Sign in to your operator dashboard"}</p>
           </div>
 
           {locked ? (
@@ -705,15 +762,17 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
             </div>
           ) : (
             <>
-              <input type="email" value={email}
+              <label htmlFor="admin-login" className="mb-1.5 block text-left text-sm font-medium">Email address or guide login</label>
+              <input id="admin-login" type="text" value={email}
                 onChange={e => { setEmail(e.target.value); setError(""); setNotice(""); }}
                 onKeyDown={e => { if (e.key === "Enter") login(); }}
-                placeholder="Email address"
-                aria-label="Email address"
-                autoComplete="email"
+                placeholder="Email address or guide@operator"
+                aria-label="Email address or guide login"
+                autoComplete="username"
                 className="ui-control mb-3 w-full px-4 py-3 text-sm outline-none" />
 
-              <input type="password" value={pass}
+              <label htmlFor="admin-password" className="mb-1.5 block text-left text-sm font-medium">Password</label>
+              <input id="admin-password" type="password" value={pass}
                 onChange={e => { setPass(e.target.value); setError(""); setNotice(""); }}
                 onKeyDown={e => { if (e.key === "Enter") login(); }}
                 placeholder="Password"
@@ -721,13 +780,16 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
                 autoComplete="current-password"
                 className={"ui-control mb-3 w-full px-4 py-3 text-sm outline-none " + (error ? "border-[var(--ck-danger)] bg-[var(--ck-danger-soft)]" : "")} />
 
-              {error && <p className="mb-3 text-xs" style={{ color: "var(--ck-danger)" }}>{error}</p>}
-              {notice && <p className="mb-3 text-xs" style={{ color: "var(--ck-success)" }}>{notice}</p>}
+              {error && <p role="alert" className="mb-3 text-sm" style={{ color: "var(--ck-danger)" }}>{error}</p>}
+              {notice && <p role="status" className="mb-3 text-sm" style={{ color: "var(--ck-success)" }}>{notice}</p>}
 
               <button onClick={() => login()} disabled={loading} className="ui-btn ui-btn-primary w-full !h-11 !rounded-xl text-sm font-semibold disabled:opacity-50">
                 {loading ? "Signing in..." : "Sign In"}
               </button>
 
+              <p className="mt-4 text-xs text-[var(--ck-text-muted)]">
+                <a href={isGuideSessionPath(pathname) ? "/" : "/simpleguide"} className="hover:underline">{isGuideSessionPath(pathname) ? "Operator sign in" : "Guide sign in"}</a>
+              </p>
               <p className="mt-4 text-xs text-[var(--ck-text-muted)]">
                 <a href="/change-password" className="hover:underline">Set up or reset password</a>
               </p>
@@ -780,8 +842,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           </h1>
           <p className="text-sm text-[var(--ck-text-muted)]">
             {subscriptionStatus === "PAUSED"
-              ? "Your subscription is paused for the off-season. When you're ready to get back to it, reactivate below."
-              : "Your subscription has been suspended. Please contact support or reactivate your subscription to continue."}
+              ? "Subscription paused. Reactivate below when ready."
+              : "Subscription suspended. Contact support or reactivate to continue."}
           </p>
           {role === "MAIN_ADMIN" && (
             <a href="/billing" className="ui-btn ui-btn-primary mt-4 !h-11 !rounded-xl !px-6 text-sm font-semibold inline-flex">
@@ -818,6 +880,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
       console.warn("refreshBusiness failed:", e);
     }
   }
+
+  if (role === "GUIDE" && !isGuidePath(pathname)) return <p role="status" className="p-6">Opening Simple View…</p>;
 
   return (
     <BusinessProvider value={{ businessId, businessName, staffName, role, logoUrl, timezone, subscriptionStatus, yocoTestMode, readOnly, operators, switchOperator, refreshBusiness }}>

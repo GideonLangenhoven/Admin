@@ -1,0 +1,233 @@
+{
+  "verified_at": "2026-10-02T10:23:31.580133+00:00",
+  "scope": "User-requested deployment of secure ChatGPT/Meta agent foundation to Admin; external access remains disabled",
+  "authorization": "User: please deploy changes",
+  "project": "caepweb-admin",
+  "deployment": {
+    "id": "dpl_8SAj3nTCJB6CAMrxzD4EYRHxoPrC",
+    "url": "https://caepweb-admin-2lqdoo9j1-jerrys-projects-f4e4eaf9.vercel.app",
+    "target": "production",
+    "status": "READY",
+    "promoted": true,
+    "verified_live_domain": "https://admin.bookingtours.co.za",
+    "previous_live_deployment": "dpl_7ZU93vPu7jXr3A5BC1VYujGLXkjN"
+  },
+  "source": {
+    "strategy": "Reconstructed exact existing live source in an isolated directory, then copied the four scoped runtime additions",
+    "existing_files_preserved": 445,
+    "baseline_git_revision": "43304b65314c2b9974f939304e7b2ebae0a62c0c",
+    "added_runtime_files_sha256": {
+      "app/lib/agent-tools.ts": "a16ae8d29a68e6016804be19bb7be0a8a59a9ce5bfa7659d06dbfd16d428b54e",
+      "app/lib/agent-read-service.ts": "bcffe6fd503b483aa1a6963065dd8479653bf9af372eeba8de86ccd4de7db435",
+      "app/api/agent/read/route.ts": "1e2ae70b755be50acdecb31be0a74669617c08e028afe32eb06b7b09b0376a57",
+      "scripts/operator-acquisition-report.mjs": "56f26595517d34dd7cfb4225ae1e35a53969f5402b7a6359aad99be39297d442"
+    },
+    "baseline_sha256_manifest": "agent-foundation-deployment-20261002/baseline-source-sha256.json",
+    "verification": {
+      "new_deployment": "dpl_8SAj3nTCJB6CAMrxzD4EYRHxoPrC",
+      "upload_format": "tgz archive",
+      "archive_uid": "064660baa5660d6905d52fdf52416bc6900faf8b",
+      "baseline_files_preserved_in_uploaded_candidate": 445,
+      "added_runtime_files": 4,
+      "candidate_sha256_verified": true,
+      "remote_file_listing_note": "Vercel stores the uploaded tgz archive; individual source hashes are verified in the isolated upload directory, not exposed in this listing."
+    },
+    "local_candidate": "/private/tmp/bookingtours-agent-deploy-20261002/admin"
+  },
+  "checks": [
+    {
+      "command": "./node_modules/.bin/vitest run tests/unit/agent-read-service.test.ts tests/unit/operator-acquisition.test.ts",
+      "environment": "isolated upload candidate; labelled fictional fixtures",
+      "exit_code": 0,
+      "tests_passed": 101
+    },
+    {
+      "command": "./node_modules/.bin/tsc --noEmit --incremental false",
+      "environment": "isolated upload candidate",
+      "exit_code": 0
+    },
+    {
+      "command": "vercel deploy --prod --skip-domain --yes --archive=tgz [scoped metadata]",
+      "exit_code": 0,
+      "production_build": "passed",
+      "cloud_typescript": "passed"
+    },
+    {
+      "command": "vercel promote https://caepweb-admin-2lqdoo9j1-jerrys-projects-f4e4eaf9.vercel.app --yes",
+      "exit_code": 0
+    },
+    {
+      "command": "vercel inspect https://admin.bookingtours.co.za",
+      "exit_code": 0,
+      "observed_id": "dpl_8SAj3nTCJB6CAMrxzD4EYRHxoPrC",
+      "observed_status": "Ready"
+    }
+  ],
+  "candidate_http_checks": [
+    {
+      "case": "get",
+      "status": 503,
+      "cache_control": "no-store",
+      "body": {
+        "ok": false,
+        "code": "INTEGRATION_DISABLED"
+      }
+    },
+    {
+      "case": "post",
+      "status": 503,
+      "cache_control": "no-store",
+      "body": {
+        "ok": false,
+        "code": "INTEGRATION_DISABLED"
+      }
+    },
+    {
+      "case": "forged",
+      "status": 503,
+      "cache_control": "no-store",
+      "body": {
+        "ok": false,
+        "code": "INTEGRATION_DISABLED"
+      }
+    },
+    {
+      "case": "unsupported",
+      "status": 503,
+      "cache_control": "no-store",
+      "body": {
+        "ok": false,
+        "code": "INTEGRATION_DISABLED"
+      }
+    },
+    {
+      "case": "head",
+      "status": 503,
+      "cache_control": "no-store"
+    },
+    {
+      "case": "home",
+      "status": 200,
+      "cache_control": "public, max-age=0, must-revalidate"
+    },
+    {
+      "case": "login",
+      "status": 404,
+      "cache_control": "public, max-age=0, must-revalidate"
+    },
+    {
+      "case": "admin_api_unauthenticated",
+      "path": "/api/admin/data-requests?summary=actionable",
+      "status": 401,
+      "body": {
+        "error": "Unauthorized"
+      }
+    },
+    {
+      "case": "nonexistent_login_matches_baseline",
+      "path": "/login",
+      "candidate_status": 404,
+      "baseline_status": 404,
+      "note": "Admin sign-in is served at /; no /login page exists."
+    }
+  ],
+  "live_http_checks": {
+    "transport": "vercel curl targeting the live domain; CLI manages deployment protection bypass, with no application credential",
+    "checks": [
+      {
+        "case": "get",
+        "status": 503,
+        "cache_control": "no-store",
+        "body": {
+          "ok": false,
+          "code": "INTEGRATION_DISABLED"
+        }
+      },
+      {
+        "case": "post",
+        "status": 503,
+        "cache_control": "no-store",
+        "body": {
+          "ok": false,
+          "code": "INTEGRATION_DISABLED"
+        }
+      },
+      {
+        "case": "forged",
+        "status": 503,
+        "cache_control": "no-store",
+        "body": {
+          "ok": false,
+          "code": "INTEGRATION_DISABLED"
+        }
+      },
+      {
+        "case": "unsupported",
+        "status": 503,
+        "cache_control": "no-store",
+        "body": {
+          "ok": false,
+          "code": "INTEGRATION_DISABLED"
+        }
+      },
+      {
+        "case": "head",
+        "status": 503,
+        "cache_control": "no-store"
+      },
+      {
+        "case": "home",
+        "status": 200,
+        "cache_control": "public, max-age=0, must-revalidate"
+      },
+      {
+        "case": "auth",
+        "status": 401,
+        "cache_control": "public, max-age=0, must-revalidate",
+        "body": {
+          "error": "Unauthorized"
+        }
+      }
+    ]
+  },
+  "public_http_checks": [
+    {
+      "path": "/",
+      "method": "HEAD",
+      "status": 200,
+      "deployment_protection_bypass": false
+    },
+    {
+      "path": "/api/agent/read",
+      "method": "HEAD",
+      "status": 503,
+      "deployment_protection_bypass": false,
+      "cache_control": "no-store"
+    }
+  ],
+  "boundaries": {
+    "external_agent_access_enabled": false,
+    "http_route_invokes_read_service": false,
+    "production_read_service_caller": false,
+    "production_sql_changes": 0,
+    "agent_sql_candidate_uploaded": false,
+    "production_report_run": false,
+    "automatic_acquisition_tracking": false,
+    "chatgpt_mcp_adapter_released": false,
+    "meta_muse_adapter_released": false,
+    "provider_connection_enabled": false,
+    "production_customer_data_mutation": false,
+    "unrelated_working_tree_changes_deployed": false,
+    "marketing_site_deployed": false,
+    "traveller_storefront_deployed": false,
+    "git_push_or_merge": false,
+    "broader_verdict": "FAILED_GATE",
+    "broader_rollout": "paused"
+  },
+  "implementation_verification": "docs/ai/verification-20261002.json",
+  "limitations": [
+    "Focused authorization tests use fictional Auth/provider fixtures; this is not a real platform connection journey.",
+    "Grant/consent SQL remains a local rehearsal candidate outside the migration ledger.",
+    "Whole-workspace unit and lint failures are recorded in the earlier implementation verification; this release was validated against the isolated live-source candidate."
+  ]
+}

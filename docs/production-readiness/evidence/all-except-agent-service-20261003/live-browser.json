@@ -1,0 +1,96 @@
+{
+  "cases": [
+    {
+      "name": "Kayak retains the original tour-card layout with populated tours and working photos",
+      "project": "desktop",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 6700
+        }
+      ]
+    },
+    {
+      "name": "calendar reaches guest details while the cookie notice stays clear of the mobile button",
+      "project": "desktop",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 2739
+        }
+      ]
+    },
+    {
+      "name": "Claires retains its own tour catalog and tenant branding",
+      "project": "desktop",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 1762
+        }
+      ]
+    },
+    {
+      "name": "Kayak retains the original tour-card layout with populated tours and working photos",
+      "project": "phone",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 5864
+        }
+      ]
+    },
+    {
+      "name": "calendar reaches guest details while the cookie notice stays clear of the mobile button",
+      "project": "phone",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 2292
+        }
+      ]
+    },
+    {
+      "name": "Claires retains its own tour catalog and tenant branding",
+      "project": "phone",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 2391
+        }
+      ]
+    },
+    {
+      "name": "Kayak retains the original tour-card layout with populated tours and working photos",
+      "project": "webkit-phone",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 4167
+        }
+      ]
+    },
+    {
+      "name": "calendar reaches guest details while the cookie notice stays clear of the mobile button",
+      "project": "webkit-phone",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 2285
+        }
+      ]
+    },
+    {
+      "name": "Claires retains its own tour catalog and tenant branding",
+      "project": "webkit-phone",
+      "results": [
+        {
+          "status": "passed",
+          "duration_ms": 1805
+        }
+      ]
+    }
+  ],
+  "passed": 9,
+  "failed": 0
+}

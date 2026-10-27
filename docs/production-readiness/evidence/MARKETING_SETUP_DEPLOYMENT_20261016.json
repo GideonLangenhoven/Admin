@@ -1,0 +1,182 @@
+{
+  "date": "2026-10-16",
+  "verified_at": "2026-10-16T05:12:35.202607+00:00",
+  "status": "DEPLOYED_AND_VERIFIED_DIAGNOSTICS_ONLY",
+  "admin": {
+    "id": "dpl_BUdA5CF8mUHjAtj1h4L7qHWwPZwT",
+    "url": "caepweb-admin-pcw4meljv-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 482,
+    "production_url": "https://admin.bookingtours.co.za"
+  },
+  "baseline": "dpl_749ZGg63mBwEQ4zfdG8bdWUPEuCZ",
+  "scope": [
+    "Selected-operator marketing setup status replaces the unconditional generic warning.",
+    "Service-only read-only Edge diagnostics report configured email/feedback flags and the existing per-operator policy reason; verified Admin API binds the target to the caller.",
+    "Support email draft includes operator identity and exact remaining steps. Failed lookups offer retry without claiming setup is incomplete.",
+    "Chatbot instructions and marketing knowledge reflect the current UI and unfinished welcome-back delivery."
+  ],
+  "confirmed_blockers": {
+    "at": "2026-10-16T04:47:46.134Z",
+    "read_only": true,
+    "secret_presence": {
+      "RESEND_API_KEY": true,
+      "RESEND_FROM_EMAIL": true,
+      "RESEND_WEBHOOK_SECRET": false
+    },
+    "policies": [
+      {
+        "policy_rows": 0,
+        "enabled_operators": 0
+      }
+    ],
+    "sender_domain_verified": "Not checked; no Resend account credential available locally.",
+    "customer_actions": 0
+  },
+  "edge": {
+    "at": "2026-10-16T05:03:02.040Z",
+    "function": {
+      "id": "0e529b6d-1cd4-41ff-934f-51ae91de2de2",
+      "slug": "marketing-setup-status",
+      "version": 1,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    },
+    "sourceChecks": [
+      {
+        "path": "supabase/functions/marketing-setup-status/index.ts",
+        "sha256": "9a78ea1a4d05a7485e4b9dc6f8e892e62738a7237fb508de5d6c6cb8427c9cce"
+      },
+      {
+        "path": "supabase/functions/_shared/auth.ts",
+        "sha256": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade"
+      },
+      {
+        "path": "supabase/functions/_shared/tenant.ts",
+        "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+      },
+      {
+        "path": "supabase/functions/_shared/pagination.ts",
+        "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+      }
+    ],
+    "internal_probe": {
+      "email_service_configured": true,
+      "email_feedback_configured": false,
+      "operator_status": "policy_approval_pending",
+      "welcome_back_available": false
+    },
+    "anonymous_status": 401,
+    "customer_actions": 0
+  },
+  "chatbot": {
+    "at": "2026-10-16T05:10:26.841Z",
+    "function": {
+      "slug": "admin-help-chat",
+      "version": 23,
+      "status": "ACTIVE"
+    },
+    "sourceChecks": [
+      {
+        "path": "supabase/functions/admin-help-chat/index.ts",
+        "sha256": "06b6d1966b40ddaf6ca5684b4b5aad3f873bfc779a088dea1b34aa9bdd2bb7e2"
+      },
+      {
+        "path": "supabase/functions/_shared/tenant.ts",
+        "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+      },
+      {
+        "path": "supabase/functions/_shared/pagination.ts",
+        "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+      },
+      {
+        "path": "supabase/functions/_shared/auth.ts",
+        "sha256": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade"
+      },
+      {
+        "path": "supabase/functions/_shared/llm.ts",
+        "sha256": "e7bed1f1ed96a04d6b326ee3580fc6550c37821b19d2618321f4d4be9b3c85c1"
+      },
+      {
+        "path": "supabase/functions/_shared/openrouter-provider.ts",
+        "sha256": "52aa270a8467d6476d17a8881a4fe29ced09b52cdb44b4bec9e05246af202cd8"
+      },
+      {
+        "path": "supabase/functions/_shared/kb.ts",
+        "sha256": "5d89feee2c9ef467716d48625b112ecb86b81b84679e48c7a22da42a5f88b68d"
+      },
+      {
+        "path": "supabase/functions/_shared/demo-guide.ts",
+        "sha256": "f9d714820fd3340ad1dc00a680be2e7207f9feeb0d44f98cd9344b954d666c49"
+      }
+    ],
+    "internal_probe": {
+      "ok": true,
+      "answer": "\u201c**Marketing emails need setup**\u201d means BookingTours has listed work remaining for the selected operator, such as:\n\n- Connecting the email service\n- Connecting bounced-email and spam reports\n- Adding the operator\u2019s local time zone, if missing\n- Enabling the operator\u2019s sending policy\n\nOn [Marketing](/marketing), **Email BookingTours** opens a support email containing the operator name, ID, and current setup steps. Review it and send it yourself. It does not enable email sending.\n\nNo. **Automatic welcome-back emails are not sending now.** Their delivery remains held until the booking-based delivery work is completed, even if email settings appear configured. You can save and preview the draft under [Marketing Automations](/marketing/automations), but it cannot be activated yet.",
+      "sources": [
+        {
+          "title": "Marketing",
+          "route": "/marketing"
+        },
+        {
+          "title": "WhatsApp and automatic messages",
+          "route": "/inbox"
+        },
+        {
+          "title": "Bookings",
+          "route": "/bookings"
+        }
+      ]
+    },
+    "no_customer_actions": true
+  },
+  "knowledge": {
+    "at": "2026-10-16T05:08:34.025Z",
+    "article": "marketing",
+    "chunks": 10,
+    "result": {
+      "ok": true,
+      "total": 176,
+      "embedded": 1,
+      "skipped": 175,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    },
+    "unrelated_articles_unchanged": true
+  },
+  "validation": {
+    "targeted_unit_tests": 42,
+    "final_setup_unit_tests": 16,
+    "local_browser_tests": 8,
+    "typescript": "PASS",
+    "eslint": "PASS",
+    "deno": [
+      "marketing-setup-status",
+      "admin-help-chat"
+    ],
+    "new_setup_endpoint_write_capability": false,
+    "no_real_customer_sends": true,
+    "verification_scope": "Handler tests use in-memory auth/database/provider dependencies. Browser checks intercept synthetic auth and data; hosted Edge probes are internal read-only diagnostics. No live provider send, webhook registration or sender-domain verification performed.",
+    "deployed_synthetic_browser_tests": 3,
+    "deployed_http_checks": 4,
+    "deployed_browser_duration_seconds": 9.1
+  },
+  "limitations": [
+    "No Resend account credential was available; sender domain, provider quota and actual webhook registration were not verified or changed.",
+    "No provider settings, secrets, customer permissions or sending policies were changed.",
+    "Automatic welcome-back delivery still requires booking-bound event implementation and end-to-end acceptance.",
+    "Configured secret presence is diagnostic only and does not certify provider readiness.",
+    "Browser checks use synthetic intercepted auth and data. No real customer email, booking, photo, payment or promotion was created.",
+    "Broader rollout pause, disabled integrations and existing promotional holds remain unchanged."
+  ],
+  "remaining_setup_instructions": "../../marketing/EMAIL_ENABLEMENT_20261016.md",
+  "source_packaging": "Admin source contains its preserved pre-existing chatbot source. The native chatbot is independently deployed and verified against the isolated one-line help update; its current source is also retained in the working tree.",
+  "evidence_directory": "marketing-setup-deployment-20261016",
+  "rollback": "Admin may roll back independently to dpl_749ZGg63mBwEQ4zfdG8bdWUPEuCZ. New diagnostics do not mutate business state. Retain existing promotional gates and delivery evidence.",
+  "latest_follow_up": {
+    "record": "GUIDE_PHOTOS_DEPLOYMENT_20261016.json",
+    "deployment": "dpl_HCaW5dys6U1GsJ9ueSpEZY6hQ3qQ",
+    "scope": "Guide photo feature parity and operational thank-you sending; marketing activation unchanged."
+  }
+}

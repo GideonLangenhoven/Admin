@@ -1,0 +1,1915 @@
+{
+ "url": "http://127.0.0.1:3000/marketing",
+ "at": "2026-10-27T15:03:59.072Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 1440,
+   "height": 900,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.75
+   ],
+   "motion": {
+    "elements": 7,
+    "css": 7,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "page": {
+     "height": 900,
+     "screens": 1,
+     "words": 142,
+     "img": 3,
+     "video": 0,
+     "canvas": 0,
+     "svg": 21,
+     "sections": 1,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Claire's Hiking",
+     "words": 2,
+     "chars": 15,
+     "lines": 1,
+     "size": 12,
+     "vw": 0.8,
+     "font": "Plus Jakarta Sans",
+     "weight": 400,
+     "tracking": 0,
+     "leading": 1.63,
+     "top": 51,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "Claire's Hiking",
+     "words": 2,
+     "lines": 1,
+     "size": 12,
+     "font": "Plus Jakarta Sans"
+    },
+    "headings": [
+     {
+      "text": "Marketing",
+      "words": 1,
+      "chars": 9,
+      "lines": 1,
+      "size": 28,
+      "vw": 1.9,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.09,
+      "top": 140,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "52",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 30,
+      "vw": 2.1,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.15,
+      "top": 388,
+      "tag": "p",
+      "kind": "heading"
+     },
+     {
+      "text": "0",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 30,
+      "vw": 2.1,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.15,
+      "top": 388,
+      "tag": "p",
+      "kind": "statement"
+     },
+     {
+      "text": "0",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 30,
+      "vw": 2.1,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.15,
+      "top": 388,
+      "tag": "p",
+      "kind": "statement"
+     },
+     {
+      "text": "0",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 30,
+      "vw": 2.1,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.15,
+      "top": 388,
+      "tag": "p",
+      "kind": "statement"
+     }
+    ],
+    "headingSummary": {
+     "count": 5,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 3,
+     "centered": 0,
+     "medianWords": 1,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 0.76,
+       "mono": false
+      },
+      {
+       "family": "Geist Mono",
+       "share": 0.19,
+       "mono": true
+      },
+      {
+       "family": "satoshi",
+       "share": 0.04,
+       "mono": false
+      }
+     ],
+     "familyCount": 3,
+     "sizes": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      28,
+      30
+     ],
+     "sizeCount": 9,
+     "notLoaded": [],
+     "body": {
+      "font": "Plus Jakarta Sans",
+      "size": 12,
+      "leading": 1.33,
+      "weight": 500,
+      "tracking": 0,
+      "contrast": null
+     },
+     "measureChars": 66,
+     "max": {
+      "size": 30,
+      "vw": 2.1,
+      "font": "satoshi",
+      "text": "52"
+     },
+     "monoShare": 0.19,
+     "monoProseShare": 0.19,
+     "monoFamilies": [
+      "Geist Mono"
+     ],
+     "monoSamples": [
+      "Customer view",
+      "Operations",
+      "Guest care",
+      "Revenue",
+      "Growth",
+      "Admin"
+     ],
+     "microLabels": 7,
+     "microLabelShare": 0.099,
+     "microSamples": [
+      "Claire's Hiking",
+      "Marketing",
+      "Active Contacts",
+      "Templates",
+      "Emails Sent",
+      "Campaigns"
+     ],
+     "upperShare": 0.17,
+     "centerShare": 0.33,
+     "smallText": 17
+    },
+    "eyebrows": [
+     {
+      "text": "Active Contacts",
+      "above": "52",
+      "upper": true,
+      "tracked": true,
+      "mono": true,
+      "pill": false,
+      "size": 10,
+      "top": 357
+     },
+     {
+      "text": "Templates",
+      "above": "0",
+      "upper": true,
+      "tracked": true,
+      "mono": true,
+      "pill": false,
+      "size": 10,
+      "top": 357
+     },
+     {
+      "text": "Emails Sent",
+      "above": "0",
+      "upper": true,
+      "tracked": true,
+      "mono": true,
+      "pill": false,
+      "size": 10,
+      "top": 357
+     },
+     {
+      "text": "Campaigns",
+      "above": "0",
+      "upper": true,
+      "tracked": true,
+      "mono": true,
+      "pill": false,
+      "size": 10,
+      "top": 357
+     }
+    ],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [],
+     "textColors": [
+      {
+       "color": "#66736b",
+       "share": 0.47
+      },
+      {
+       "color": "#17221c",
+       "share": 0.2
+      },
+      {
+       "color": "#125e40",
+       "share": 0.14
+      },
+      {
+       "color": "#85998c",
+       "share": 0.09
+      },
+      {
+       "color": "#b7c9bd",
+       "share": 0.04
+      }
+     ],
+     "button": {
+      "bg": "#125e40",
+      "hsl": {
+       "h": 156,
+       "s": 0.68,
+       "l": 0.22
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 5,
+     "inHero": 3,
+     "radius": 10,
+     "height": 37,
+     "withShadow": 2,
+     "withGradient": 1,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "POWERED BY BookingTours",
+      "Sign Out",
+      "AI bot"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 13,
+     "shadowOverlay": 0,
+     "shadowSamples": [
+      "button.flex.h-11 → rgba(15, 43, 31, 0.06) 0px 4px 10px 0px, rgba(15, 43, 31, 0.2) 0px 28px 56px -20",
+      "section.ui-card.space-y-3 → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px ",
+      "div.ui-card.ui-card-hover → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px ",
+      "div.ui-card.ui-card-hover → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px "
+     ],
+     "gradients": 12,
+     "scrims": 0,
+     "gradientSamples": [
+      "aside.hidden.shrink-0 → radial-gradient(140% 50% at 50% -8%, rgba(0, 217, 139, 0.07), rgba(0, 0, 0, 0) 60%), radial-gradient(120% 45% ",
+      "section.ui-card.space-y-3 → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "div.ui-card.ui-card-hover → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "div.ui-card.ui-card-hover → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)"
+     ],
+     "gradientText": 0,
+     "hairlines": 5,
+     "hairlineSamples": [
+      "aside.hidden.shrink-0 256px",
+      "a.mt-auto.border-t 255px",
+      "header.ui-glass.flex 1184px",
+      "div.shrink-0.border-b 1184px",
+      "nav.hidden.border-b 1104px"
+     ],
+     "outlinedBoxes": 10,
+     "dashed": 0,
+     "blurred": 1,
+     "roundedBoxes": 10,
+     "boxRadius": 16,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": [
+      {
+       "count": 4,
+       "iconTopped": false,
+       "rounded": true,
+       "top": 336
+      }
+     ]
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 1,
+     "fixed": false,
+     "height": 34,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "plus jakarta sans fallback",
+     "geist mono",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "pageH": 900,
+    "margins": {
+     "left": 24,
+     "right": 36
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Claire's Hiking",
+      "size": 12,
+      "top": 51,
+      "firstScreen": true
+     },
+     {
+      "text": "Marketing",
+      "size": 28,
+      "top": 140,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 317,
+      "n": 3
+     },
+     {
+      "x": 296,
+      "n": 1
+     },
+     {
+      "x": 693,
+      "n": 1
+     },
+     {
+      "x": 881,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 6,
+    "bodySize": 12,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0.09,
+    "voidBox": {
+     "x": 540,
+     "y": 420,
+     "w": 660,
+     "h": 180
+    }
+   },
+   "app": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": {
+     "w": 256,
+     "tag": "aside",
+     "links": 13,
+     "share": 0.18
+    },
+    "topbar": {
+     "h": 61
+    },
+    "canvas": {
+     "left": 40,
+     "right": 36
+    },
+    "hero": {
+     "text": "Claire's Hiking",
+     "words": 2,
+     "chars": 15,
+     "lines": 1,
+     "size": 12,
+     "vw": 0.8,
+     "font": "Plus Jakarta Sans",
+     "weight": 400,
+     "tracking": 0,
+     "leading": 1.63,
+     "top": 51,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 10,
+     "firstScreen": 9,
+     "ragged": [],
+     "voids": [
+      {
+       "gap": 87,
+       "at": 946,
+       "panel": "Open Rate Trend"
+      },
+      {
+       "gap": 74,
+       "at": 726,
+       "panel": "Engagement Overview"
+      },
+      {
+       "gap": 60,
+       "at": 659,
+       "panel": "Campaign Performance"
+      },
+      {
+       "gap": 42,
+       "at": 1249,
+       "panel": "No campaigns yet"
+      }
+     ]
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 10,
+     "radii": [
+      [
+       16,
+       10
+      ]
+     ],
+     "heavyBorders": 10,
+     "borderSamples": [
+      "#0b2c21 on #f7f5f0 (13.8:1)",
+      "#0b2c21 on #f7f5f0 (13.8:1)",
+      "#0b2c21 on #f7f5f0 (13.8:1)"
+     ],
+     "heavyShadows": 10,
+     "softShadows": 10,
+     "shadowSamples": [
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px"
+     ],
+     "glass": 0
+    },
+    "chips": {
+     "count": 0,
+     "hues": 0,
+     "samples": []
+    },
+    "numbers": {
+     "cells": 0,
+     "leftAligned": 0,
+     "figures": 4,
+     "tabularShare": 1,
+     "kpiMax": 30
+    },
+    "rows": null,
+    "chartHues": 1,
+    "placeholders": [],
+    "type": {
+     "under13": 0.45,
+     "tiny": 11,
+     "tinySamples": [
+      "Customer view 10px",
+      "Operations 10px",
+      "Guest care 10px",
+      "Revenue 10px"
+     ],
+     "sizes": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      28,
+      30
+     ]
+    },
+    "title": {
+     "text": "Claire's Hiking",
+     "size": 12,
+     "top": 51
+    },
+    "colourShare": 0.002
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 768,
+   "height": 1024,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.62
+   ],
+   "motion": {
+    "elements": 19,
+    "css": 19,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "page": {
+     "height": 1024,
+     "screens": 1,
+     "words": 106,
+     "img": 3,
+     "video": 0,
+     "canvas": 0,
+     "svg": 21,
+     "sections": 0,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "52",
+     "words": 1,
+     "chars": 2,
+     "lines": 1,
+     "size": 30,
+     "vw": 3.9,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1,
+     "top": 292,
+     "tag": "p",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": null,
+    "headings": [
+     {
+      "text": "Marketing",
+      "words": 1,
+      "chars": 9,
+      "lines": 1,
+      "size": 28,
+      "vw": 3.6,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.16,
+      "top": 122,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "52",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 30,
+      "vw": 3.9,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.4,
+      "top": 292,
+      "tag": "p",
+      "kind": "heading"
+     },
+     {
+      "text": "0",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 30,
+      "vw": 3.9,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.4,
+      "top": 292,
+      "tag": "p",
+      "kind": "statement"
+     },
+     {
+      "text": "0",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 30,
+      "vw": 3.9,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.4,
+      "top": 411,
+      "tag": "p",
+      "kind": "statement"
+     },
+     {
+      "text": "0",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 30,
+      "vw": 3.9,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.4,
+      "top": 411,
+      "tag": "p",
+      "kind": "statement"
+     }
+    ],
+    "headingSummary": {
+     "count": 5,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 3,
+     "centered": 0,
+     "medianWords": 1,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 0.88,
+       "mono": false
+      },
+      {
+       "family": "Geist Mono",
+       "share": 0.1,
+       "mono": true
+      },
+      {
+       "family": "satoshi",
+       "share": 0.02,
+       "mono": false
+      }
+     ],
+     "familyCount": 3,
+     "sizes": [
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      28,
+      30
+     ],
+     "sizeCount": 9,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 30,
+      "vw": 3.9,
+      "font": "satoshi",
+      "text": "52"
+     },
+     "monoShare": 0.1,
+     "monoProseShare": 0.1,
+     "monoFamilies": [
+      "Geist Mono"
+     ],
+     "monoSamples": [
+      "Active Contacts",
+      "Templates",
+      "Emails Sent",
+      "Campaigns",
+      "0%",
+      "Recent Campaigns"
+     ],
+     "microLabels": 5,
+     "microLabelShare": 0.096,
+     "microSamples": [
+      "Active Contacts",
+      "Templates",
+      "Emails Sent",
+      "Campaigns",
+      "Recent Campaigns"
+     ],
+     "upperShare": 0.1,
+     "centerShare": 0.35,
+     "smallText": 11
+    },
+    "eyebrows": [
+     {
+      "text": "Active Contacts",
+      "above": "52",
+      "upper": true,
+      "tracked": true,
+      "mono": true,
+      "pill": false,
+      "size": 10,
+      "top": 261
+     },
+     {
+      "text": "Templates",
+      "above": "0",
+      "upper": true,
+      "tracked": true,
+      "mono": true,
+      "pill": false,
+      "size": 10,
+      "top": 261
+     },
+     {
+      "text": "Emails Sent",
+      "above": "0",
+      "upper": true,
+      "tracked": true,
+      "mono": true,
+      "pill": false,
+      "size": 10,
+      "top": 380
+     },
+     {
+      "text": "Campaigns",
+      "above": "0",
+      "upper": true,
+      "tracked": true,
+      "mono": true,
+      "pill": false,
+      "size": 10,
+      "top": 380
+     }
+    ],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [],
+     "textColors": [
+      {
+       "color": "#66736b",
+       "share": 0.57
+      },
+      {
+       "color": "#17221c",
+       "share": 0.28
+      },
+      {
+       "color": "#125e40",
+       "share": 0.11
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.02
+      },
+      {
+       "color": "#46534b",
+       "share": 0.01
+      }
+     ],
+     "button": {
+      "bg": "#176b4b",
+      "hsl": {
+       "h": 157,
+       "s": 0.65,
+       "l": 0.25
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 2,
+     "inHero": 0,
+     "radius": 10,
+     "height": 44,
+     "withShadow": 1,
+     "withGradient": 1,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": []
+    },
+    "surfaces": {
+     "shadowStatic": 12,
+     "shadowOverlay": 0,
+     "shadowSamples": [
+      "button.flex.h-11 → rgba(15, 43, 31, 0.06) 0px 4px 10px 0px, rgba(15, 43, 31, 0.2) 0px 28px 56px -20",
+      "div.ui-card.ui-card-hover → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px ",
+      "div.ui-card.ui-card-hover → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px ",
+      "div.ui-card.ui-card-hover → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px "
+     ],
+     "gradients": 10,
+     "scrims": 0,
+     "gradientSamples": [
+      "div.ui-card.ui-card-hover → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "div.ui-card.ui-card-hover → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "div.ui-card.ui-card-hover → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "div.ui-card.ui-card-hover → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)"
+     ],
+     "gradientText": 0,
+     "hairlines": 4,
+     "hairlineSamples": [
+      "header.ui-glass.flex 768px",
+      "div.shrink-0.border-b 768px",
+      "nav.hidden.border-b 720px",
+      "nav.ui-glass.lg:hidden 768px"
+     ],
+     "outlinedBoxes": 10,
+     "dashed": 0,
+     "blurred": 2,
+     "roundedBoxes": 10,
+     "boxRadius": 16,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": [
+      {
+       "count": 4,
+       "iconTopped": false,
+       "rounded": true,
+       "top": 240
+      }
+     ]
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 0,
+     "fixed": false,
+     "height": 0,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "geist mono",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "pageH": 1024,
+    "margins": {
+     "left": 40,
+     "right": 16
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Claire's Hiking",
+      "size": 16,
+      "top": 18,
+      "firstScreen": true
+     },
+     {
+      "text": "Marketing",
+      "size": 28,
+      "top": 122,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 45,
+      "n": 4
+     },
+     {
+      "x": 24,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 5,
+    "bodySize": 12,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": null,
+    "topbar": {
+     "h": 61
+    },
+    "canvas": {
+     "left": 24,
+     "right": 16
+    },
+    "hero": {
+     "text": "52",
+     "words": 1,
+     "chars": 2,
+     "lines": 1,
+     "size": 30,
+     "vw": 3.9,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1,
+     "top": 292,
+     "tag": "p",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 10,
+     "firstScreen": 7,
+     "ragged": [],
+     "voids": [
+      {
+       "gap": 60,
+       "at": 869,
+       "panel": "Campaign Performance"
+      },
+      {
+       "gap": 52,
+       "at": 682,
+       "panel": "Engagement Overview"
+      },
+      {
+       "gap": 44,
+       "at": 1329,
+       "panel": "Open Rate Trend"
+      },
+      {
+       "gap": 42,
+       "at": 1638,
+       "panel": "No campaigns yet"
+      }
+     ]
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 10,
+     "radii": [
+      [
+       16,
+       10
+      ]
+     ],
+     "heavyBorders": 10,
+     "borderSamples": [
+      "#0b2c21 on #f7f5f0 (13.8:1)",
+      "#0b2c21 on #f7f5f0 (13.8:1)",
+      "#0b2c21 on #f7f5f0 (13.8:1)"
+     ],
+     "heavyShadows": 10,
+     "softShadows": 10,
+     "shadowSamples": [
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px"
+     ],
+     "glass": 0
+    },
+    "chips": {
+     "count": 1,
+     "hues": 1,
+     "samples": [
+      {
+       "hue": 156,
+       "size": 46,
+       "radius": "9999px"
+      }
+     ]
+    },
+    "numbers": {
+     "cells": 0,
+     "leftAligned": 0,
+     "figures": 4,
+     "tabularShare": 1,
+     "kpiMax": 30
+    },
+    "rows": null,
+    "chartHues": 1,
+    "placeholders": [],
+    "type": {
+     "under13": 0.41,
+     "tiny": 11,
+     "tinySamples": [
+      "Customer view 10px",
+      "Operations 10px",
+      "Guest care 10px",
+      "Revenue 10px"
+     ],
+     "sizes": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      28,
+      30
+     ]
+    },
+    "title": null,
+    "colourShare": 0.002
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 390,
+   "height": 844,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.78
+   ],
+   "motion": {
+    "elements": 10,
+    "css": 10,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "page": {
+     "height": 844,
+     "screens": 1,
+     "words": 106,
+     "img": 3,
+     "video": 0,
+     "canvas": 0,
+     "svg": 21,
+     "sections": 0,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "52",
+     "words": 1,
+     "chars": 2,
+     "lines": 1,
+     "size": 30,
+     "vw": 7.7,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1,
+     "top": 242,
+     "tag": "p",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": null,
+    "headings": [
+     {
+      "text": "Marketing",
+      "words": 1,
+      "chars": 9,
+      "lines": 1,
+      "size": 24,
+      "vw": 6.2,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.27,
+      "top": 132,
+      "tag": "h1",
+      "kind": "heading"
+     },
+     {
+      "text": "52",
+      "words": 1,
+      "chars": 2,
+      "lines": 1,
+      "size": 30,
+      "vw": 7.7,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.33,
+      "top": 242,
+      "tag": "p",
+      "kind": "heading"
+     },
+     {
+      "text": "0",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 30,
+      "vw": 7.7,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.33,
+      "top": 242,
+      "tag": "p",
+      "kind": "statement"
+     },
+     {
+      "text": "0",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 30,
+      "vw": 7.7,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.33,
+      "top": 361,
+      "tag": "p",
+      "kind": "statement"
+     },
+     {
+      "text": "0",
+      "words": 1,
+      "chars": 1,
+      "lines": 1,
+      "size": 30,
+      "vw": 7.7,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "right",
+      "widthRatio": 0.33,
+      "top": 361,
+      "tag": "p",
+      "kind": "statement"
+     }
+    ],
+    "headingSummary": {
+     "count": 5,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 3,
+     "centered": 0,
+     "medianWords": 1,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 0.87,
+       "mono": false
+      },
+      {
+       "family": "Geist Mono",
+       "share": 0.11,
+       "mono": true
+      },
+      {
+       "family": "satoshi",
+       "share": 0.02,
+       "mono": false
+      }
+     ],
+     "familyCount": 3,
+     "sizes": [
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      24,
+      30
+     ],
+     "sizeCount": 9,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 30,
+      "vw": 7.7,
+      "font": "satoshi",
+      "text": "52"
+     },
+     "monoShare": 0.11,
+     "monoProseShare": 0.11,
+     "monoFamilies": [
+      "Geist Mono"
+     ],
+     "monoSamples": [
+      "Active Contacts",
+      "Templates",
+      "Emails Sent",
+      "Campaigns",
+      "0%",
+      "Recent Campaigns"
+     ],
+     "microLabels": 5,
+     "microLabelShare": 0.105,
+     "microSamples": [
+      "Active Contacts",
+      "Templates",
+      "Emails Sent",
+      "Campaigns",
+      "Recent Campaigns"
+     ],
+     "upperShare": 0.1,
+     "centerShare": 0.38,
+     "smallText": 11
+    },
+    "eyebrows": [
+     {
+      "text": "Active Contacts",
+      "above": "52",
+      "upper": true,
+      "tracked": true,
+      "mono": true,
+      "pill": false,
+      "size": 10,
+      "top": 211
+     },
+     {
+      "text": "Templates",
+      "above": "0",
+      "upper": true,
+      "tracked": true,
+      "mono": true,
+      "pill": false,
+      "size": 10,
+      "top": 211
+     },
+     {
+      "text": "Emails Sent",
+      "above": "0",
+      "upper": true,
+      "tracked": true,
+      "mono": true,
+      "pill": false,
+      "size": 10,
+      "top": 330
+     },
+     {
+      "text": "Campaigns",
+      "above": "0",
+      "upper": true,
+      "tracked": true,
+      "mono": true,
+      "pill": false,
+      "size": 10,
+      "top": 330
+     }
+    ],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [],
+     "textColors": [
+      {
+       "color": "#66736b",
+       "share": 0.55
+      },
+      {
+       "color": "#17221c",
+       "share": 0.31
+      },
+      {
+       "color": "#125e40",
+       "share": 0.11
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.02
+      },
+      {
+       "color": "#46534b",
+       "share": 0.01
+      }
+     ],
+     "button": {
+      "bg": "#176b4b",
+      "hsl": {
+       "h": 157,
+       "s": 0.65,
+       "l": 0.25
+      },
+      "fg": "#ffffff"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 2,
+     "inHero": 0,
+     "radius": 10,
+     "height": 44,
+     "withShadow": 1,
+     "withGradient": 1,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": []
+    },
+    "surfaces": {
+     "shadowStatic": 12,
+     "shadowOverlay": 0,
+     "shadowSamples": [
+      "button.flex.h-11 → rgba(15, 43, 31, 0.06) 0px 4px 10px 0px, rgba(15, 43, 31, 0.2) 0px 28px 56px -20",
+      "div.ui-card.ui-card-hover → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px ",
+      "div.ui-card.ui-card-hover → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px ",
+      "div.ui-card.ui-card-hover → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px "
+     ],
+     "gradients": 10,
+     "scrims": 0,
+     "gradientSamples": [
+      "div.ui-card.ui-card-hover → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "div.ui-card.ui-card-hover → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "div.ui-card.ui-card-hover → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "div.ui-card.ui-card-hover → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)"
+     ],
+     "gradientText": 0,
+     "hairlines": 3,
+     "hairlineSamples": [
+      "header.ui-glass.flex 390px",
+      "div.shrink-0.border-b 390px",
+      "nav.ui-glass.lg:hidden 390px"
+     ],
+     "outlinedBoxes": 10,
+     "dashed": 0,
+     "blurred": 2,
+     "roundedBoxes": 10,
+     "boxRadius": 16,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": [
+      {
+       "count": 4,
+       "iconTopped": false,
+       "rounded": true,
+       "top": 190
+      }
+     ]
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 0,
+     "fixed": false,
+     "height": 0,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "geist mono",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "pageH": 844,
+    "margins": {
+     "left": 26,
+     "right": 16
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Claire's Hiking",
+      "size": 16,
+      "top": 18,
+      "firstScreen": true
+     },
+     {
+      "text": "Marketing",
+      "size": 24,
+      "top": 132,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 37,
+      "n": 2
+     },
+     {
+      "x": 16,
+      "n": 1
+     },
+     {
+      "x": 48,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 4,
+    "bodySize": 12,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": null,
+    "topbar": {
+     "h": 61
+    },
+    "canvas": {
+     "left": 16,
+     "right": 16
+    },
+    "hero": {
+     "text": "52",
+     "words": 1,
+     "chars": 2,
+     "lines": 1,
+     "size": 30,
+     "vw": 7.7,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1,
+     "top": 242,
+     "tag": "p",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 10,
+     "firstScreen": 7,
+     "ragged": [],
+     "voids": [
+      {
+       "gap": 60,
+       "at": 819,
+       "panel": "Campaign Performance"
+      },
+      {
+       "gap": 52,
+       "at": 632,
+       "panel": "Engagement Overview"
+      },
+      {
+       "gap": 44,
+       "at": 1279,
+       "panel": "Open Rate Trend"
+      },
+      {
+       "gap": 42,
+       "at": 1588,
+       "panel": "No campaigns yet"
+      }
+     ]
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 10,
+     "radii": [
+      [
+       16,
+       10
+      ]
+     ],
+     "heavyBorders": 10,
+     "borderSamples": [
+      "#0b2c21 on #f7f5f0 (13.8:1)",
+      "#0b2c21 on #f7f5f0 (13.8:1)",
+      "#0b2c21 on #f7f5f0 (13.8:1)"
+     ],
+     "heavyShadows": 10,
+     "softShadows": 10,
+     "shadowSamples": [
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px"
+     ],
+     "glass": 0
+    },
+    "chips": {
+     "count": 1,
+     "hues": 1,
+     "samples": [
+      {
+       "hue": 156,
+       "size": 46,
+       "radius": "9999px"
+      }
+     ]
+    },
+    "numbers": {
+     "cells": 0,
+     "leftAligned": 0,
+     "figures": 4,
+     "tabularShare": 1,
+     "kpiMax": 30
+    },
+    "rows": null,
+    "chartHues": 1,
+    "placeholders": [],
+    "type": {
+     "under13": 0.41,
+     "tiny": 11,
+     "tinySamples": [
+      "Customer view 10px",
+      "Operations 10px",
+      "Guest care 10px",
+      "Revenue 10px"
+     ],
+     "sizes": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      24,
+      30
+     ]
+    },
+    "title": null,
+    "colourShare": 0.004
+   },
+   "consoleErrors": []
+  }
+ ],
+ "findings": [
+  {
+   "level": "FAIL",
+   "id": "micro-label",
+   "width": 1440,
+   "message": "7 tiny uppercase letter-spaced labels (e.g. \"Claire's Hiking\", \"Marketing\", \"Active Contacts\", \"Templates\").",
+   "fix": "Use sentence-case text at a readable size, or delete the label.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "gradient",
+   "width": 1440,
+   "message": "12 gradient fill(s): aside.hidden.shrink-0 → radial-gradient(140% 50% at 50% -8%, rgba(0, 217, 139, 0.07), rgba(0, 0, 0, 0) 60%), radial-gradient(120% 45%  | section.ui-card.space-y-3 → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%) | div.ui-card.ui-card-hover → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+   "fix": "Use a flat colour or a real image. The only gradient allowed by default is a neutral scrim over a photo for legibility.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "button-fx",
+   "width": 1440,
+   "message": "Buttons with gradient fill and shadow/glow.",
+   "fix": "Flat fill, one colour.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "palette-cream",
+   "width": 1440,
+   "message": "Yellow-cream background (page background #f7f5f0).",
+   "fix": "Use the drawn palette. If you want warmth, take a low-chroma stone or bone, not a yellow cream.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "font-count",
+   "width": 1440,
+   "message": "3 typefaces in use (Plus Jakarta Sans, Geist Mono, satoshi).",
+   "fix": "Two at most.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "many-h1",
+   "width": 1440,
+   "message": "2 h1 elements.",
+   "fix": "One h1 per page; section titles are h2.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "heavy-shadow",
+   "width": 1440,
+   "message": "10 panel shadow(s) heavy enough to read as floating: rgba(15, 43, 31, 0.12) 0px 10px 28px -14px | rgba(15, 43, 31, 0.12) 0px 10px 28px -14px | rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+   "fix": "Panels sit on the ground: separate them with a fill one step from the ground or a quiet 1px border. A shadow, if any, is under 8% black with a small blur. Real overlays (menus, dialogs, popovers) may float.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "heavy-borders",
+   "width": 1440,
+   "message": "10 panel borders are dark against their ground: #0b2c21 on #f7f5f0 (13.8:1) | #0b2c21 on #f7f5f0 (13.8:1) | #0b2c21 on #f7f5f0 (13.8:1)",
+   "fix": "A panel border is a whisper: about 1.1–1.3:1 against its ground on a light screen (#e5e7eb–#ededed on white), and about 1.2–1.5:1 on a dark one (#1a1a1a on #000, #2e2e2e on #111). Darker lines turn the screen into a grid of boxes; keep the stronger line for controls.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "tiny-text",
+   "width": 1440,
+   "message": "11 text blocks under 11px: Customer view 10px, Operations 10px, Guest care 10px, Revenue 10px.",
+   "fix": "Nothing below 11px; secondary text 12px, data 13–14px.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "panel-void",
+   "width": 1440,
+   "message": "4 card(s) hold a blank band inside: 87px in \"Open Rate Trend\", 74px in \"Engagement Overview\", 60px in \"Campaign Performance\".",
+   "fix": "A card stretches to its neighbour only when it has content to fill. Keep a legend or a note directly under its chart (only an action or a total may sit at a stretched card's foot), let a short card keep its own height (align-items: start), and let a filtered block shrink to its rows."
+  },
+  {
+   "level": "FAIL",
+   "id": "no-title",
+   "width": 768,
+   "message": "The screen has no h1.",
+   "fix": "Name the screen in an h1 at the top of the canvas (18–28px): \"Overview\", \"Payouts\", the project's name.",
+   "alsoAt": [
+    390
+   ]
+  }
+ ],
+ "images": [
+  {
+   "viewport": "desktop",
+   "width": 1440,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/marketing/desktop-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/marketing/desktop-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "tablet",
+   "width": 768,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/marketing/tablet-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/marketing/tablet-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "mobile",
+   "width": 390,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/marketing/mobile-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/marketing/mobile-page-01.jpg"
+   ],
+   "film": []
+  }
+ ]
+}

@@ -1,0 +1,20 @@
+{
+  "at": "2026-10-15T16:47:04.809Z",
+  "migration": "20261015200000_guide_simple_manifest.sql",
+  "sha256": "51a5fab7a7e1824c9c90e6f9d9f282f68ce6711dd9fa7e7410b23652974894e9",
+  "grants": [
+    {
+      "proname": "guide_simple_day",
+      "anon": false,
+      "authenticated": true,
+      "service": true
+    },
+    {
+      "proname": "record_guide_booking_arrival",
+      "anon": false,
+      "authenticated": true,
+      "service": false
+    }
+  ],
+  "guide_audit_column": true
+}

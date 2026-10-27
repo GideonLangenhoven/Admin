@@ -1,0 +1,72 @@
+[
+  {
+    "slug": "billing-enforcement",
+    "path": "supabase/functions/billing-enforcement/index.ts",
+    "sha256": "6bcd922b0387d660fd19bddf6f85ae8ca05e3c49afb468e2a22937b7acd52ae8"
+  },
+  {
+    "slug": "billing-enforcement",
+    "path": "supabase/functions/_shared/tenant.ts",
+    "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+  },
+  {
+    "slug": "billing-enforcement",
+    "path": "supabase/functions/_shared/pagination.ts",
+    "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+  },
+  {
+    "slug": "confirm-booking",
+    "path": "supabase/functions/confirm-booking/index.ts",
+    "sha256": "7f747be253ab5466f55fccfe3ec9b245c83894ae89706a51834c65fe29790a74"
+  },
+  {
+    "slug": "confirm-booking",
+    "path": "supabase/functions/_shared/tenant.ts",
+    "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+  },
+  {
+    "slug": "confirm-booking",
+    "path": "supabase/functions/_shared/pagination.ts",
+    "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+  },
+  {
+    "slug": "confirm-booking",
+    "path": "supabase/functions/_shared/waiver.ts",
+    "sha256": "def8bb4c226f45a473419ef49fc3d7b49f9d786c9dde17396f9069f8c6ffc579"
+  },
+  {
+    "slug": "confirm-booking",
+    "path": "supabase/functions/_shared/voucher-balances.ts",
+    "sha256": "81cfd970364a2c9958d30d3a262cad0eb2b759d83c9f722a706a94c5993c2252"
+  },
+  {
+    "slug": "manual-mark-paid",
+    "path": "supabase/functions/manual-mark-paid/index.ts",
+    "sha256": "4b6b14c85c049788be030258e181bf8afea670b4822c0fc9dfc05b972388d99c"
+  },
+  {
+    "slug": "manual-mark-paid",
+    "path": "supabase/functions/_shared/tenant.ts",
+    "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+  },
+  {
+    "slug": "manual-mark-paid",
+    "path": "supabase/functions/_shared/pagination.ts",
+    "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+  },
+  {
+    "slug": "manual-mark-paid",
+    "path": "supabase/functions/_shared/waiver.ts",
+    "sha256": "def8bb4c226f45a473419ef49fc3d7b49f9d786c9dde17396f9069f8c6ffc579"
+  },
+  {
+    "slug": "manual-mark-paid",
+    "path": "supabase/functions/_shared/auth.ts",
+    "sha256": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade"
+  },
+  {
+    "slug": "manual-mark-paid",
+    "path": "supabase/functions/manual-mark-paid/deno.json",
+    "sha256": "776494746017e3d2b06d84933befb734499e53c2ef2e951566801b8cb65882ba"
+  }
+]

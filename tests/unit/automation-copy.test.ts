@@ -37,7 +37,7 @@ describe("stepSentence", () => {
 
   it("describes an opened_email condition in plain language", () => {
     const step = { step_type: "condition", config: { condition_type: "opened_email" } };
-    expect(stepSentence(step, 0, [step])).toBe("If they opened the previous email: continue, otherwise: stop");
+    expect(stepSentence(step, 0, [step])).toBe("If any recorded email open exists for this contact: continue, otherwise: stop");
   });
 
   it("names the tag for a has_tag condition", () => {
@@ -128,5 +128,14 @@ describe("validateAutomation", () => {
       { step_type: "send_email", config: { template_id: "t1" } },
     ]);
     expect(issues).toEqual([]);
+  });
+});
+
+describe("welcome-back email timing", () => {
+  it("describes booking-based timing and rebooking exit", () => {
+    expect(triggerSentence({ trigger_type: "booking_inactive", trigger_config: { days_since_last_booking: 45 } })).toBe("Runs 45 days after the last paid booking. Stops if the customer books again.");
+  });
+  it.each([0, -1, 1.5, 3651, undefined])("rejects invalid wait period %s", days => {
+    expect(validateAutomation({ trigger_type: "booking_inactive", trigger_config: { days_since_last_booking: days } }, [{ step_type: "send_email", config: { template_id: "template-a" } }])).toContain("Trigger: days since last booking must be a whole number from 1 to 3,650.");
   });
 });

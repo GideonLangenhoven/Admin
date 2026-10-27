@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { CaretLeft, CaretRight, Check } from "@phosphor-icons/react";
+import { confirmCancellation } from "../lib/cancellation-choice";
 import { confirmAction } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
@@ -38,13 +39,12 @@ export default function BroadcastsPage() {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<any>(null);
-  const [history, setHistory] = useState<any[]>([]);
   const [weatherMode, setWeatherMode] = useState(false);
   const [weatherReason, setWeatherReason] = useState("unfavourable weather conditions");
   const [weatherResult, setWeatherResult] = useState<any>(null);
   const [cancellingWeather, setCancellingWeather] = useState(false);
 
-  useEffect(() => { loadSlots(); loadHistory(); }, [businessId]);
+  useEffect(() => { loadSlots(); }, [businessId]);
 
   async function loadSlots() {
     // Start of today in admin timezone, converted back to UTC for the query
@@ -80,11 +80,6 @@ export default function BroadcastsPage() {
       }
     }
     setPaxByDate(pByDate);
-  }
-
-  async function loadHistory() {
-    const { data } = await supabase.from("broadcasts").select("*").eq("business_id", businessId).order("created_at", { ascending: false }).limit(15);
-    setHistory(data || []);
   }
 
   // Calendar helpers
@@ -165,19 +160,14 @@ export default function BroadcastsPage() {
       const d = await r.json();
       setResult(d);
       if (!d.error) { setMessage(""); setSelectedSlotIds([]); setBookings([]); }
-      loadHistory();
     } catch (e) { setResult({ error: String(e) }); }
     setSending(false);
   }
 
   async function sendWeatherCancel() {
     if (selectedSlotIds.length === 0) return;
-    if (!await confirmAction({
-      title: "Cancel selected slots",
-      message: "Cancel " + selectedSlotIds.length + " slot(s) and notify " + bookings.length + " customer(s)? This will close each slot, cancel all bookings, and send WhatsApp plus email with self-service options.",
-      tone: "warning",
-      confirmLabel: "Cancel slots",
-    })) return;
+    const handling = await confirmCancellation("Cancel selected slots", "Cancel " + selectedSlotIds.length + " slot(s) and notify " + bookings.length + " customer(s)? This will close each slot, cancel all bookings, and send WhatsApp plus email.");
+    if (!handling) return;
     setCancellingWeather(true); setWeatherResult(null);
 
     try {
@@ -185,12 +175,12 @@ export default function BroadcastsPage() {
       // for slot closure, tenant-scoped booking cancellation, atomic capacity
       // release, refund_status ACTION_REQUIRED, and customer notifications.
       const { data, error } = await supabase.functions.invoke("weather-cancel", {
-        body: { slot_ids: selectedSlotIds, business_id: businessId, reason: weatherReason, log_broadcast: true },
+        body: { slot_ids: selectedSlotIds, business_id: businessId, reason: weatherReason, log_broadcast: true, offer_choice: handling.offerChoice },
       });
       if (error) throw error;
       setWeatherResult({ affected: (data as any)?.bookings_cancelled ?? 0, sent: (data as any)?.notified ?? 0 });
       setSelectedSlotIds([]); setBookings([]); setSelectedDate(null);
-      loadSlots(); loadHistory();
+      loadSlots();
     } catch (e) {
       setWeatherResult({ error: e instanceof Error ? e.message : String(e) });
     }
@@ -198,17 +188,20 @@ export default function BroadcastsPage() {
     setCancellingWeather(false);
   }
 
+  const weatherButton = (
+    <button type="button" aria-pressed={weatherMode} onClick={() => { setWeatherMode(!weatherMode); setWeatherResult(null); }}
+      className={"ui-btn w-full lg:w-auto " + (weatherMode ? "ui-btn-danger" : "ui-btn-ghost")}>
+      {weatherMode ? "Weather Mode ON" : "Weather Cancel"}
+    </button>
+  );
+
   return (
     <div className="max-w-6xl">
       <div className="anim-fade-up mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="ui-mono-label mb-2">Customer Messaging</p>
           <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Broadcasts</h1>
         </div>
-        <button onClick={() => { setWeatherMode(!weatherMode); setWeatherResult(null); }}
-          className={"ui-btn w-full sm:w-auto " + (weatherMode ? "ui-btn-danger" : "ui-btn-ghost")}>
-          {weatherMode ? "Weather Mode ON" : "Weather Cancel"}
-        </button>
+        <div className="hidden lg:block">{weatherButton}</div>
       </div>
 
       <SectionTabs section="broadcasts" />
@@ -255,6 +248,8 @@ export default function BroadcastsPage() {
             </div>
             <p className="ui-mono-label !text-[10px] !tracking-[0.06em] text-center mt-2 normal-case">Numbers = booked guests</p>
           </div>
+
+          <div className="mb-4 lg:hidden">{weatherButton}</div>
 
           {/* Slots for selected date */}
           {selectedDate && (
@@ -373,7 +368,7 @@ export default function BroadcastsPage() {
                             {b.phone && (
                               <span
                                 className="ui-status ui-pill-success"
-                                title="WhatsApp will be attempted. Actual delivery depends on whether this number is registered with WhatsApp and within the 24h service window."
+                                title="WhatsApp needs a registered number and an open 24-hour messaging window."
                               >
                                 WA?
                               </span>
@@ -395,7 +390,7 @@ export default function BroadcastsPage() {
               <div className="flex items-center gap-2.5 mb-2">
                 <h2 className="text-lg font-semibold" style={{ color: "var(--ck-danger)" }}>Weather Cancellation</h2>
               </div>
-              <p className="text-sm mb-4" style={{ color: "var(--ck-text-muted)" }}>Cancels selected slots, sends refund/reschedule options via WhatsApp, and a professional cancellation email.</p>
+              <p className="text-sm mb-4" style={{ color: "var(--ck-text-muted)" }}>Cancels selected departures and sends cancellation notices by WhatsApp and email. Choose whether to offer customer options before confirming.</p>
               <div className="mb-4">
                 <label className="ui-mono-label !text-[10px] block mb-1.5">Reason</label>
                 <input type="text" value={weatherReason} onChange={e => setWeatherReason(e.target.value)}
@@ -432,7 +427,7 @@ export default function BroadcastsPage() {
                     placeholder="Hi {name}, just a quick message about your upcoming paddle..."
                   />
                   <p className="text-xs mt-1" style={{ color: "var(--ck-text-muted)" }}>
-                    Use &#123;name&#125; for the customer&apos;s first name. Formatting helps the email version; WhatsApp sends a cleaned text version.
+                    Use &#123;name&#125; for the first name. Formatting appears in email; WhatsApp uses plain text.
                   </p>
                 </div>
                 <button data-demo-action="broadcast.send" onClick={sendBroadcast} disabled={sending || !htmlToPlainText(message).trim() || selectedSlotIds.length === 0 || bookings.length === 0}
@@ -471,29 +466,6 @@ export default function BroadcastsPage() {
               </div>
             </div>
           )}
-
-          {/* History */}
-          <div className="ui-card p-5">
-            <h2 className="text-sm font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>Recent Broadcasts</h2>
-            {history.length === 0 ? (
-              <div className="ui-empty !py-8">
-                <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No broadcasts sent yet.</p>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-48 overflow-auto">
-                {history.map(h => (
-                  <div key={h.id} className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:gap-3" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                    <span className={"ui-status shrink-0 " + (h.target_group === "AFFECTED_BOOKINGS" ? "ui-pill-danger" : "ui-pill-ocean")}>
-                      {h.target_group === "AFFECTED_BOOKINGS" ? "WX" : "BC"}
-                    </span>
-                    <p className="text-sm flex-1 line-clamp-1" style={{ color: "var(--ck-text)" }}>{h.message}</p>
-                    <span className="text-xs shrink-0 tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{h.sent_count} sent</span>
-                    <span className="text-xs shrink-0 tabular-nums" style={{ color: "var(--ck-text-muted)", opacity: 0.7 }}>{new Date(h.created_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>

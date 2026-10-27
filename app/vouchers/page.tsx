@@ -5,6 +5,7 @@ import { getAdminTimezone } from "../lib/admin-timezone";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { buildAdminVoucherPurchase } from "./voucher-purchase";
+import { renderGiftVoucherFace } from "../../supabase/functions/_shared/gift-voucher-face";
 import SectionTabs from "../../components/SectionTabs";
 
 const STATUS_PILL: Record<string, string> = {
@@ -73,6 +74,21 @@ function generateVoucherCode() {
 
 export default function Vouchers() {
   const { businessId } = useBusinessContext();
+  const [giftDesignResult, setGiftDesignResult] = useState<{ businessId: string; attempt: number; designs: { id: string; name: string; image_url: string | null; voucher_image_url: string | null }[]; error: boolean } | null>(null);
+  const giftDesigns = giftDesignResult?.businessId === businessId ? giftDesignResult?.designs || [] : [];
+  const [giftBrandResult, setGiftBrandResult] = useState({ businessId: "", image: "", name: "", logo: "" });
+  const giftBrand = giftBrandResult.businessId === businessId ? giftBrandResult : { image: "", name: "", logo: "" };
+  const [giftDesignAttempt, setGiftDesignAttempt] = useState(0);
+  const giftDesignError = giftDesignResult?.businessId === businessId && giftDesignResult?.attempt === giftDesignAttempt && giftDesignResult?.error;
+  useEffect(() => {
+    if (!businessId) return;
+    let cancelled = false;
+    supabase.from("businesses").select("business_name,name,email_img_gift,logo_url").eq("id", businessId).maybeSingle()
+      .then(({ data }) => { if (!cancelled) setGiftBrandResult({ businessId, image: data?.email_img_gift || "", name: data?.business_name || data?.name || "", logo: data?.logo_url || "" }); });
+    supabase.from("tours").select("id,name,image_url,voucher_image_url").eq("business_id", businessId).eq("active", true).order("sort_order")
+      .then(({ data, error }) => { if (!cancelled) setGiftDesignResult({ businessId, attempt: giftDesignAttempt, designs: data || [], error: !!error }); });
+    return () => { cancelled = true; };
+  }, [businessId, giftDesignAttempt]);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState("");
@@ -90,7 +106,10 @@ export default function Vouchers() {
     type: "FREE_TRIP",
     value: "0",
     gift_message: "",
+    gift_tour_id: "",
   });
+
+  const giftDesign = giftDesigns.find(item => item.id === form.gift_tour_id);
 
   const loadVouchers = useCallback(async () => {
     const { data } = await supabase
@@ -180,6 +199,7 @@ export default function Vouchers() {
       value: form.value,
       expiresAt: "",
       giftMessage: form.gift_message,
+      giftTourId: giftDesign?.id,
     });
     const payload = purchase.voucherPayload;
     // Retry on unique constraint violation (code collision)
@@ -216,6 +236,7 @@ export default function Vouchers() {
         type: "FREE_TRIP",
         value: "0",
         gift_message: "",
+    gift_tour_id: "",
       });
       await loadVouchers();
     }
@@ -223,12 +244,13 @@ export default function Vouchers() {
   }
 
   return (
-    <div className="space-y-4">
-      <SectionTabs section="marketing" />
+    <div className="max-w-7xl space-y-6">
       <div className="anim-fade-up">
         <p className="ui-mono-label mb-2">Marketing · Vouchers</p>
-        <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Vouchers</h2>
+        <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Vouchers</h1>
       </div>
+
+      <SectionTabs section="marketing" />
 
       <div className="anim-fade-up anim-d1 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <form data-demo-submit="voucher.create" onSubmit={createVoucher} className="ui-card p-4">
@@ -256,7 +278,7 @@ export default function Vouchers() {
               <input name="recipient_name" value={form.recipient_name} onChange={(e) => setForm({ ...form, recipient_name: e.target.value })} className="ui-control mt-1 w-full" />
             </label>
             <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
-              Recipient's email (optional; sends the gift straight to them instead of the buyer)
+              Recipient email (optional, receives the gift)
               <input name="recipient_email" type="email" value={form.recipient_email} onChange={(e) => setForm({ ...form, recipient_email: e.target.value })} className="ui-control mt-1 w-full" />
             </label>
             <label className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
@@ -290,12 +312,26 @@ export default function Vouchers() {
             <textarea name="gift_message" value={form.gift_message} onChange={(e) => setForm({ ...form, gift_message: e.target.value })} rows={3} className="ui-control mt-1 w-full" />
           </label>
 
+          <div className="mt-4">
+            <label htmlFor="operator-gift-design" className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Gift voucher photo</label>
+            <select id="operator-gift-design" className="ui-control mt-1 w-full" value={giftDesign?.id || ""} onChange={e => setForm({ ...form, gift_tour_id: e.target.value })}>
+              <option value="">Default gift voucher</option>
+              {giftDesigns.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+            <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Choose a photo from Settings &gt; Tours. Voucher type and redemption rules stay the same.</p>
+            {giftDesignError && <p role="status" className="mt-2 text-sm">Experience photos couldn’t load. <button type="button" className="underline" onClick={() => setGiftDesignAttempt(value => value + 1)}>Try again</button></p>}
+            <details className="mt-2">
+              <summary className="cursor-pointer py-2 text-sm">Preview gift voucher</summary>
+              <div className="max-w-lg" dangerouslySetInnerHTML={{ __html: renderGiftVoucherFace({ imageUrl: giftDesign?.voucher_image_url || giftDesign?.image_url || giftBrand.image, businessName: giftBrand.name, logoUrl: giftBrand.logo, experienceName: giftDesign?.name || form.tour_name, recipientName: form.recipient_name, buyerName: form.buyer_name, message: form.gift_message, value: form.value, monetary: form.type === "MONETARY", expiresLabel: "Valid for 3 years" }) }} />
+            </details>
+          </div>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm" style={{ color: createMessage.includes("sent") ? "var(--ck-success)" : "var(--ck-danger)" }}>{createMessage}</p>
             <button type="submit" data-help-submit="" disabled={creating || !form.code.trim()} className="ui-btn ui-btn-primary disabled:opacity-50">
               {creating ? "Creating..." : "Send payment link"}
             </button>
           </div>
+
         </form>
 
         <div className="ui-card p-4">
@@ -315,7 +351,7 @@ export default function Vouchers() {
               </div>
             ))}
           </div>
-          <p className="mt-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>Use status filters below to confirm which codes are still redeemable and which have already been used.</p>
+          <p className="mt-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>Filter by status to see available and used codes.</p>
         </div>
       </div>
 
@@ -359,7 +395,7 @@ export default function Vouchers() {
         <div className="ui-card">
           <div className="ui-empty">
             <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No vouchers found</p>
-            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>No vouchers match this filter. Try clearing the date or status.</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>No matches. Clear the date or status filter.</p>
           </div>
         </div>
       ) : (

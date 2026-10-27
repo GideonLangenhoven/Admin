@@ -1,0 +1,13 @@
+{
+  "baseline": "dpl_8JtvXGv3DA9BPrbhZnufBaRiT7iD",
+  "changed": [
+    "app/new-booking/page.tsx",
+    "components/booking/BookingQuestions.tsx"
+  ],
+  "preserved": 484,
+  "database_changes": [
+    "20261016140000_admin_extra_pax.sql"
+  ],
+  "functions": [],
+  "marketing_activation": false
+}

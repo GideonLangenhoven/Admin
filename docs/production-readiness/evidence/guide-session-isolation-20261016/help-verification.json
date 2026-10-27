@@ -1,0 +1,16 @@
+{
+  "at": "2026-10-16T08:56:33.749Z",
+  "updated": [
+    "help:guide:4"
+  ],
+  "preserved_other_chunks": 175,
+  "result": {
+    "ok": true,
+    "total": 176,
+    "embedded": 1,
+    "skipped": 175,
+    "removed": 0,
+    "failed": 0,
+    "errors": []
+  }
+}

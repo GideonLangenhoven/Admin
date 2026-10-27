@@ -31,7 +31,7 @@ describe("operator dashboard snapshot", () => {
     expect(admissionMigration).toContain("not coalesce(a.read_only, false)");
     expect(admissionMigration).toContain("public.record_booking_arrival(");
     expect(admissionMigration).toMatch(/grant execute on function public\.record_authenticated_booking_arrival\([\s\S]*?to authenticated;/);
-    expect(arrivalServer).toContain('.rpc("record_authenticated_booking_arrival"');
+    expect(arrivalServer).toContain('.rpc(guide ? "record_guide_booking_arrival" : "record_authenticated_booking_arrival"');
     expect(arrivalServer).not.toContain("getCallerAdmin");
   });
 

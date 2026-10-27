@@ -1,0 +1,28 @@
+{
+  "deployment": "dpl_2cE6KEW2u1WcXnQtVJfvKWHcwYBD",
+  "archive_uid": "61057fdb6ea22e570cda59be418d361d0193809f",
+  "baseline_files": 453,
+  "deployed_files": 453,
+  "unchanged_files": 450,
+  "added_files": [],
+  "removed_files": [],
+  "updated_files_sha256": {
+    "app/lib/agent-read-service.ts": {
+      "before": "bcffe6fd503b483aa1a6963065dd8479653bf9af372eeba8de86ccd4de7db435",
+      "after": "e8ef5384a55ac069c4a5d8619eac425e5ede013effdc8d3c0639c287e76203bf"
+    },
+    "app/lib/agent-tools.ts": {
+      "before": "a16ae8d29a68e6016804be19bb7be0a8a59a9ce5bfa7659d06dbfd16d428b54e",
+      "after": "be49b5b2c472e4706535da9f9aaaecc6b30da9b14ce14aea3402d600c591cf17"
+    },
+    "tests/unit/agent-read-service.test.ts": {
+      "before": "69203ab1c6b91d2eb95bb44340033372020a3b4cabfd3f5edb8cf7c54f7be202",
+      "after": "412695e8ef99c1eb6ea1e3f6aeef82b40eb4b2ffb381dc43f961ef27976c91f7"
+    }
+  },
+  "remote_archive_hashes_verified": true,
+  "environment_files_present": false,
+  "agent_sql_candidate_present": false,
+  "verification": "Both Vercel source archives read back and compared byte for byte; fixtures are source only, without a production caller",
+  "api_documentation": "https://vercel.com/docs/rest-api/deployments/get-deployment-file-contents"
+}

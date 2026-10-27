@@ -1,0 +1,13 @@
+{
+  "held_marketing_sources_preserved": [
+    "app/lib/marketing-journey.ts",
+    "app/marketing/automations/[id]/page.tsx",
+    "app/marketing/automations/page.tsx",
+    "supabase/functions/marketing-dispatch/index.ts",
+    "supabase/functions/marketing-automation-dispatch/index.ts",
+    "supabase/functions/auto-messages/index.ts",
+    "supabase/functions/broadcast/index.ts",
+    "supabase/functions/wa-webhook/index.ts"
+  ],
+  "all_match_previous_release": true
+}

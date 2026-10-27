@@ -1,0 +1,245 @@
+{
+  "task": "Reconcile and refresh dashboard AI help against the current dashboard",
+  "verifiedAt": "2026-10-04T15:56:00.637Z",
+  "articles": 30,
+  "beforeChunks": 133,
+  "liveChunks": 165,
+  "changedChunks": 101,
+  "exactContentAndMetadataMatch": true,
+  "embeddingsPresent": true,
+  "changedFunctions": [
+    "admin-help-chat"
+  ],
+  "helpFunctionVersion": 19,
+  "liveAnswerCases": 9,
+  "liveAnswerChecksPassed": true,
+  "liveAnswerLinksValid": true,
+  "liveAnswersManuallyReviewed": true,
+  "checkAdjustment": "Accepted a valid /settings link with the correct Tours & Activities section; the initial check unnecessarily required the #tours anchor.",
+  "publishedSourceMatchesTestedCandidate": true,
+  "publishedSourceFiles": [
+    {
+      "path": "supabase/functions/_shared/auth.ts",
+      "sha256": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade"
+    },
+    {
+      "path": "supabase/functions/_shared/demo-guide.ts",
+      "sha256": "f9d714820fd3340ad1dc00a680be2e7207f9feeb0d44f98cd9344b954d666c49"
+    },
+    {
+      "path": "supabase/functions/_shared/kb.ts",
+      "sha256": "5d89feee2c9ef467716d48625b112ecb86b81b84679e48c7a22da42a5f88b68d"
+    },
+    {
+      "path": "supabase/functions/_shared/llm.ts",
+      "sha256": "e7bed1f1ed96a04d6b326ee3580fc6550c37821b19d2618321f4d4be9b3c85c1"
+    },
+    {
+      "path": "supabase/functions/_shared/openrouter-provider.ts",
+      "sha256": "52aa270a8467d6476d17a8881a4fe29ced09b52cdb44b4bec9e05246af202cd8"
+    },
+    {
+      "path": "supabase/functions/_shared/pagination.ts",
+      "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+    },
+    {
+      "path": "supabase/functions/_shared/tenant.ts",
+      "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+    },
+    {
+      "path": "supabase/functions/admin-help-chat/index.ts",
+      "sha256": "4a0eeea27f536fff42950e4a1922c9f3123d7ed13265fa5691cf9db0face7e1a"
+    }
+  ],
+  "finishedAt": "2026-10-04T15:57:16.642Z",
+  "knowledgeSync": {
+    "total": 165,
+    "embedded": 101,
+    "skipped": 64,
+    "removed": 0,
+    "failed": 0
+  },
+  "tests": {
+    "unit": {
+      "files": 4,
+      "passed": 10,
+      "suites": [
+        "admin-help-current-guide",
+        "demo-help-chat",
+        "help-chat-actions",
+        "help-chat-navigation"
+      ]
+    },
+    "denoCheck": "passed",
+    "scopedEslint": "passed",
+    "nodeSyntaxCheck": "passed",
+    "diffWhitespaceCheck": "passed"
+  },
+  "liveAnswers": [
+    {
+      "question": "Where do I find Chat FAQ and gift vouchers in the current dashboard?",
+      "answer": "### Chat FAQ and gift vouchers\n\nOpen [AI](/ai-usage) in the Growth group, then select the **Chat FAQ** tab. The **Chat FAQ** page is [here](/settings/chat-faq), and lets the main admin maintain approved answers used by the website and WhatsApp guest chatbot.\n\nGift vouchers are the **Vouchers** tab under [Marketing](/marketing), also available directly at [Vouchers](/vouchers). You email the buyer a payment link, and BookingTours activates the voucher after payment. The buyer receives the link and the recipient can use the activated voucher according to your voucher setup.",
+      "sources": [
+        {
+          "title": "Chat FAQ (Quick Answers)",
+          "route": "/settings/chat-faq"
+        },
+        {
+          "title": "Dashboard home",
+          "route": "/"
+        },
+        {
+          "title": "AI usage and customer chatbot allowance",
+          "route": "/ai-usage"
+        }
+      ],
+      "checksPassed": true,
+      "errors": []
+    },
+    {
+      "question": "Where do I edit custom booking questions?",
+      "answer": "### Custom booking questions\n\nEdit them in [Settings](/settings), under **Tours & Activities**. Add a template or question, choose its answer type, options, and whether it is required, then save. The answers are captured with the booking and shown to staff.",
+      "sources": [
+        {
+          "title": "Settings",
+          "route": "/settings"
+        },
+        {
+          "title": "New Booking",
+          "route": "/new-booking"
+        },
+        {
+          "title": "How bookings work (statuses, payments, changes)",
+          "route": "/bookings"
+        }
+      ],
+      "checksPassed": true,
+      "errors": []
+    },
+    {
+      "question": "How do I record only 2 of 4 guests as arrived?",
+      "answer": "### Record a partial arrival\n\nOpen [Simple View Check-ins](/simple/check-ins), select the session, use the minus/plus controls to set the arrival count to **2 of 4**, then save. A signed waiver and settled payment are required before recording arrivals. This does not collect payment.\n\nBookingTours records the partial arrival count and keeps the reservation unchanged. No guest notification is specified for this action.",
+      "sources": [
+        {
+          "title": "Simple View, roll call and check-ins",
+          "route": "/simple"
+        },
+        {
+          "title": "Bookings",
+          "route": "/bookings"
+        },
+        {
+          "title": "Dashboard home",
+          "route": "/"
+        }
+      ],
+      "checksPassed": true,
+      "errors": []
+    },
+    {
+      "question": "Does Submit refund mean the refund is completed, and how do I check a pending refund?",
+      "answer": "### Refund status\n\nNo. On [Refunds](/refunds), **Submit refund** sends the eligible refundable card amount to Yoco, but the refund may remain **Refund pending**. Submission does not confirm that the guest has received the money. BookingTours records the provider outcome, such as completed, pending, failed or unknown, and the guest is notified according to the refund result.\n\nFor a pending refund, select **Check status** on the same refund. This reconciles the existing provider attempt, so do not submit it again. For a manual bank refund, transfer the money outside BookingTours first, then use **Confirm bank transfer** to record it.",
+      "sources": [
+        {
+          "title": "Refunds",
+          "route": "/refunds"
+        }
+      ],
+      "checksPassed": true,
+      "errors": []
+    },
+    {
+      "question": "Where is the separate Payment Reminders page?",
+      "answer": "### Payment reminders\n\nThere is no separate Payment Reminders page. Manage them from [Bookings](/bookings): open an unpaid booking’s action menu and choose **Payment Reminder**. If no checkout link exists, use **Payment Link** first.",
+      "sources": [
+        {
+          "title": "Payment reminders and unpaid bookings",
+          "route": "/bookings"
+        },
+        {
+          "title": "Finding your way around",
+          "route": "/"
+        }
+      ],
+      "checksPassed": true,
+      "errors": []
+    },
+    {
+      "question": "How are trip photos shared? Do customers still need to reply YES to get the correct trip link?",
+      "answer": "### Trip Photos\n\nIn [Trip Photos](/photos), select a recent trip, upload photos or videos to connected Google Drive, or paste photo URLs. Review the gallery and choose **Send Photos to Lead Bookers**. BookingTours saves the links in **My Bookings** and sends them in the thank-you email and WhatsApp message when contact details are available.\n\nNo. Customers do **not** need to reply **YES**. The WhatsApp message includes the correct trip links directly. The page also shows sending progress and channel failures, while a saved link alone does not prove delivery.",
+      "sources": [
+        {
+          "title": "Trip Photos",
+          "route": "/photos"
+        },
+        {
+          "title": "WhatsApp and automatic messages",
+          "route": "/inbox"
+        }
+      ],
+      "checksPassed": true,
+      "errors": []
+    },
+    {
+      "question": "Can I use direct Viator, GetYourGuide, ChatGPT MCP or Meta Muse operator connections yet?",
+      "answer": "### Unavailable connections\n\nNo. Direct Viator and GetYourGuide connections are not available yet. ChatGPT/MCP and Meta Muse operator connections are also not customer-available. Do not configure credentials or use local connection screens as live integrations.\n\nCheck the status in [Settings](/settings) or the [AI Usage](/ai-usage) page. Ask platform support about future availability.",
+      "sources": [
+        {
+          "title": "Finding your way around",
+          "route": "/"
+        },
+        {
+          "title": "AI usage and customer chatbot allowance",
+          "route": "/ai-usage"
+        },
+        {
+          "title": "Settings",
+          "route": "/settings"
+        }
+      ],
+      "checksPassed": true,
+      "errors": []
+    },
+    {
+      "question": "Does dashboard help count towards the customer chatbot AI allowance?",
+      "answer": "No. Dashboard help does not count toward the customer chatbot’s AI reply allowance. Only customer WhatsApp and website chatbot replies count toward that allowance. You can review usage on [AI Usage](/ai-usage).",
+      "sources": [
+        {
+          "title": "AI usage and customer chatbot allowance",
+          "route": "/ai-usage"
+        },
+        {
+          "title": "Dashboard home",
+          "route": "/"
+        },
+        {
+          "title": "Billing",
+          "route": "/billing"
+        }
+      ],
+      "checksPassed": true,
+      "errors": []
+    },
+    {
+      "question": "Can staff still view Reports and export while the subscription is paused or suspended?",
+      "answer": "### Reports during suspension\n\nNo. When the subscription is paused or suspended, the sign-in gate blocks normal dashboard pages, including [Reports](/reports). Staff cannot rely on Reports or its download controls being available.\n\nA MAIN_ADMIN can access [Billing](/billing), while other staff should ask their main admin. If an export is needed while access is blocked, contact BookingTours support.",
+      "sources": [
+        {
+          "title": "Reports",
+          "route": "/reports"
+        },
+        {
+          "title": "Finding your way around",
+          "route": "/"
+        },
+        {
+          "title": "Billing",
+          "route": "/billing"
+        }
+      ],
+      "checksPassed": true,
+      "errors": []
+    }
+  ],
+  "scope": "Only admin-help-chat was deployed. Verification used a read-only demo session; no booking, payment, provider-message, or migration actions were performed."
+}

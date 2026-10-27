@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "passed": 6,
+  "failed": 0,
+  "duration_seconds": 46.3,
+  "target": "https://admin.bookingtours.co.za",
+  "scope": "Production JavaScript and routes with synthetic intercepted auth, tenant data and writes; no real account, booking, photo, payment or customer message created.",
+  "checks": [
+    "Shared guide sign-in, pax, contacts and office-route exclusion",
+    "Guide trip photos and synthetic upload",
+    "One-time guide password setup",
+    "Operator shared guide setup link",
+    "Full and partial guide arrivals with no desk payment controls",
+    "Plain-English marketing actions and email setup link"
+  ]
+}

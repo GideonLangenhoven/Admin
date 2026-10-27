@@ -43,7 +43,7 @@ describe("payment-link opt-in", () => {
 
   it("3rd failed payment emails the payment link", () => {
     const src = read("supabase/functions/yoco-webhook/index.ts");
-    expect(src).toContain('event: "booking_payment_failed"');
+    expect(src).toContain('rpc("record_booking_payment_failure"');
     expect(src).toMatch(/failCount\.count \|\| 0\) === 3/);
     expect(src).toContain("PAYMENT_FAILED_3X_PAYLINK_SENT");
   });

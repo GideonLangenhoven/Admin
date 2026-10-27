@@ -1,0 +1,22 @@
+[
+  {
+    "antipattern": "overused-font",
+    "name": "Overused font",
+    "description": "Inter, Roboto, Fraunces, Geist, Plus Jakarta Sans, and Space Grotesk are used on so many sites they no longer feel distinctive. Each new wave of AI-generated UIs converges on the same handful of faces. Choose a face that gives your interface personality.",
+    "severity": "warning",
+    "category": "slop",
+    "file": "/Users/gideonlangenhoven/dev/capekayak/supabase/functions/_shared/gift-voucher-face.ts",
+    "line": 34,
+    "snippet": "font-family:Arial"
+  },
+  {
+    "antipattern": "overused-font",
+    "name": "Overused font",
+    "description": "Inter, Roboto, Fraunces, Geist, Plus Jakarta Sans, and Space Grotesk are used on so many sites they no longer feel distinctive. Each new wave of AI-generated UIs converges on the same handful of faces. Choose a face that gives your interface personality.",
+    "severity": "warning",
+    "category": "slop",
+    "file": "/Users/gideonlangenhoven/dev/capekayak/booking/lib/gift-voucher-face.ts",
+    "line": 34,
+    "snippet": "font-family:Arial"
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "at": "2026-10-16T05:36:23.422Z",
+  "previous_baseline": "dpl_BUdA5CF8mUHjAtj1h4L7qHWwPZwT",
+  "new_baseline": "dpl_3ELT2erzNJAya63VE6U35WhbH125",
+  "changes": [
+    "components/AuthGate.tsx",
+    "components/SignOutButton.tsx"
+  ],
+  "removed": [],
+  "source_files": 482
+}

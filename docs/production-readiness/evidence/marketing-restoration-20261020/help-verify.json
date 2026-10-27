@@ -1,0 +1,24 @@
+{
+  "at": "2026-10-20T04:43:04.429Z",
+  "changed": [
+    "help:marketing:0",
+    "help:marketing:1",
+    "help:marketing:2",
+    "help:marketing:3",
+    "help:marketing:4",
+    "help:marketing:5",
+    "help:marketing:6",
+    "help:marketing:7",
+    "help:marketing:8",
+    "help:marketing:9"
+  ],
+  "result": {
+    "ok": true,
+    "total": 178,
+    "embedded": 4,
+    "skipped": 174,
+    "removed": 0,
+    "failed": 0,
+    "errors": []
+  }
+}

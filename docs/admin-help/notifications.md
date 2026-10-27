@@ -4,17 +4,17 @@ route: /notifications
 required_role: MAIN_ADMIN
 ---
 
-The Failed Notifications page (at /notifications, MAIN_ADMIN and above) is the WhatsApp outbox monitor — where you see messages that couldn't be delivered and retry them.
+Open [Broadcasts](/broadcasts), then the **Failed Notifications** tab at /notifications. MAIN_ADMIN and SUPER_ADMIN can inspect both WhatsApp outbox messages and transactional email jobs here.
 
 ## The tabs
 
-- **Failed** — messages that exhausted their retry attempts. Each row shows the phone number, message type, attempts, the error, and the expandable message body.
+- **Failed** — failed or expired messages. Each row shows the destination, channel, message type, attempts, error and expandable message body.
 - **Waiting for window** — messages queued until WhatsApp's 24-hour window reopens (they send automatically once the customer messages in or a template becomes applicable).
 - **Recent sent** — recently delivered messages, for confirmation.
 
 ## Retrying
 
-**Retry** requeues a failed message; the outbox processor picks it up within about 5 minutes.
+**Retry** attempts WhatsApp delivery immediately. If the service window is closed, the message stays queued until the customer messages again. Email retries are queued for the next notification worker run. Check whether the result says sent, queued or failed instead of assuming every retry delivered immediately.
 
 ## Common failure causes
 

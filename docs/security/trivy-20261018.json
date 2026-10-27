@@ -1,0 +1,229 @@
+{
+  "at": "2026-10-18T14:52:35.579950+00:00",
+  "scanner": {
+    "name": "Trivy",
+    "version": "0.76.0",
+    "release": "https://github.com/aquasecurity/trivy/releases/tag/v0.76.0",
+    "archive_sha256": "e7ec0d21fe842553f59af99aba2efbcc822369fbaed27019c575408b6d135fce",
+    "verified_against": "GitHub release asset digest and published checksums",
+    "database": {
+      "Version": 2,
+      "NextUpdate": "2026-10-19T13:11:41.355239192Z",
+      "UpdatedAt": "2026-10-18T13:11:41.355239553Z",
+      "DownloadedAt": "2026-10-18T14:51:15.660105Z"
+    }
+  },
+  "scope": {
+    "source_files": 1935,
+    "selection": "Current tracked and non-ignored untracked files from root repository and nested booking repository; symlinks excluded.",
+    "scanners": [
+      "vuln",
+      "secret",
+      "misconfig"
+    ],
+    "include_dev_dependencies": true,
+    "offline_dependency_analysis": true,
+    "telemetry": false,
+    "dependency_files_detected": 3,
+    "infrastructure_config_files_detected": 0
+  },
+  "summary": {
+    "occurrences": {
+      "HIGH": 7,
+      "MEDIUM": 3
+    },
+    "critical": 0,
+    "unique_advisories": 5,
+    "secrets_detected": 0
+  },
+  "targets": [
+    {
+      "target": "booking/package-lock.json",
+      "type": "npm",
+      "severity_counts": {
+        "HIGH": 3,
+        "MEDIUM": 1
+      },
+      "package_records": 579
+    },
+    {
+      "target": "package-lock.json",
+      "type": "npm",
+      "severity_counts": {
+        "HIGH": 3,
+        "MEDIUM": 1
+      },
+      "package_records": 932
+    },
+    {
+      "target": "remotion/booking-tours-hero/package-lock.json",
+      "type": "npm",
+      "severity_counts": {
+        "MEDIUM": 1,
+        "HIGH": 1
+      },
+      "package_records": 309
+    }
+  ],
+  "findings": [
+    {
+      "VulnerabilityID": "CVE-2026-93687",
+      "PkgName": "braces",
+      "InstalledVersion": "3.0.3",
+      "FixedVersion": null,
+      "Severity": "HIGH",
+      "Title": "braces: braces: Denial of Service via Stack Overflow from Deeply Nested Patterns",
+      "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-93687",
+      "occurrences": [
+        {
+          "target": "booking/package-lock.json",
+          "dependency_entries": [
+            {
+              "path": "node_modules/braces",
+              "dev": true
+            }
+          ]
+        },
+        {
+          "target": "package-lock.json",
+          "dependency_entries": [
+            {
+              "path": "node_modules/braces",
+              "dev": true
+            }
+          ]
+        }
+      ],
+      "triage": "Development dependency through Tailwind/ESLint file matching. Trivy lists no fixed version; review upstream before choosing a replacement."
+    },
+    {
+      "VulnerabilityID": "CVE-2026-104844",
+      "PkgName": "postcss-selector-parser",
+      "InstalledVersion": "6.1.4",
+      "FixedVersion": "7.1.6",
+      "Severity": "MEDIUM",
+      "Title": "postcss-selector-parser: postcss-selector-parser: Denial of Service via crafted CSS selectors",
+      "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-104844",
+      "occurrences": [
+        {
+          "target": "booking/package-lock.json",
+          "dependency_entries": [
+            {
+              "path": "node_modules/postcss-selector-parser",
+              "dev": true
+            }
+          ]
+        },
+        {
+          "target": "package-lock.json",
+          "dependency_entries": [
+            {
+              "path": "node_modules/postcss-selector-parser",
+              "dev": true
+            }
+          ]
+        }
+      ],
+      "triage": "Affected 6.1.4 comes through Tailwind 3/postcss-nested development dependencies. Fixed 7.1.6 is a major-version change; validate upstream compatibility rather than force a global override."
+    },
+    {
+      "VulnerabilityID": "GHSA-wq5f-xc86-pv6w",
+      "PkgName": "sharp",
+      "InstalledVersion": "0.35.4",
+      "FixedVersion": "0.35.5",
+      "Severity": "HIGH",
+      "Title": "sharp : Vulnerability in librsvg dependency CVE-2026-96889",
+      "PrimaryURL": "https://github.com/advisories/GHSA-wq5f-xc86-pv6w",
+      "occurrences": [
+        {
+          "target": "booking/package-lock.json",
+          "dependency_entries": [
+            {
+              "path": "node_modules/sharp",
+              "dev": false
+            }
+          ]
+        },
+        {
+          "target": "package-lock.json",
+          "dependency_entries": [
+            {
+              "path": "node_modules/sharp",
+              "dev": false
+            }
+          ]
+        }
+      ],
+      "triage": "Priority: runtime dependency used by operator voucher image rendering and customer /api/img. Upgrade 0.35.4 to at least 0.35.5; deployment exploitability was not tested."
+    },
+    {
+      "VulnerabilityID": "CVE-2026-93749",
+      "PkgName": "source-map-js",
+      "InstalledVersion": "1.2.1",
+      "FixedVersion": "1.2.2",
+      "Severity": "HIGH",
+      "Title": "source-map-js: source-map-js: Denial of Service via malformed indexed source maps",
+      "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-93749",
+      "occurrences": [
+        {
+          "target": "booking/package-lock.json",
+          "dependency_entries": [
+            {
+              "path": "node_modules/source-map-js",
+              "dev": false
+            }
+          ]
+        },
+        {
+          "target": "package-lock.json",
+          "dependency_entries": [
+            {
+              "path": "node_modules/source-map-js",
+              "dev": false
+            }
+          ]
+        },
+        {
+          "target": "remotion/booking-tours-hero/package-lock.json",
+          "dependency_entries": [
+            {
+              "path": "node_modules/source-map-js",
+              "dev": false
+            }
+          ]
+        }
+      ],
+      "triage": "Transitive dependency of PostCSS/Next/Remotion tooling. Trivy lists 1.2.2 as fixed; all three lockfiles affected."
+    },
+    {
+      "VulnerabilityID": "CVE-2026-86472",
+      "PkgName": "fast-uri",
+      "InstalledVersion": "3.1.7",
+      "FixedVersion": "2.4.7, 3.1.8, 4.1.5",
+      "Severity": "MEDIUM",
+      "Title": "fast-uri: fast-uri: Security bypass due to inconsistent host case normalization",
+      "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2026-86472",
+      "occurrences": [
+        {
+          "target": "remotion/booking-tours-hero/package-lock.json",
+          "dependency_entries": [
+            {
+              "path": "node_modules/fast-uri",
+              "dev": false
+            }
+          ]
+        }
+      ],
+      "triage": "Only standalone Remotion lockfile affected. Compatible fixed 3.x version listed by Trivy is 3.1.8; both web apps already resolve that version."
+    }
+  ],
+  "limits": [
+    "No supported infrastructure configuration files were detected; this is not a clean infrastructure-security verdict.",
+    "Deno/JSR dependencies in deno.lock were not included in the three detected dependency targets.",
+    "Ignored local environment files, generated deployment/build directories, installed node_modules and Git history were outside the snapshot.",
+    "No live exploitation, deployed-container scanning or production configuration assessment was performed.",
+    "No application dependencies were changed or deployed."
+  ],
+  "source_manifest_sha256": "b722906ac725641789cc345fb2c29d45cfd51bd102bec8075b30687b87c019a5",
+  "command": "trivy fs --scanners vuln,misconfig,secret --include-dev-deps --offline-scan --disable-telemetry --skip-version-check --timeout 10m --format json --output raw-report.json <source-snapshot>"
+}

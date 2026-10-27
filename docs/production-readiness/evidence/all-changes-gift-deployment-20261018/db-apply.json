@@ -1,0 +1,14 @@
+{
+  "at": "2026-10-18T11:38:28.387Z",
+  "migrations": [
+    {
+      "name": "20261018120000_manual_booking_deadlines.sql",
+      "sha256": "253adf9c06977543df023900965762db1771e0a1987a02bffcaa1929b7b7c1bd"
+    },
+    {
+      "name": "20261018160000_gift_voucher_photographs.sql",
+      "sha256": "a6ffd7d03c9ffa184c3005dbe4a6cf5bc6537d33d599467fc2493398faee0b46"
+    }
+  ],
+  "result": []
+}

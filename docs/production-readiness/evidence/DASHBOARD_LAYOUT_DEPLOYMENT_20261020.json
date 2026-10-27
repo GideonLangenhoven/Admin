@@ -1,0 +1,160 @@
+{
+  "date": "2026-10-20",
+  "status": "deployed_and_verified",
+  "deployed": true,
+  "url": "https://kayak.admin.bookingtours.co.za/",
+  "deployment": {
+    "id": "dpl_9TVrVHNzgCuMcGV5a9zApHf68Xpi",
+    "url": "caepweb-admin-61rspcgzq-jerrys-projects-f4e4eaf9.vercel.app",
+    "source_files_verified": 503,
+    "at": "2026-10-20T05:08:16.256Z"
+  },
+  "baseline": "dpl_778XJ2zdJiXacCXcKaPrQ7ij43vM",
+  "source": {
+    "changed": [
+      "app/page.tsx",
+      "app/api/dashboard-layout/route.ts",
+      "app/lib/dashboard-layout.ts",
+      "components/DashboardTiles.tsx",
+      "components/DashboardTiles.module.css"
+    ],
+    "hashes": {
+      "app/page.tsx": "5a1c8d8c410bd2e2c5cf0e6353d5ef7c21da73fa3095903cd42f567f977f3ae2",
+      "app/api/dashboard-layout/route.ts": "e089e9b19d0f6d0ea2061c8c7d302a12e0a65c3a865bcef6b91f3dcea858c02b",
+      "app/lib/dashboard-layout.ts": "8a0c658a4f72abf3c08e215124b1f26ebf6d98b469579935b1833b74bc9b2613",
+      "components/DashboardTiles.tsx": "a5416d0b603267914aed1a086002bef7a618f09ed5c64db5233f0c716771f6d9",
+      "components/DashboardTiles.module.css": "1f119fdc02c5f4769a8a696f267a6d3196aba37676859edd96eb957c57bec0c0"
+    },
+    "preserved_files": 498,
+    "verified_files": 503
+  },
+  "database": {
+    "at": "2026-10-20T05:10:58.566Z",
+    "version": "20261020090000",
+    "rows": [
+      {
+        "rls": true,
+        "anon_read": false,
+        "anon_write": false,
+        "authenticated_read": false,
+        "authenticated_write": false,
+        "service_access": true
+      }
+    ]
+  },
+  "migration": {
+    "at": "2026-10-20T05:09:49.132Z",
+    "version": "20261020090000",
+    "sha256": "4ccf310a7fe95b23974253783c30b7c0a801e160570fd36f37abee2177d8109f",
+    "committed": true,
+    "result": [
+      {
+        "rls": true,
+        "anon_read": false,
+        "authenticated_write": false,
+        "service_write": true
+      }
+    ]
+  },
+  "live_checks": [
+    {
+      "name": "Anonymous layout reads and writes are denied",
+      "status": "PASS"
+    },
+    {
+      "name": "A main admin cannot read or edit another operator layout",
+      "status": "PASS"
+    },
+    {
+      "name": "A writable main admin can save and reload the operator layout",
+      "status": "PASS"
+    },
+    {
+      "name": "Ordering and hidden tiles persist through the deployed API",
+      "status": "PASS"
+    },
+    {
+      "name": "Super admin can save for the selected operator",
+      "status": "PASS"
+    },
+    {
+      "name": "Concurrent stale saves cannot overwrite the saved layout",
+      "status": "PASS"
+    },
+    {
+      "name": "Injected operator IDs are rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "An existing restricted account cannot bypass the editing permission",
+      "status": "PASS",
+      "role": "MAIN_ADMIN",
+      "read_only": true
+    },
+    {
+      "name": "Direct anonymous and authenticated database access is denied",
+      "status": "PASS"
+    },
+    {
+      "name": "Writable main-admin dashboard exposes the layout editor",
+      "status": "PASS"
+    },
+    {
+      "name": "Read-only main-admin dashboard hides the layout editor",
+      "status": "PASS"
+    },
+    {
+      "name": "Live desktop move and save survive a fresh page load",
+      "status": "PASS"
+    },
+    {
+      "name": "Live mobile unhide persists after reload",
+      "status": "PASS"
+    },
+    {
+      "name": "Live editor fits the mobile viewport",
+      "status": "PASS"
+    },
+    {
+      "name": "The other operator layout remains unchanged",
+      "status": "PASS"
+    },
+    {
+      "name": "Temporary verification layout restored to its original state",
+      "status": "PASS"
+    },
+    {
+      "path": "/",
+      "status": 200
+    },
+    {
+      "path": "/api/dashboard-layout",
+      "status": 401
+    }
+  ],
+  "live_check_count": 18,
+  "help": {
+    "at": "2026-10-20T05:23:46.728Z",
+    "changed": [
+      "help:dashboard:9"
+    ],
+    "result": {
+      "ok": true,
+      "total": 179,
+      "embedded": 1,
+      "skipped": 178,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    },
+    "unrelated_help_preserved": true
+  },
+  "verification_notes": "Writable main-admin save tested with unchanged choices and original row restored. Super-admin selected-operator saves and mobile restoration tested on the Claire demo operator and original layout restored. The demo main-admin account is read-only, and its API and UI editing restrictions were verified.",
+  "screenshots": [
+    "docs/production-readiness/evidence/dashboard-layout-deployment-20261020/editor-1440.png",
+    "docs/production-readiness/evidence/dashboard-layout-deployment-20261020/editor-390.png"
+  ],
+  "real_emails_sent": 0,
+  "real_payments": 0,
+  "original_layouts_restored": true
+}

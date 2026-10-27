@@ -1,0 +1,2 @@
+import { defineConfig } from "@playwright/test";
+export default defineConfig({ testDir: "./tests/e2e", testMatch: "guide-photos-parity.spec.ts", workers: 1, retries: 0, timeout: 90000, expect: { timeout: 20000 }, reporter: "list", outputDir: ".vercel/guide-photos-results", use: { baseURL: process.env.PHOTO_PREVIEW_ORIGIN || "http://127.0.0.1:3206", browserName: "chromium", channel: "chrome", trace: "retain-on-failure" } });

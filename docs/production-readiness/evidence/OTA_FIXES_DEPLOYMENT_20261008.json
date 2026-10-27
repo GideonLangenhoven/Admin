@@ -1,0 +1,452 @@
+{
+  "authorization": "deploy",
+  "verified_at": "2026-10-08T10:17:37.112890+00:00",
+  "status": "DEPLOYED_AND_VERIFIED_OTA_LIVE_ACTIVATION_BLOCKED",
+  "project_ref": "ukdsrndqhsatjkmxijuj",
+  "scope": "OTA migration, five OTA entrypoints and cron-tasks expiry update; no frontend source changes required",
+  "migration": {
+    "at": "2026-10-08T10:08:48.723Z",
+    "passed": true,
+    "sha256": "47833ce58212ac6544789bf3dfb92ce7968fa0c93d8b7586d31672d278132162",
+    "project": "ukdsrndqhsatjkmxijuj",
+    "mode": "apply",
+    "boundary": "BLOCKED",
+    "version": "20261008120000",
+    "name": "ota_transactions",
+    "rollback_rehearsal_passed": true,
+    "history_source_matches": true
+  },
+  "functions": [
+    {
+      "name": "viator-webhook",
+      "previous_version": 33,
+      "version": 34,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "source_matches": true
+    },
+    {
+      "name": "getyourguide-webhook",
+      "previous_version": 28,
+      "version": 29,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "source_matches": true
+    },
+    {
+      "name": "viator-availability-sync",
+      "previous_version": 27,
+      "version": 28,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "source_matches": true
+    },
+    {
+      "name": "getyourguide-availability-sync",
+      "previous_version": 27,
+      "version": 28,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "source_matches": true
+    },
+    {
+      "name": "ota-reconcile",
+      "previous_version": 26,
+      "version": 27,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "source_matches": true
+    },
+    {
+      "name": "cron-tasks",
+      "previous_version": 82,
+      "version": 83,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "source_matches": true
+    }
+  ],
+  "verification": {
+    "live_http": [
+      {
+        "name": "viator-webhook",
+        "status": 503,
+        "code": "OTA_NOT_READY"
+      },
+      {
+        "name": "getyourguide-webhook",
+        "status": 503,
+        "code": "OTA_NOT_READY"
+      },
+      {
+        "name": "viator-availability-sync",
+        "status": 503,
+        "code": "OTA_NOT_READY"
+      },
+      {
+        "name": "getyourguide-availability-sync",
+        "status": 503,
+        "code": "OTA_NOT_READY"
+      },
+      {
+        "name": "ota-reconcile",
+        "status": 503,
+        "code": "OTA_NOT_READY"
+      },
+      {
+        "name": "cron-tasks",
+        "status": 401
+      }
+    ],
+    "database": {
+      "history": [
+        {
+          "version": "20261008120000",
+          "name": "ota_transactions",
+          "source_sha256": "47833ce58212ac6544789bf3dfb92ce7968fa0c93d8b7586d31672d278132162",
+          "source_matches": true
+        }
+      ],
+      "boundary": [
+        {
+          "singleton": true,
+          "environment": "BLOCKED"
+        }
+      ],
+      "tables": [
+        {
+          "relname": "ota_availability_snapshots",
+          "relrowsecurity": true
+        },
+        {
+          "relname": "ota_events",
+          "relrowsecurity": true
+        },
+        {
+          "relname": "ota_reservations",
+          "relrowsecurity": true
+        },
+        {
+          "relname": "ota_runtime_boundary",
+          "relrowsecurity": true
+        }
+      ],
+      "policies": [
+        {
+          "schemaname": "public",
+          "tablename": "ota_availability_snapshots",
+          "policyname": "ota_snapshots_service",
+          "cmd": "ALL",
+          "roles": "{service_role}",
+          "qual": "true",
+          "with_check": "true"
+        },
+        {
+          "schemaname": "public",
+          "tablename": "ota_events",
+          "policyname": "ota_events_service",
+          "cmd": "ALL",
+          "roles": "{service_role}",
+          "qual": "true",
+          "with_check": "true"
+        },
+        {
+          "schemaname": "public",
+          "tablename": "ota_reservations",
+          "policyname": "ota_reservations_service",
+          "cmd": "ALL",
+          "roles": "{service_role}",
+          "qual": "true",
+          "with_check": "true"
+        }
+      ],
+      "grants": [
+        {
+          "rolname": "service_role",
+          "relname": "ota_availability_snapshots",
+          "privilege_type": "DELETE"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_availability_snapshots",
+          "privilege_type": "INSERT"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_availability_snapshots",
+          "privilege_type": "MAINTAIN"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_availability_snapshots",
+          "privilege_type": "REFERENCES"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_availability_snapshots",
+          "privilege_type": "SELECT"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_availability_snapshots",
+          "privilege_type": "TRIGGER"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_availability_snapshots",
+          "privilege_type": "TRUNCATE"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_availability_snapshots",
+          "privilege_type": "UPDATE"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_events",
+          "privilege_type": "DELETE"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_events",
+          "privilege_type": "INSERT"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_events",
+          "privilege_type": "MAINTAIN"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_events",
+          "privilege_type": "REFERENCES"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_events",
+          "privilege_type": "SELECT"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_events",
+          "privilege_type": "TRIGGER"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_events",
+          "privilege_type": "TRUNCATE"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_events",
+          "privilege_type": "UPDATE"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_reservations",
+          "privilege_type": "DELETE"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_reservations",
+          "privilege_type": "INSERT"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_reservations",
+          "privilege_type": "MAINTAIN"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_reservations",
+          "privilege_type": "REFERENCES"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_reservations",
+          "privilege_type": "SELECT"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_reservations",
+          "privilege_type": "TRIGGER"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_reservations",
+          "privilege_type": "TRUNCATE"
+        },
+        {
+          "rolname": "service_role",
+          "relname": "ota_reservations",
+          "privilege_type": "UPDATE"
+        }
+      ],
+      "rpc_grants": [
+        {
+          "proname": "ota_apply_operation",
+          "rolname": "anon",
+          "allowed": false
+        },
+        {
+          "proname": "ota_apply_operation",
+          "rolname": "authenticated",
+          "allowed": false
+        },
+        {
+          "proname": "ota_apply_operation",
+          "rolname": "service_role",
+          "allowed": true
+        },
+        {
+          "proname": "ota_assert_sandbox",
+          "rolname": "anon",
+          "allowed": false
+        },
+        {
+          "proname": "ota_assert_sandbox",
+          "rolname": "authenticated",
+          "allowed": false
+        },
+        {
+          "proname": "ota_assert_sandbox",
+          "rolname": "service_role",
+          "allowed": true
+        },
+        {
+          "proname": "ota_expire_reservations",
+          "rolname": "anon",
+          "allowed": false
+        },
+        {
+          "proname": "ota_expire_reservations",
+          "rolname": "authenticated",
+          "allowed": false
+        },
+        {
+          "proname": "ota_expire_reservations",
+          "rolname": "service_role",
+          "allowed": true
+        }
+      ],
+      "counts": [
+        {
+          "events": 0,
+          "reservations": 0,
+          "snapshots": 0,
+          "ota_bookings": 0
+        }
+      ],
+      "cron": [
+        {
+          "jobname": "cron-tasks-every-5-minutes",
+          "schedule": "*/5 * * * *",
+          "active": true
+        },
+        {
+          "jobname": "gyg-availability-hourly",
+          "schedule": "12 * * * *",
+          "active": true
+        },
+        {
+          "jobname": "notification-jobs-every-minute",
+          "schedule": "* * * * *",
+          "active": true
+        },
+        {
+          "jobname": "ota-reconcile-nightly",
+          "schedule": "37 2 * * *",
+          "active": false
+        },
+        {
+          "jobname": "viator-availability-hourly",
+          "schedule": "7 * * * *",
+          "active": false
+        }
+      ]
+    },
+    "public_sites": [
+      {
+        "url": "https://admin.bookingtours.co.za/",
+        "status": 200
+      },
+      {
+        "url": "https://kayak.booking.bookingtours.co.za/",
+        "status": 200
+      }
+    ],
+    "scheduled_cleanup": [
+      {
+        "created": "2026-10-08 10:15:00.125482+00",
+        "status_code": 200,
+        "error_count": 0,
+        "ota_hold_cleanup": "0"
+      },
+      {
+        "created": "2026-10-08 10:10:00.860491+00",
+        "status_code": 200,
+        "error_count": 0,
+        "ota_hold_cleanup": "0"
+      }
+    ],
+    "security_baseline_updated_only_for_new_ota_tables": true,
+    "baseline_added_rows": {
+      "grants": 21,
+      "rls_status": 4,
+      "policies": 3
+    },
+    "unrelated_bundled_dependencies_match_previous_live_source": [
+      "_shared/ota-readiness.ts",
+      "_shared/pagination.ts",
+      "_shared/sentry.ts",
+      "_shared/tenant.ts",
+      "_shared/auth.ts"
+    ]
+  },
+  "local_test_evidence": "docs/production-readiness/evidence/OTA_FIXES_LOCAL_VERIFICATION_20261008.json",
+  "local_tests": {
+    "unit_passed": 2124,
+    "unit_skipped": 56,
+    "postgres_regression_groups": 14,
+    "new_ota_unit_tests": 27,
+    "typescript_and_scoped_lint": "passed"
+  },
+  "preserved": {
+    "public_ota_boundary": "503 OTA_NOT_READY",
+    "database_ota_boundary": "BLOCKED",
+    "cron_schedules_unchanged": true,
+    "integrations_enabled_by_deployment": false,
+    "customer_bookings_payments_or_messages_submitted_by_checks": false,
+    "other_pending_migrations_applied": false,
+    "unrelated_work_preserved": true
+  },
+  "remaining_launch_requirements": [
+    "Provider registration, sandbox access, official contract tests and certification",
+    "GYG required group/time-period support",
+    "Viator notification connection lifecycle and stable amendment identity agreement",
+    "Verified supported reconciliation feed"
+  ],
+  "rollback_source_backups": "/private/tmp/bookingtours-ota-deploy-20261008-IAYifr/before",
+  "release_snapshot": "/private/tmp/bookingtours-ota-deploy-20261008-IAYifr/release",
+  "source_sha256": {
+    "supabase/functions/_shared/auth.ts": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade",
+    "supabase/functions/_shared/getyourguide.ts": "2c747b931283ccd2dd0821abb8b0eb11b664be7e98dc27681a22177ed36f582d",
+    "supabase/functions/_shared/ota-availability.ts": "826788a01760ff98964e6f4a3bb466c86a9e3b93f61868851fed271c5be30ed7",
+    "supabase/functions/_shared/ota-backend.ts": "30e1ecdf274aae550705a4d15942c24ced3a9cf0bfaf19efd34f1f0cba9efc22",
+    "supabase/functions/_shared/ota-readiness.ts": "41a9e291ccae7f5df6a1047cb68b17b71111e8ec4fc7310accda66c08e9451c3",
+    "supabase/functions/_shared/ota-runtime.ts": "9472e61c06a894effde098e8c7c8493cf244ee3b7fffa922af459232b1457a71",
+    "supabase/functions/_shared/ota-supplier.ts": "ddff36563c2aee8bd3a36398567bb4bd40935d4494791fe8c6e2887db37c570a",
+    "supabase/functions/_shared/pagination.ts": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e",
+    "supabase/functions/_shared/sentry.ts": "cf5cad26d7ddb3a103a60d658dab85fa647d98e574d5ddb44ab83700c915bafb",
+    "supabase/functions/_shared/tenant.ts": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669",
+    "supabase/functions/_shared/viator.ts": "236fae7c5a12e9fc2b0b635666cfaf8c99d4701ee42b495b3abb4a1020c6a4de",
+    "supabase/functions/cron-tasks/index.ts": "915d0ecf6f1afcd1f9decdbcb6a292b6c7cfb63da5914f26ad24538eacaa1c8e",
+    "supabase/functions/getyourguide-availability-sync/index.ts": "58df49cadf94a12d814e7659642bf7f1249cb4ca63148abf8222de1e0d450897",
+    "supabase/functions/getyourguide-webhook/index.ts": "9332cb47c122e15c30fe1557271218602946a308ab882316d1b93807d9190ac4",
+    "supabase/functions/ota-reconcile/index.ts": "28708b2da8a9907f3ece8648a53ddd3c6d6239330cf1a992a3f9591bd50ea244",
+    "supabase/functions/viator-availability-sync/index.ts": "f7757f05622036d387982aff1ffacb3693b56650570641584af2984bec41c021",
+    "supabase/functions/viator-webhook/index.ts": "964c8b8f2300bab3e71bd323cac8ff247ba0882a06a0f5dbbe436d529aeca62e"
+  },
+  "security_baseline_sha256": "26ae2034f9a607823b0c4d22221227e56dce6371def024446f7d574e99a3881b",
+  "git_commit_or_push": false
+}

@@ -1,11 +1,17 @@
 "use client";
 import { useEffect, useState } from "react";
+import { resolveWaiverLink } from "@/supabase/functions/_shared/waiver";
+import ArrivalApproval from "@/components/booking/ArrivalApproval";
+import CopyEmailButton from "@/components/booking/CopyEmailButton";
+import { safeSimpleReturn } from "@/app/lib/simple-view";
+import { amountOutstanding, amountReceived } from "@/app/lib/report-accounting";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../lib/supabase";
 import { getAdminTimezone } from "../../lib/admin-timezone";
 import { formatDuration } from "../../lib/duration";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { notify } from "../../lib/app-notify";
+import { bookingCustomFieldEntries } from "../../../supabase/functions/_shared/booking-custom-fields";
 
 /* ── helpers ── */
 function fmtDate(iso: string) {
@@ -56,8 +62,10 @@ interface BookingDetail {
   refund_status: string | null;
   refund_amount: number | null;
   refund_notes: string | null;
-  custom_fields: Record<string, string> | null;
+  custom_fields: Record<string, unknown> | null;
   waiver_status: string;
+  waiver_token?: string;
+  arrival_approval_version?: number;
   waiver_signed_at: string | null;
   waiver_signed_name: string | null;
   waiver_payload: Record<string, unknown> | null;
@@ -137,6 +145,8 @@ const REFUND_COLORS: Record<string, string> = {
 
 const SOURCE_LABELS: Record<string, string> = {
   ADMIN: "Admin",
+  WEB: "Website",
+  WHATSAPP: "WhatsApp",
   WEB_CHAT: "Web Chat",
   WA_WEBHOOK: "WhatsApp",
   REBOOK: "Rebook",
@@ -265,12 +275,12 @@ function InfoRow({ label, value, mono = false }: { label: string; value: React.R
 
 function Card({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className={`ui-card ${className}`}>
+    <section id={title === "Waiver & Intake" ? "waiver" : title === "Pricing & Payment" ? "payment" : undefined} aria-label={title} tabIndex={-1} className={`ui-card scroll-mt-24 ${className}`}>
       <div className="border-b border-gray-100 px-5 py-3">
         <h3 className="ui-title-md text-sm">{title}</h3>
       </div>
       <div className="px-5 py-3">{children}</div>
-    </div>
+    </section>
   );
 }
 
@@ -279,8 +289,17 @@ export default function BookingDetailPage() {
   const params = useParams();
   const router = useRouter();
   const bookingId = params.id as string;
-  const { businessId } = useBusinessContext();
+  const { businessId, readOnly } = useBusinessContext();
 
+  const [returnTo, setReturnTo] = useState("/bookings");
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("returnTo");
+    setReturnTo(requested === "/" || requested === "/bookings" ? requested : safeSimpleReturn(requested, "/bookings"));
+  }, []);
+
+  const [waiverUrl,setWaiverUrl]=useState("");
+  const [sendingWaiver, setSendingWaiver] = useState(false);
+  const [waiverMessage, setWaiverMessage] = useState("");
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -311,7 +330,7 @@ export default function BookingDetailPage() {
       setLoading(true);
       setError(null);
 
-      const [bookingRes, invoiceRes, logsRes, amRes, holdsRes, addOnsRes] = await Promise.all([
+      const [bookingRes, invoiceRes, logsRes, amRes, holdsRes, addOnsRes, waiverSettings] = await Promise.all([
         supabase
           .from("bookings")
           .select("*, tours(name, duration_minutes, base_price_per_person), slots(start_time, capacity_total, booked, status)")
@@ -344,6 +363,7 @@ export default function BookingDetailPage() {
           .from("booking_add_ons")
           .select("id, qty, unit_price, add_ons(name)")
           .eq("booking_id", bookingId),
+        supabase.from("businesses").select("waiver_url,booking_site_url").eq("id",businessId).maybeSingle(),
       ]);
 
       if (bookingRes.error || !bookingRes.data) {
@@ -353,6 +373,10 @@ export default function BookingDetailPage() {
       }
 
       setBooking(bookingRes.data as BookingDetail);
+      try {
+        const url=waiverSettings.error?"":resolveWaiverLink(waiverSettings.data,bookingId,bookingRes.data.waiver_token);
+        setWaiverUrl(/^https?:\/\//i.test(url)?url:"");
+      }catch{setWaiverUrl("");}
       setCustomerDraft({
         name: bookingRes.data.customer_name || "",
         phone: bookingRes.data.phone || "",
@@ -370,6 +394,12 @@ export default function BookingDetailPage() {
     }
     load();
   }, [bookingId, businessId]);
+
+  useEffect(() => {
+    if (loading || !booking) return;
+    const section = window.location.hash === "#waiver" ? "waiver" : window.location.hash === "#payment" ? "payment" : null;
+    if (section) { const target = document.getElementById(section); target?.scrollIntoView(); target?.focus(); }
+  }, [loading, booking]);
 
   if (loading) {
     return (
@@ -392,8 +422,8 @@ export default function BookingDetailPage() {
   if (error || !booking) {
     return (
       <div className="max-w-3xl space-y-4 py-10">
-        <button onClick={() => router.push("/bookings")} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs w-fit">
-          Back to bookings
+        <button onClick={() => router.push(returnTo)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs w-fit">
+          Back
         </button>
         <div className="rounded-xl border p-6 text-center text-sm" style={{ background: "var(--ck-danger-soft)", borderColor: "color-mix(in srgb, var(--ck-danger) 28%, transparent)", color: "var(--ck-danger)" }}>
           {error || "Booking not found"}
@@ -609,7 +639,7 @@ export default function BookingDetailPage() {
       } else if (promoResult) {
         setCodeResult({ type: "error", message: promoResult.error || "Invalid promo code" });
       } else {
-        setCodeResult({ type: "error", message: "Code not found. Check the code and try again." });
+        setCodeResult({ type: "error", message: "Code not found. Check it and retry." });
       }
     } catch (err: any) {
       setCodeResult({ type: "error", message: err.message || "Failed to apply code" });
@@ -710,8 +740,8 @@ export default function BookingDetailPage() {
         setCodeResult({ type: "error", message: errMsg });
         notify({ title: "Payment link failed", message: res.error.message, tone: "error" });
       } else if (res.data?.fully_covered) {
-        setCodeResult({ type: "success", message: "Booking fully covered by promo \u2014 no payment needed" });
-        notify({ title: "Fully covered", message: "Promo covers the full amount. No payment required.", tone: "success" });
+        setCodeResult({ type: "success", message: "Promo covers the full booking." });
+        notify({ title: "Fully covered", message: "Promo applied. Nothing to pay.", tone: "success" });
       } else if (res.data?.redirectUrl) {
         setBooking({ ...booking, yoco_checkout_id: res.data.id });
         setCodeResult({ type: "success", message: `New payment link sent to customer (${fmtCurrency(Number(booking.total_amount))})` });
@@ -730,10 +760,10 @@ export default function BookingDetailPage() {
       {/* Header */}
       <div className="anim-fade-up flex flex-wrap items-center gap-3">
         <button
-          onClick={() => router.push("/bookings")}
+          onClick={() => router.push(returnTo)}
           className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs"
         >
-          Bookings
+          Back
         </button>
         <div className="flex items-center gap-3">
           <h1 className="font-display text-[24px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Booking {ref}</h1>
@@ -766,8 +796,7 @@ export default function BookingDetailPage() {
           <div>
             <h3 className="text-sm font-semibold text-emerald-900">Record manual payment</h3>
             <p className="mt-1 text-xs text-emerald-800">
-              Use this to record a cash, EFT, or in-person card payment. The customer will be marked as paid, a confirmation
-              email + WhatsApp will be sent, and an invoice will be issued.
+              Record cash, EFT or card payment already received. Marks the booking paid, sends email and WhatsApp confirmation, and issues an invoice.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -849,7 +878,7 @@ export default function BookingDetailPage() {
           {editingCustomer && isPending && booking.yoco_checkout_id && (
             <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 mb-3">
               <p className="text-xs text-amber-800 leading-snug">
-                <span className="font-semibold">Warning:</span> An existing payment link will be invalidated if you save changes. The customer will need a new payment link.
+                <span className="font-semibold">Warning:</span> Saving cancels the current payment link. Send the customer a new one.
               </p>
             </div>
           )}
@@ -872,7 +901,12 @@ export default function BookingDetailPage() {
             <>
               <InfoRow label="Name" value={booking.customer_name} />
               <InfoRow label="Phone" value={booking.phone || "Not provided"} />
-              <InfoRow label="Email" value={booking.email || "Not provided"} />
+              <InfoRow label="Email" value={
+                <span className="inline-flex max-w-full items-center gap-1">
+                  <span className="min-w-0 [overflow-wrap:anywhere]">{booking.email || "Not provided"}</span>
+                  <CopyEmailButton email={booking.email} />
+                </span>
+              } />
             </>
           )}
         </Card>
@@ -919,8 +953,7 @@ export default function BookingDetailPage() {
           {reduceGuestsOpen && !isCancelled && booking.qty > 1 && (
             <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-3">
               <p className="text-xs text-amber-900 leading-snug">
-                <span className="font-semibold">Reduce guest count.</span> Slot capacity will be freed and the customer will be notified.
-                Within 24 hours of the trip this action is blocked.
+                <span className="font-semibold">Reduce guest count.</span> Releases places and notifies the customer. Blocked within 24 hours of departure.
               </p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <label className="block text-xs font-medium text-amber-900">
@@ -975,6 +1008,10 @@ export default function BookingDetailPage() {
 
         {/* Pricing & Payment */}
         <Card title="Pricing & Payment">
+          <InfoRow label="Received" value={fmtCurrency(amountReceived(booking))} />
+          <InfoRow label="Still due" value={fmtCurrency(amountOutstanding(booking))} />
+          <p className="my-2 text-sm">Confirmed bookings may still owe money. Record payment only for money received; it does not charge a card.</p>
+          <ArrivalApproval bookingId={booking.id} status={booking.status} slotId={booking.slot_id} approvalVersion={Number(booking.arrival_approval_version||0)} />
           <InfoRow label="Unit Price" value={fmtCurrency(Number(booking.unit_price || 0))} />
           <InfoRow label="Quantity" value={booking.qty} />
           {booking.original_total && discountAmount > 0 && (
@@ -1117,6 +1154,27 @@ export default function BookingDetailPage() {
         )}
 
         <Card title="Waiver & Intake">
+          {waiverUrl ? <a href={waiverUrl} target="_blank" rel="noopener noreferrer" className="ui-btn ui-btn-soft mb-3">Open waiver</a> : booking.waiver_status!=="SIGNED" && <p className="mb-3 text-sm">Waiver link unavailable. Ask your main admin to check the waiver settings.</p>}
+          {booking.waiver_status !== "SIGNED" && !["CANCELLED", "EXPIRED"].includes(booking.status) && <div className="mb-4">
+            <button type="button" className="ui-btn ui-btn-primary disabled:opacity-50" disabled={readOnly || sendingWaiver || !booking.email || !waiverUrl} onClick={async () => {
+              if (sendingWaiver) return;
+              setSendingWaiver(true); setWaiverMessage("");
+              try {
+                const response = await supabase.functions.invoke("send-email", { body: { type: "WAIVER_REQUEST", data: { business_id: businessId, booking_id: booking.id } } });
+                if (response.error) {
+                  const detail = await response.error.context?.json?.().catch(() => null);
+                  throw new Error(detail?.error || response.error.message);
+                }
+                if (response.data?.ok !== true) throw new Error(response.data?.error || "Waiver email failed. Try again.");
+                setWaiverMessage(`Waiver email sent to ${booking.email}.`);
+              } catch (error) {
+                setWaiverMessage(error instanceof Error ? error.message : "Waiver email failed. Try again.");
+              } finally { setSendingWaiver(false); }
+            }}>{sendingWaiver ? "Sending waiver…" : "Email waiver"}</button>
+            <p className="mt-2 text-sm break-words">{booking.email ? `Sends this booking’s waiver to ${booking.email}.` : "Add the guest's email to send a waiver."}</p>
+            {waiverMessage && <p className="mt-2 text-sm" role="status">{waiverMessage}</p>}
+          </div>}
+          <p className="mb-3 text-sm">One waiver record per booking. Check the signer and guest details against your requirements.</p>
           <InfoRow
             label="Waiver status"
             value={
@@ -1160,13 +1218,13 @@ export default function BookingDetailPage() {
               </>
             );
           })()}
-          {booking.custom_fields && Object.keys(booking.custom_fields).length > 0 ? (
+          {bookingCustomFieldEntries(booking.custom_fields).length > 0 ? (
             <div className="mt-3 space-y-2 rounded-lg border border-gray-100 bg-gray-50 p-3">
-              {Object.entries(booking.custom_fields).map(([key, value]) => (
+              {bookingCustomFieldEntries(booking.custom_fields).map(({ key, label, value }) => (
                 <InfoRow
                   key={key}
-                  label={key.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())}
-                  value={String(value || "—")}
+                  label={label}
+                  value={value}
                 />
               ))}
             </div>

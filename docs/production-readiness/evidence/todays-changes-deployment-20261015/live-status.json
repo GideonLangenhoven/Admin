@@ -1,0 +1,69 @@
+{
+  "admin": {
+    "id": "dpl_6dmkz7W8U4wj9MQLNSgcGj8dhwMB",
+    "url": "caepweb-admin-4xtsi8qab-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY"
+  },
+  "functions": [
+    {
+      "slug": "wa-webhook",
+      "version": 239,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "yoco-webhook",
+      "version": 133,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "auto-messages",
+      "version": 98,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "broadcast",
+      "version": 84,
+      "verify_jwt": true,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "send-email",
+      "version": 188,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "marketing-dispatch",
+      "version": 64,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "marketing-track",
+      "version": 40,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "marketing-unsubscribe",
+      "version": 45,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "marketing-automation-dispatch",
+      "version": 58,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    },
+    {
+      "slug": "resend-webhook",
+      "version": 1,
+      "verify_jwt": false,
+      "status": "ACTIVE"
+    }
+  ]
+}

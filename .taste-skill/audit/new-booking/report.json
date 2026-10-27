@@ -1,0 +1,1449 @@
+{
+ "url": "http://127.0.0.1:3000/new-booking",
+ "at": "2026-10-27T15:03:24.853Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 1440,
+   "height": 900,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.58
+   ],
+   "motion": {
+    "elements": 5,
+    "css": 4,
+    "transitions": 1,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "page": {
+     "height": 900,
+     "screens": 1,
+     "words": 187,
+     "img": 3,
+     "video": 0,
+     "canvas": 0,
+     "svg": 25,
+     "sections": 5,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Claire's Hiking",
+     "words": 2,
+     "chars": 15,
+     "lines": 1,
+     "size": 12,
+     "vw": 0.8,
+     "font": "Plus Jakarta Sans",
+     "weight": 400,
+     "tracking": 0,
+     "leading": 1.63,
+     "top": 51,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "Claire's Hiking",
+     "words": 2,
+     "lines": 1,
+     "size": 12,
+     "font": "Plus Jakarta Sans"
+    },
+    "headings": [
+     {
+      "text": "New Booking",
+      "words": 2,
+      "chars": 11,
+      "lines": 1,
+      "size": 32,
+      "vw": 2.2,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1.2,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.13,
+      "top": 140,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 0.83,
+       "mono": false
+      },
+      {
+       "family": "Geist Mono",
+       "share": 0.13,
+       "mono": true
+      },
+      {
+       "family": "satoshi",
+       "share": 0.04,
+       "mono": false
+      }
+     ],
+     "familyCount": 3,
+     "sizes": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      20,
+      32
+     ],
+     "sizeCount": 10,
+     "notLoaded": [],
+     "body": {
+      "font": "Plus Jakarta Sans",
+      "size": 12,
+      "leading": 1.33,
+      "weight": 500,
+      "tracking": 0,
+      "contrast": null
+     },
+     "measureChars": 66,
+     "max": {
+      "size": 32,
+      "vw": 2.2,
+      "font": "satoshi",
+      "text": "New Booking"
+     },
+     "monoShare": 0.13,
+     "monoProseShare": 0.13,
+     "monoFamilies": [
+      "Geist Mono"
+     ],
+     "monoSamples": [
+      "Customer view",
+      "Operations",
+      "Guest care",
+      "Revenue",
+      "Growth",
+      "Admin"
+     ],
+     "microLabels": 3,
+     "microLabelShare": 0.051,
+     "microSamples": [
+      "Claire's Hiking",
+      "New Booking",
+      "0 departures · 0 places available"
+     ],
+     "upperShare": 0.1,
+     "centerShare": 0.14,
+     "smallText": 8
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [],
+     "textColors": [
+      {
+       "color": "#46534b",
+       "share": 0.42
+      },
+      {
+       "color": "#17221c",
+       "share": 0.18
+      },
+      {
+       "color": "#66736b",
+       "share": 0.16
+      },
+      {
+       "color": "#125e40",
+       "share": 0.09
+      },
+      {
+       "color": "#85998c",
+       "share": 0.06
+      }
+     ],
+     "button": {
+      "bg": "#ffffff",
+      "hsl": {
+       "h": 0,
+       "s": 0,
+       "l": 1
+      },
+      "fg": "#17221c"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 13,
+     "inHero": 6,
+     "radius": 8,
+     "height": 50,
+     "withShadow": 3,
+     "withGradient": 2,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "POWERED BY BookingTours",
+      "Sign Out",
+      "AI bot",
+      "Kirstenbosch Morning Walk",
+      "27"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 7,
+     "shadowOverlay": 0,
+     "shadowSamples": [
+      "button.flex.h-11 → rgba(15, 43, 31, 0.06) 0px 4px 10px 0px, rgba(15, 43, 31, 0.2) 0px 28px 56px -20",
+      "div.ui-card.anim-fade-up → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px ",
+      "div.ui-card.p-5 → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px ",
+      "div.ui-card.p-5 → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px "
+     ],
+     "gradients": 5,
+     "scrims": 0,
+     "gradientSamples": [
+      "aside.hidden.shrink-0 → radial-gradient(140% 50% at 50% -8%, rgba(0, 217, 139, 0.07), rgba(0, 0, 0, 0) 60%), radial-gradient(120% 45% ",
+      "div.ui-card.anim-fade-up → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "div.ui-card.p-5 → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "div.ui-card.p-5 → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)"
+     ],
+     "gradientText": 0,
+     "hairlines": 6,
+     "hairlineSamples": [
+      "aside.hidden.shrink-0 256px",
+      "a.mt-auto.border-t 255px",
+      "header.ui-glass.flex 1184px",
+      "div.shrink-0.border-b 1184px",
+      "details.mt-6.border-t 982px"
+     ],
+     "outlinedBoxes": 3,
+     "dashed": 0,
+     "blurred": 1,
+     "roundedBoxes": 5,
+     "boxRadius": 16,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": [
+      {
+       "count": 3,
+       "iconTopped": false,
+       "rounded": true,
+       "top": 230
+      }
+     ]
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 1,
+     "fixed": false,
+     "height": 34,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "plus jakarta sans fallback",
+     "geist mono",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "pageH": 900,
+    "margins": {
+     "left": 24,
+     "right": 53
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Claire's Hiking",
+      "size": 12,
+      "top": 51,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 296,
+      "n": 1
+     },
+     {
+      "x": 317,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 2,
+    "bodySize": 12,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0.11,
+    "voidBox": {
+     "x": 660,
+     "y": 120,
+     "w": 780,
+     "h": 180
+    }
+   },
+   "app": {
+    "viewport": {
+     "w": 1440,
+     "h": 900
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": {
+     "w": 256,
+     "tag": "aside",
+     "links": 13,
+     "share": 0.18
+    },
+    "topbar": {
+     "h": 61
+    },
+    "canvas": {
+     "left": 40,
+     "right": 84
+    },
+    "hero": {
+     "text": "Claire's Hiking",
+     "words": 2,
+     "chars": 15,
+     "lines": 1,
+     "size": 12,
+     "vw": 0.8,
+     "font": "Plus Jakarta Sans",
+     "weight": 400,
+     "tracking": 0,
+     "leading": 1.63,
+     "top": 51,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 3,
+    "layout": {
+     "panels": 3,
+     "firstScreen": 1,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 7,
+     "radii": [
+      [
+       16,
+       3
+      ],
+      [
+       8,
+       3
+      ],
+      [
+       0,
+       1
+      ]
+     ],
+     "heavyBorders": 5,
+     "borderSamples": [
+      "#0b2c21 on #f7f5f0 (13.8:1)",
+      "#122a1e on #ffffff (15.27:1)",
+      "#0b2c21 on #f7f5f0 (13.8:1)"
+     ],
+     "heavyShadows": 3,
+     "softShadows": 3,
+     "shadowSamples": [
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px"
+     ],
+     "glass": 0
+    },
+    "chips": {
+     "count": 0,
+     "hues": 0,
+     "samples": []
+    },
+    "numbers": {
+     "cells": 31,
+     "leftAligned": 0,
+     "figures": 22,
+     "tabularShare": 1,
+     "kpiMax": 15
+    },
+    "rows": {
+     "count": 5,
+     "median": 83
+    },
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.26,
+     "tiny": 7,
+     "tinySamples": [
+      "Customer view 10px",
+      "Operations 10px",
+      "Guest care 10px",
+      "Revenue 10px"
+     ],
+     "sizes": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      20,
+      32
+     ]
+    },
+    "title": {
+     "text": "Claire's Hiking",
+     "size": 12,
+     "top": 51
+    },
+    "colourShare": 0.008
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 768,
+   "height": 1024,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.42
+   ],
+   "motion": {
+    "elements": 17,
+    "css": 16,
+    "transitions": 1,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "page": {
+     "height": 1024,
+     "screens": 1,
+     "words": 153,
+     "img": 3,
+     "video": 0,
+     "canvas": 0,
+     "svg": 25,
+     "sections": 5,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "New Booking",
+     "words": 2,
+     "chars": 11,
+     "lines": 1,
+     "size": 32,
+     "vw": 4.2,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1.2,
+     "top": 122,
+     "tag": "h2",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": null,
+    "headings": [
+     {
+      "text": "New Booking",
+      "words": 2,
+      "chars": 11,
+      "lines": 1,
+      "size": 32,
+      "vw": 4.2,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1.2,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.25,
+      "top": 122,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 0.93,
+       "mono": false
+      },
+      {
+       "family": "Geist Mono",
+       "share": 0.05,
+       "mono": true
+      },
+      {
+       "family": "satoshi",
+       "share": 0.02,
+       "mono": false
+      }
+     ],
+     "familyCount": 3,
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      20,
+      32
+     ],
+     "sizeCount": 8,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 32,
+      "vw": 4.2,
+      "font": "satoshi",
+      "text": "New Booking"
+     },
+     "monoShare": 0.05,
+     "monoProseShare": 0.05,
+     "monoFamilies": [
+      "Geist Mono"
+     ],
+     "monoSamples": [
+      "Su",
+      "Mo",
+      "Tu",
+      "We",
+      "Th",
+      "Fr"
+     ],
+     "microLabels": 1,
+     "microLabelShare": 0.034,
+     "microSamples": [
+      "0 departures · 0 places available"
+     ],
+     "upperShare": 0.03,
+     "centerShare": 0.11,
+     "smallText": 2
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [],
+     "textColors": [
+      {
+       "color": "#46534b",
+       "share": 0.5
+      },
+      {
+       "color": "#17221c",
+       "share": 0.22
+      },
+      {
+       "color": "#66736b",
+       "share": 0.17
+      },
+      {
+       "color": "#125e40",
+       "share": 0.07
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.02
+      }
+     ],
+     "button": {
+      "bg": "#ffffff",
+      "hsl": {
+       "h": 0,
+       "s": 0,
+       "l": 1
+      },
+      "fg": "#17221c"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 10,
+     "inHero": 3,
+     "radius": 8,
+     "height": 50,
+     "withShadow": 2,
+     "withGradient": 2,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Kirstenbosch Morning Walk",
+      "27",
+      "30"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 7,
+     "shadowOverlay": 0,
+     "shadowSamples": [
+      "button.flex.h-11 → rgba(15, 43, 31, 0.06) 0px 4px 10px 0px, rgba(15, 43, 31, 0.2) 0px 28px 56px -20",
+      "div.ui-card.anim-fade-up → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px ",
+      "div.ui-card.p-5 → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px ",
+      "div.ui-card.p-5 → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px "
+     ],
+     "gradients": 4,
+     "scrims": 0,
+     "gradientSamples": [
+      "div.ui-card.anim-fade-up → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "div.ui-card.p-5 → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "div.ui-card.p-5 → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "details.ui-card.p-5 → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)"
+     ],
+     "gradientText": 0,
+     "hairlines": 10,
+     "hairlineSamples": [
+      "header.ui-glass.flex 768px",
+      "div.shrink-0.border-b 768px",
+      "details.mt-6.border-t 678px",
+      "section.booking-form_day__BfFvJ 331px",
+      "section.booking-form_day__BfFvJ 331px"
+     ],
+     "outlinedBoxes": 3,
+     "dashed": 0,
+     "blurred": 2,
+     "roundedBoxes": 5,
+     "boxRadius": 16,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 0,
+     "fixed": false,
+     "height": 0,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "geist mono",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "pageH": 1024,
+    "margins": {
+     "left": 24,
+     "right": 45
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Claire's Hiking",
+      "size": 16,
+      "top": 18,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 45,
+      "n": 2
+     },
+     {
+      "x": 24,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 3,
+    "bodySize": 12,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": null,
+    "topbar": {
+     "h": 61
+    },
+    "canvas": {
+     "left": 24,
+     "right": 45
+    },
+    "hero": {
+     "text": "New Booking",
+     "words": 2,
+     "chars": 11,
+     "lines": 1,
+     "size": 32,
+     "vw": 4.2,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1.2,
+     "top": 122,
+     "tag": "h2",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 3,
+    "layout": {
+     "panels": 3,
+     "firstScreen": 1,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 7,
+     "radii": [
+      [
+       16,
+       3
+      ],
+      [
+       8,
+       3
+      ],
+      [
+       0,
+       1
+      ]
+     ],
+     "heavyBorders": 5,
+     "borderSamples": [
+      "#0b2c21 on #f7f5f0 (13.8:1)",
+      "#122a1e on #ffffff (15.27:1)",
+      "#0b2c21 on #f7f5f0 (13.8:1)"
+     ],
+     "heavyShadows": 3,
+     "softShadows": 3,
+     "shadowSamples": [
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px"
+     ],
+     "glass": 0
+    },
+    "chips": {
+     "count": 1,
+     "hues": 1,
+     "samples": [
+      {
+       "hue": 156,
+       "size": 46,
+       "radius": "9999px"
+      }
+     ]
+    },
+    "numbers": {
+     "cells": 31,
+     "leftAligned": 0,
+     "figures": 22,
+     "tabularShare": 1,
+     "kpiMax": 15
+    },
+    "rows": {
+     "count": 5,
+     "median": 78
+    },
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.21,
+     "tiny": 7,
+     "tinySamples": [
+      "Customer view 10px",
+      "Operations 10px",
+      "Guest care 10px",
+      "Revenue 10px"
+     ],
+     "sizes": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      20,
+      32
+     ]
+    },
+    "title": null,
+    "colourShare": 0.01
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 390,
+   "height": 844,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.84
+   ],
+   "motion": {
+    "elements": 8,
+    "css": 8,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "page": {
+     "height": 844,
+     "screens": 1,
+     "words": 103,
+     "img": 3,
+     "video": 0,
+     "canvas": 0,
+     "svg": 25,
+     "sections": 5,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "New Booking",
+     "words": 2,
+     "chars": 11,
+     "lines": 1,
+     "size": 28,
+     "vw": 7.2,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1.2,
+     "top": 122,
+     "tag": "h2",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": null,
+    "headings": [
+     {
+      "text": "New Booking",
+      "words": 2,
+      "chars": 11,
+      "lines": 1,
+      "size": 28,
+      "vw": 7.2,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.02,
+      "leading": 1.2,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "left",
+      "widthRatio": 0.42,
+      "top": 122,
+      "tag": "h2",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 0.93,
+       "mono": false
+      },
+      {
+       "family": "Geist Mono",
+       "share": 0.04,
+       "mono": true
+      },
+      {
+       "family": "satoshi",
+       "share": 0.03,
+       "mono": false
+      }
+     ],
+     "familyCount": 3,
+     "sizes": [
+      11,
+      12,
+      13,
+      14,
+      16,
+      20,
+      28
+     ],
+     "sizeCount": 7,
+     "notLoaded": [],
+     "body": null,
+     "measureChars": null,
+     "max": {
+      "size": 28,
+      "vw": 7.2,
+      "font": "satoshi",
+      "text": "New Booking"
+     },
+     "monoShare": 0.04,
+     "monoProseShare": 0.04,
+     "monoFamilies": [
+      "Geist Mono"
+     ],
+     "monoSamples": [
+      "0 departures · 0 places available"
+     ],
+     "microLabels": 1,
+     "microLabelShare": 0.04,
+     "microSamples": [
+      "0 departures · 0 places available"
+     ],
+     "upperShare": 0.04,
+     "centerShare": 0.05,
+     "smallText": 2
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [],
+     "textColors": [
+      {
+       "color": "#46534b",
+       "share": 0.45
+      },
+      {
+       "color": "#17221c",
+       "share": 0.24
+      },
+      {
+       "color": "#66736b",
+       "share": 0.2
+      },
+      {
+       "color": "#125e40",
+       "share": 0.08
+      },
+      {
+       "color": "#ffffff",
+       "share": 0.02
+      }
+     ],
+     "button": {
+      "bg": "#ffffff",
+      "hsl": {
+       "h": 0,
+       "s": 0,
+       "l": 1
+      },
+      "fg": "#17221c"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 8,
+     "inHero": 2,
+     "radius": 8,
+     "height": 50,
+     "withShadow": 2,
+     "withGradient": 2,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Kirstenbosch Morning Walk",
+      "No departures available"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 7,
+     "shadowOverlay": 0,
+     "shadowSamples": [
+      "button.flex.h-11 → rgba(15, 43, 31, 0.06) 0px 4px 10px 0px, rgba(15, 43, 31, 0.2) 0px 28px 56px -20",
+      "div.ui-card.anim-fade-up → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px ",
+      "div.ui-card.p-5 → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px ",
+      "div.ui-card.p-5 → rgba(255, 255, 255, 0.65) 0px 1px 0px 0px inset, rgba(15, 43, 31, 0.05) 0px 1px "
+     ],
+     "gradients": 5,
+     "scrims": 0,
+     "gradientSamples": [
+      "div.ui-card.anim-fade-up → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "div.ui-card.p-5 → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "div.ui-card.p-5 → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+      "details.ui-card.p-5 → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)"
+     ],
+     "gradientText": 0,
+     "hairlines": 10,
+     "hairlineSamples": [
+      "header.ui-glass.flex 390px",
+      "div.shrink-0.border-b 390px",
+      "details.mt-6.border-t 316px",
+      "section.booking-form_day__BfFvJ 316px",
+      "section.booking-form_day__BfFvJ 316px"
+     ],
+     "outlinedBoxes": 3,
+     "dashed": 0,
+     "blurred": 2,
+     "roundedBoxes": 5,
+     "boxRadius": 16,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 0,
+     "fixed": false,
+     "height": 0,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "geist mono",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "pageH": 844,
+    "margins": {
+     "left": 16,
+     "right": 16
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Claire's Hiking",
+      "size": 16,
+      "top": 18,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 16,
+      "n": 1
+     },
+     {
+      "x": 37,
+      "n": 1
+     },
+     {
+      "x": 48,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 3,
+    "bodySize": 12,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": null,
+    "topbar": {
+     "h": 61
+    },
+    "canvas": {
+     "left": 16,
+     "right": 16
+    },
+    "hero": {
+     "text": "New Booking",
+     "words": 2,
+     "chars": 11,
+     "lines": 1,
+     "size": 28,
+     "vw": 7.2,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.02,
+     "leading": 1.2,
+     "top": 122,
+     "tag": "h2",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 3,
+     "firstScreen": 1,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 6,
+     "radii": [
+      [
+       16,
+       3
+      ],
+      [
+       8,
+       2
+      ],
+      [
+       0,
+       1
+      ]
+     ],
+     "heavyBorders": 4,
+     "borderSamples": [
+      "#0b2c21 on #f7f5f0 (13.8:1)",
+      "#0b2c21 on #f7f5f0 (13.8:1)",
+      "#0b2c21 on #f7f5f0 (13.8:1)"
+     ],
+     "heavyShadows": 3,
+     "softShadows": 3,
+     "shadowSamples": [
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+      "rgba(15, 43, 31, 0.12) 0px 10px 28px -14px"
+     ],
+     "glass": 0
+    },
+    "chips": {
+     "count": 1,
+     "hues": 1,
+     "samples": [
+      {
+       "hue": 156,
+       "size": 46,
+       "radius": "9999px"
+      }
+     ]
+    },
+    "numbers": {
+     "cells": 31,
+     "leftAligned": 0,
+     "figures": 0,
+     "tabularShare": null,
+     "kpiMax": null
+    },
+    "rows": null,
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.21,
+     "tiny": 7,
+     "tinySamples": [
+      "Customer view 10px",
+      "Operations 10px",
+      "Guest care 10px",
+      "Revenue 10px"
+     ],
+     "sizes": [
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      20,
+      28
+     ]
+    },
+    "title": null,
+    "colourShare": 0.004
+   },
+   "consoleErrors": []
+  }
+ ],
+ "findings": [
+  {
+   "level": "FAIL",
+   "id": "micro-label",
+   "width": 1440,
+   "message": "3 tiny uppercase letter-spaced labels (e.g. \"Claire's Hiking\", \"New Booking\", \"0 departures · 0 places available\").",
+   "fix": "Use sentence-case text at a readable size, or delete the label."
+  },
+  {
+   "level": "FAIL",
+   "id": "gradient",
+   "width": 1440,
+   "message": "5 gradient fill(s): aside.hidden.shrink-0 → radial-gradient(140% 50% at 50% -8%, rgba(0, 217, 139, 0.07), rgba(0, 0, 0, 0) 60%), radial-gradient(120% 45%  | div.ui-card.anim-fade-up → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%) | div.ui-card.p-5 → linear-gradient(rgb(255, 255, 255) 0px, rgb(252, 251, 247) 100%)",
+   "fix": "Use a flat colour or a real image. The only gradient allowed by default is a neutral scrim over a photo for legibility.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "button-fx",
+   "width": 1440,
+   "message": "Buttons with gradient fill and shadow/glow.",
+   "fix": "Flat fill, one colour.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "palette-cream",
+   "width": 1440,
+   "message": "Yellow-cream background (page background #f7f5f0).",
+   "fix": "Use the drawn palette. If you want warmth, take a low-chroma stone or bone, not a yellow cream.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "font-count",
+   "width": 1440,
+   "message": "3 typefaces in use (Plus Jakarta Sans, Geist Mono, satoshi).",
+   "fix": "Two at most.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "heavy-shadow",
+   "width": 1440,
+   "message": "3 panel shadow(s) heavy enough to read as floating: rgba(15, 43, 31, 0.12) 0px 10px 28px -14px | rgba(15, 43, 31, 0.12) 0px 10px 28px -14px | rgba(15, 43, 31, 0.12) 0px 10px 28px -14px",
+   "fix": "Panels sit on the ground: separate them with a fill one step from the ground or a quiet 1px border. A shadow, if any, is under 8% black with a small blur. Real overlays (menus, dialogs, popovers) may float.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "heavy-borders",
+   "width": 1440,
+   "message": "5 panel borders are dark against their ground: #0b2c21 on #f7f5f0 (13.8:1) | #122a1e on #ffffff (15.27:1) | #0b2c21 on #f7f5f0 (13.8:1)",
+   "fix": "A panel border is a whisper: about 1.1–1.3:1 against its ground on a light screen (#e5e7eb–#ededed on white), and about 1.2–1.5:1 on a dark one (#1a1a1a on #000, #2e2e2e on #111). Darker lines turn the screen into a grid of boxes; keep the stronger line for controls.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "tiny-text",
+   "width": 1440,
+   "message": "7 text blocks under 11px: Customer view 10px, Operations 10px, Guest care 10px, Revenue 10px.",
+   "fix": "Nothing below 11px; secondary text 12px, data 13–14px.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "micro-label",
+   "width": 768,
+   "message": "1 tiny uppercase letter-spaced label(s): \"0 departures · 0 places available\"",
+   "fix": "Prefer sentence case at body size.",
+   "alsoAt": [
+    390
+   ]
+  },
+  {
+   "level": "FAIL",
+   "id": "no-title",
+   "width": 768,
+   "message": "The screen has no h1.",
+   "fix": "Name the screen in an h1 at the top of the canvas (18–28px): \"Overview\", \"Payouts\", the project's name.",
+   "alsoAt": [
+    390
+   ]
+  }
+ ],
+ "images": [
+  {
+   "viewport": "desktop",
+   "width": 1440,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/new-booking/desktop-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/new-booking/desktop-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "tablet",
+   "width": 768,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/new-booking/tablet-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/new-booking/tablet-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "mobile",
+   "width": 390,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/new-booking/mobile-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/new-booking/mobile-page-01.jpg"
+   ],
+   "film": []
+  }
+ ]
+}

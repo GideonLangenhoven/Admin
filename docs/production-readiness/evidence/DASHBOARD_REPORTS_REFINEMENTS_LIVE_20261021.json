@@ -1,0 +1,209 @@
+{
+  "released_at": "2026-10-21T15:16:13.165317+00:00",
+  "production_url": "https://admin.bookingtours.co.za",
+  "deployment": {
+    "id": "dpl_6H2f34jFgDTznFefv9VwfsWvm4An",
+    "url": "caepweb-admin-oriobaizw-jerrys-projects-f4e4eaf9.vercel.app",
+    "files_verified": 516,
+    "changed": [
+      "app/dashboard.module.css",
+      "app/lib/operator-day.ts",
+      "app/page.tsx",
+      "app/simple/page.tsx",
+      "app/simple/check-ins/page.tsx",
+      "app/guide/slot/[slotId]/page.tsx",
+      "components/simple/DepartureCard.tsx",
+      "components/PaymentRecoveryPanel.tsx",
+      "components/AppShell.tsx",
+      "components/MobileMenuDrawer.tsx",
+      "app/reports/page.tsx",
+      "app/reviews/page.tsx",
+      "app/lib/report-booking-periods.ts",
+      "components/ReportPeriodGroup.tsx"
+    ]
+  },
+  "branch": "feature/dashboard-focused-20261021",
+  "implementation_commits": [
+    "2b5b2ee",
+    "811c64d",
+    "eea287a"
+  ],
+  "production_report_baseline_commit": "9445e27",
+  "changes": [
+    "Today’s Guests stretches to the Payment Recovery height on desktop; single-column mobile layout retained.",
+    "Roll Call shows only the resolution action, including Resolve waiver. Simple View check-ins also use Resolve waiver.",
+    "Simple View reuses dashboard Today/Tomorrow/All departure days recovery, retaining its existing contact controls and GUIDE exclusion.",
+    "Bookings report offers Weeks and Months, defaulting to Weeks, including CSV/PDF grouping.",
+    "Financials and Attendance use expandable week/month groups with existing rows and per-group totals.",
+    "Reviews use expandable week/month groups by business-local submission date, falling back to creation date. Moderation handlers retained.",
+    "Only Operations starts expanded; Guest care, Revenue, Growth and Admin can be opened manually. Desktop/mobile share expansion state within the current shell."
+  ],
+  "validation": {
+    "production_build": "READY; Vercel remote build passed",
+    "focused_unit_tests": {
+      "passed": 79,
+      "files": 8,
+      "log": "/private/tmp/capekayak-dashboard-refinements-20261021/focused-tests.log"
+    },
+    "navigation_checks": {
+      "passed": 2,
+      "unselected_tests": 5,
+      "log": "/private/tmp/capekayak-dashboard-refinements-20261021/navigation-tests.log"
+    },
+    "roll_call_followup_tests": {
+      "passed": 30,
+      "overlap_with_focused_suite": true,
+      "log": "/private/tmp/capekayak-dashboard-refinements-20261021/roll-call-tests.log"
+    },
+    "actual_report_component_server_renders": {
+      "checks": [
+        {
+          "surface": "bookings",
+          "period": "week",
+          "server_render": "passed"
+        },
+        {
+          "surface": "bookings",
+          "period": "month",
+          "server_render": "passed"
+        },
+        {
+          "surface": "financials",
+          "period": "week",
+          "server_render": "passed"
+        },
+        {
+          "surface": "financials",
+          "period": "month",
+          "server_render": "passed"
+        },
+        {
+          "surface": "attendance",
+          "period": "week",
+          "server_render": "passed"
+        },
+        {
+          "surface": "attendance",
+          "period": "month",
+          "server_render": "passed"
+        },
+        {
+          "surface": "reviews",
+          "period": "week",
+          "server_render": "passed",
+          "moderation_controls": "retained"
+        },
+        {
+          "surface": "reviews",
+          "period": "month",
+          "server_render": "passed",
+          "moderation_controls": "retained"
+        }
+      ],
+      "browser_verification": "Not performed",
+      "external_actions": 0
+    },
+    "lint": "No errors in touched source files; existing hook/image warnings remain.",
+    "uploaded_source_files_verified": 516,
+    "production_http_and_asset_delivery": {
+      "at": "2026-10-21T15:14:40.622Z",
+      "origin": "https://admin.bookingtours.co.za",
+      "checks": [
+        {
+          "path": "/",
+          "status": 200,
+          "assets_checked": 20,
+          "copy_verified": true
+        },
+        {
+          "path": "/simple",
+          "status": 200,
+          "assets_checked": 21,
+          "copy_verified": true
+        },
+        {
+          "path": "/simple/check-ins",
+          "status": 200,
+          "assets_checked": 20,
+          "copy_verified": true
+        },
+        {
+          "path": "/reports",
+          "status": 200,
+          "assets_checked": 18,
+          "copy_verified": true
+        },
+        {
+          "path": "/reviews",
+          "status": 200,
+          "assets_checked": 16,
+          "copy_verified": true
+        },
+        {
+          "path": "/slots",
+          "status": 200,
+          "assets_checked": 18,
+          "copy_verified": true
+        },
+        {
+          "path": "/refunds",
+          "status": 200,
+          "assets_checked": 16,
+          "copy_verified": true
+        },
+        {
+          "path": "/invoices",
+          "status": 200,
+          "assets_checked": 17,
+          "copy_verified": true
+        },
+        {
+          "path": "/marketing/contacts",
+          "status": 200,
+          "assets_checked": 19,
+          "copy_verified": true
+        }
+      ]
+    },
+    "font_and_css_delivery": {
+      "at": "2026-10-21T15:14:34.501Z",
+      "origin": "https://admin.bookingtours.co.za",
+      "fonts": [
+        {
+          "path": "/fonts/lato/Lato-Regular.woff2",
+          "status": 200,
+          "bytes": 211928,
+          "sha256": "92151a5256255fff1e99abaada09fe5be6002e68078e74e12ec39e6354aedd59"
+        },
+        {
+          "path": "/fonts/lato/Lato-Bold.woff2",
+          "status": 200,
+          "bytes": 211516,
+          "sha256": "b19158d418134fec815b33339c35f6a7f89dc69ecdcc3ed095f95c56faf96983"
+        }
+      ],
+      "stylesheets_checked": 4,
+      "font_declarations_served": true,
+      "browser_rendered_font_check": "Not performed, per user restriction"
+    },
+    "summary_band_align_items": "stretch verified in compiled candidate and live stylesheets",
+    "browser_or_playwright": "Not used, per user instruction",
+    "unverified": [
+      "Actual browser visual layout and font use",
+      "Keyboard/touch interaction in real browsers",
+      "Authenticated end-to-end flows and consequential integration actions"
+    ],
+    "full_functional_parity": "Not newly certified; prior handoff limits remain."
+  },
+  "data_scope": {
+    "migrations": false,
+    "edge_deployments": false,
+    "live_business_data_or_settings_writes": false
+  },
+  "rollback": {
+    "action": "Promote the previous deployment",
+    "id": "dpl_3EKQx428LDraotpRs5ctHrvgrhMg",
+    "url": "caepweb-admin-ezxefxvdb-jerrys-projects-f4e4eaf9.vercel.app"
+  },
+  "release_directory": "/private/tmp/capekayak-dashboard-refinements-20261021"
+}

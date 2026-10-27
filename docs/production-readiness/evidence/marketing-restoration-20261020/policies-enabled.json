@@ -1,0 +1,51 @@
+{
+  "at": "2026-10-20T04:39:57.725Z",
+  "operators": [
+    {
+      "id": "280d9c97-c09d-4ca2-8ffc-37f0b6e31ba7",
+      "business_name": "Aonyx"
+    },
+    {
+      "id": "44ff11ab-c697-47de-9227-0ffa51db127c",
+      "business_name": "Kayak"
+    },
+    {
+      "id": "a236bd31-5ab5-4c75-b9ee-b6fccc6be624",
+      "business_name": "Ocean Adventures"
+    },
+    {
+      "id": "af17838c-fdd6-4b84-97c0-1cea39db7c0a",
+      "business_name": "Claire's Hiking"
+    }
+  ],
+  "policies": [
+    {
+      "business_id": "a236bd31-5ab5-4c75-b9ee-b6fccc6be624",
+      "enabled": true,
+      "minimum_interval_seconds": 86400,
+      "window_start": "08:00:00",
+      "window_end": "20:00:00"
+    },
+    {
+      "business_id": "af17838c-fdd6-4b84-97c0-1cea39db7c0a",
+      "enabled": true,
+      "minimum_interval_seconds": 86400,
+      "window_start": "08:00:00",
+      "window_end": "20:00:00"
+    },
+    {
+      "business_id": "44ff11ab-c697-47de-9227-0ffa51db127c",
+      "enabled": true,
+      "minimum_interval_seconds": 86400,
+      "window_start": "08:00:00",
+      "window_end": "20:00:00"
+    },
+    {
+      "business_id": "280d9c97-c09d-4ca2-8ffc-37f0b6e31ba7",
+      "enabled": true,
+      "minimum_interval_seconds": 86400,
+      "window_start": "08:00:00",
+      "window_end": "20:00:00"
+    }
+  ]
+}

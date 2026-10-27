@@ -1,16 +1,19 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "../lib/supabase";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { amountReceived, amountRefunded, netReceived, derivePaymentMethod, financialTotals } from "../lib/report-accounting";
+import { groupBookingPeriods, groupReportRows, type ReportPeriod } from "../lib/report-booking-periods";
+import ReportPeriodGroup, { ReportPeriodPicker } from "../../components/ReportPeriodGroup";
 import { fetchAllRowsResult } from "../../supabase/functions/_shared/pagination";
 import { zonedToUtc } from "../lib/admin-timezone";
 import { notify } from "../lib/app-notify";
-import SectionTabs from "../../components/SectionTabs";
+import ReportsLayout, { REPORT_TABS } from "../../components/ReportsLayout";
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, Cell, LabelList,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer,
 } from "recharts";
 
 function fmtCurrency(n: number) {
@@ -113,11 +116,10 @@ function ChartTooltip({ active, payload, label, valueFormat }: any) {
 }
 
 // Table header cell — mono instrument voice, hairline underline.
-function Th({ children, className = "", onClick }: { children?: React.ReactNode; className?: string; onClick?: () => void }) {
+function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
   return (
     <th
-      onClick={onClick}
-      className={`px-4 py-3 text-[10.5px] font-medium uppercase tracking-[0.1em] border-b ${onClick ? "cursor-pointer select-none" : ""} ${className}`}
+      className={`px-4 py-3 text-[10.5px] font-medium uppercase tracking-[0.1em] border-b ${className}`}
       style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}
     >
       {children}
@@ -133,6 +135,11 @@ function addDaysStr(ymd: string, n: number) {
 }
 
 export default function Reports() {
+  return <Suspense fallback={<div className="ui-skeleton h-24" />}><ReportsContent /></Suspense>;
+}
+
+function ReportsContent() {
+  const searchParams = useSearchParams();
   const { businessId, businessName, timezone } = useBusinessContext();
   const activeTimezone = timezone || "UTC";
   const [bookings, setBookings] = useState<any[]>([]);
@@ -149,9 +156,8 @@ export default function Reports() {
   // missing" (matches the dashboard's payment-date semantics).
   const [filterBy, setFilterBy] = useState<"slot" | "created">("created");
   const [filterStatus, setFilterStatus] = useState("ALL");
-  const [sortCol, setSortCol] = useState<"created_at" | "slot_time" | "total_amount">("slot_time");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [activeTab, setActiveTab] = useState<"bookings" | "financials" | "marketing" | "attendance" | "waivers">("bookings");
+  const [bookingPeriod, setBookingPeriod] = useState<ReportPeriod>("week");
+  const activeTab = REPORT_TABS.find(tab => tab.key === searchParams.get("tab"))?.key || "bookings";
 
   useEffect(() => {
     mountedRef.current = true;
@@ -228,7 +234,7 @@ export default function Reports() {
       if (requestId !== loadRequestRef.current) return;
       console.error("Report load error:", error);
       setBookings([]);
-      setReportError("This report could not be fully loaded. Retry to get complete totals and exports.");
+      setReportError("Report incomplete. Retry before using totals or exports.");
     } finally {
       if (requestId === loadRequestRef.current) setLoading(false);
     }
@@ -240,25 +246,11 @@ export default function Reports() {
   }, [startDate, endDate, filterBy, businessId, activeTimezone]);
 
   const filtered = useMemo(() => {
-    let rows = filterStatus === "ALL" ? bookings : bookings.filter(b => b.status === filterStatus);
-    rows = [...rows].sort((a, b) => {
-      let av: any, bv: any;
-      if (sortCol === "slot_time") {
-        av = a.slots?.start_time || a.created_at;
-        bv = b.slots?.start_time || b.created_at;
-      } else if (sortCol === "total_amount") {
-        av = Number(a.total_amount || 0);
-        bv = Number(b.total_amount || 0);
-      } else {
-        av = a.created_at;
-        bv = b.created_at;
-      }
-      if (av < bv) return sortDir === "asc" ? -1 : 1;
-      if (av > bv) return sortDir === "asc" ? 1 : -1;
-      return 0;
-    });
-    return rows;
-  }, [bookings, filterStatus, sortCol, sortDir]);
+    const rows = filterStatus === "ALL" ? bookings : bookings.filter(b => b.status === filterStatus);
+    return [...rows].sort((a, b) => String(a.slots?.start_time || a.created_at).localeCompare(String(b.slots?.start_time || b.created_at)));
+  }, [bookings, filterStatus]);
+
+  const bookingPeriods = useMemo(() => activeTab === "bookings" ? groupBookingPeriods(filtered, bookingPeriod, filterBy, activeTimezone) : [], [activeTab, filtered, bookingPeriod, filterBy, activeTimezone]);
 
   const summary = useMemo(() => {
     const paid = filtered.filter(b => ["PAID", "COMPLETED", "CONFIRMED"].includes(b.status));
@@ -267,7 +259,6 @@ export default function Reports() {
       total: filtered.length,
       pax: filtered.reduce((s, b) => s + Number(b.qty || 0), 0),
       revenue: paid.reduce((s, b) => s + Number(b.total_amount || 0), 0),
-      pending: filtered.filter(b => b.status === "PENDING").length,
       cancelled: filtered.filter(b => b.status === "CANCELLED").length,
       waiverSigned: active.filter(b => b.waiver_status === "SIGNED").length,
       waiverPending: active.filter(b => b.waiver_status !== "SIGNED").length,
@@ -278,73 +269,9 @@ export default function Reports() {
   // per the captured/refund columns, not booked totals by status.
   const fin = useMemo(() => financialTotals(filtered), [filtered]);
 
-  const visualSeries = useMemo(() => {
-    if (activeTab === "marketing") {
-      const grouped = Object.values(
-        filtered.reduce((acc: Record<string, { label: string; value: number }>, booking) => {
-          const source = formatSource(booking.source);
-          if (!acc[source]) acc[source] = { label: source, value: 0 };
-          acc[source].value += 1;
-          return acc;
-        }, {})
-      );
-      return grouped.sort((a, b) => b.value - a.value).slice(0, 5);
-    }
-
-    if (activeTab === "attendance") {
-      // Three buckets so the visual reconciles with the top "Pax" stat tile.
-      // Previously: Checked + Not-checked excluded cancelled entirely, so
-      // 6 + 88 = 94 against a 99-pax total looked like a math bug.
-      const active = filtered.filter((b) => b.status !== "CANCELLED");
-      const checkedIn = active.reduce((sum, b) => sum + arrivedGuests(b), 0);
-      const notCheckedIn = active.reduce((sum, b) => sum + Math.max(0, Number(b.qty || 0) - arrivedGuests(b)), 0);
-      const cancelled = filtered.filter((b) => b.status === "CANCELLED").reduce((sum, b) => sum + Number(b.qty || 0), 0);
-      return [
-        { label: "Checked in", value: checkedIn },
-        { label: "Not arrived", value: notCheckedIn },
-        { label: "Cancelled", value: cancelled },
-      ];
-    }
-
-    if (activeTab === "waivers") {
-      const active = filtered.filter(b => b.status !== "CANCELLED");
-      return [
-        { label: "Signed", value: active.filter(b => b.waiver_status === "SIGNED").length },
-        { label: "Pending", value: active.filter(b => b.waiver_status !== "SIGNED").length },
-      ];
-    }
-
-    if (activeTab === "financials") {
-      const grouped = Object.values(
-        filtered.reduce((acc: Record<string, { label: string; value: number }>, booking) => {
-          const status = booking.status || "UNKNOWN";
-          if (!acc[status]) acc[status] = { label: status, value: 0 };
-          acc[status].value += Number(booking.total_amount || 0);
-          return acc;
-        }, {})
-      );
-      return grouped.sort((a, b) => b.value - a.value).slice(0, 5);
-    }
-
-    const grouped = Object.values(
-      filtered.reduce((acc: Record<string, { label: string; value: number }>, booking) => {
-        const tour = booking.tours?.name || "Unknown";
-        if (!acc[tour]) acc[tour] = { label: tour, value: 0 };
-        acc[tour].value += Number(booking.qty || 0);
-        return acc;
-      }, {})
-    );
-    return grouped.sort((a, b) => b.value - a.value).slice(0, 5);
-  }, [activeTab, filtered]);
-
-  // Revenue-over-time series — pure derivation from existing state (no query).
-  // Same paid-status set as summary.revenue, bucketed by the date field the
-  // page is already filtering on (tour date vs booking date). Buckets are
-  // pre-seeded across the range so the area stays continuous; a wide span
-  // (> ~3 months) rolls up to monthly so the axis stays readable.
+  // Receipts follow the same date filter and accounting rules as Financials.
   const revenueSeries = useMemo(() => {
-    if (!startDate || !endDate || endDate < startDate) return [];
-    const paidStatuses = new Set(["PAID", "COMPLETED", "CONFIRMED"]);
+    if (activeTab !== "financials" || !startDate || !endDate || endDate < startDate) return [];
     const dayOf = (iso: string) =>
       new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: activeTimezone }).format(new Date(iso));
 
@@ -361,12 +288,11 @@ export default function Reports() {
     }
 
     for (const b of filtered) {
-      if (!paidStatuses.has(b.status)) continue;
       const iso = filterBy === "slot" ? (b.slots?.start_time || b.created_at) : b.created_at;
       if (!iso) continue;
       const day = dayOf(iso);
       const key = byMonth ? day.slice(0, 7) : day;
-      if (buckets.has(key)) buckets.set(key, (buckets.get(key) || 0) + Number(b.total_amount || 0));
+      if (buckets.has(key)) buckets.set(key, (buckets.get(key) || 0) + amountReceived(b));
     }
 
     const labelOf = (key: string) => {
@@ -379,26 +305,9 @@ export default function Reports() {
     };
 
     return Array.from(buckets, ([key, revenue]) => ({ key, label: labelOf(key), revenue }));
-  }, [filtered, filterBy, startDate, endDate, activeTimezone]);
+  }, [activeTab, filtered, filterBy, startDate, endDate, activeTimezone]);
 
   const hasRevenue = revenueSeries.some(d => d.revenue > 0);
-  const breakdownCaption =
-    activeTab === "financials" ? "Revenue by status"
-      : activeTab === "marketing" ? "Bookings by source"
-        : activeTab === "attendance" ? "Attendance by pax"
-          : activeTab === "waivers" ? "Signed vs pending"
-            : "Pax by activity";
-
-  function toggleSort(col: typeof sortCol) {
-    if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
-    else { setSortCol(col); setSortDir("asc"); }
-  }
-
-  function sortIcon(col: typeof sortCol) {
-    if (sortCol !== col) return <span className="ml-1" style={{ color: "var(--ck-text-muted)", opacity: 0.5 }}>↕</span>;
-    return <span className="ml-1" style={{ color: "var(--ck-accent)" }}>{sortDir === "asc" ? "↑" : "↓"}</span>;
-  }
-
   const reportGenDate = new Date().toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric", timeZone: activeTimezone });
   const csvPrefix = businessName.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
 
@@ -560,33 +469,9 @@ export default function Reports() {
       return;
     }
 
-    const headers = [
-      "Ref", "Booked At", "Customer Name", "Phone", "Email",
-      "Tour", "Slot Date", "Slot Time",
-      "Qty", "Unit Price", "Original Total", "Discount Type", "Discount %",
-      "Total Amount", "Status", "Source", "Payment Ref", "Waiver",
-    ];
-    const rows = filtered.map(b => [
-      b.id.substring(0, 8).toUpperCase(),
-      fmtDateTime(b.created_at, activeTimezone),
-      b.customer_name || "",
-      b.phone || "",
-      b.email || "",
-      b.tours?.name || "",
-      b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "",
-      b.slots?.start_time ? fmtTime(b.slots.start_time, activeTimezone) : "",
-      b.qty || 0,
-      Number(b.unit_price || 0).toFixed(2),
-      Number(b.original_total || b.total_amount || 0).toFixed(2),
-      b.discount_type || "",
-      b.discount_percent || 0,
-      Number(b.total_amount || 0).toFixed(2),
-      b.status || "",
-      b.source || "",
-      b.yoco_payment_id || "",
-      b.waiver_status === "SIGNED" ? "SIGNED" : "PENDING",
-    ]);
-    triggerDownload(buildCSV("Bookings Report", headers, rows), `${csvPrefix}-bookings-${startDate}-to-${endDate}.csv`);
+    const headers = ["Period", "Bookings", "Guests"];
+    const rows = bookingPeriods.map(group => [group.label, group.bookings, group.guests]);
+    triggerDownload(buildCSV(`Bookings by ${bookingPeriod}`, headers, rows), `${csvPrefix}-bookings-${bookingPeriod}-${startDate}-to-${endDate}.csv`);
   }
 
   // ── Accounting registers (on-demand fetch + CSV; financials tab only) ──
@@ -842,19 +727,9 @@ export default function Reports() {
         b.status,
       ]);
     } else {
-      title = `Bookings Report (${startDate} to ${endDate})`;
-      headers = ["Ref", "Date", "Customer", "Tour", "Date/Time", "Qty", "Total", "Status", "Waiver"];
-      rows = filtered.map(b => [
-        b.id.substring(0, 8).toUpperCase(),
-        fmtDate(b.created_at, activeTimezone),
-        b.customer_name || "—",
-        b.tours?.name || "—",
-        b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—",
-        b.qty,
-        fmtCurrency(Number(b.total_amount || 0)),
-        b.status,
-        b.waiver_status === "SIGNED" ? "Signed" : "Pending",
-      ]);
+      title = `Bookings by ${bookingPeriod} (${startDate} to ${endDate})`;
+      headers = ["Period", "Bookings", "Guests"];
+      rows = bookingPeriods.map(group => [group.label, group.bookings, group.guests]);
     }
 
     // Company header
@@ -881,7 +756,15 @@ export default function Reports() {
   }
 
   return (
-    <div className="space-y-5 max-w-[1400px] mx-auto pb-10">
+    <ReportsLayout activeTab={activeTab}
+      actions={<>
+        <button data-demo-action="report.csv" onClick={downloadCSV} disabled={loading || filtered.length === 0} className="ui-btn ui-btn-primary disabled:opacity-40">
+          CSV
+        </button>
+        <button data-demo-action="report.pdf" onClick={downloadPDF} disabled={loading || filtered.length === 0} className="ui-btn ui-btn-ghost disabled:opacity-40">
+          PDF
+        </button>
+      </>}>
       {reportError && (
         <div role="alert" className="rounded-md px-3 py-2 text-[13px]" style={{ background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }}>
           {reportError} <button type="button" onClick={loadReport} className="underline">Retry</button>
@@ -889,51 +772,9 @@ export default function Reports() {
       )}
       {reportTruncated && (
         <div className="rounded-md px-3 py-2 text-[13px]" style={{ background: "var(--ck-warn-soft, #fef3c7)", color: "var(--ck-warn-strong, #92400e)" }}>
-          This report reached the 20,000-booking limit. Totals and exports cover those bookings only; narrow the date range to verify complete figures.
+          20,000-booking limit reached. Totals and exports are partial; choose a smaller date range.
         </div>
       )}
-      {/* ── Header ── */}
-      <div className="anim-fade-up flex flex-col gap-3 pt-2 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-        <div>
-          <p className="ui-mono-label mb-2">Reports · {businessName}</p>
-          <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Reports</h2>
-          <p className="mt-2 text-[13px]" style={{ color: "var(--ck-text-muted)" }}>Filter by tour date or booking date, download as CSV or PDF.</p>
-        </div>
-        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-          <button data-demo-action="report.csv" onClick={downloadCSV} disabled={loading || filtered.length === 0} className="ui-btn ui-btn-primary disabled:opacity-40">
-            CSV ({filtered.length})
-          </button>
-          <button data-demo-action="report.pdf" onClick={downloadPDF} disabled={loading || filtered.length === 0} className="ui-btn ui-btn-ghost disabled:opacity-40">
-            PDF
-          </button>
-        </div>
-      </div>
-
-      <SectionTabs section="reports" />
-
-      {/* ── Tabs — segmented control ── */}
-      <div className="anim-fade-up anim-d1 -mx-4 overflow-x-auto px-4 no-scrollbar sm:mx-0 sm:px-0">
-        <div className="ui-seg w-max">
-          {([
-            ["bookings", "Bookings"],
-            ["financials", "Financials"],
-            ["marketing", "Marketing"],
-            ["attendance", "Attendance"],
-            ["waivers", "Waivers"],
-          ] as const).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              className="ui-seg-item"
-              data-active={activeTab === key}
-              onClick={() => setActiveTab(key)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* ── Filters ── */}
       <div className="ui-card flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-end">
         <label className="flex flex-col gap-1.5 sm:min-w-[150px]">
@@ -1033,31 +874,16 @@ export default function Reports() {
             </button>
           </div>
         </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {[
-            { label: "Bookings", value: summary.total },
-            { label: "Pax", value: summary.pax },
-            { label: "Revenue", value: fmtCurrency(summary.revenue) },
-            { label: "Pending", value: summary.pending },
-            { label: "Cancelled", value: summary.cancelled },
-          ].map(c => (
-            <div key={c.label} className="ui-card p-4">
-              <p className="ui-mono-label !text-[10px]">{c.label}</p>
-              <p className="font-display mt-1.5 text-[26px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{c.value}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      ) : null}
 
-      {/* ── Revenue over time — area chart ── */}
-      <div className="ui-card p-5">
+      {/* ── Revenue over time — Financials only ── */}
+      {activeTab === "financials" && <div className="ui-card p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Revenue over time</h3>
-            <p className="ui-mono-label mt-1 !text-[10px]">Paid revenue · {filterBy === "slot" ? "by tour date" : "by booking date"}</p>
+            <p className="ui-mono-label mt-1 !text-[10px]">Received · {filterBy === "slot" ? "by tour date" : "by booking date"}</p>
           </div>
-          <span className="font-display text-[22px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(summary.revenue)}</span>
+          <span className="font-display text-[22px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(fin.received)}</span>
         </div>
         {hasRevenue ? (
           <ResponsiveContainer width="100%" height={220}>
@@ -1090,72 +916,11 @@ export default function Reports() {
           </ResponsiveContainer>
         ) : (
           <div className="ui-empty">
-            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No revenue in this period</p>
-            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Paid bookings will chart here once they fall in range.</p>
+            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No payments in this period</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>No payments received in this range.</p>
           </div>
         )}
-      </div>
-
-      {/* ── Breakdown bar chart + date-range context ── */}
-      <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="ui-card p-5">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Visual breakdown</h3>
-            <span className="ui-mono-label !text-[10px]">{breakdownCaption}</span>
-          </div>
-          {visualSeries.length === 0 ? (
-            <div className="ui-empty">
-              <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No chart data</p>
-              <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Nothing to break down for this filter yet.</p>
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={Math.max(170, visualSeries.length * 46)}>
-              <BarChart data={visualSeries} layout="vertical" margin={{ top: 0, right: 88, left: 0, bottom: 0 }} barCategoryGap={14}>
-                <CartesianGrid stroke="var(--ck-chart-grid)" horizontal={false} />
-                <XAxis type="number" hide />
-                <YAxis
-                  type="category"
-                  dataKey="label"
-                  width={112}
-                  tick={{ fontSize: 11, fontFamily: "var(--font-mono)", fill: "var(--ck-text-muted)" }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v: any) => (String(v).length > 17 ? String(v).slice(0, 16) + "…" : String(v))}
-                />
-                <Tooltip cursor={{ fill: "var(--ck-surface-sunken)" }} content={<ChartTooltip valueFormat={activeTab === "financials" ? fmtCurrency : undefined} />} />
-                <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={26}>
-                  {visualSeries.map((_, i) => <Cell key={i} fill={`var(--ck-chart-${(i % 6) + 1})`} />)}
-                  <LabelList
-                    dataKey="value"
-                    position="right"
-                    formatter={(v: any) => (activeTab === "financials" ? fmtCurrency(Number(v)) : `${v}`)}
-                    fill="var(--ck-text-muted)"
-                    fontSize={10.5}
-                    fontFamily="var(--font-mono)"
-                  />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
-
-        <div className="ui-card p-5">
-          <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Date range context</h3>
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {[
-              { label: "From", value: startDate || "Not set" },
-              { label: "To", value: endDate || "Not set" },
-              { label: "Filtered by", value: filterBy === "slot" ? "Tour date" : "Booking date" },
-              { label: "Status scope", value: filterStatus },
-            ].map(cell => (
-              <div key={cell.label} className="rounded-xl p-3" style={{ background: "var(--ck-surface-sunken)" }}>
-                <p className="ui-mono-label !text-[9.5px]">{cell.label}</p>
-                <p className="mt-2 text-[14px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{cell.value}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      </div>}
 
       {/* ── Table ── */}
       {loading ? (
@@ -1171,86 +936,92 @@ export default function Reports() {
           </div>
         </div>
       ) : activeTab === "financials" ? (
-        <>
-        <div className="space-y-3 md:hidden">
-          {filtered.map(b => {
-            const received = amountReceived(b);
-            const refunded = amountRefunded(b);
-            const method = derivePaymentMethod(b);
-            return (
-              <div key={b.id} className="ui-card p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
-                    <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{fmtDateTime(b.created_at, activeTimezone)}</p>
-                    <p className="mt-1 font-mono text-[11px]" style={{ color: "var(--ck-text-muted)" }}>{b.id.substring(0, 8).toUpperCase()}{method ? ` · ${method}` : ""}</p>
-                  </div>
-                  <span className={statusPill(b.status)}>{b.status}</span>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                  <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
-                    <p className="ui-mono-label !text-[9.5px]">Received</p>
-                    <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(received)}</p>
-                  </div>
-                  <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
-                    <p className="ui-mono-label !text-[9.5px]">Net</p>
-                    <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(received - refunded)}</p>
-                  </div>
-                </div>
-                {refunded > 0 && <p className="mt-2 text-xs" style={{ color: "var(--ck-danger)" }}>Refunded {fmtCurrency(refunded)}</p>}
-              </div>
-            );
-          })}
-        </div>
-        <div className="ui-card hidden overflow-x-auto md:block">
-          <table className="w-full text-sm">
-            <thead>
-              <tr>
-                <Th>Transaction Date</Th>
-                <Th>Booking Ref</Th>
-                <Th>Customer</Th>
-                <Th>Method</Th>
-                <Th className="text-right">Total Due</Th>
-                <Th className="text-right">Received</Th>
-                <Th className="text-right">Refunded</Th>
-                <Th className="text-right">Net</Th>
-                <Th className="text-center">Status</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
-              {filtered.map(b => {
-                const due = Number(b.total_amount || 0);
+        <div className="space-y-3">
+        <ReportPeriodPicker value={bookingPeriod} onChange={setBookingPeriod} label="Group transactions by" />
+        {groupReportRows(filtered, bookingPeriod, activeTimezone, b => b.created_at).map(group => {
+          const totals = financialTotals(group.rows);
+          return <ReportPeriodGroup key={`${bookingPeriod}:${group.key}`} label={group.label} summary={`${group.rows.length} transactions · Net ${fmtCurrency(totals.net)}`}>
+            <div className="space-y-3 md:hidden">
+              {group.rows.map(b => {
                 const received = amountReceived(b);
                 const refunded = amountRefunded(b);
                 const method = derivePaymentMethod(b);
                 return (
-                  <tr key={b.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]">
-                    <td className="whitespace-nowrap p-3 font-medium" style={{ color: "var(--ck-text)" }}>{fmtDateTime(b.created_at, activeTimezone)}</td>
-                    <td className="p-3 font-mono text-xs" style={{ color: "var(--ck-text-muted)" }} title={b.yoco_payment_id || b.payfast_m_payment_id || ""}>{b.id.substring(0, 8).toUpperCase()}</td>
-                    <td className="min-w-[150px] p-3" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</td>
-                    <td className="p-3 text-xs" style={{ color: method === "Unrecorded" ? "var(--ck-warning)" : "var(--ck-text-muted)" }}>{method || "—"}</td>
-                    <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(due)}</td>
-                    <td className="p-3 text-right tabular-nums" style={{ color: received > 0 ? "var(--ck-success)" : "var(--ck-text-muted)" }}>{received > 0 ? fmtCurrency(received) : "—"}</td>
-                    <td className="p-3 text-right tabular-nums" style={{ color: refunded > 0 ? "var(--ck-danger)" : "var(--ck-text-muted)" }}>{refunded > 0 ? "-" + fmtCurrency(refunded) : "—"}</td>
-                    <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(received - refunded)}</td>
-                    <td className="p-3 text-center"><span className={statusPill(b.status)}>{b.status}</span></td>
-                  </tr>
+                  <div key={b.id} className="border-t p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
+                        <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{fmtDateTime(b.created_at, activeTimezone)}</p>
+                        <p className="mt-1 font-mono text-[11px]" style={{ color: "var(--ck-text-muted)" }}>{b.id.substring(0, 8).toUpperCase()}{method ? ` · ${method}` : ""}</p>
+                      </div>
+                      <span className={statusPill(b.status)}>{b.status}</span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                      <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                        <p className="ui-mono-label !text-[9.5px]">Received</p>
+                        <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(received)}</p>
+                      </div>
+                      <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                        <p className="ui-mono-label !text-[9.5px]">Net</p>
+                        <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(received - refunded)}</p>
+                      </div>
+                    </div>
+                    {refunded > 0 && <p className="mt-2 text-xs" style={{ color: "var(--ck-danger)" }}>Refunded {fmtCurrency(refunded)}</p>}
+                  </div>
                 );
               })}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 text-sm font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
-                <td colSpan={4} className="p-3 text-right" style={{ color: "var(--ck-text-muted)" }}>Totals</td>
-                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(fin.grossBooked)}</td>
-                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(fin.received)}</td>
-                <td className="p-3 text-right tabular-nums" style={{ color: fin.refunded > 0 ? "var(--ck-danger)" : "var(--ck-text-muted)" }}>{fin.refunded > 0 ? "-" + fmtCurrency(fin.refunded) : "—"}</td>
-                <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(fin.net)}</td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
+            </div>
+            <div className="hidden overflow-x-auto border-t md:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr>
+                    <Th>Transaction Date</Th>
+                    <Th>Booking Ref</Th>
+                    <Th>Customer</Th>
+                    <Th>Method</Th>
+                    <Th className="text-right">Total Due</Th>
+                    <Th className="text-right">Received</Th>
+                    <Th className="text-right">Refunded</Th>
+                    <Th className="text-right">Net</Th>
+                    <Th className="text-center">Status</Th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
+                  {group.rows.map(b => {
+                    const due = Number(b.total_amount || 0);
+                    const received = amountReceived(b);
+                    const refunded = amountRefunded(b);
+                    const method = derivePaymentMethod(b);
+                    return (
+                      <tr key={b.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]">
+                        <td className="whitespace-nowrap p-3 font-medium" style={{ color: "var(--ck-text)" }}>{fmtDateTime(b.created_at, activeTimezone)}</td>
+                        <td className="p-3 font-mono text-xs" style={{ color: "var(--ck-text-muted)" }} title={b.yoco_payment_id || b.payfast_m_payment_id || ""}>{b.id.substring(0, 8).toUpperCase()}</td>
+                        <td className="min-w-[150px] p-3" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</td>
+                        <td className="p-3 text-xs" style={{ color: method === "Unrecorded" ? "var(--ck-warning)" : "var(--ck-text-muted)" }}>{method || "—"}</td>
+                        <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(due)}</td>
+                        <td className="p-3 text-right tabular-nums" style={{ color: received > 0 ? "var(--ck-success)" : "var(--ck-text-muted)" }}>{received > 0 ? fmtCurrency(received) : "—"}</td>
+                        <td className="p-3 text-right tabular-nums" style={{ color: refunded > 0 ? "var(--ck-danger)" : "var(--ck-text-muted)" }}>{refunded > 0 ? "-" + fmtCurrency(refunded) : "—"}</td>
+                        <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(received - refunded)}</td>
+                        <td className="p-3 text-center"><span className={statusPill(b.status)}>{b.status}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 text-sm font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
+                    <td colSpan={4} className="p-3 text-right" style={{ color: "var(--ck-text-muted)" }}>Group total</td>
+                    <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(totals.grossBooked)}</td>
+                    <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(totals.received)}</td>
+                    <td className="p-3 text-right tabular-nums" style={{ color: totals.refunded > 0 ? "var(--ck-danger)" : "var(--ck-text-muted)" }}>{totals.refunded > 0 ? "-" + fmtCurrency(totals.refunded) : "—"}</td>
+                    <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(totals.net)}</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </ReportPeriodGroup>;
+        })}
         </div>
-        </>
       ) : activeTab === "attendance" ? (
         (() => {
           const activeBookings = filtered.filter(b => b.status !== "CANCELLED");
@@ -1272,9 +1043,14 @@ export default function Reports() {
                   </div>
                 ))}
               </div>
+              <ReportPeriodPicker value={bookingPeriod} onChange={setBookingPeriod} label="Group attendance by" />
+              {groupReportRows(activeBookings, bookingPeriod, activeTimezone, b => b.slots?.start_time).map(group => {
+                const totalPax = group.rows.reduce((sum, b) => sum + Number(b.qty || 0), 0);
+                const checkedInPax = group.rows.reduce((sum, b) => sum + arrivedGuests(b), 0);
+                return <ReportPeriodGroup key={`${bookingPeriod}:${group.key}`} label={group.label} summary={`${group.rows.length} bookings · ${checkedInPax} of ${totalPax} arrived`}>
               <div className="space-y-3 md:hidden">
-                {activeBookings.map(b => (
-                  <div key={b.id} className="ui-card p-4" style={b.checked_in ? { borderColor: "var(--ck-success)", background: "var(--ck-success-soft)" } : arrivedGuests(b) > 0 ? { borderColor: "var(--ck-amber)", background: "var(--ck-amber-soft)" } : undefined}>
+                {group.rows.map(b => (
+                  <div key={b.id} className="border-t p-4" style={b.checked_in ? { borderColor: "var(--ck-success)", background: "var(--ck-success-soft)" } : arrivedGuests(b) > 0 ? { borderColor: "var(--ck-amber)", background: "var(--ck-amber-soft)" } : undefined}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
@@ -1292,7 +1068,7 @@ export default function Reports() {
                   </div>
                 ))}
               </div>
-              <div className="ui-card hidden overflow-x-auto md:block">
+              <div className="hidden overflow-x-auto border-t md:block">
                 <table className="w-full text-sm">
                   <thead>
                     <tr>
@@ -1307,7 +1083,7 @@ export default function Reports() {
                     </tr>
                   </thead>
                   <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
-                    {activeBookings.map(b => (
+                    {group.rows.map(b => (
                       <tr key={b.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]" style={b.checked_in ? { background: "var(--ck-success-soft)" } : arrivedGuests(b) > 0 ? { background: "var(--ck-amber-soft)" } : undefined}>
                         <td className="whitespace-nowrap p-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{b.slots?.start_time ? fmtDate(b.slots.start_time, activeTimezone) : "—"}</td>
                         <td className="whitespace-nowrap p-3 tabular-nums" style={{ color: "var(--ck-text)" }}>{b.slots?.start_time ? fmtTime(b.slots.start_time, activeTimezone) : "—"}</td>
@@ -1328,7 +1104,7 @@ export default function Reports() {
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 text-sm font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
-                      <td colSpan={5} className="p-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>Totals ({activeBookings.length} bookings)</td>
+                      <td colSpan={5} className="p-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>Totals ({group.rows.length} bookings)</td>
                       <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{totalPax}</td>
                       <td className="p-3 text-center" style={{ color: "var(--ck-success)" }}>{checkedInPax} present</td>
                       <td className="hidden p-3 lg:table-cell"></td>
@@ -1336,6 +1112,8 @@ export default function Reports() {
                   </tfoot>
                 </table>
               </div>
+                </ReportPeriodGroup>;
+              })}
             </div>
           );
         })()
@@ -1489,126 +1267,28 @@ export default function Reports() {
           );
         })()
       ) : (
-        <>
-        <div className="space-y-3 md:hidden">
-          {filtered.map(b => {
-            const hasDiscount = b.discount_type && b.discount_type !== "none";
-            return (
-              <div key={b.id} className="ui-card p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
-                    <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.slots?.start_time ? `${fmtDate(b.slots.start_time, activeTimezone)} · ${fmtTime(b.slots.start_time, activeTimezone)}` : "—"}</p>
-                    <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.tours?.name || "—"}</p>
-                    <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "No phone"}{b.email ? ` · ${b.email}` : ""}</p>
-                  </div>
-                  <span className={statusPill(b.status)}>{b.status}</span>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                  <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
-                    <p className="ui-mono-label !text-[9.5px]">Qty</p>
-                    <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{b.qty}</p>
-                  </div>
-                  <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
-                    <p className="ui-mono-label !text-[9.5px]">Total</p>
-                    <p className="mt-0.5 font-semibold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(Number(b.total_amount || 0))}</p>
-                  </div>
-                </div>
-                {hasDiscount && (
-                  <p className="mt-2 text-xs" style={{ color: "var(--ck-warning)" }}>
-                    {b.discount_type === "PERCENT" ? `${b.discount_percent}% off` :
-                      b.discount_type === "FIXED" ? "Fixed discount" :
-                        b.discount_type === "MANUAL" ? "Manual price" : b.discount_type}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        <div className="ui-card hidden overflow-x-auto md:block">
-          <table className="w-full text-sm">
-            <thead>
-              <tr>
-                <Th className="hidden md:table-cell">Ref</Th>
-                <Th onClick={() => toggleSort("slot_time")}>Tour Date {sortIcon("slot_time")}</Th>
-                <Th>Customer</Th>
-                <Th className="hidden md:table-cell">Contact</Th>
-                <Th className="hidden lg:table-cell">Tour</Th>
-                <Th className="text-right">Qty</Th>
-                <Th className="text-right" onClick={() => toggleSort("total_amount")}>Total {sortIcon("total_amount")}</Th>
-                <Th className="hidden lg:table-cell">Discount</Th>
-                <Th>Status</Th>
-                <Th className="hidden xl:table-cell" onClick={() => toggleSort("created_at")}>Booked {sortIcon("created_at")}</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
-              {filtered.map(b => {
-                const hasDiscount = b.discount_type && b.discount_type !== "none";
-                return (
-                  <tr key={b.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]">
-                    <td className="hidden p-3 font-mono text-xs md:table-cell" style={{ color: "var(--ck-text-muted)" }}>{b.id.substring(0, 8).toUpperCase()}</td>
-                    <td className="whitespace-nowrap p-3">
-                      {b.slots?.start_time ? (
-                        <span>
-                          <span className="font-medium" style={{ color: "var(--ck-text-strong)" }}>{fmtDate(b.slots.start_time, activeTimezone)}</span>
-                          <span className="ml-1 text-xs tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtTime(b.slots.start_time, activeTimezone)}</span>
-                        </span>
-                      ) : <span style={{ color: "var(--ck-text-muted)" }}>—</span>}
-                    </td>
-                    <td className="p-3">
-                      <p className="font-medium" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name || "—"}</p>
-                    </td>
-                    <td className="hidden p-3 md:table-cell">
-                      <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "—"}</p>
-                      <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.email || "—"}</p>
-                    </td>
-                    <td className="hidden p-3 lg:table-cell" style={{ color: "var(--ck-text)" }}>{b.tours?.name || "—"}</td>
-                    <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text)" }}>{b.qty}</td>
-                    <td className="p-3 text-right">
-                      {hasDiscount && b.original_total ? (
-                        <div>
-                          <p className="text-xs line-through tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(Number(b.original_total))}</p>
-                          <p className="font-semibold tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(Number(b.total_amount || 0))}</p>
-                        </div>
-                      ) : (
-                        <p className="font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(Number(b.total_amount || 0))}</p>
-                      )}
-                    </td>
-                    <td className="hidden p-3 text-xs lg:table-cell">
-                      {hasDiscount ? (
-                        <span className="ui-status ui-pill-amber">
-                          {b.discount_type === "PERCENT" ? `${b.discount_percent}% off` :
-                            b.discount_type === "FIXED" ? "Fixed" :
-                              b.discount_type === "MANUAL" ? "Manual" : b.discount_type}
-                        </span>
-                      ) : <span style={{ color: "var(--ck-text-muted)" }}>—</span>}
-                    </td>
-                    <td className="p-3"><span className={statusPill(b.status)}>{b.status}</span></td>
-                    <td className="hidden whitespace-nowrap p-3 text-xs xl:table-cell" style={{ color: "var(--ck-text-muted)" }}>
-                      {fmtDateTime(b.created_at, activeTimezone)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="border-t-2 text-sm font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
-                <td className="hidden p-3 md:table-cell"></td>
-                <td className="p-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>Totals ({filtered.length})</td>
-                <td className="p-3"></td>
-                <td className="hidden p-3 md:table-cell"></td>
-                <td className="hidden p-3 lg:table-cell"></td>
-                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{summary.pax}</td>
-                <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-success)" }}>{fmtCurrency(summary.revenue)}</td>
-                <td className="hidden p-3 lg:table-cell"></td>
-                <td className="p-3"></td>
-                <td className="hidden p-3 xl:table-cell"></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-        </>
+        <section className="ui-card overflow-hidden" aria-label="Bookings by period">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <h2 className="text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>Bookings by {bookingPeriod}</h2>
+            <ReportPeriodPicker value={bookingPeriod} onChange={setBookingPeriod} label="Group bookings by" />
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr><Th>Period</Th><Th className="text-right">Bookings</Th><Th className="text-right">Guests</Th></tr></thead>
+              <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
+                {bookingPeriods.map(group => <tr key={group.key}>
+                  <td className="p-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{group.label}</td>
+                  <td className="p-3 text-right tabular-nums">{group.bookings}</td>
+                  <td className="p-3 text-right tabular-nums">{group.guests}</td>
+                </tr>)}
+              </tbody>
+              <tfoot><tr className="border-t-2 font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
+                <td className="p-3">Total</td><td className="p-3 text-right tabular-nums">{summary.total}</td><td className="p-3 text-right tabular-nums">{summary.pax}</td>
+              </tr></tfoot>
+            </table>
+          </div>
+        </section>
       )}
-    </div>
+    </ReportsLayout>
   );
 }

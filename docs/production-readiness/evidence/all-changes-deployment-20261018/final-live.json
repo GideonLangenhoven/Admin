@@ -1,0 +1,51 @@
+{
+  "at": "2026-10-18T10:30:57.155Z",
+  "projects": [
+    {
+      "name": "admin",
+      "id": "dpl_BnQsYQsx6G8bi4p9wQPBCf1gDQHh",
+      "state": "READY",
+      "files": 488,
+      "workspace_matches": true
+    },
+    {
+      "name": "booking",
+      "id": "dpl_6mkaQSQVq2XvqUAotEBgEkcfJ7uk",
+      "state": "READY",
+      "files": 169,
+      "workspace_matches": true
+    }
+  ],
+  "checks": [
+    {
+      "url": "https://admin.bookingtours.co.za/bookings",
+      "status": 200,
+      "expected_content": true
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/simple/bookings",
+      "status": 200,
+      "expected_content": true
+    },
+    {
+      "url": "https://admin.bookingtours.co.za/new-booking",
+      "status": 200,
+      "expected_content": true
+    },
+    {
+      "url": "https://kayak.booking.bookingtours.co.za/voucher",
+      "status": 200,
+      "expected_content": true
+    },
+    {
+      "url": "https://claires-hiking.booking.bookingtours.co.za/my-bookings",
+      "status": 200,
+      "expected_content": true
+    },
+    {
+      "url": "https://ukdsrndqhsatjkmxijuj.supabase.co/functions/v1/marketing-unsubscribe",
+      "status": 400,
+      "expected_content": true
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+TASTESKILL · INSPECT   http://127.0.0.1:3000/refunds
+
+MEASURED (first viewport listed)
+  hero headline   "Claire's Hiking"  2 words · 1 line(s) · 12px (0.8vw) · Plus Jakarta Sans 400 · tracking 0em · leading 1.63
+  @768px          1 line(s) · 24px
+  @390px          1 line(s) · 24px
+  typefaces       Plus Jakarta Sans 79%, Geist Mono 17%, satoshi 4%
+  sizes in use    9 / 10 / 11 / 12 / 13 / 14 / 15 / 24 px   body 12px / 1.33
+  colour          page #f7f5f0 · button #125e40
+  page            1 screens · 86 words · 3 images · hero media none
+  headings        0 · longest 0 line(s) · median - words
+
+FAIL — fix every one of these
+  [gradient] @1440px (+390)  1 gradient fill(s): aside.hidden.shrink-0 → radial-gradient(140% 50% at 50% -8%, rgba(0, 217, 139, 0.07), rgba(0, 0, 0, 0) 60%), radial-gradient(120% 45% 
+      → Use a flat colour or a real image. The only gradient allowed by default is a neutral scrim over a photo for legibility.
+  [button-fx] @1440px (+768, 390)  Buttons with gradient fill and shadow/glow.
+      → Flat fill, one colour.
+  [tiny-text] @1440px (+768, 390)  7 text blocks under 11px: Customer view 10px, Operations 10px, Guest care 10px, Revenue 10px.
+      → Nothing below 11px; secondary text 12px, data 13–14px.
+  [no-title] @768px (+390)  The screen has no h1.
+      → Name the screen in an h1 at the top of the canvas (18–28px): "Overview", "Payouts", the project's name.
+
+WARN — fix, or be able to defend
+  [micro-label] @1440px  2 tiny uppercase letter-spaced label(s): "Claire's Hiking", "Refunds"
+      → Prefer sentence case at body size.
+  [palette-cream] @1440px (+768, 390)  Yellow-cream background (page background #f7f5f0).
+      → Use the drawn palette. If you want warmth, take a low-chroma stone or bone, not a yellow cream.
+  [font-count] @1440px  3 typefaces in use (Plus Jakarta Sans, Geist Mono, satoshi).
+      → Two at most.
+  [hero-void] @1440px  33% of the first screen is one empty block (1440×300px at 0,540).
+      → Place the void on purpose or fill it: move the picture, the film or one fact into it, grow the headline to meet it, or shrink the screen to its content. A void reads as placed only when something closes it on the far side and it is the screen's one rest.
+  [blank-gap] @768px  A 472px stretch at 496px holds nothing.
+      → Check that it is a deliberate rest (once per page at most); otherwise close it to the normal section gap.
+
+LOOK AT THE RENDER — open these with your image viewer / Read tool before saying anything about quality:
+  desktop 1440px  .taste-skill/audit/refunds/desktop-fold.jpg
+                  .taste-skill/audit/refunds/desktop-page-01.jpg
+  tablet 768px    .taste-skill/audit/refunds/tablet-fold.jpg
+                  .taste-skill/audit/refunds/tablet-page-01.jpg
+  mobile 390px    .taste-skill/audit/refunds/mobile-fold.jpg
+                  .taste-skill/audit/refunds/mobile-page-01.jpg
+
+report: .taste-skill/audit/refunds/report.json
+RESULT: 4 FAIL, 5 WARN — not done.

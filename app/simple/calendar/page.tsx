@@ -9,7 +9,7 @@ import { addDaysToDateKey, businessDateKey, isDateKey } from "@/app/lib/simple-v
 import { useSimpleDay } from "../use-simple-day";
 
 function longDate(date: string) {
-  return new Intl.DateTimeFormat("en-ZA", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date(date + "T12:00:00Z"));
+  return new Intl.DateTimeFormat("en-ZA", { timeZone: "UTC", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date(date + "T12:00:00Z"));
 }
 
 export default function SimpleCalendarPage() {
@@ -17,7 +17,7 @@ export default function SimpleCalendarPage() {
   const router = useRouter();
   const today = businessDateKey(timezone);
   const [date, setDate] = useState(today);
-  const { data, loading, error, reload } = useSimpleDay(businessId, date, timezone);
+  const { data, loading, error, reload, refreshing } = useSimpleDay(businessId, date, timezone);
 
   useEffect(() => {
     const requested = new URLSearchParams(window.location.search).get("date");
@@ -33,9 +33,8 @@ export default function SimpleCalendarPage() {
   return (
     <div className="sv-page">
       <header className="sv-intro sv-intro--calendar">
-        <p className="sv-eyebrow"><CalendarBlank size={16} /> View and book</p>
+        <p className="sv-eyebrow"><CalendarBlank size={16} /> Booked sessions</p>
         <h1 className="sv-title">Calendar</h1>
-        <p className="sv-intro-copy">Find a departure. Make room for the next adventure.</p>
       </header>
 
       <section className="ui-card sv-filters flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" aria-label="Choose date">
@@ -56,7 +55,7 @@ export default function SimpleCalendarPage() {
 
       <div className="sv-section-heading">
         <h2>{longDate(date)}</h2>
-        {!loading && !error && <span>{data?.departures.length || 0} departures</span>}
+        {!loading && !error && <span>{data?.departures.length || 0} booked session{data?.departures.length === 1 ? "" : "s"}</span>}
       </div>
 
       {loading && <div className="space-y-3">{[0, 1, 2].map(item => <div key={item} className="ui-skeleton h-36 rounded-2xl" />)}</div>}
@@ -71,8 +70,8 @@ export default function SimpleCalendarPage() {
       {!loading && !error && data?.departures.length === 0 && (
         <div className="ui-card px-5 py-10 text-center">
           <CalendarBlank size={30} className="mx-auto" style={{ color: "var(--ck-text-muted)" }} />
-          <h2 className="mt-3 font-semibold" style={{ color: "var(--ck-text-strong)" }}>No departures on this day</h2>
-          <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>Try the previous or next day.</p>
+          <h2 className="mt-3 font-semibold" style={{ color: "var(--ck-text-strong)" }}>No booked sessions on this day</h2>
+          <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>Choose another day or add a walk-in.</p>
         </div>
       )}
 
@@ -84,8 +83,9 @@ export default function SimpleCalendarPage() {
               departure={departure}
               date={date}
               timeZone={timezone}
-              currency={data.currency}
               returnTo={`/simple/calendar?date=${encodeURIComponent(date)}`}
+              reload={reload}
+              refreshing={refreshing}
             />
           ))}
         </div>

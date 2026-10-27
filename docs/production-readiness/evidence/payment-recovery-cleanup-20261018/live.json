@@ -1,0 +1,11 @@
+{
+  "at": "2026-10-18T12:01:34.617Z",
+  "id": "dpl_9w8e8gESdf4MqUkYftQvLQJp13XJ",
+  "url": "https://admin.bookingtours.co.za",
+  "state": "READY",
+  "pages": [
+    "/",
+    "/simple"
+  ],
+  "http_status": 200
+}

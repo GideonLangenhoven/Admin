@@ -1,0 +1,24 @@
+{
+  "at": "2026-10-16T12:56:47.656Z",
+  "version": "20261016140000",
+  "sha256": "14e0c0c0be94ff4fbb9439423010a0854d9a93ef5727dcf9167e834aff0dc60a",
+  "grants": [
+    {
+      "rolname": "anon",
+      "helper": false,
+      "create_booking": false
+    },
+    {
+      "rolname": "authenticated",
+      "helper": false,
+      "create_booking": true
+    },
+    {
+      "rolname": "service_role",
+      "helper": false,
+      "create_booking": false
+    }
+  ],
+  "exact_function_source_verified": 6,
+  "unchanged_function_permissions": true
+}

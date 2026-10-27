@@ -1,0 +1,23 @@
+{
+  "at": "2026-10-21T15:36:58.531Z",
+  "articles": [
+    "dashboard",
+    "simple-view"
+  ],
+  "changed": [
+    "help:dashboard:4",
+    "help:dashboard:5",
+    "help:simple-view:3"
+  ],
+  "removed": [],
+  "result": {
+    "ok": true,
+    "total": 177,
+    "embedded": 3,
+    "skipped": 174,
+    "removed": 0,
+    "failed": 0,
+    "errors": []
+  },
+  "all_chunks_verified": 177
+}

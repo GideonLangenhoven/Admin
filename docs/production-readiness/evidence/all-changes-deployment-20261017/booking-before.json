@@ -1,0 +1,683 @@
+{
+  "id": "dpl_DEtYg9jBcEThHpReFGiaJE6dX4qZ",
+  "url": "booking-cf1uto1o1-jerrys-projects-f4e4eaf9.vercel.app",
+  "state": "READY",
+  "files": [
+    {
+      "path": ".github/workflows/lighthouse.yml",
+      "uid": "ce5115d6c6a58ed90fd30b7f880c09caf4780db6"
+    },
+    {
+      "path": ".nvmrc",
+      "uid": "d0758565fd06c37aa66b071160d156f5628cd518"
+    },
+    {
+      "path": ".vercelignore",
+      "uid": "ee12dd93586b37d5dcd524e5ddf7d22485343e71"
+    },
+    {
+      "path": "README.md",
+      "uid": "7ba16f1bf099196063e5d413cf00a5aa850b043d"
+    },
+    {
+      "path": "app/api/ics/route.ts",
+      "uid": "e796825bf01cf67840e158d5315e82abefcaf91c"
+    },
+    {
+      "path": "app/api/img/route.ts",
+      "uid": "b54b00f01500be8d7cd071048b1c0e201e8f750a"
+    },
+    {
+      "path": "app/api/popia/confirm/route.ts",
+      "uid": "1e98a425a301bc70e19398024f4953c32d4ae2a7"
+    },
+    {
+      "path": "app/api/popia/request/route.ts",
+      "uid": "f4ebc49dd4f8f23be64ae6decd523b074b101903"
+    },
+    {
+      "path": "app/api/review-submit/route.ts",
+      "uid": "ccb7248fadbf19023e888950d0c289a30538d731"
+    },
+    {
+      "path": "app/api/review-token/[token]/route.ts",
+      "uid": "5a4f09d713c9b15cbbdae219f596a86d32d24804"
+    },
+    {
+      "path": "app/auth/callback/page.tsx",
+      "uid": "06031912e67c787c0f9a7bb72590c548c3e89a70"
+    },
+    {
+      "path": "app/book/booking-panels.css",
+      "uid": "182a60cc4f6603fcf90df69c9c03d3db4a3e32a8"
+    },
+    {
+      "path": "app/book/layout.tsx",
+      "uid": "0576196a34a823ca4d9e924e06ad321e5633a6d9"
+    },
+    {
+      "path": "app/book/page.tsx",
+      "uid": "744a217f485b6c8a0669922d8531814f17fb569b"
+    },
+    {
+      "path": "app/booking-surfaces.css",
+      "uid": "a5dc1dfaec4e3ace6a44264a8e0851bf610d345c"
+    },
+    {
+      "path": "app/cancelled/layout.tsx",
+      "uid": "eedff71573f6d2af6235bff6c4008be4e89da978"
+    },
+    {
+      "path": "app/cancelled/page.tsx",
+      "uid": "6392a80d46ef1f2ba64ed41831662ce7ffea0334"
+    },
+    {
+      "path": "app/combo/[id]/layout.tsx",
+      "uid": "a916b6c05b083e056bea6f0553f6163df9ce4375"
+    },
+    {
+      "path": "app/combo/[id]/page.tsx",
+      "uid": "2e04daa0dadeb455ce36ee5df2c979ab06876a63"
+    },
+    {
+      "path": "app/components/BookingQuestions.tsx",
+      "uid": "4107d19925fc6d235d768b43f5a794fe2a9bfbc5"
+    },
+    {
+      "path": "app/components/BottomNav.tsx",
+      "uid": "2829de2dc51c2b22016e62a73f7699b9a0b6febd"
+    },
+    {
+      "path": "app/components/BrandLogo.tsx",
+      "uid": "d3b83c253afbeb61fbe1c1757f4cdf2026a45049"
+    },
+    {
+      "path": "app/components/CancellationDisclosure.tsx",
+      "uid": "7a78b65f77447c565d96f938268c355a8595ef37"
+    },
+    {
+      "path": "app/components/Catalogue.tsx",
+      "uid": "3609f6fb0422e3e2cd03b94f165a2a941a997237"
+    },
+    {
+      "path": "app/components/ChatCalendar.tsx",
+      "uid": "f62d83d09ab58736e13cb711a8331f2024ee73a4"
+    },
+    {
+      "path": "app/components/ChatWidget.tsx",
+      "uid": "43a03c41012154f9ed9acd5304a595a503ef65c9"
+    },
+    {
+      "path": "app/components/CookieBanner.tsx",
+      "uid": "47e0f43b049e2f4cc081a7265075002a34cd5620"
+    },
+    {
+      "path": "app/components/Footer.tsx",
+      "uid": "0cc66fd19686efb2310c5c01bc47b1e824771205"
+    },
+    {
+      "path": "app/components/GlassBackdrop.tsx",
+      "uid": "2370ecf3cdcc5304b9b30a9692f7ba8f75c99837"
+    },
+    {
+      "path": "app/components/Header.tsx",
+      "uid": "4020ce879f56b3e7dc1b39f925e1ddfd346c7153"
+    },
+    {
+      "path": "app/components/HoldCountdown.tsx",
+      "uid": "10d9564393feb881b47eb56cc4555ce84e8efa58"
+    },
+    {
+      "path": "app/components/OperatorDirectory.tsx",
+      "uid": "f3ba3ba755c19bfff67d2d12f33e3d5b928ea815"
+    },
+    {
+      "path": "app/components/SelectedTourSummary.tsx",
+      "uid": "5775e20e2197de593ce423f61afaf77027f22a92"
+    },
+    {
+      "path": "app/components/TenantClosedNotice.tsx",
+      "uid": "51a5dda6e73e1989925a145427ebe1c2e96c822c"
+    },
+    {
+      "path": "app/components/ThemeProvider.tsx",
+      "uid": "22720d9eba21af0dd08cff1a29f3f5f1d54aa0b5"
+    },
+    {
+      "path": "app/components/catalogue.css",
+      "uid": "0089c4de62be4f2049eaeb00e5215b2dc6e47758"
+    },
+    {
+      "path": "app/components/skeletons/BookingFlowSkeleton.tsx",
+      "uid": "ff1466b270b063f65840bf2bdbd50a66525d69a9"
+    },
+    {
+      "path": "app/components/skeletons/ConfirmationSkeleton.tsx",
+      "uid": "ac4442a18ebc67f4fa600c59ddf9e8a74808a446"
+    },
+    {
+      "path": "app/components/skeletons/PolicySkeleton.tsx",
+      "uid": "f6ebff2f0466c610cb566c5a711062ee1dee9236"
+    },
+    {
+      "path": "app/components/skeletons/TourCardSkeleton.tsx",
+      "uid": "3b687a5832387f6ba1b04c2a659297080e712e68"
+    },
+    {
+      "path": "app/components/skeletons/VoucherSkeleton.tsx",
+      "uid": "9ce3f2b39c097bd90f01211ea90d3552f216ba1f"
+    },
+    {
+      "path": "app/components/ui/Button.tsx",
+      "uid": "802fe28576aeb655cdeb4e27584bd615240cef4d"
+    },
+    {
+      "path": "app/components/ui/Card.tsx",
+      "uid": "b041290dc55edbe247b1f437b443d63be35eee3b"
+    },
+    {
+      "path": "app/components/ui/Glyphs.tsx",
+      "uid": "f27237d015e19a7ac452725c56a62dcc9d9596e7"
+    },
+    {
+      "path": "app/components/ui/Input.tsx",
+      "uid": "dbde0388128e64bcba1b018b7d81c1437867dd47"
+    },
+    {
+      "path": "app/components/ui/SectionHeader.tsx",
+      "uid": "7b286d7eb3e4d0a5cb840f859bb0d15f3ac9cabf"
+    },
+    {
+      "path": "app/components/ui/Toast.tsx",
+      "uid": "e8e6958938bdd6ecd6bc2d7db3fa480218771219"
+    },
+    {
+      "path": "app/cookies/layout.tsx",
+      "uid": "2246a50fe684c6c3c604571930524f9ce14b1652"
+    },
+    {
+      "path": "app/cookies/page.tsx",
+      "uid": "03b1c7e9a4675abfd66f19cfeb56de8ca3084c18"
+    },
+    {
+      "path": "app/directory/activities/[slug]/page.tsx",
+      "uid": "6c66a1e82ec45db593293ebefdb4182bc8ef29d1"
+    },
+    {
+      "path": "app/directory/destinations/[slug]/page.tsx",
+      "uid": "55b4f804ba9e7e5331e4eb81817a21cc991124dd"
+    },
+    {
+      "path": "app/directory/page.tsx",
+      "uid": "46e975df12c9637679ed26686cffaadd54b89755"
+    },
+    {
+      "path": "app/embed/layout.tsx",
+      "uid": "0766d1d8d56b10164b54642393f94d7ebca9e7c1"
+    },
+    {
+      "path": "app/embed/page.tsx",
+      "uid": "6fbbdc3b40122268e71080840a92524c7522e044"
+    },
+    {
+      "path": "app/error.tsx",
+      "uid": "1d75d8b50e32096b49186108d64c280a43dc454a"
+    },
+    {
+      "path": "app/favicon.ico",
+      "uid": "9f3d7b821c24a36d285b34130b16429521990350"
+    },
+    {
+      "path": "app/icon.png",
+      "uid": "9f3d7b821c24a36d285b34130b16429521990350"
+    },
+    {
+      "path": "app/global-error.tsx",
+      "uid": "31815cdf180d304ca9a3c8358989fee1a98de8f0"
+    },
+    {
+      "path": "app/globals.css",
+      "uid": "856ebc1ed58085035f8b4b71a0ecc0f01e0f3a39"
+    },
+    {
+      "path": "app/hooks/useToast.ts",
+      "uid": "22eb8d5fa766ced50a5e04b2e45c2fde9049e636"
+    },
+    {
+      "path": "app/layout.tsx",
+      "uid": "c15dc3e90f6fda16f9627b13649a9a6f67a45ed8"
+    },
+    {
+      "path": "app/lib/booking-custom-fields.ts",
+      "uid": "6e9f17cd4cef04d43d6912bf9976cd9cea84b743"
+    },
+    {
+      "path": "app/lib/booking-draft.ts",
+      "uid": "4c6a9ee2aa4f89389bf15f54928b04928aa2a605"
+    },
+    {
+      "path": "app/lib/cancellation-policy.ts",
+      "uid": "8c64b4a01ffe0f526b90d838554988bfb80bb78f"
+    },
+    {
+      "path": "app/lib/chat-contact.ts",
+      "uid": "565393cda4533bf83e8602e3d8c9a7860efb2f59"
+    },
+    {
+      "path": "app/lib/cn.ts",
+      "uid": "2344fea70183821102804d2c077ea5f524fecfae"
+    },
+    {
+      "path": "app/lib/directory-ways.ts",
+      "uid": "6af34587ca7d8eea59699074fb150a57c5589118"
+    },
+    {
+      "path": "app/lib/duration.ts",
+      "uid": "91b863d651d6da9d8f0aa9b4653af7b7866587c8"
+    },
+    {
+      "path": "app/lib/format.ts",
+      "uid": "4d3953eee896af88f93b39e33cbf04337113acd7"
+    },
+    {
+      "path": "app/lib/phone.ts",
+      "uid": "1b7756422d8d0e3d8f3da5a1bc9a26e1eb2ec41d"
+    },
+    {
+      "path": "app/lib/policy-fallback.ts",
+      "uid": "f84ed7a993bac48e9781d6879997dc71243fce0b"
+    },
+    {
+      "path": "app/lib/pricing.ts",
+      "uid": "e8fa76bb73a186a620705629e466f8f253bb7270"
+    },
+    {
+      "path": "app/lib/rate-limit.ts",
+      "uid": "538499d1745dba1c988fd3b6142a8abe1d8e33a8"
+    },
+    {
+      "path": "app/lib/sanitize.ts",
+      "uid": "24b2d501c9a105e8e4e18ae9242708a23cdc9cc8"
+    },
+    {
+      "path": "app/lib/supabase.ts",
+      "uid": "0e752cdcdd9bf03c225a0fb7ba39382913ff6383"
+    },
+    {
+      "path": "app/lib/tenant-headers.ts",
+      "uid": "09cda4c15f543b8c4b2d1f8e3da39e3f97b2d630"
+    },
+    {
+      "path": "app/lib/tenant-server.ts",
+      "uid": "04fd5ae0da8ecf4dfe22e935efb940582f73b798"
+    },
+    {
+      "path": "app/lib/types.ts",
+      "uid": "98b21762dd1a2fc685c7e2eecab8cf2b393976a5"
+    },
+    {
+      "path": "app/my-bookings/ActionBtn.tsx",
+      "uid": "ea119d20f10668ff90d8c6512c57ba84f336543b"
+    },
+    {
+      "path": "app/my-bookings/BookingCard.tsx",
+      "uid": "94426c67487261e6a04ad4165d43fa626c2c44be"
+    },
+    {
+      "path": "app/my-bookings/LoginScreen.tsx",
+      "uid": "e6296c050acf4568da98c5ae6174e1b9d17ddd27"
+    },
+    {
+      "path": "app/my-bookings/MiniCalendar.tsx",
+      "uid": "17cdc4f50b1ad4059830c50727012566d9fb9cb6"
+    },
+    {
+      "path": "app/my-bookings/Modal.tsx",
+      "uid": "be6f8953a8a432bbf669073d04c632f8bbb4b670"
+    },
+    {
+      "path": "app/my-bookings/ProfileTab.tsx",
+      "uid": "51a61a08c3581fba87c6678c460752061f8013de"
+    },
+    {
+      "path": "app/my-bookings/RescheduleFlow.tsx",
+      "uid": "b95d254ef3fdbd3f5090ec1bcfa285de8e8c32a8"
+    },
+    {
+      "path": "app/my-bookings/constants.ts",
+      "uid": "35e7109757e9f6feb913cdc848885eb03daa1d4c"
+    },
+    {
+      "path": "app/my-bookings/layout.tsx",
+      "uid": "a697fa6ebb595427edb7f89045c759ee2606a723"
+    },
+    {
+      "path": "app/my-bookings/modals/CancelModal.tsx",
+      "uid": "ba47f2d067b4a3fabd2a5c2cb7c88fda7c9c4080"
+    },
+    {
+      "path": "app/my-bookings/modals/ContactModal.tsx",
+      "uid": "ebda29f4fc44be097b639b9eba0d92adaf74f520"
+    },
+    {
+      "path": "app/my-bookings/modals/ContactUsModal.tsx",
+      "uid": "77a085cd2af12b848675f4ee4d1588b11bfa0b7c"
+    },
+    {
+      "path": "app/my-bookings/modals/EditGuestsModal.tsx",
+      "uid": "81c374d9b35b4bfb06ee34482e248c7ff12c3052"
+    },
+    {
+      "path": "app/my-bookings/modals/SpecialRequestModal.tsx",
+      "uid": "5387312d8ff3db26743ef43be8ea8ba5b22f8439"
+    },
+    {
+      "path": "app/my-bookings/modals/VoucherCheckerModal.tsx",
+      "uid": "05f4170311cc6ac15c9f9de69a8e5cbbc6b1142a"
+    },
+    {
+      "path": "app/my-bookings/page.tsx",
+      "uid": "7d65d4978882a9f7ff1013f68a3211016d1be008"
+    },
+    {
+      "path": "app/not-found.tsx",
+      "uid": "550c4e027746d25428b26df72b149baa26e68230"
+    },
+    {
+      "path": "app/page.tsx",
+      "uid": "1b1f00d8095e7ff4c7c5b7fd48093b05b371ad99"
+    },
+    {
+      "path": "app/popia/confirm/page.tsx",
+      "uid": "9a10fd24ef5a89c76b9510a78d8aefdf1fe8b313"
+    },
+    {
+      "path": "app/popia/page.tsx",
+      "uid": "077e1634aad533eb1b4019dedb1419af30501f38"
+    },
+    {
+      "path": "app/privacy/layout.tsx",
+      "uid": "3e9cd7c7a1ab8bb6373630a6ad9098e90735e5e3"
+    },
+    {
+      "path": "app/privacy/page.tsx",
+      "uid": "d3c510bb7a77ff22ee929234e367a291ec7bb651"
+    },
+    {
+      "path": "app/review/[token]/page.tsx",
+      "uid": "94927c2f5deaff2bd40c4b273b52f419a9e5e54d"
+    },
+    {
+      "path": "app/robots.ts",
+      "uid": "cc7545f7d2b7a96327c06a9edc4409fe183b1530"
+    },
+    {
+      "path": "app/sitemap.ts",
+      "uid": "ff6160c346e576075292df4a7f2e7f4bf488b86e"
+    },
+    {
+      "path": "app/success/layout.tsx",
+      "uid": "e60f04954e8814864f82150e363c10d11934ccd5"
+    },
+    {
+      "path": "app/success/page.tsx",
+      "uid": "6489fcb85876bb6d231e69331ea6bb53b2ef510a"
+    },
+    {
+      "path": "app/terms/layout.tsx",
+      "uid": "bc508c1352b4aa787d7bd375968b661c0c3fc316"
+    },
+    {
+      "path": "app/terms/page.tsx",
+      "uid": "af74f189705af3ae2654cf18725291f0852c5642"
+    },
+    {
+      "path": "app/voucher-confirmed/layout.tsx",
+      "uid": "ed5219390818c8bdebbe161260bb23f6d2806c74"
+    },
+    {
+      "path": "app/voucher-confirmed/page.tsx",
+      "uid": "65a75315436a99d361375bb415bd8b49f9b0e773"
+    },
+    {
+      "path": "app/voucher-success/layout.tsx",
+      "uid": "5878971e4bc945165796332f3f9758cb99671848"
+    },
+    {
+      "path": "app/voucher-success/page.tsx",
+      "uid": "f69ee48673525c1dac00ee18d011f3c88cc2afb7"
+    },
+    {
+      "path": "app/voucher/layout.tsx",
+      "uid": "b64f03e8cd733784da37972d34541072851464e7"
+    },
+    {
+      "path": "app/voucher/page.tsx",
+      "uid": "6bb52f382dcd034a50adb020beb0f48d8c965a84"
+    },
+    {
+      "path": "app/waiver/layout.tsx",
+      "uid": "43d3f01927a173066965e7ea215a4296e48b1394"
+    },
+    {
+      "path": "app/waiver/page.tsx",
+      "uid": "6a0b46b89d64939dd02ae2d72835bcf8f223a3e5"
+    },
+    {
+      "path": "eslint.config.mjs",
+      "uid": "61ff3efe25bb48497089541d366993f09213a5ab"
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "uid": "7f2866bb323b97d54c1b4dc361f091d5525633c9"
+    },
+    {
+      "path": "instrumentation.ts",
+      "uid": "7a0e238d2b9d261f75035d9dec66937b777cd534"
+    },
+    {
+      "path": "lib/imageLoader.ts",
+      "uid": "cd9d1ee566ca2437db0d109046e402da0ca7db49"
+    },
+    {
+      "path": "lib/theme-engine.ts",
+      "uid": "b2f41efa09470cc40657c8fb6a032b6612389ef7"
+    },
+    {
+      "path": "lighthouserc.json",
+      "uid": "4e3d6522af79051ae4a4b279e5918b4af28496e8"
+    },
+    {
+      "path": "middleware.ts",
+      "uid": "18f98b1c1bd9cb0225b4f89cfe3e7a2a39b8d7f6"
+    },
+    {
+      "path": "next-env.d.ts",
+      "uid": "915946e261450f4fb6aab2ca862c8b440b748240"
+    },
+    {
+      "path": "next.config.ts",
+      "uid": "1d9467540ae5cd4d55d3d86c74a5f0e486ae64a4"
+    },
+    {
+      "path": "package-lock.json",
+      "uid": "4164e1d7516864c509a512afd891b65b318850c4"
+    },
+    {
+      "path": "package.json",
+      "uid": "869e0ce856a573210fd4adebb63c46ef5cef43ef"
+    },
+    {
+      "path": "postcss.config.js",
+      "uid": "58086d3ba69f69df1df1cfe907d6f5934fb4590b"
+    },
+    {
+      "path": "public/brand/bt-mark-email.png",
+      "uid": "4dc56b99237208a4a8cf0d01daf991a86bcd5f6f"
+    },
+    {
+      "path": "public/brand/bt-mark-ivory.png",
+      "uid": "73d3a88135f0194daa3513d8bac7764e69dc3a81"
+    },
+    {
+      "path": "public/brand/bt-mark.png",
+      "uid": "146e103f9862dd2fb6721ade4a9a44dbc4cfcd2e"
+    },
+    {
+      "path": "public/file 2.svg",
+      "uid": "fb380eeffe87d50b597383664c02982964d0d28c"
+    },
+    {
+      "path": "public/file.svg",
+      "uid": "fb380eeffe87d50b597383664c02982964d0d28c"
+    },
+    {
+      "path": "public/globe 2.svg",
+      "uid": "2eba23b01a46733bb8423e6d38ebf5f7e95abec5"
+    },
+    {
+      "path": "public/globe.svg",
+      "uid": "2eba23b01a46733bb8423e6d38ebf5f7e95abec5"
+    },
+    {
+      "path": "public/manifest.json",
+      "uid": "75a5317029e3d09932330dc1a04c6bcf5144b51b"
+    },
+    {
+      "path": "public/next 2.svg",
+      "uid": "3f3e95622612b989c5bd6a03299a308c6f3c7e6b"
+    },
+    {
+      "path": "public/next.svg",
+      "uid": "3f3e95622612b989c5bd6a03299a308c6f3c7e6b"
+    },
+    {
+      "path": "public/stock/boat.jpg",
+      "uid": "7e6a49fcfb1feaaf48d9e5f30cc963a6b8087eff"
+    },
+    {
+      "path": "public/stock/canyon.jpg",
+      "uid": "23885f264355d4e4e0dfb595138aaa2a359225f9"
+    },
+    {
+      "path": "public/stock/cape-town-hero.jpg",
+      "uid": "688ef043861405a0920a1064a9956406478588f3"
+    },
+    {
+      "path": "public/stock/cape-town-thumb.jpg",
+      "uid": "3462f591fa773361001d28820242f5bc03e2241c"
+    },
+    {
+      "path": "public/stock/cape-town.jpg",
+      "uid": "b961b2729b75407fbe9ffc4fab014e7c1ca6f557"
+    },
+    {
+      "path": "public/stock/coast-hero.jpg",
+      "uid": "b1247237f969b0a88534cb0aa0f470e51574eb88"
+    },
+    {
+      "path": "public/stock/coast-thumb.jpg",
+      "uid": "b428894efd515d2dbb34dec471a629dc0a998da3"
+    },
+    {
+      "path": "public/stock/coast.jpg",
+      "uid": "01acfce2479e524924e24532a687ee2624179288"
+    },
+    {
+      "path": "public/stock/cycle.jpg",
+      "uid": "f17c807c29ba6c8b638574dc09c8f59a36b53442"
+    },
+    {
+      "path": "public/stock/dive.jpg",
+      "uid": "0f17e090d67218eab5dfba1039e38eeac985ad84"
+    },
+    {
+      "path": "public/stock/giraffe.jpg",
+      "uid": "17bfd7b6c6a9f3fb76913ac0804d3b0242a13a25"
+    },
+    {
+      "path": "public/stock/hike-alt.jpg",
+      "uid": "4ce654abb773c0327f2c3199af152e92fdc69e11"
+    },
+    {
+      "path": "public/stock/hike-hero.jpg",
+      "uid": "99197c262f696ebc9fc312d2834560c1c689f1c1"
+    },
+    {
+      "path": "public/stock/hike-thumb.jpg",
+      "uid": "a8f42b48228060777ccc24fd5cb9355826388df8"
+    },
+    {
+      "path": "public/stock/hike.jpg",
+      "uid": "067560c8c4866bc67ce2d80988033e986c208ef3"
+    },
+    {
+      "path": "public/stock/mountain.jpg",
+      "uid": "e7eff3f558d6ee71b42d9519217c520526f19e7c"
+    },
+    {
+      "path": "public/stock/raft.jpg",
+      "uid": "1a4a59ca7350dc161064bfb6d4b088534b771ddf"
+    },
+    {
+      "path": "public/stock/safari.jpg",
+      "uid": "b4ed01bc93617b106b32de6af9547d26a3d6df5c"
+    },
+    {
+      "path": "public/stock/skydive.jpg",
+      "uid": "c4a17581fc5087d0e05f4b8268e63fa2ec09605b"
+    },
+    {
+      "path": "public/stock/wine.jpg",
+      "uid": "32b08e93ccc9b15017fd2e0f17c9a443205fa5f9"
+    },
+    {
+      "path": "public/sw.js",
+      "uid": "1e408cbaeef6db4552a166f551524c41518e641b"
+    },
+    {
+      "path": "public/vercel 2.svg",
+      "uid": "cebb8852d58c8886be3e9051a26957f42bb82f1a"
+    },
+    {
+      "path": "public/vercel.svg",
+      "uid": "cebb8852d58c8886be3e9051a26957f42bb82f1a"
+    },
+    {
+      "path": "public/widget.js",
+      "uid": "c9478b057ea9c98d81cb1dfea77f777e2cf64532"
+    },
+    {
+      "path": "public/window 2.svg",
+      "uid": "54c48e0daa6caa317fe1b4c419007fd93e948db9"
+    },
+    {
+      "path": "public/window.svg",
+      "uid": "54c48e0daa6caa317fe1b4c419007fd93e948db9"
+    },
+    {
+      "path": "scripts/check-ways.mts",
+      "uid": "ebabac90a08390da67d0f5ced455975fbceaefc1"
+    },
+    {
+      "path": "sentry.edge.config.ts",
+      "uid": "b80438e5f37a60e504939f18cf70b1fa06131e64"
+    },
+    {
+      "path": "sentry.server.config.ts",
+      "uid": "b80438e5f37a60e504939f18cf70b1fa06131e64"
+    },
+    {
+      "path": "tailwind.config.js",
+      "uid": "bf96c1aedf36dba414b891c9b54ca6da4df72b39"
+    },
+    {
+      "path": "tsconfig.json",
+      "uid": "ebeabd31ddcbf2aff9126679c122cf54735728f0"
+    },
+    {
+      "path": "vercel.json",
+      "uid": "b8a2e4f9d2fae523aeb221b73de7123cab7c3be6"
+    }
+  ]
+}

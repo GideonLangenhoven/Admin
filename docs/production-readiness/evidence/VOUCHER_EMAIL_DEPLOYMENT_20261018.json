@@ -1,0 +1,141 @@
+{
+  "status": "DEPLOYED_AND_VERIFIED",
+  "verified_at": "2026-10-18T12:24:47.146Z",
+  "scope": "Gift voucher purchase-confirmation email, dedicated voucher sender address, and standalone PNG attachment with embedded voucher text for buyer and recipient emails",
+  "web": {
+    "id": "dpl_Bhg19YuhMbFKCKEgn2vJ9NU4U8rc",
+    "url": "caepweb-admin-j2jrcwoi0-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 494
+  },
+  "preserved_existing_production_files": 490,
+  "live_renderer": {
+    "at": "2026-10-18T12:24:03.063Z",
+    "deployment": "dpl_Bhg19YuhMbFKCKEgn2vJ9NU4U8rc",
+    "results": [
+      {
+        "name": "photo",
+        "format": "png",
+        "width": 1200,
+        "height": 900,
+        "bytes": 1024903
+      },
+      {
+        "name": "long",
+        "format": "png",
+        "width": 1200,
+        "height": 2414,
+        "bytes": 292090
+      }
+    ],
+    "unauthenticated_status": 401,
+    "customer_messages_sent": 0
+  },
+  "email_function": {
+    "at": "2026-10-18T12:24:47.146Z",
+    "project": "ukdsrndqhsatjkmxijuj",
+    "functions": [
+      {
+        "slug": "send-email",
+        "version": 191,
+        "status": "ACTIVE",
+        "verify_jwt": false
+      }
+    ],
+    "source_files": [
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/send-email/index.ts",
+        "sha256": "3fbbaef606b2601d83d878f8331829401b6bceada2fc6bbe41f38e7e9efbc5e6"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/gift-voucher-face.ts",
+        "sha256": "65fdcaac91278e5757d25497eaa204996f034e3bc87f5491cf1a5102971352ec"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/sentry.ts",
+        "sha256": "cf5cad26d7ddb3a103a60d658dab85fa647d98e574d5ddb44ab83700c915bafb"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/waiver.ts",
+        "sha256": "8a81bc17ec5a1106629301c77e2d479b7b7ba6fc66a8927534fb70b7311829d7"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/tenant.ts",
+        "sha256": "07bc561b9ef82536e0d8d2ba8065ab6083129d95d7b9a3546aa24ec0d6145669"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/pagination.ts",
+        "sha256": "5ac6f3c95dd79b8c3708e57c844b14e2f7e1f01afdb6e82429dc25147f4ee57e"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/duration.ts",
+        "sha256": "4f6eb2b814536b6066378deb29002e829e4784ff09e26245009ea76aee22626c"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/marketing-tokens.ts",
+        "sha256": "ac28048ac64a3e0bca6d84db933d91aa2f33479804e457e2922f595b3934ab12"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/marketing-email-html.ts",
+        "sha256": "fa51d920412113136b15c3bf90b694cf5bfc33caec1588357bb64b5bc9c29b42"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/auth.ts",
+        "sha256": "11801767d8e3d32ee0e6d5c06d077860b0ce4e05ddb47213ee13d12fb5e24ade"
+      },
+      {
+        "slug": "send-email",
+        "path": "supabase/functions/_shared/payment-deadline.ts",
+        "sha256": "afb8e3a68337c44ddd81d5f2c90a5f1504f89530ee2077b109ce9e57388bb3a7"
+      }
+    ],
+    "probes": [
+      {
+        "slug": "send-email",
+        "status": 401
+      }
+    ],
+    "worker": [
+      {
+        "status": "succeeded",
+        "start_time": "2026-10-18 12:24:00.781879+00",
+        "end_time": "2026-10-18 12:24:00.835328+00"
+      },
+      {
+        "status": "succeeded",
+        "start_time": "2026-10-18 12:23:00.103025+00",
+        "end_time": "2026-10-18 12:23:00.11228+00"
+      },
+      {
+        "status": "succeeded",
+        "start_time": "2026-10-18 12:22:00.72364+00",
+        "end_time": "2026-10-18 12:22:00.761069+00"
+      }
+    ],
+    "unrelated_functions_unchanged": true,
+    "customer_messages_sent": 0
+  },
+  "validation": {
+    "unit_tests_passed": 152,
+    "production_build": "passed",
+    "renderer_route_eslint": "passed",
+    "send_email_deno_typecheck": "passed",
+    "hosted_photo_and_long_message_render": "passed",
+    "unauthenticated_renderer_status": 401,
+    "customer_messages_sent": 0
+  },
+  "limitations": [
+    "Gmail controls inbox category placement; Primary cannot be guaranteed.",
+    "Previously delivered emails are unchanged."
+  ]
+}

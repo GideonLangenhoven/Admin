@@ -1,0 +1,256 @@
+{
+  "date": "2026-10-01",
+  "status": "published_and_verified",
+  "inspected_public_catalogue": "https://kayak.booking.bookingtours.co.za",
+  "scope": "Shared catalogue presentation and Booking Site Configuration preview",
+  "changed_shared_components": [
+    "booking/app/components/Catalogue.tsx",
+    "booking/app/components/catalogue.css",
+    "booking/app/components/Header.tsx",
+    "booking/app/components/Footer.tsx",
+    "booking/app/components/GlassBackdrop.tsx",
+    "booking/lib/theme-engine.ts",
+    "components/booking/BookingSitePreview.tsx",
+    "components/booking/Catalogue.tsx",
+    "components/booking/catalogue.css",
+    "app/lib/theme-engine.ts"
+  ],
+  "integration_points": [
+    "booking/app/page.tsx",
+    "app/settings/page.tsx"
+  ],
+  "operator_controls_preserved": [
+    "Six saved palette fields",
+    "Uploaded site background",
+    "Logo and tour photographs",
+    "Business name, tagline, optional hero and footer copy",
+    "Navigation, primary action and chat labels",
+    "Existing URL and redirect settings",
+    "Existing body font and display-font hooks"
+  ],
+  "new_settings": 0,
+  "new_dependencies": 0,
+  "saved_configuration_changes": 0,
+  "live_record_mutations": 0,
+  "booking_payment_notification_submissions": 0,
+  "photograph_aspect_ratios": {
+    "mobile": "16:9",
+    "desktop": "2:1"
+  },
+  "price_display": "Existing numeric tour base price in rand, per person; no price rendered for null or unavailable values. Existing offer and slot pricing calculations retained.",
+  "checks": {
+    "browser_tests": {
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "isolated_source_fixtures": 15,
+      "live_tenant_checks": 9
+    },
+    "browsers": [
+      "Desktop Chromium",
+      "Pixel 7 Chromium",
+      "iPhone 13 WebKit"
+    ],
+    "coverage": [
+      "Current public three-tour data and saved palette",
+      "Six tours with representative long titles",
+      "320px, mobile, tablet and desktop widths",
+      "Six light, dark and mid-tone palettes",
+      "Busy saved background photographs",
+      "Existing fonts plus Arial, Georgia and Courier font metrics",
+      "200 percent text zoom",
+      "No detected overflow or clipped card text",
+      "Rendered card, metadata, action and header text contrast at least 4.5:1",
+      "44px or larger primary booking targets",
+      "Keyboard focus, Enter navigation and whole-card navigation",
+      "Gift Voucher and My Bookings destinations",
+      "Tour and slot deep links with existing slot price override",
+      "Unavailable price and image, plus valid zero price",
+      "Configuration preview with three and six tours and saved background",
+      "Unsaved palette, title, navigation and action-label preview changes",
+      "Shared markup, stylesheet and theme-engine drift guards"
+    ],
+    "focused_unit_tests_passed": 76,
+    "typescript": {
+      "booking": "passed",
+      "admin": "passed"
+    },
+    "isolated_booking_production_build": "passed with existing Next/Sentry warnings",
+    "changed_component_lint": "passed; existing unused totalBookings warning retained",
+    "both_repository_diff_checks": "passed",
+    "focused_unit_command": "npm run test:unit -- tests/unit/theme-engine.test.ts tests/unit/demo-action-guide.test.ts",
+    "production_builds": {
+      "booking": "passed on Vercel",
+      "admin": "passed on Vercel after correcting the ignore rule"
+    },
+    "live_coverage": [
+      "Kayak current three tours, authoritative prices and working photographs",
+      "Claire own branding, five tours and booking URLs",
+      "Desktop Chrome, phone Chrome and phone WebKit",
+      "No clipping or horizontal overflow at 320px",
+      "Keyboard focus, Enter navigation and whole-card navigation",
+      "Gift Voucher and My Bookings destinations",
+      "Existing calendar, date and departure selection, Continue and Back",
+      "Complete tour, slot and date deep links",
+      "Phone chat launcher stays inside the catalogue header, clears branding, prices and actions, retains a 44px target, and opens and closes its dialog",
+      "Live catalogue and chat launcher retain their layout at 200 percent text size on 320px screens"
+    ],
+    "verification_notes": [
+      "Protected candidate domains were not made public for testing. The isolated source was checked with the existing local demo fixtures before promotion.",
+      "The initial live test was corrected to wait for loaded booking actions rather than loading placeholders, and to use the existing complete tour, slot and date deep-link format. No product code changed for these test corrections.",
+      "Overlap checks compare visible card content below the opaque sticky header. Content scrolling behind that header is intentionally occluded; the launcher itself must fit the header and clear branding and navigation."
+    ]
+  },
+  "verification_command": "CATALOGUE_LIVE=1 CATALOGUE_URL=https://kayak.booking.bookingtours.co.za npx playwright test --config=docs/production-readiness/evidence/catalogue-polish-20261001/deployment.config.cjs",
+  "visual_artifacts_directory": "docs/production-readiness/evidence/catalogue-polish-20261001",
+  "fixtures": "Read-only localhost backend and copies of public tour photos. No live operator records edited.",
+  "deployment_note": "Both scoped UI updates are published. Production source inventories exclude all unrelated workspace edits. Admin preview rendering and unsaved configuration changes were checked with fictional operator data in isolated browser fixtures; no live settings were saved.",
+  "verified_at": "2026-10-01T15:27:14.505672+00:00",
+  "deployment": {
+    "booking": {
+      "id": "dpl_eFbqMkYez62RS1HuUSwZgRdGUs9L",
+      "url": "https://booking-klryj8jl1-jerrys-projects-f4e4eaf9.vercel.app",
+      "public_url": "https://kayak.booking.bookingtours.co.za",
+      "ready_state": "READY",
+      "preserved_deployment": "dpl_HfxVu4rKbgP8YobipgnzU26SBzzs",
+      "supersedes": "dpl_56vaV1jVzGUURMYWh2PotXSTPjP8",
+      "alias_verified": true
+    },
+    "admin": {
+      "id": "dpl_7ZU93vPu7jXr3A5BC1VYujGLXkjN",
+      "url": "https://caepweb-admin-l77coxqe4-jerrys-projects-f4e4eaf9.vercel.app",
+      "public_url": "https://kayak.admin.bookingtours.co.za/settings#site",
+      "ready_state": "READY",
+      "preserved_deployment": "dpl_eyvMNQvxeXN89b7wJbBqt9ev2Z8v",
+      "preserved_revision": "43304b65314c2b9974f939304e7b2ebae0a62c0c",
+      "supersedes": "dpl_8QsXPDu6uomQH65GNvqHPwf2m6nV",
+      "alias_verified": true
+    },
+    "scope": "Shared catalogue presentation and matching settings preview, plus the essential deployment ignore correction. No database, provider, environment or booking behavior change.",
+    "reason": "Fresh production deployment requested by user; identical verified UI source."
+  },
+  "source_manifest": {
+    "scope": "Shared catalogue presentation and matching Booking Page Preview only",
+    "preserved_calendar_deployment": "dpl_HfxVu4rKbgP8YobipgnzU26SBzzs",
+    "admin_base_revision": "43304b65314c2b9974f939304e7b2ebae0a62c0c",
+    "database_changes": 0,
+    "environment_changes": 0,
+    "candidates": {
+      "booking": {
+        "source": "/private/tmp/bookingtours-catalogue-publish-20261001/booking",
+        "base_deployment": "dpl_HfxVu4rKbgP8YobipgnzU26SBzzs",
+        "changed_files": [
+          "app/components/Catalogue.tsx",
+          "app/components/Footer.tsx",
+          "app/components/GlassBackdrop.tsx",
+          "app/components/Header.tsx",
+          "app/components/catalogue.css",
+          "app/page.tsx",
+          "lib/theme-engine.ts"
+        ],
+        "file_hashes": {
+          "app/components/Catalogue.tsx": "a1f83bc85d3d33b3a72a1c5b705bd4c3188cea4d10c3b58761b9d859fcbaa216",
+          "app/components/Footer.tsx": "98f2aa0473bde54509c62b8f64e707dd5149068e1bdb5edc419a2a2b2934355a",
+          "app/components/GlassBackdrop.tsx": "1e34a201202a1f65f63bdbb8cfac6658d9e9a1b2c7b4307d4988ff6091603302",
+          "app/components/Header.tsx": "87bf945ee29fa4904cff6d1e2ed62d1a2868ac71017a4bb2d243c327dd6eb5be",
+          "app/components/catalogue.css": "08cbdf0056beb8841ffc223cbd5215aab83764e86d8bf033d2d4a7aadcd5b9a0",
+          "app/page.tsx": "704c0747886c2baed957422d016406ea80805b176a7ebd48465c3383f581bbd4",
+          "lib/theme-engine.ts": "2c4b179dceef170097ac92905da82402d95ef4c0ddce7ac1f7237fdbfdf79e41"
+        },
+        "unchanged_files": 156
+      },
+      "admin": {
+        "source": "/private/tmp/bookingtours-catalogue-publish-20261001/admin",
+        "base_deployment": "dpl_eyvMNQvxeXN89b7wJbBqt9ev2Z8v",
+        "changed_files": [
+          ".vercelignore",
+          "app/lib/theme-engine.ts",
+          "app/settings/page.tsx",
+          "components/booking/BookingSitePreview.tsx",
+          "components/booking/Catalogue.tsx",
+          "components/booking/catalogue.css"
+        ],
+        "file_hashes": {
+          "app/lib/theme-engine.ts": "c671d97463380fea2d8338c2b46481bf627d01f3278f31baf6f99fa97573424b",
+          "app/settings/page.tsx": "a8b6e73ae72dc54b52af46e5dd9660451fdeb6ab6368b51f9f21467ba0cd01ed",
+          "components/booking/BookingSitePreview.tsx": "4247b186e76a23a35ef726acade0fbf33e24fd954cca82fdd5e9f83318e5e106",
+          "components/booking/Catalogue.tsx": "a1f83bc85d3d33b3a72a1c5b705bd4c3188cea4d10c3b58761b9d859fcbaa216",
+          "components/booking/catalogue.css": "08cbdf0056beb8841ffc223cbd5215aab83764e86d8bf033d2d4a7aadcd5b9a0",
+          ".vercelignore": "e0428dde45642ef5c6cc9131ebe4f413634b92003ab9bcd20c44d82735f81c67"
+        },
+        "unchanged_files": 1081
+      }
+    },
+    "deployment_packaging_fix": "Anchor /booking/ ignore rule so components/booking is included",
+    "mobile_launcher_fix": "At widths below 480px, reserve catalogue header space for the existing chat launcher so it cannot cover card prices or booking actions. Chat behavior and non-catalogue pages are unchanged."
+  },
+  "packaging_fix": {
+    "file": ".vercelignore",
+    "change": "booking/ -> /booking/",
+    "reason": "The unanchored rule excluded components/booking from Vercel uploads. The root companion repository remains excluded."
+  },
+  "business_preservation": {
+    "catalogue": {
+      "unchanged_executable_declarations": 48
+    },
+    "settings": {
+      "unchanged_executable_declarations": 278
+    }
+  },
+  "screenshots": {
+    "desktop": "catalogue-polish-20261001/desktop.png",
+    "mobile": "catalogue-polish-20261001/mobile.png",
+    "mobile_320": "catalogue-polish-20261001/mobile-320.png",
+    "mobile_320_safari": "catalogue-polish-20261001/mobile-320-safari.png",
+    "configuration_preview_fixture": "catalogue-polish-20261001/fixture-settings.png",
+    "six_tour_fixture": "catalogue-polish-20261001/fixture-six-tours.png",
+    "text_200_percent_fixture": "catalogue-polish-20261001/fixture-text-200.png",
+    "text_200_percent_live": "catalogue-polish-20261001/mobile-text-200.png"
+  },
+  "broader_rollout": "PAUSED_BY_USER; FAILED_GATE unchanged",
+  "mobile_launcher_fix": "At widths below 480px, reserve catalogue header space for the existing chat launcher so it cannot cover card prices or booking actions. Chat behavior and non-catalogue pages are unchanged.",
+  "deployment_history": [
+    {
+      "verified_at": "2026-10-01T15:17:54.472971+00:00",
+      "deployment": {
+        "booking": {
+          "id": "dpl_56vaV1jVzGUURMYWh2PotXSTPjP8",
+          "url": "https://booking-kc291s5ji-jerrys-projects-f4e4eaf9.vercel.app",
+          "public_url": "https://kayak.booking.bookingtours.co.za",
+          "ready_state": "READY",
+          "preserved_deployment": "dpl_HfxVu4rKbgP8YobipgnzU26SBzzs",
+          "supersedes": "dpl_ATj6sijZcuka7WCfou8aqr3hfyJ8",
+          "alias_verified": true
+        },
+        "admin": {
+          "id": "dpl_8QsXPDu6uomQH65GNvqHPwf2m6nV",
+          "url": "https://caepweb-admin-qch2kah5a-jerrys-projects-f4e4eaf9.vercel.app",
+          "public_url": "https://kayak.admin.bookingtours.co.za/settings#site",
+          "ready_state": "READY",
+          "preserved_deployment": "dpl_eyvMNQvxeXN89b7wJbBqt9ev2Z8v",
+          "preserved_revision": "43304b65314c2b9974f939304e7b2ebae0a62c0c",
+          "supersedes": "dpl_3uukSmYUudPyo4yn36kMzYKDbFHg",
+          "alias_verified": true
+        },
+        "scope": "Shared catalogue presentation and matching settings preview, plus the essential deployment ignore correction. No database, provider, environment or booking behavior change."
+      }
+    }
+  ],
+  "last_reverified_at": "2026-10-01T15:51:08.544Z",
+  "last_reverification": {
+    "production_aliases_and_ready_state": "Confirmed with Vercel inspect and deployment API",
+    "live_browser_tests": {
+      "startTime": "2026-10-01T15:49:00.320Z",
+      "duration": 38484.912000000004,
+      "expected": 9,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "unchanged_catalogue_executable_declarations": 48,
+    "unchanged_settings_executable_declarations": 278,
+    "source_scope": "Existing approved catalogue and preview releases verified. Newer unrelated workspace styling and booking edits excluded.",
+    "new_deployment_required": false
+  }
+}

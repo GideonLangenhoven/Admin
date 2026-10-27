@@ -285,9 +285,35 @@ th {
     outline: 2px solid color-mix(in srgb, var(--ck-accent) 65%, white 35%);
     outline-offset: 2px;
   }
+
+  summary:focus-visible {
+    outline: 2px solid var(--ck-accent);
+    outline-offset: 2px;
+    border-radius: var(--ck-radius-sm);
+  }
 }
 
 @layer components {
+  .admin-main {
+    overflow-wrap: anywhere;
+  }
+
+  .admin-main > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .admin-main :where(input, select, textarea) {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .ui-table-container {
+    container: admin-table / inline-size;
+    min-width: 0;
+    max-width: 100%;
+  }
+
 
   /* ── Surfaces ─────────────────────────────────────────────── */
 
@@ -325,6 +351,8 @@ th {
   /* THE card — lifted paper: warm gradient, inset top highlight, layered
      ambient shadow. Replaces both .ui-surface and hand-rolled bg-white cards. */
   .ui-card {
+    min-width: 0;
+    max-width: 100%;
     border-radius: 16px;
     border: 1px solid var(--ck-border-subtle);
     background: linear-gradient(180deg, var(--ck-surface) 0%, var(--ck-surface-warm) 100%);
@@ -408,6 +436,8 @@ th {
 
   .ui-control {
     @apply border rounded-lg px-3 py-2 text-sm;
+    min-width: 0;
+    max-width: 100%;
     background: var(--ck-surface);
     border-color: var(--ck-border-strong);
     color: var(--ck-text-strong);
@@ -421,6 +451,11 @@ th {
     border-color: var(--ck-accent);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--ck-accent) 18%, transparent);
     outline: none;
+  }
+
+  .ui-control:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
   }
 
   .ui-pill {
@@ -460,6 +495,8 @@ th {
   /* Segmented control — sunken track, lifted active chip */
   .ui-seg {
     display: inline-flex;
+    flex-wrap: wrap;
+    max-width: 100%;
     align-items: center;
     gap: 2px;
     padding: 3px;
@@ -590,16 +627,25 @@ th {
 
   .ui-btn {
     @apply inline-flex items-center justify-center gap-2 rounded-[10px] px-4 text-[13.5px] font-medium;
-    height: 36px;
-    /* Fixed height + wrapping label = text spilling out of the button when a
-       row gets tight. Keep labels on one line and let the row wrap instead. */
-    white-space: nowrap;
+    min-height: 36px;
+    max-width: 100%;
+    padding-block: 8px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: center;
+    line-height: 1.4;
     transition: background-color 160ms var(--ck-ease), border-color 160ms var(--ck-ease),
       color 160ms var(--ck-ease), transform 160ms var(--ck-ease), box-shadow 160ms var(--ck-ease);
   }
 
-  .ui-btn:active {
+  .ui-btn:active:not(:disabled) {
     transform: translateY(1px);
+  }
+
+  .ui-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+    transform: none;
   }
 
   .ui-btn-primary {
@@ -608,13 +654,13 @@ th {
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 1px 2px rgba(15, 43, 31, 0.28), 0 8px 20px -8px rgba(18, 94, 64, 0.50);
   }
 
-  .ui-btn-primary:hover {
+  .ui-btn-primary:hover:not(:disabled) {
     background: linear-gradient(180deg, #1B7855 0%, #147049 55%, #115C3F 100%);
     transform: translateY(-1px);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 2px 4px rgba(15, 43, 31, 0.28), 0 12px 26px -8px rgba(18, 94, 64, 0.55);
   }
 
-  .ui-btn-primary:active {
+  .ui-btn-primary:active:not(:disabled) {
     transform: translateY(0.5px);
   }
 
@@ -624,7 +670,7 @@ th {
     color: var(--ck-text-strong);
   }
 
-  .ui-btn-ghost:hover {
+  .ui-btn-ghost:hover:not(:disabled) {
     border-color: color-mix(in srgb, var(--ck-text-muted) 60%, transparent);
     background: color-mix(in srgb, var(--ck-text-strong) 3%, var(--ck-surface));
   }
@@ -634,7 +680,7 @@ th {
     color: var(--ck-accent);
   }
 
-  .ui-btn-soft:hover {
+  .ui-btn-soft:hover:not(:disabled) {
     background: color-mix(in srgb, var(--ck-accent) 14%, transparent);
   }
 
@@ -643,7 +689,7 @@ th {
     color: var(--ck-danger);
   }
 
-  .ui-btn-danger:hover {
+  .ui-btn-danger:hover:not(:disabled) {
     background: color-mix(in srgb, var(--ck-danger) 16%, transparent);
   }
 
@@ -663,7 +709,7 @@ html.dark .ui-btn-primary {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 22px -8px rgba(0, 217, 139, 0.40);
 }
 
-html.dark .ui-btn-primary:hover {
+html.dark .ui-btn-primary:hover:not(:disabled) {
   background: linear-gradient(180deg, #3FEEB2 0%, #21E8A6 60%, #00D98B 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 2px 4px rgba(0, 0, 0, 0.4), 0 12px 28px -8px rgba(0, 217, 139, 0.45);
 }
@@ -702,7 +748,7 @@ html.dark .ui-progress-fill {
   }
   .ui-card-hover:hover,
   .ui-surface-hoverable:hover,
-  .ui-btn-primary:hover {
+  .ui-btn-primary:hover:not(:disabled) {
     transform: none;
   }
 }
@@ -728,6 +774,54 @@ html.dark .ui-progress-fill {
 
   .ui-status {
     font-size: 12px;
+  }
+}
+
+/* Account for the sidebar as well as the viewport when stacking wide tables. */
+@container admin-table (max-width: 63.99rem) {
+  .ui-responsive-table,
+  .ui-responsive-table tbody,
+  .ui-responsive-table tr,
+  .ui-responsive-table td {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .ui-responsive-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .ui-responsive-table tr {
+    padding-block: 0.5rem;
+    border-bottom: 1px solid var(--ck-border-subtle);
+  }
+
+  .ui-responsive-table td {
+    padding: 0.5rem 1rem;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .ui-responsive-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.25rem;
+    color: var(--ck-text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .ui-responsive-table button {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 

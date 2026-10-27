@@ -1,0 +1,1476 @@
+{
+ "url": "http://127.0.0.1:3000/simple/check-ins",
+ "at": "2026-10-27T15:04:41.961Z",
+ "allow": [],
+ "viewports": [
+  {
+   "width": 1024,
+   "height": 768,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.96
+   ],
+   "motion": {
+    "elements": 4,
+    "css": 4,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 1024,
+     "h": 768
+    },
+    "page": {
+     "height": 768,
+     "screens": 1,
+     "words": 370,
+     "img": 1,
+     "video": 0,
+     "canvas": 0,
+     "svg": 52,
+     "sections": 5,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Check-ins",
+     "words": 1,
+     "chars": 9,
+     "lines": 1,
+     "size": 36,
+     "vw": 3.5,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.03,
+     "leading": 1.2,
+     "top": 205,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "Check-ins",
+     "words": 1,
+     "lines": 1,
+     "size": 36,
+     "font": "satoshi"
+    },
+    "headings": [
+     {
+      "text": "Check-ins",
+      "words": 1,
+      "chars": 9,
+      "lines": 1,
+      "size": 36,
+      "vw": 3.5,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.2,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.91,
+      "top": 205,
+      "tag": "h1",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 1,
+       "mono": false
+      },
+      {
+       "family": "satoshi",
+       "share": 0,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      12,
+      14,
+      16,
+      18,
+      20,
+      36
+     ],
+     "sizeCount": 6,
+     "notLoaded": [],
+     "body": {
+      "font": "Plus Jakarta Sans",
+      "size": 12,
+      "leading": 1.63,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 12.8
+     },
+     "measureChars": 139,
+     "max": {
+      "size": 36,
+      "vw": 3.5,
+      "font": "satoshi",
+      "text": "Check-ins"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0,
+     "centerShare": 0.09,
+     "smallText": 11
+    },
+    "eyebrows": [
+     {
+      "text": "Arrivals and desk payments",
+      "above": "Check-ins",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 14,
+      "top": 174
+     }
+    ],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#141815",
+       "top": 0,
+       "hsl": {
+        "h": 135,
+        "s": 0.09,
+        "l": 0.09
+       }
+      },
+      {
+       "color": "#fbfbf8",
+       "top": 506,
+       "hsl": {
+        "h": 60,
+        "s": 0.27,
+        "l": 0.98
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#c6453a",
+       "share": 0.23
+      },
+      {
+       "color": "#1a261c",
+       "share": 0.22
+      },
+      {
+       "color": "#f6f5ef",
+       "share": 0.18
+      },
+      {
+       "color": "#545e55",
+       "share": 0.15
+      },
+      {
+       "color": "#19201a",
+       "share": 0.13
+      }
+     ],
+     "button": {
+      "bg": "#141815",
+      "hsl": {
+       "h": 135,
+       "s": 0.09,
+       "l": 0.09
+      },
+      "fg": "#f6f5ef"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 12,
+     "inHero": 1,
+     "radius": "pill",
+     "height": 44,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Full dashboard"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 9,
+     "hairlineSamples": [
+      "div.sv-readiness 924px",
+      "div.sv-readiness 924px",
+      "div.sv-readiness 924px",
+      "div.sv-readiness 924px",
+      "div.sv-readiness 924px"
+     ],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 11,
+     "boxRadius": 24,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 3,
+     "fixed": false,
+     "height": 150,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 1024,
+     "h": 768
+    },
+    "pageH": 768,
+    "margins": {
+     "left": 30,
+     "right": 36
+    },
+    "sections": [
+     {
+      "sel": "header.sv-header",
+      "tag": "header",
+      "top": 0,
+      "height": 150,
+      "words": 7,
+      "media": 0,
+      "middle": 339,
+      "heading": null,
+      "left": 70,
+      "right": 67,
+      "textLeft": 70,
+      "textRight": 67,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "main.sv-main",
+      "tag": "main",
+      "top": 150,
+      "height": 618,
+      "words": 34,
+      "media": 0,
+      "middle": 16,
+      "heading": {
+       "text": "Check-ins",
+       "size": 36,
+       "tag": "h1"
+      },
+      "left": 30,
+      "right": 30,
+      "textLeft": 30,
+      "textRight": 30,
+      "fullBleed": false,
+      "footer": true,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Check-ins",
+      "size": 36,
+      "top": 205,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 30,
+      "n": 2
+     },
+     {
+      "x": 48,
+      "n": 1
+     },
+     {
+      "x": 92,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 4,
+    "bodySize": 16,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0.12,
+    "voidBox": {
+     "x": 555,
+     "y": 102,
+     "w": 469,
+     "h": 205
+    }
+   },
+   "app": {
+    "viewport": {
+     "w": 1024,
+     "h": 768
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": null,
+    "topbar": null,
+    "canvas": {
+     "left": 30,
+     "right": 36
+    },
+    "hero": {
+     "text": "Check-ins",
+     "words": 1,
+     "chars": 9,
+     "lines": 1,
+     "size": 36,
+     "vw": 3.5,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.03,
+     "leading": 1.2,
+     "top": 205,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 11,
+     "firstScreen": 3,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 22,
+     "radii": [
+      [
+       0,
+       11
+      ],
+      [
+       24,
+       10
+      ],
+      [
+       16,
+       1
+      ]
+     ],
+     "heavyBorders": 0,
+     "borderSamples": [],
+     "heavyShadows": 0,
+     "softShadows": 0,
+     "shadowSamples": [],
+     "glass": 0
+    },
+    "chips": {
+     "count": 20,
+     "hues": 1,
+     "samples": [
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      },
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      },
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      },
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      }
+     ]
+    },
+    "numbers": {
+     "cells": 0,
+     "leftAligned": 0,
+     "figures": 0,
+     "tabularShare": null,
+     "kpiMax": null
+    },
+    "rows": null,
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.23,
+     "tiny": 0,
+     "tinySamples": [],
+     "sizes": [
+      12,
+      14,
+      16,
+      18,
+      20,
+      36
+     ]
+    },
+    "title": {
+     "text": "Check-ins",
+     "size": 36,
+     "top": 205
+    },
+    "colourShare": 0.138
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 768,
+   "height": 1024,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.97
+   ],
+   "motion": {
+    "elements": 17,
+    "css": 17,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "page": {
+     "height": 1024,
+     "screens": 1,
+     "words": 370,
+     "img": 1,
+     "video": 0,
+     "canvas": 0,
+     "svg": 52,
+     "sections": 5,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Check-ins",
+     "words": 1,
+     "chars": 9,
+     "lines": 1,
+     "size": 36,
+     "vw": 4.7,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.03,
+     "leading": 1.2,
+     "top": 205,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "Check-ins",
+     "words": 1,
+     "lines": 1,
+     "size": 36,
+     "font": "satoshi"
+    },
+    "headings": [
+     {
+      "text": "Check-ins",
+      "words": 1,
+      "chars": 9,
+      "lines": 1,
+      "size": 36,
+      "vw": 4.7,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.2,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.88,
+      "top": 205,
+      "tag": "h1",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 1,
+       "mono": false
+      },
+      {
+       "family": "satoshi",
+       "share": 0,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      12,
+      14,
+      16,
+      18,
+      20,
+      36
+     ],
+     "sizeCount": 6,
+     "notLoaded": [],
+     "body": {
+      "font": "Plus Jakarta Sans",
+      "size": 12,
+      "leading": 1.63,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 12.8
+     },
+     "measureChars": 107,
+     "max": {
+      "size": 36,
+      "vw": 4.7,
+      "font": "satoshi",
+      "text": "Check-ins"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0,
+     "centerShare": 0.09,
+     "smallText": 11
+    },
+    "eyebrows": [
+     {
+      "text": "Arrivals and desk payments",
+      "above": "Check-ins",
+      "upper": false,
+      "tracked": false,
+      "mono": false,
+      "pill": false,
+      "size": 14,
+      "top": 174
+     }
+    ],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#141815",
+       "top": 0,
+       "hsl": {
+        "h": 135,
+        "s": 0.09,
+        "l": 0.09
+       }
+      },
+      {
+       "color": "#fbfbf8",
+       "top": 506,
+       "hsl": {
+        "h": 60,
+        "s": 0.27,
+        "l": 0.98
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#c6453a",
+       "share": 0.23
+      },
+      {
+       "color": "#1a261c",
+       "share": 0.22
+      },
+      {
+       "color": "#f6f5ef",
+       "share": 0.18
+      },
+      {
+       "color": "#545e55",
+       "share": 0.15
+      },
+      {
+       "color": "#19201a",
+       "share": 0.13
+      }
+     ],
+     "button": {
+      "bg": "#141815",
+      "hsl": {
+       "h": 135,
+       "s": 0.09,
+       "l": 0.09
+      },
+      "fg": "#f6f5ef"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 12,
+     "inHero": 2,
+     "radius": "pill",
+     "height": 44,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": [
+      "Full dashboard",
+      "Save arrivals"
+     ]
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 9,
+     "hairlineSamples": [
+      "div.sv-readiness 668px",
+      "div.sv-readiness 668px",
+      "div.sv-readiness 668px",
+      "div.sv-readiness 668px",
+      "div.sv-readiness 668px"
+     ],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 11,
+     "boxRadius": 24,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 3,
+     "fixed": false,
+     "height": 150,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "pageH": 1024,
+    "margins": {
+     "left": 30,
+     "right": 30
+    },
+    "sections": [
+     {
+      "sel": "header.sv-header",
+      "tag": "header",
+      "top": 0,
+      "height": 150,
+      "words": 7,
+      "media": 0,
+      "middle": 211,
+      "heading": null,
+      "left": 70,
+      "right": 67,
+      "textLeft": 70,
+      "textRight": 67,
+      "fullBleed": false,
+      "footer": false,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     },
+     {
+      "sel": "main.sv-main",
+      "tag": "main",
+      "top": 150,
+      "height": 874,
+      "words": 46,
+      "media": 0,
+      "middle": 8,
+      "heading": {
+       "text": "Check-ins",
+       "size": 36,
+       "tag": "h1"
+      },
+      "left": 30,
+      "right": 30,
+      "textLeft": 30,
+      "textRight": 30,
+      "fullBleed": false,
+      "footer": true,
+      "hero": true,
+      "continues": false,
+      "pinned": false
+     }
+    ],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Check-ins",
+      "size": 36,
+      "top": 205,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 30,
+      "n": 3
+     },
+     {
+      "x": 92,
+      "n": 2
+     },
+     {
+      "x": 48,
+      "n": 1
+     }
+    ],
+    "leftBlocks": 6,
+    "bodySize": 16,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 768,
+     "h": 1024
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": null,
+    "topbar": null,
+    "canvas": {
+     "left": 30,
+     "right": 36
+    },
+    "hero": {
+     "text": "Check-ins",
+     "words": 1,
+     "chars": 9,
+     "lines": 1,
+     "size": 36,
+     "vw": 4.7,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.03,
+     "leading": 1.2,
+     "top": 205,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 11,
+     "firstScreen": 4,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 22,
+     "radii": [
+      [
+       0,
+       11
+      ],
+      [
+       24,
+       10
+      ],
+      [
+       16,
+       1
+      ]
+     ],
+     "heavyBorders": 0,
+     "borderSamples": [],
+     "heavyShadows": 0,
+     "softShadows": 0,
+     "shadowSamples": [],
+     "glass": 0
+    },
+    "chips": {
+     "count": 20,
+     "hues": 1,
+     "samples": [
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      },
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      },
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      },
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      }
+     ]
+    },
+    "numbers": {
+     "cells": 0,
+     "leftAligned": 0,
+     "figures": 0,
+     "tabularShare": null,
+     "kpiMax": null
+    },
+    "rows": null,
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.23,
+     "tiny": 0,
+     "tinySamples": [],
+     "sizes": [
+      12,
+      14,
+      16,
+      18,
+      20,
+      36
+     ]
+    },
+    "title": {
+     "text": "Check-ins",
+     "size": 36,
+     "top": 205
+    },
+    "colourShare": 0.108
+   },
+   "consoleErrors": []
+  },
+  {
+   "width": 390,
+   "height": 844,
+   "load": "load",
+   "screens": 1,
+   "filled": [
+    0.92
+   ],
+   "motion": {
+    "elements": 9,
+    "css": 9,
+    "transitions": 0,
+    "scripted": 0,
+    "videos": 0,
+    "playingVideos": 0
+   },
+   "metrics": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "page": {
+     "height": 844,
+     "screens": 1,
+     "words": 367,
+     "img": 1,
+     "video": 0,
+     "canvas": 0,
+     "svg": 52,
+     "sections": 5,
+     "horizontalOverflow": 0,
+     "overflowCulprits": [],
+     "uiFragments": 0,
+     "uiAbuse": false,
+     "realPictures": 0,
+     "videoCount": 0,
+     "uiPictures": 0,
+     "pictureSamples": [],
+     "blendText": 0,
+     "sideScrollers": 0,
+     "brokenImages": [],
+     "emoji": [],
+     "videosNoPoster": 0
+    },
+    "hero": {
+     "text": "Check-ins",
+     "words": 1,
+     "chars": 9,
+     "lines": 1,
+     "size": 28,
+     "vw": 7.2,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.03,
+     "leading": 1.2,
+     "top": 127,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "h1": {
+     "text": "Check-ins",
+     "words": 1,
+     "lines": 1,
+     "size": 28,
+     "font": "satoshi"
+    },
+    "headings": [
+     {
+      "text": "Check-ins",
+      "words": 1,
+      "chars": 9,
+      "lines": 1,
+      "size": 28,
+      "vw": 7.2,
+      "font": "satoshi",
+      "weight": 600,
+      "tracking": -0.03,
+      "leading": 1.2,
+      "upper": false,
+      "italic": false,
+      "mono": false,
+      "align": "left",
+      "position": "center",
+      "widthRatio": 0.86,
+      "top": 127,
+      "tag": "h1",
+      "kind": "heading"
+     }
+    ],
+    "headingSummary": {
+     "count": 1,
+     "maxLines": 1,
+     "over2Lines": 0,
+     "statements": 0,
+     "centered": 0,
+     "medianWords": null,
+     "mixedFontHeadings": 0
+    },
+    "type": {
+     "families": [
+      {
+       "family": "Plus Jakarta Sans",
+       "share": 1,
+       "mono": false
+      },
+      {
+       "family": "satoshi",
+       "share": 0,
+       "mono": false
+      }
+     ],
+     "familyCount": 2,
+     "sizes": [
+      12,
+      14,
+      16,
+      18,
+      20,
+      28
+     ],
+     "sizeCount": 6,
+     "notLoaded": [],
+     "body": {
+      "font": "Plus Jakarta Sans",
+      "size": 12,
+      "leading": 1.63,
+      "weight": 400,
+      "tracking": 0,
+      "contrast": 12.8
+     },
+     "measureChars": 50,
+     "max": {
+      "size": 28,
+      "vw": 7.2,
+      "font": "satoshi",
+      "text": "Check-ins"
+     },
+     "monoShare": 0,
+     "monoProseShare": 0,
+     "monoFamilies": [],
+     "monoSamples": [],
+     "microLabels": 0,
+     "microLabelShare": 0,
+     "microSamples": [],
+     "upperShare": 0,
+     "centerShare": 0.09,
+     "smallText": 11
+    },
+    "eyebrows": [],
+    "numbered": [],
+    "color": {
+     "bodyBg": "#f7f5f0",
+     "bodyBgHsl": {
+      "h": 43,
+      "s": 0.3,
+      "l": 0.95
+     },
+     "dark": false,
+     "sectionBgs": [
+      {
+       "color": "#141815",
+       "top": 0,
+       "hsl": {
+        "h": 135,
+        "s": 0.09,
+        "l": 0.09
+       }
+      },
+      {
+       "color": "#fbfbf8",
+       "top": 486,
+       "hsl": {
+        "h": 60,
+        "s": 0.27,
+        "l": 0.98
+       }
+      },
+      {
+       "color": "#fee797",
+       "top": 2288,
+       "hsl": {
+        "h": 47,
+        "s": 0.98,
+        "l": 0.79
+       }
+      }
+     ],
+     "textColors": [
+      {
+       "color": "#c6453a",
+       "share": 0.23
+      },
+      {
+       "color": "#1a261c",
+       "share": 0.22
+      },
+      {
+       "color": "#f6f5ef",
+       "share": 0.18
+      },
+      {
+       "color": "#545e55",
+       "share": 0.15
+      },
+      {
+       "color": "#19201a",
+       "share": 0.13
+      }
+     ],
+     "button": {
+      "bg": "#141815",
+      "hsl": {
+       "h": 135,
+       "s": 0.09,
+       "l": 0.09
+      },
+      "fg": "#f6f5ef"
+     },
+     "lowContrast": []
+    },
+    "buttons": {
+     "count": 11,
+     "inHero": 0,
+     "radius": "pill",
+     "height": 44,
+     "withShadow": 0,
+     "withGradient": 0,
+     "mono": 0,
+     "upper": 0,
+     "heroLabels": []
+    },
+    "surfaces": {
+     "shadowStatic": 0,
+     "shadowOverlay": 0,
+     "shadowSamples": [],
+     "gradients": 0,
+     "scrims": 0,
+     "gradientSamples": [],
+     "gradientText": 0,
+     "hairlines": 9,
+     "hairlineSamples": [
+      "div.sv-readiness 326px",
+      "div.sv-readiness 326px",
+      "div.sv-readiness 326px",
+      "div.sv-readiness 326px",
+      "div.sv-readiness 326px"
+     ],
+     "outlinedBoxes": 0,
+     "dashed": 0,
+     "blurred": 0,
+     "roundedBoxes": 11,
+     "boxRadius": 24,
+     "squareMedia": 0,
+     "roundedMedia": 0,
+     "mediaRadius": 0,
+     "textShadow": 0,
+     "cardRows": []
+    },
+    "heroMedia": [],
+    "nav": {
+     "links": 2,
+     "fixed": false,
+     "height": 80,
+     "floatingPill": false,
+     "blur": false
+    },
+    "fontsLoaded": [
+     "plus jakarta sans",
+     "satoshi"
+    ]
+   },
+   "layout": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "pageH": 844,
+    "margins": {
+     "left": 18,
+     "right": 24
+    },
+    "sections": [],
+    "gaps": [],
+    "h1s": [
+     {
+      "text": "Check-ins",
+      "size": 28,
+      "top": 127,
+      "firstScreen": true
+     }
+    ],
+    "edgeText": [],
+    "edges": [
+     {
+      "x": 18,
+      "n": 4
+     }
+    ],
+    "leftBlocks": 4,
+    "bodySize": 16,
+    "stage": false,
+    "explains": false,
+    "slivers": [],
+    "voidShare": 0,
+    "voidBox": null
+   },
+   "app": {
+    "viewport": {
+     "w": 390,
+     "h": 844
+    },
+    "dark": false,
+    "ground": "#f7f5f0",
+    "sidebar": null,
+    "topbar": {
+     "h": 80
+    },
+    "canvas": {
+     "left": 18,
+     "right": 24
+    },
+    "hero": {
+     "text": "Check-ins",
+     "words": 1,
+     "chars": 9,
+     "lines": 1,
+     "size": 28,
+     "vw": 7.2,
+     "font": "satoshi",
+     "weight": 600,
+     "tracking": -0.03,
+     "leading": 1.2,
+     "top": 127,
+     "tag": "h1",
+     "kind": "heading",
+     "align": "left",
+     "position": "left"
+    },
+    "charts": 0,
+    "layout": {
+     "panels": 11,
+     "firstScreen": 3,
+     "ragged": [],
+     "voids": []
+    },
+    "tiles": 0,
+    "panels": {
+     "count": 22,
+     "radii": [
+      [
+       0,
+       11
+      ],
+      [
+       24,
+       10
+      ],
+      [
+       16,
+       1
+      ]
+     ],
+     "heavyBorders": 0,
+     "borderSamples": [],
+     "heavyShadows": 0,
+     "softShadows": 0,
+     "shadowSamples": [],
+     "glass": 0
+    },
+    "chips": {
+     "count": 20,
+     "hues": 1,
+     "samples": [
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      },
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      },
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      },
+      {
+       "hue": 60,
+       "size": 46,
+       "radius": "50%"
+      }
+     ]
+    },
+    "numbers": {
+     "cells": 0,
+     "leftAligned": 0,
+     "figures": 0,
+     "tabularShare": null,
+     "kpiMax": null
+    },
+    "rows": null,
+    "chartHues": 0,
+    "placeholders": [],
+    "type": {
+     "under13": 0.23,
+     "tiny": 0,
+     "tinySamples": [],
+     "sizes": [
+      12,
+      14,
+      16,
+      18,
+      20,
+      28
+     ]
+    },
+    "title": {
+     "text": "Check-ins",
+     "size": 28,
+     "top": 127
+    },
+    "colourShare": 0.101
+   },
+   "consoleErrors": []
+  }
+ ],
+ "findings": [
+  {
+   "level": "WARN",
+   "id": "palette-cream",
+   "width": 1024,
+   "message": "Yellow-cream background (page background #f7f5f0, section #fbfbf8, text #f6f5ef).",
+   "fix": "Use the drawn palette. If you want warmth, take a low-chroma stone or bone, not a yellow cream.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "icon-chips",
+   "width": 1024,
+   "message": "20 icons sit in tinted squares or circles.",
+   "fix": "This is the commonest tell of a generated dashboard. Drop the tinted square: a KPI is a label and a number; an icon, if it helps, is plain and in the text colour.",
+   "alsoAt": [
+    768,
+    390
+   ]
+  },
+  {
+   "level": "WARN",
+   "id": "colour-sprawl",
+   "width": 1024,
+   "message": "14% of the first screen is strongly coloured.",
+   "fix": "Keep the screen neutral and spend colour on data and status: the studied screens sit near 3%, and only tinted styles reach 10–15%, as pale tints rather than saturated fills."
+  },
+  {
+   "level": "WARN",
+   "id": "app-title-size",
+   "width": 1024,
+   "message": "The h1 is 36px (\"Check-ins\").",
+   "fix": "An app screen is not a landing page: the title is 18-32px (20-24px on a phone).",
+   "alsoAt": [
+    768
+   ]
+  }
+ ],
+ "images": [
+  {
+   "viewport": "tablet",
+   "width": 1024,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/simple-checkins/tablet-1024-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/simple-checkins/tablet-1024-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "tablet",
+   "width": 768,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/simple-checkins/tablet-768-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/simple-checkins/tablet-768-page-01.jpg"
+   ],
+   "film": []
+  },
+  {
+   "viewport": "mobile",
+   "width": 390,
+   "fold": "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/simple-checkins/mobile-fold.jpg",
+   "pages": [
+    "/Users/gideonlangenhoven/dev/capekayak/.taste-skill/audit/simple-checkins/mobile-page-01.jpg"
+   ],
+   "film": []
+  }
+ ]
+}

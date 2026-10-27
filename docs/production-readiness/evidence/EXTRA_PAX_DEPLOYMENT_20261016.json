@@ -1,0 +1,89 @@
+{
+  "at": "2026-10-16T12:57:34.211Z",
+  "deployment": {
+    "id": "dpl_7of8iQxrzBkWfvFKR6hiG9jyFm5S",
+    "url": "caepweb-admin-i4rh5ierj-jerrys-projects-f4e4eaf9.vercel.app",
+    "state": "READY",
+    "source_files_verified": 486
+  },
+  "scope": {
+    "baseline": "dpl_8JtvXGv3DA9BPrbhZnufBaRiT7iD",
+    "changed": [
+      "app/new-booking/page.tsx",
+      "components/booking/BookingQuestions.tsx"
+    ],
+    "preserved": 484,
+    "database_changes": [
+      "20261016140000_admin_extra_pax.sql"
+    ],
+    "functions": [],
+    "marketing_activation": false
+  },
+  "database": {
+    "at": "2026-10-16T12:56:47.656Z",
+    "version": "20261016140000",
+    "sha256": "14e0c0c0be94ff4fbb9439423010a0854d9a93ef5727dcf9167e834aff0dc60a",
+    "grants": [
+      {
+        "rolname": "anon",
+        "helper": false,
+        "create_booking": false
+      },
+      {
+        "rolname": "authenticated",
+        "helper": false,
+        "create_booking": true
+      },
+      {
+        "rolname": "service_role",
+        "helper": false,
+        "create_booking": false
+      }
+    ],
+    "exact_function_source_verified": 6,
+    "unchanged_function_permissions": true
+  },
+  "help": {
+    "at": "2026-10-16T12:57:37.635Z",
+    "articles": 30,
+    "chunks": 177,
+    "changed": 2,
+    "result": {
+      "ok": true,
+      "total": 177,
+      "embedded": 2,
+      "skipped": 175,
+      "removed": 0,
+      "failed": 0,
+      "errors": []
+    }
+  },
+  "checks": {
+    "cloud_production_build": "passed",
+    "typescript": "passed",
+    "focused_unit_tests": 65,
+    "local_postgresql_acceptance_groups": 21,
+    "payment_recovery_database_suite": "passed",
+    "candidate_browser_cases": 4,
+    "live_browser_cases": 4,
+    "live_http_access_checks": 11,
+    "unrelated_uploaded_files_preserved": 484,
+    "edge_functions_unchanged": true
+  },
+  "features": [
+    "Extra pax is always available to writable admins under To attend",
+    "Custom date, departure time, adult/child counts and agreed group price, including zero",
+    "Overrides accept full and closed existing departures; bespoke departures closed to public sales",
+    "Confirmed bespoke guests appear on their departure date in Bookings, dashboard manifest and Simple View",
+    "Per-guest questions support groups over 50; exact prices and idempotent booking/invoice creation preserved"
+  ],
+  "guest_site": {
+    "id": "dpl_DEtYg9jBcEThHpReFGiaJE6dX4qZ",
+    "source_files": 169,
+    "local_matches_live": true
+  },
+  "limits": [
+    "Hosted browser identities, booking writes and provider calls were simulated; no real customer booking, payment or message was submitted during verification."
+  ],
+  "evidence": "extra-pax-deployment-20261016/"
+}

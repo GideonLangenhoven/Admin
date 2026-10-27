@@ -1,23 +1,15 @@
 "use client";
-import React, { useEffect, useState, createContext, useContext, useCallback, useMemo } from "react";
+import React, { useEffect, useState, createContext, useContext, useCallback, useMemo, useRef } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { addMonths } from "date-fns/addMonths";
-import { endOfMonth } from "date-fns/endOfMonth";
 import { format } from "date-fns/format";
 import { isValid } from "date-fns/isValid";
 import { parse } from "date-fns/parse";
 import { startOfMonth } from "date-fns/startOfMonth";
 import { listAvailableSlots } from "../app/lib/slot-availability";
+import { businessDateKey, businessDayRange } from "../app/lib/simple-view";
 import { getAdminTimezone } from "../app/lib/admin-timezone";
-
-/* ── timezone offset helper ── */
-function getTimezoneOffsetMs() {
-    const now = new Date();
-    const tzLocal = new Date(now.toLocaleString("en-US", { timeZone: getAdminTimezone() }));
-    const tzUtc = new Date(now.toLocaleString("en-US", { timeZone: "UTC" }));
-    return tzLocal.getTime() - tzUtc.getTime();
-}
 
 /* ── types ── */
 interface SlotInfo {
@@ -84,6 +76,10 @@ export default function AvailabilityCalendar({ value, onChange, tourId, business
     const validDate = isValid(parsedDate) ? parsedDate : new Date();
 
     const [displayMonth, setDisplayMonth] = useState(() => startOfMonth(validDate));
+    const [loading,setLoading]=useState(true);
+    const [error,setError]=useState("");
+    const requestRef=useRef(0);
+    const timeZone=getAdminTimezone();
     const [daySlots, setDaySlots] = useState<DaySlotMap>({});
 
     const availabilitySummary = useMemo(() => {
@@ -97,37 +93,34 @@ export default function AvailabilityCalendar({ value, onChange, tourId, business
     }, [daySlots, minQty]);
 
     const fetchMonthSlots = useCallback(async () => {
-        if (!tourId || !businessId) { setDaySlots({}); return; }
+        if (!tourId || !businessId) { requestRef.current++; setDaySlots({}); setLoading(false); setError(""); return; }
 
-        // Month range in admin timezone → convert to UTC
-        const mStart = startOfMonth(displayMonth);
-        const mEnd = endOfMonth(displayMonth);
-        const offsetMs = getTimezoneOffsetMs();
-        const utcStart = new Date(new Date(mStart.getFullYear(), mStart.getMonth(), mStart.getDate(), 0, 0, 0).getTime() - offsetMs);
-        const utcEnd = new Date(new Date(mEnd.getFullYear(), mEnd.getMonth(), mEnd.getDate(), 23, 59, 59).getTime() - offsetMs);
-
+        const request=++requestRef.current;
+        setLoading(true);setError("");setDaySlots({});
+        try {
+        const start=businessDayRange(format(startOfMonth(displayMonth),"yyyy-MM-dd"),timeZone).startIso;
+        const end=businessDayRange(format(addMonths(startOfMonth(displayMonth),1),"yyyy-MM-dd"),timeZone).startIso;
         const data = await listAvailableSlots({
             businessId,
             tourId,
-            startIso: utcStart.toISOString(),
-            endIso: new Date(utcEnd.getTime() + 1000).toISOString(),
+            startIso: start,
+            endIso: end,
         });
 
         const map: DaySlotMap = {};
         for (const slot of (data || [])) {
-            // Convert UTC start_time to admin timezone date key
-            const dt = new Date(slot.start_time);
-            const sastDate = new Date(dt.getTime() + getTimezoneOffsetMs());
-            const key = format(sastDate, "yyyy-MM-dd");
-            const time = format(sastDate, "HH:mm");
+            const key=businessDateKey(timeZone,new Date(slot.start_time));
+            const time=new Intl.DateTimeFormat("en-ZA",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone}).format(new Date(slot.start_time));
             const available = Math.max(0, Number(slot.available_capacity || 0));
             if (!map[key]) map[key] = [];
             map[key].push({ available, time });
         }
-        setDaySlots(map);
-    }, [tourId, businessId, displayMonth]);
+        if(request===requestRef.current)setDaySlots(map);
+        } catch {if(request===requestRef.current)setError("Calendar availability is unavailable. Choose a date and refresh departure times before booking.");}
+        finally {if(request===requestRef.current)setLoading(false);}
+    }, [tourId, businessId, displayMonth, timeZone]);
 
-    useEffect(() => { fetchMonthSlots(); }, [fetchMonthSlots]);
+    useEffect(() => { fetchMonthSlots(); return()=>{requestRef.current++;}; }, [fetchMonthSlots]);
 
     // Sync displayMonth when the value prop changes to a different month
     useEffect(() => {
@@ -224,6 +217,7 @@ export default function AvailabilityCalendar({ value, onChange, tourId, business
                 <div className="avail-cal-wrap space-y-3">
                     <DayPicker
                         className="avail-cal"
+                        today={parse(businessDateKey(timeZone),"yyyy-MM-dd",new Date())}
                         mode="single"
                         selected={validDate}
                         month={displayMonth}
@@ -232,10 +226,10 @@ export default function AvailabilityCalendar({ value, onChange, tourId, business
                             if (d) onChange(format(d, "yyyy-MM-dd"));
                         }}
                         components={{ Day: CustomDay as any }}
-                        disabled={{ before: new Date(new Date().setHours(0, 0, 0, 0)) }}
+                        disabled={{ before: parse(businessDateKey(timeZone),"yyyy-MM-dd",new Date()) }}
                     />
 
-                    <div className="rounded-xl px-3 py-3 text-xs" style={{ background: "var(--ck-surface-sunken)", border: "1px solid var(--ck-border-subtle)", color: "var(--ck-text)" }}>
+                    {!tourId ? <p>Choose an activity to see availability.</p> : error ? <p role="alert" className="text-sm text-[var(--ck-danger)]">{error}</p> : loading ? <p role="status">Checking calendar availability…</p> : <div className="rounded-xl px-3 py-3 text-xs" style={{ background: "var(--ck-surface-sunken)", border: "1px solid var(--ck-border-subtle)", color: "var(--ck-text)" }}>
                         <div className="flex flex-wrap items-center gap-3">
                             <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-[4px]" style={{ background: "var(--cal-day-bg, #24312A)" }} />Seats open</span>
                             <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-[4px]" style={{ background: "var(--ck-surface-sunken)", border: "1px solid var(--ck-border-subtle)" }} />Fully booked</span>
@@ -244,7 +238,7 @@ export default function AvailabilityCalendar({ value, onChange, tourId, business
                                 <span className="inline-flex items-center gap-2"><span className="font-semibold tabular-nums" style={{ color: "var(--ck-danger)" }}>{availabilitySummary.fullDays}</span> days full for this party size</span>
                             )}
                         </div>
-                    </div>
+                    </div>}
                 </div>
             </MinQtyCtx.Provider>
         </SlotDataCtx.Provider>
