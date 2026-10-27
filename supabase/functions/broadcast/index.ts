@@ -2,7 +2,7 @@
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getAdminAppOrigins, isAllowedOrigin, getTenantByBusinessId, getBusinessDisplayName } from "../_shared/tenant.ts";
+import { getAdminAppOrigins, isAllowedOrigin, getTenantByBusinessId, getBusinessDisplayName, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
 import { requireAuth } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
@@ -33,7 +33,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json();
-    const { action, message, target_group, slot_ids, send_email, send_whatsapp } = body;
+    const { action, message, target_group, slot_ids } = body;
 
     const business_id = (auth.isServiceRole || auth.role === "SUPER_ADMIN")
       ? String(body.business_id || "")
@@ -47,275 +47,156 @@ Deno.serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: "Invalid parameters" }), { status: 400, headers: getCors(req) });
     }
 
-    if (send_whatsapp) return new Response(JSON.stringify({ error: "WhatsApp broadcasts require verified channel permission. No messages sent." }), { status: 409, headers: getCors(req) });
-    // Free-form promotion has no durable queue identity, frequency reservation or safe recovery.
-    // Keep it unavailable until routed through the shared promotional delivery gate.
-    return new Response(JSON.stringify({ error: "Promotional broadcasts unavailable: shared delivery gate required. No messages sent." }),
-      { status: 409, headers: getCors(req) });
+    // A departure message goes to the guests booked on the operator's own
+    // departures, about that trip. Anything wider is promotion, which stays
+    // with Marketing (consent, unsubscribe, frequency limits).
+    const slotIds: string[] = Array.isArray(slot_ids) ? [...new Set(slot_ids.map(String))] : [];
+    if (target_group !== "SLOT" || slotIds.length === 0 || slotIds.length > 50) {
+      return new Response(JSON.stringify({ error: "Pick the departures to message. Promotions go out from Marketing. No messages sent." }), { status: 409, headers: getCors(req) });
+    }
+    const text = String(message).trim();
+    if (text.length > 2000) {
+      return new Response(JSON.stringify({ error: "Keep the message under 2,000 characters. No messages sent." }), { status: 400, headers: getCors(req) });
+    }
+    // One id per composed message, so a retried send never reaches a guest twice.
+    const broadcastId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(body.broadcast_id || ""))
+      ? String(body.broadcast_id).toLowerCase()
+      : crypto.randomUUID();
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Default limit
-    const limit = 500;
+    const { data: slots, error: sErr } = await supabase.from("slots").select("id")
+      .eq("business_id", business_id).in("id", slotIds);
+    if (sErr || (slots || []).length !== slotIds.length) {
+      return new Response(JSON.stringify({ error: "Departure not found. No messages sent." }), { status: 404, headers: getCors(req) });
+    }
 
-    // Get bookings scoped to this business
-    let query = supabase.from("bookings")
-      .select("id, customer_name, email, phone, slot_id, status")
+    const { data: bookings, error: bErr } = await supabase.from("bookings")
+      .select("id, customer_name, email, phone, whatsapp_booking_updates_opt_in")
       .eq("business_id", business_id)
-      .in("status", ["PAID", "CONFIRMED"]);
-
-    if (target_group === "SLOT" && Array.isArray(slot_ids) && slot_ids.length > 0) {
-      query = query.in("slot_id", slot_ids);
-    }
-
-    const { data: bookings, error: bErr } = await query.limit(limit);
-
+      .in("slot_id", slotIds)
+      .in("status", ["PAID", "CONFIRMED"])
+      .limit(500);
     if (bErr || !bookings) {
-      return new Response(JSON.stringify({ error: "Could not fetch bookings" }), { status: 500, headers: getCors(req) });
+      console.error("BROADCAST_BOOKINGS_ERR:", bErr);
+      return new Response(JSON.stringify({ error: "Could not load the guests. No messages sent." }), { status: 500, headers: getCors(req) });
     }
 
-    // Broadcast sourced recipients straight from paid bookings and never once
-    // checked marketing_contacts.status — an unsubscribed customer kept
-    // receiving every broadcast indefinitely. One batch lookup up front avoids
-    // an extra query per recipient.
-    const candidateEmails = Array.from(new Set(bookings.map((b) => String(b.email || "").toLowerCase()).filter(Boolean)));
-    let unsubscribedEmails = new Set<string>();
-    if (candidateEmails.length > 0) {
-      const { data: unsubRows, error: unsubErr } = await supabase.from("marketing_contacts")
-        .select("email")
-        .eq("business_id", business_id)
-        .eq("status", "unsubscribed")
-        .in("email", candidateEmails);
-      if (unsubErr) console.error("BROADCAST_UNSUB_LOOKUP_ERR:", unsubErr.message);
-      else unsubscribedEmails = new Set((unsubRows || []).map((r: any) => String(r.email).toLowerCase()));
+    const tenant = await getTenantByBusinessId(supabase, business_id);
+    const firstName = (b: any) => String(b.customer_name || "").trim().split(" ")[0] || "there";
+    const personal = (b: any) => text.replace(/\{name\}/gi, firstName(b));
+    const reached = new Set<string>();
+
+    // Guests who unsubscribed from this operator's emails stay unsubscribed.
+    const emails = [...new Set(bookings.map((b: any) => String(b.email || "").trim().toLowerCase()).filter((e) => e.includes("@")))];
+    const { data: unsubRows, error: uErr } = emails.length > 0
+      ? await supabase.from("marketing_contacts").select("email").eq("business_id", business_id).eq("status", "unsubscribed").in("email", emails)
+      : { data: [], error: null };
+    if (uErr) {
+      console.error("BROADCAST_UNSUB_LOOKUP_ERR:", uErr);
+      return new Response(JSON.stringify({ error: "Could not check email preferences. No messages sent." }), { status: 500, headers: getCors(req) });
+    }
+    const unsubscribed = new Set((unsubRows || []).map((r: any) => String(r.email).toLowerCase()));
+    const withEmail = bookings.filter((b: any) => String(b.email || "").includes("@"));
+
+    // Email: the durable notification queue every other guest email uses, so
+    // each one is retried, logged, and listed under Failed Notifications if it
+    // never goes out. Queued before any WhatsApp so a queue failure sends nothing.
+    const emailJobs = withEmail.filter((b: any) => !unsubscribed.has(String(b.email).trim().toLowerCase())).map((b: any) => ({
+      business_id,
+      booking_id: b.id,
+      source_type: "DEPARTURE_BROADCAST",
+      source_id: broadcastId,
+      template_type: "BROADCAST",
+      recipient: String(b.email).trim().toLowerCase(),
+      payload: { business_id, booking_id: b.id, customer_name: b.customer_name, message: personal(b) },
+      dedupe_key: "departure-broadcast/" + broadcastId + "/" + b.id,
+    }));
+    let newEmails = 0;
+    if (emailJobs.length > 0) {
+      const { data: newJobs, error: qErr } = await supabase.from("notification_jobs")
+        .upsert(emailJobs, { onConflict: "dedupe_key", ignoreDuplicates: true }).select("id");
+      if (qErr) {
+        console.error("BROADCAST_QUEUE_ERR:", qErr);
+        return new Response(JSON.stringify({ error: "The emails could not be queued. No messages sent." }), { status: 500, headers: getCors(req) });
+      }
+      for (const job of emailJobs) reached.add(job.booking_id);
+      newEmails = (newJobs || []).length;
     }
 
-    let waSent = 0;
-    let waAttempted = 0;
-    let emailSent = 0;
-    let emailAttempted = 0;
-    let totalSent = 0;
-    const errors: string[] = [];
-    // Per-recipient channel accounting (item 19). WhatsApp's 24h free-form
-    // window is enforced by Meta: inside the window we can send free-form text;
-    // outside it we must use an approved template. send-whatsapp-text handles
-    // that routing reactively (free-form → catch 131047/131026 → template) and
-    // reports back which channel it used. Out-of-window recipients get the
-    // pre-approved reopener template ("please reply") and the actual broadcast
-    // message is queued in outbox — wa-webhook drains it the moment they reply.
-    const channelCounts = { wa_freeform: 0, wa_template: 0, email: 0, email_fallback: 0, failed: 0 };
-    const channelLog: Array<{ to: string; channel: string }> = [];
+    // WhatsApp: only on the operator's connected number, to guests who opted in
+    // to WhatsApp booking updates. Everyone else is skipped with the reason.
+    const waConnected = Boolean(tenant.credentials.waToken && tenant.credentials.waPhoneId);
     const reopenerName = Deno.env.get("WA_REOPENER_TEMPLATE_NAME") || "booking_update_reopener";
-    let brandName = "";
-    if (send_whatsapp) {
+    const whatsapp = { sent: 0, waiting: 0, failed: 0, skipped: { not_connected: 0, no_number: 0, no_opt_in: 0 } };
+    for (const b of bookings as any[]) {
+      if (!waConnected) { whatsapp.skipped.not_connected++; continue; }
+      if (!b.phone) { whatsapp.skipped.no_number++; continue; }
+      if (!b.whatsapp_booking_updates_opt_in) { whatsapp.skipped.no_opt_in++; continue; }
+      let phone = String(b.phone).replace(/\D/g, "");
+      if (phone.startsWith("0")) phone = "27" + phone.substring(1);
+      // Claim before calling Meta so a repeated send cannot message twice.
+      const key = "departure-broadcast-wa/" + broadcastId + "/" + b.id;
+      const claim = await supabase.from("idempotency_keys").insert({ key, status: "processing" });
+      if (claim.error?.code === "23505") { whatsapp.sent++; reached.add(b.id); continue; }
       try {
-        const tenant = await getTenantByBusinessId(supabase, business_id);
-        brandName = getBusinessDisplayName(tenant.business);
+        if (claim.error) throw new Error("WhatsApp send could not be recorded");
+        const res = await sendWhatsappTextForTenant(tenant, phone, personal(b), {
+          name: reopenerName,
+          params: [firstName(b), getBusinessDisplayName(tenant.business) || "our team"],
+          language: "en",
+        });
+        if (res?.channel === "template") {
+          // Outside the 24-hour window the guest got the approved "please
+          // reply" template; wa-webhook delivers the message when they do.
+          await supabase.from("outbox").insert({
+            business_id, booking_id: b.id, phone, message_type: "BROADCAST_FOLLOWUP", message_body: personal(b),
+            scheduled_for: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), status: "WAITING_WINDOW",
+          });
+          whatsapp.waiting++;
+        } else whatsapp.sent++;
+        reached.add(b.id);
+        await supabase.from("idempotency_keys").update({ status: "completed" }).eq("key", key);
       } catch (e) {
-        console.error("BROADCAST_TENANT_LOOKUP_ERR:", e);
+        whatsapp.failed++;
+        await supabase.from("idempotency_keys").update({ status: "failed", last_error: String((e as Error)?.message || e).slice(0, 500) }).eq("key", key);
+        // Listed under Failed Notifications, where the operator can retry it.
+        await supabase.from("outbox").insert({
+          business_id, booking_id: b.id, phone, message_type: "BROADCAST", message_body: personal(b),
+          scheduled_for: new Date().toISOString(), status: "FAILED", attempts: 1,
+          error: String((e as Error)?.message || e).slice(0, 500),
+        });
       }
     }
+    console.log("BROADCAST business=" + business_id + " id=" + broadcastId + " emails=" + emailJobs.length + " whatsapp=" + JSON.stringify(whatsapp));
 
-    for (const b of bookings) {
-      let sentToCustomer = false;
-      let channelUsed = "none";
-      let waOk = false;
-      const firstName = (b.customer_name || "Guest").split(" ")[0];
-      const parsedMessage = message.replace(/\{name\}/gi, firstName);
-      const emailLowerRaw = String(b.email || "").toLowerCase();
-      const isUnsubscribed = !!emailLowerRaw && unsubscribedEmails.has(emailLowerRaw);
-
-      // Free-form broadcast content has no verified operational purpose contract.
-      // It cannot acquire marketing authority merely from a booking or a label.
-      const { data: marketingContact, error: contactError } = await supabase.from("marketing_contacts")
-        .select("id").eq("business_id", business_id).eq("email", emailLowerRaw).maybeSingle();
-      const permission = marketingContact && !contactError
-        ? await supabase.rpc("marketing_eligibility", { p_business_id: business_id, p_contact_id: marketingContact.id })
-        : { data: "permission_unknown", error: contactError };
-      if (permission.error || permission.data !== "eligible") continue;
-      // WhatsApp promotion needs its own channel evidence and approved templates.
-      if (send_whatsapp) {
-        return new Response(JSON.stringify({ error: "WhatsApp broadcasts require a verified channel-permission workflow. No messages sent." }),
-          { status: 409, headers: getCors(req) });
-      }
-
-      // WhatsApp — send with an approved-template fallback so out-of-window
-      // recipients still get the message (as a template) rather than silently
-      // dropping. send-whatsapp-text returns {ok, channel}; trust the body.
-      if (send_whatsapp && b.phone) {
-        waAttempted++;
-        try {
-          const waRes = await fetch(`${SUPABASE_URL}/functions/v1/send-whatsapp-text`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
-            body: JSON.stringify({
-              to: b.phone,
-              message: parsedMessage,
-              business_id,
-              template_fallback: { name: reopenerName, params: [firstName, brandName || "our team"], language: "en" },
-            }),
-          });
-          const waBody = await waRes.json().catch(() => ({} as any));
-          if (waRes.ok && waBody?.ok === true) {
-            waOk = true;
-            waSent++;
-            sentToCustomer = true;
-            channelUsed = waBody.channel === "template" ? "wa_template" : "wa_freeform";
-            channelCounts[channelUsed === "wa_template" ? "wa_template" : "wa_freeform"]++;
-            // Out-of-window: the recipient only got the reopener ("please
-            // reply") — queue the real broadcast message so wa-webhook
-            // delivers it the moment they respond.
-            if (channelUsed === "wa_template") {
-              let normalizedTo = String(b.phone || "").replace(/\D/g, "");
-              if (normalizedTo.startsWith("0")) normalizedTo = "27" + normalizedTo.substring(1);
-              const { error: qErr } = await supabase.from("outbox").insert({
-                business_id,
-                booking_id: b.id,
-                phone: normalizedTo,
-                message_type: "BROADCAST_FOLLOWUP",
-                message_body: parsedMessage,
-                scheduled_for: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(), // far future; drained on reply
-                status: "WAITING_WINDOW",
-              });
-              if (qErr) console.error("BROADCAST_QUEUE_ERR for", b.phone, ":", qErr.message);
-            }
-          } else {
-            errors.push(`WA to ${b.phone}: ${waBody?.error || ("HTTP " + waRes.status)}`);
-          }
-        } catch (e) {
-          errors.push(`WA to ${b.phone}: ${e}`);
-        }
-      }
-
-      // Email is sent when the operator explicitly chose email, OR as an
-      // automatic fallback when a requested WhatsApp send failed entirely
-      // (so the customer isn't left with no communication). Deduped so we
-      // never email the same recipient twice.
-      const wantEmailPrimary = send_email && !!b.email;
-      const wantEmailFallback = send_whatsapp && !!b.phone && !waOk && !!b.email;
-      if ((wantEmailPrimary || wantEmailFallback) && b.email && isUnsubscribed) {
-        // Skip silently — an unsubscribed recipient isn't a send failure.
-      } else if ((wantEmailPrimary || wantEmailFallback) && b.email) {
-        const isFallback = wantEmailFallback && !wantEmailPrimary;
-        emailAttempted++;
-        try {
-          // Compliance: generate a one-click unsubscribe token per recipient.
-          // POPIA / CAN-SPAM / GDPR all require an opt-out path on every mass
-          // commercial communication. Broadcasts target bookings (not
-          // marketing_contacts), so we upsert a contact row first and tie the
-          // token to it — reusing the existing marketing-unsubscribe handler.
-          let unsubscribeUrl = "";
-          try {
-            const emailLower = String(b.email).toLowerCase();
-            const { data: contactRow } = await supabase.from("marketing_contacts")
-              .upsert({
-                business_id,
-                email: emailLower,
-                first_name: (b.customer_name || "").split(" ")[0] || null,
-                source: "booking",
-              }, { onConflict: "business_id,email", ignoreDuplicates: false })
-              .select("id")
-              .maybeSingle();
-            const contactId = contactRow?.id || null;
-            if (contactId) {
-              const token = crypto.randomUUID();
-              const { error: tokenErr } = await supabase.from("marketing_unsubscribe_tokens").insert({
-                business_id,
-                contact_id: contactId,
-                token,
-              });
-              if (!tokenErr) {
-                unsubscribeUrl = `${SUPABASE_URL}/functions/v1/marketing-unsubscribe?token=${token}`;
-              }
-            }
-          } catch (e) {
-            console.warn("BROADCAST_UNSUB_TOKEN_ERR for", b.email, ":", e);
-          }
-
-          // Fail closed: POPIA/CAN-SPAM/GDPR require an opt-out path on every
-          // mass commercial email. This used to send anyway with a blank
-          // unsubscribe link whenever token creation failed above.
-          if (!unsubscribeUrl) {
-            errors.push(`Email to ${b.email}: skipped, could not generate an unsubscribe token`);
-            continue;
-          }
-
-          const emailRes = await fetch(`${SUPABASE_URL}/functions/v1/send-email`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` },
-            body: JSON.stringify({
-              type: "BROADCAST",
-              data: {
-                // business_id must live INSIDE data — send-email's branding
-                // resolver only reads data.business_id, so the old top-level
-                // placement made every broadcast fall back to the platform
-                // sender instead of the operator's brand.
-                business_id,
-                email: b.email,
-                customer_name: b.customer_name,
-                message: parsedMessage,
-                unsubscribe_url: unsubscribeUrl,
-              }
-            })
-          });
-          const emailBody = await emailRes.json().catch(() => ({} as any));
-          if (emailRes.ok && emailBody?.ok === true) {
-            emailSent++;
-            sentToCustomer = true;
-            if (isFallback) { channelCounts.email_fallback++; if (channelUsed === "none") channelUsed = "email_fallback"; }
-            else { channelCounts.email++; if (channelUsed === "none") channelUsed = "email"; }
-          } else {
-            errors.push(`Email to ${b.email}: ${emailBody?.error || emailBody?.message || ("HTTP " + emailRes.status)}`);
-          }
-        } catch (e) {
-          errors.push(`Email to ${b.email}: ${e}`);
-        }
-      }
-
-      if (sentToCustomer) totalSent++;
-      else channelCounts.failed++;
-      channelLog.push({ to: b.phone || b.email || "unknown", channel: channelUsed });
-    }
-
-    // Per-recipient channel routing summary (item 19): clear record of which
-    // channel actually delivered to each recipient, so out-of-window template
-    // routing and email fallbacks are auditable rather than invisible.
-    console.log("BROADCAST_CHANNELS business=" + business_id + " " + JSON.stringify(channelCounts));
-
-    // Billing: every broadcast email is a real Resend send with a real cost,
-    // but broadcast never fed the same usage counters campaigns/automations
-    // do — a tenant sending everything via Broadcast paid nothing extra
-    // regardless of volume, and the marketing dashboard's tally undercounted.
-    if (emailSent > 0) {
+    // Billing: broadcast emails count towards the same usage as campaigns
+    // (only newly queued ones, so a repeated send is not billed twice).
+    if (newEmails > 0) {
       const currentPeriod = new Date().toISOString().slice(0, 7); // "2026-03"
-      await supabase.rpc("increment_marketing_email_usage", { p_business_id: business_id, p_amount: emailSent });
-      await supabase.rpc("increment_marketing_monthly_usage", { p_business_id: business_id, p_period: currentPeriod, p_amount: emailSent });
+      await supabase.rpc("increment_marketing_email_usage", { p_business_id: business_id, p_amount: newEmails });
+      await supabase.rpc("increment_marketing_monthly_usage", { p_business_id: business_id, p_period: currentPeriod, p_amount: newEmails });
     }
 
-    // Log broadcast
-    if (totalSent > 0) {
+    if (newEmails > 0 || whatsapp.sent + whatsapp.waiting > 0) {
       await supabase.from("broadcasts").insert({
         business_id,
-        message: message,
-        target_group: target_group || "CUSTOM",
-        sent_count: totalSent
+        message: text,
+        target_group: "SLOT",
+        sent_count: reached.size,
       });
     }
 
     return new Response(JSON.stringify({
       ok: true,
-      wa_sent: waSent,
-      wa_attempted: waAttempted,
-      email_sent: emailSent,
-      email_attempted: emailAttempted,
-      total_customers: totalSent,
-      // Per-channel routing breakdown so operators can see how many went via
-      // free-form WhatsApp vs the out-of-window template vs email fallback.
-      channels: channelCounts,
-      errors: errors.length > 0 ? errors : undefined
+      broadcast_id: broadcastId,
+      guests: bookings.length,
+      reached: reached.size,
+      email: { queued: emailJobs.length, no_email: bookings.length - withEmail.length, unsubscribed: withEmail.length - emailJobs.length },
+      whatsapp,
     }), { status: 200, headers: getCors(req) });
 
   } catch (err: any) {
     console.error("BROADCAST ERR:", err);
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: getCors(req) });
+    return new Response(JSON.stringify({ error: "The broadcast could not be sent. Please try again." }), { status: 500, headers: getCors(req) });
   }
 });

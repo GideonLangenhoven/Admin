@@ -29,11 +29,16 @@ describe("marketing unsubscribe (item 10)", () => {
 
   it("broadcast excludes unsubscribed contacts before sending email", () => {
     expect(broadcast).toContain('.eq("status", "unsubscribed")');
-    expect(broadcast).toContain("unsubscribedEmails.has(emailLowerRaw)");
+    expect(broadcast).toContain("!unsubscribed.has(");
   });
 
-  it("broadcast fails closed instead of sending with a blank unsubscribe link", () => {
-    expect(broadcast).toContain("if (!unsubscribeUrl)");
+  // H5 (go-live 2026-10-27): broadcast now only sends trip updates to guests
+  // booked on the operator's own departures, without an unsubscribe link;
+  // promotion to a wider audience is refused and stays with Marketing.
+  // Behaviour is covered in broadcast-departure-runtime.test.ts.
+  it("broadcast refuses promotion beyond the caller's own departures", () => {
+    expect(broadcast).toContain('target_group !== "SLOT"');
+    expect(broadcast).toContain('.eq("business_id", business_id).in("id", slotIds)');
   });
 
   it("campaign dispatch re-checks contact status at send time, not just at enqueue time", () => {

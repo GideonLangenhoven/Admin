@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { CaretLeft, CaretRight, Check } from "@phosphor-icons/react";
 import { confirmCancellation } from "../lib/cancellation-choice";
-import { confirmAction } from "../lib/app-notify";
+import { confirmAction, notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
@@ -24,6 +24,22 @@ function htmlToPlainText(html: string) {
   return (div.textContent || div.innerText || "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+// "3 emails queued. Skipped 2 WhatsApp: WhatsApp not connected."
+function broadcastSummary(r: any) {
+  const reasons: Record<string, string> = { not_connected: "WhatsApp not connected", no_number: "no mobile number", no_opt_in: "no WhatsApp opt-in" };
+  const n = (count: number, word: string) => count + " " + word + (count === 1 ? "" : "s");
+  const wa = r.whatsapp || {};
+  const lines = [n(r.email?.queued || 0, "email") + " queued"];
+  if (wa.sent) lines.push(n(wa.sent, "WhatsApp message") + " sent");
+  if (wa.waiting) lines.push(n(wa.waiting, "WhatsApp message") + " waiting for the guest to reply");
+  if (wa.failed) lines.push(n(wa.failed, "WhatsApp message") + " failed (see Failed Notifications)");
+  const skipped = Object.entries(wa.skipped || {}).filter(([, count]) => Number(count) > 0);
+  if (skipped.length) lines.push("Skipped " + skipped.map(([reason, count]) => count + " WhatsApp: " + reasons[reason]).join(", "));
+  if (r.email?.no_email) lines.push(n(r.email.no_email, "guest") + " without an email address");
+  if (r.email?.unsubscribed) lines.push(n(r.email.unsubscribed, "guest") + " unsubscribed from emails");
+  return lines.join(". ") + ".";
+}
+
 type SlotData = { id: string; start_time: string; capacity_total: number; booked: number; held: number; status: string; tours: { name: string } };
 
 export default function BroadcastsPage() {
@@ -39,6 +55,7 @@ export default function BroadcastsPage() {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [broadcastId, setBroadcastId] = useState(() => crypto.randomUUID());
   const [weatherMode, setWeatherMode] = useState(false);
   const [weatherReason, setWeatherReason] = useState("unfavourable weather conditions");
   const [weatherResult, setWeatherResult] = useState<any>(null);
@@ -141,13 +158,15 @@ export default function BroadcastsPage() {
   async function sendBroadcast() {
     const plainMessage = htmlToPlainText(message);
     if (!plainMessage.trim() || selectedSlotIds.length === 0 || bookings.length === 0) return;
+    const guests = bookings.length + " guest" + (bookings.length === 1 ? "" : "s");
     if (!await confirmAction({
       title: "Send broadcast",
-      message: "Send to " + bookings.length + " customers via WhatsApp and email?",
+      message: "Message " + guests + "? Email goes to guests who have an email address and haven't unsubscribed. WhatsApp goes to guests who opted in, when WhatsApp is connected.",
       tone: "info",
       confirmLabel: "Send broadcast",
     })) return;
     setSending(true); setResult(null);
+    let failure = "";
     try {
       // broadcast requires the admin's JWT — it derives the target business
       // from the caller's admin row, not the request body.
@@ -155,12 +174,23 @@ export default function BroadcastsPage() {
       const r = await fetch(SU + "/functions/v1/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token, apikey: SK },
-        body: JSON.stringify({ action: "broadcast_targeted", message: plainMessage, target_group: "SLOT", slot_ids: selectedSlotIds, send_email: true, send_whatsapp: true, business_id: businessId }),
+        body: JSON.stringify({ action: "broadcast_targeted", message: plainMessage, target_group: "SLOT", slot_ids: selectedSlotIds, business_id: businessId, broadcast_id: broadcastId }),
       });
-      const d = await r.json();
-      setResult(d);
-      if (!d.error) { setMessage(""); setSelectedSlotIds([]); setBookings([]); }
-    } catch (e) { setResult({ error: String(e) }); }
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.ok) {
+        setResult(d);
+        setMessage(""); setSelectedSlotIds([]); setBookings([]); setBroadcastId(crypto.randomUUID());
+        const partial = d.reached < d.guests || d.whatsapp?.failed > 0;
+        notify({ title: partial ? "Broadcast partly sent" : "Broadcast sent", message: broadcastSummary(d), tone: partial ? "warning" : "success" });
+      } else failure = d.error || "The broadcast could not be sent. Please try again.";
+    } catch {
+      // The same broadcast_id is kept, so sending again never doubles up.
+      failure = "The broadcast could not be sent. Check your connection and try again.";
+    }
+    if (failure) {
+      setResult({ error: failure });
+      notify({ title: "Broadcast not sent", message: failure, tone: "error" });
+    }
     setSending(false);
   }
 
@@ -419,7 +449,7 @@ export default function BroadcastsPage() {
               <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>Compose</h2>
               <div className="space-y-3">
                 <div>
-                  <label className="ui-mono-label !text-[10px] block mb-1.5">WhatsApp Message</label>
+                  <label className="ui-mono-label !text-[10px] block mb-1.5">Message</label>
                   <RichTextEditor
                     value={message}
                     onChange={setMessage}
@@ -427,42 +457,23 @@ export default function BroadcastsPage() {
                     placeholder="Hi {name}, just a quick message about your upcoming paddle..."
                   />
                   <p className="text-xs mt-1" style={{ color: "var(--ck-text-muted)" }}>
-                    Use &#123;name&#125; for the first name. Formatting appears in email; WhatsApp uses plain text.
+                    Use &#123;name&#125; for the first name. For updates about the trip; promotions go out from Marketing. Email goes to guests who have an email address and haven&apos;t unsubscribed. WhatsApp goes to guests who opted in, when WhatsApp is connected.
                   </p>
                 </div>
                 <button data-demo-action="broadcast.send" onClick={sendBroadcast} disabled={sending || !htmlToPlainText(message).trim() || selectedSlotIds.length === 0 || bookings.length === 0}
                   className="ui-btn ui-btn-primary w-full !h-11 disabled:opacity-50">
-                  {sending ? "Sending..." : "Send to " + bookings.length + " Customers (email + WhatsApp where possible)"}
+                  {sending ? "Sending..." : "Send to " + bookings.length + " guest" + (bookings.length === 1 ? "" : "s")}
                 </button>
-                {result && (() => {
-                  if (result.error) {
-                    return <div className="text-sm p-3 rounded-lg" style={{ background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }}>Error: {result.error}</div>;
-                  }
-                  const waSent = result.wa_sent || 0;
-                  const waAtt = result.wa_attempted ?? waSent;
-                  const emSent = result.email_sent || 0;
-                  const emAtt = result.email_attempted ?? emSent;
-                  const anyFailed = (waAtt > 0 && waSent < waAtt) || (emAtt > 0 && emSent < emAtt);
-                  return (
-                    <div className="text-sm p-3 rounded-lg"
-                      style={anyFailed
+                {result && (
+                  <div className="text-sm p-3 rounded-lg" role="status"
+                    style={result.error
+                      ? { background: "var(--ck-danger-soft)", color: "var(--ck-danger)" }
+                      : result.reached < result.guests || result.whatsapp?.failed > 0
                         ? { background: "var(--ck-warning-soft)", color: "var(--ck-warning)" }
                         : { background: "var(--ck-success-soft)", color: "var(--ck-success)" }}>
-                      <p className="tabular-nums">
-                        WhatsApp: {waSent} of {waAtt} delivered · Email: {emSent} of {emAtt} delivered
-                      </p>
-                      {anyFailed && Array.isArray(result.errors) && result.errors.length > 0 && (
-                        <details className="mt-2 text-xs">
-                          <summary className="cursor-pointer font-semibold">Why some failed ({result.errors.length})</summary>
-                          <ul className="mt-1 list-disc pl-5 space-y-0.5">
-                            {result.errors.slice(0, 5).map((e: string, i: number) => <li key={i} className="break-all">{e}</li>)}
-                            {result.errors.length > 5 && <li>… and {result.errors.length - 5} more.</li>}
-                          </ul>
-                        </details>
-                      )}
-                    </div>
-                  );
-                })()}
+                    {result.error || broadcastSummary(result)}
+                  </div>
+                )}
               </div>
             </div>
           )}
