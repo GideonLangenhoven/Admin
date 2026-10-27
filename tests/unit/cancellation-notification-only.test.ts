@@ -69,7 +69,7 @@ describe("operator cancellation notification only", () => {
   });
 
   it("weather email renders options only with explicit consent", () => {
-    const render = sourceFunction("supabase/functions/send-email/index.ts", "cancellationHtml", { heroImg: () => "" });
+    const render = sourceFunction("supabase/functions/send-email/index.ts", "cancellationHtml", { heroImg: () => "", isWeatherCancel: sourceFunction("supabase/functions/send-email/index.ts", "isWeatherCancel", {}) });
     const data = { is_weather: true, customer_name: "Synthetic", ref: "SYNTHETIC", _manageUrl: "https://synthetic.invalid/my-bookings" };
     expect(render({ ...data, offer_choice: true })).toContain("Your options");
     for (const extra of [{ notification_only: true, offer_choice: true }, { offer_choice: false }]) {
@@ -80,7 +80,7 @@ describe("operator cancellation notification only", () => {
   });
 
   it.each([{ is_weather: true }, { reason: "Cancelled due to weather conditions" }])("weather contact-only email directs guests to the operator for rescheduling: %j", weather => {
-    const render = sourceFunction("supabase/functions/send-email/index.ts", "cancellationHtml", { heroImg: () => "" });
+    const render = sourceFunction("supabase/functions/send-email/index.ts", "cancellationHtml", { heroImg: () => "", isWeatherCancel: sourceFunction("supabase/functions/send-email/index.ts", "isWeatherCancel", {}) });
     const data = { ...weather, customer_name: "Synthetic", ref: "SYNTHETIC", _manageUrl: "https://synthetic.invalid/my-bookings" };
     const guidance = "Please contact the operator to discuss your rescheduling options.";
     const html = render({ ...data, notification_only: true, offer_choice: true, voucher_code: "OLD-VOUCHER", is_forfeit: true, refund_amount: 900 });

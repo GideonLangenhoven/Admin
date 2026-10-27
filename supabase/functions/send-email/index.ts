@@ -1361,9 +1361,18 @@ function giftVoucherHtml(d: Record<string, unknown>, face: string) {
     </html>`;
 }
 
+// weather-cancel sets is_weather; other cancellations can still name the weather in their reason.
+function isWeatherCancel(d: Record<string, unknown>): boolean {
+  return d.is_weather === true || (typeof d.reason === "string" && d.reason.toLowerCase().includes("weather"));
+}
+
+function cancellationSubject(d: Record<string, unknown>): string {
+  return (isWeatherCancel(d) ? "Cape Kayak - Trip Cancelled due to Weather" : "Cape Kayak - Booking Cancelled") + " (Ref: " + d.ref + ")";
+}
+
 function cancellationHtml(d: Record<string, unknown>) {
   const notificationOnly = d.notification_only === true;
-  const isWeather = d.is_weather === true || (typeof d.reason === "string" && d.reason.toLowerCase().includes("weather"));
+  const isWeather = isWeatherCancel(d);
   // When a voucher was issued (customer chose it, or voucher-paid booking),
   // the email confirms the voucher — it must NOT re-offer the three options.
   const hasVoucher = !notificationOnly && Boolean(d.voucher_code);
@@ -1451,7 +1460,9 @@ function cancellationHtml(d: Record<string, unknown>) {
                 <td style="padding: 24px; text-align: center;">
                   <p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #047857;">Your options</p>
                   <p style="margin: 0 0 16px 0; font-size: 14px; color: #166534; line-height: 1.5;">Pick a new date, convert to a voucher, or request a full refund.</p>
-                  ${emailBtn("Manage My Booking", manageUrl, "#166534")}
+                  ${emailBtn("Choose a New Date", manageUrl, "#166534")}
+                  ${emailBtn("Get a Voucher", manageUrl, "#166534")}
+                  ${emailBtn("Request a Refund", manageUrl, "#166534")}
                 </td>
               </tr>
             </table>
@@ -1493,7 +1504,7 @@ function cancellationHtml(d: Record<string, unknown>) {
         <tr>
           <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
             <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
-            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">Trip Cancelled</h1>
+            <h1 style="margin: 10px 0 0 0; font-size: 30px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">${isWeather ? "Trip Cancelled due to Weather" : "Trip Cancelled"}</h1>
           </td>
         </tr>
         <!-- Hero Image -->
@@ -2948,7 +2959,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         break;
       }
       case "CANCELLATION":
-        subject = "Cape Kayak - Booking Cancelled (Ref: " + d.ref + ")";
+        subject = cancellationSubject(d);
         html = cancellationHtml(d);
         break;
       case "WAIVER_REQUEST":
