@@ -57,7 +57,7 @@ export default function AgentConnectionsPage() {
   }
   return <main className="max-w-3xl space-y-6">
     <Link href="/settings" className="text-sm underline text-[var(--ck-text-muted)] focus-visible:outline">Back to settings</Link>
-    <div><h1 className="text-2xl font-semibold text-[var(--ck-text-strong)]">AI agent connections</h1>
+    <div><h2 className="text-2xl font-semibold text-[var(--ck-text-strong)]">AI agent connections</h2>
       <p className="mt-2 text-sm text-[var(--ck-text-muted)] max-w-prose">Manage read access to {businessName || "your business"}. Connection permission is separate from email marketing consent.</p></div>
     {role!=="MAIN_ADMIN" || readOnly ? <p role="status">Only the owner can approve connections.</p> : <>
       {status && <p role="status" className="text-sm">{status}</p>}

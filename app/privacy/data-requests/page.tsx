@@ -156,7 +156,7 @@ export default function DataRequestsPage() {
       <div className="anim-fade-up flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="ui-mono-label mb-2">Admin · Privacy</p>
-          <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>POPIA Data Requests</h1>
+          <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>POPIA Data Requests</h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {requests.filter(r => r.status === "PENDING_CONFIRMATION").length > 0 && (

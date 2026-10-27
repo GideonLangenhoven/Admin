@@ -778,7 +778,7 @@ function ReportsContent() {
       {/* ── Filters ── */}
       <div className="ui-card flex flex-col gap-3 p-4 sm:flex-row sm:flex-wrap sm:items-end">
         <label className="flex flex-col gap-1.5 sm:min-w-[150px]">
-          <span className="ui-mono-label !text-[10px]">Filter by</span>
+          <span className="ui-mono-label">Filter by</span>
           <select
             value={filterBy}
             onChange={e => setFilterBy(e.target.value as "slot" | "created")}
@@ -790,15 +790,15 @@ function ReportsContent() {
           </select>
         </label>
         <label className="flex flex-col gap-1.5 sm:min-w-[150px]">
-          <span className="ui-mono-label !text-[10px]">From</span>
+          <span className="ui-mono-label">From</span>
           <DatePicker value={startDate} onChange={setStartDate} />
         </label>
         <label className="flex flex-col gap-1.5 sm:min-w-[150px]">
-          <span className="ui-mono-label !text-[10px]">To</span>
+          <span className="ui-mono-label">To</span>
           <DatePicker alignRight={true} value={endDate} onChange={setEndDate} />
         </label>
         <label className="flex flex-col gap-1.5 sm:min-w-[160px]">
-          <span className="ui-mono-label !text-[10px]">Status</span>
+          <span className="ui-mono-label">Status</span>
           <select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value)}
@@ -831,7 +831,7 @@ function ReportsContent() {
             { label: "Compliance", value: (summary.waiverSigned + summary.waiverPending) > 0 ? Math.round((summary.waiverSigned / (summary.waiverSigned + summary.waiverPending)) * 100) + "%" : "—", color: "var(--ck-text-strong)" },
           ].map(c => (
             <div key={c.label} className="ui-card p-4" title={c.hint || c.label}>
-              <p className="ui-mono-label !text-[10px]">{c.label}</p>
+              <p className="ui-mono-label">{c.label}</p>
               <p className="font-display mt-1.5 text-[26px] font-semibold leading-none tabular-nums" style={{ color: c.color }}>{c.value}</p>
             </div>
           ))}
@@ -847,7 +847,7 @@ function ReportsContent() {
               { label: "Outstanding", value: fmtCurrency(fin.outstanding), color: fin.outstanding > 0 ? "var(--ck-warning)" : "var(--ck-text-strong)", hint: "due but not yet received on live bookings" },
             ].map(c => (
               <div key={c.label} className="ui-card p-4" title={c.hint}>
-                <p className="ui-mono-label !text-[10px]">{c.label}</p>
+                <p className="ui-mono-label">{c.label}</p>
                 <p className="font-display mt-1.5 text-[26px] font-semibold leading-none tabular-nums" style={{ color: c.color }}>{c.value}</p>
               </div>
             ))}
@@ -859,7 +859,7 @@ function ReportsContent() {
             </p>
           )}
           <div className="ui-card flex flex-wrap items-center gap-2 p-3">
-            <span className="ui-mono-label !text-[10px] mr-1">Accounting registers</span>
+            <span className="ui-mono-label mr-1">Accounting registers</span>
             <button data-demo-action="report.refunds" onClick={downloadRefundRegister} disabled={registerBusy !== null} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-40">
               {registerBusy === "refunds" ? "Building…" : "Refunds CSV"}
             </button>
@@ -881,7 +881,7 @@ function ReportsContent() {
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Revenue over time</h3>
-            <p className="ui-mono-label mt-1 !text-[10px]">Received · {filterBy === "slot" ? "by tour date" : "by booking date"}</p>
+            <p className="ui-mono-label mt-1">Received · {filterBy === "slot" ? "by tour date" : "by booking date"}</p>
           </div>
           <span className="font-display text-[22px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(fin.received)}</span>
         </div>
@@ -1038,7 +1038,7 @@ function ReportsContent() {
                   { label: "Attendance Rate", value: `${totalPax > 0 ? Math.round((checkedInPax / totalPax) * 100) : 0}%`, color: "var(--ck-text-strong)" },
                 ].map(c => (
                   <div key={c.label} className="ui-card p-4">
-                    <p className="ui-mono-label !text-[10px]">{c.label}</p>
+                    <p className="ui-mono-label">{c.label}</p>
                     <p className="font-display mt-1.5 text-[26px] font-semibold leading-none tabular-nums" style={{ color: c.color }}>{c.value}</p>
                   </div>
                 ))}

@@ -494,7 +494,7 @@ export default function SuperAdminPage() {
   if (!/super/i.test(role || "")) {
     return (
       <div className="max-w-2xl">
-        <h1 className="font-display mb-6 text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Super Admin</h1>
+        <h2 className="font-display mb-6 text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Super Admin</h2>
         <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6 text-center">
           <p className="ui-text-muted">This route is restricted to super admin accounts.</p>
         </div>
@@ -506,7 +506,7 @@ export default function SuperAdminPage() {
     <div className="max-w-4xl space-y-6">
       <div className="anim-fade-up">
         <p className="ui-mono-label mb-2">Platform Control</p>
-        <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Super Admin</h1>
+        <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Super Admin</h2>
         <p className="mt-2 text-sm text-[var(--ck-text-muted)]">Create and set up client accounts.</p>
         <a href="/super-admin/sensitive-actions" className="ui-btn ui-btn-ghost mt-4 inline-flex">Operator settings support</a>
       </div>

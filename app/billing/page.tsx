@@ -174,7 +174,7 @@ export default function BillingPage() {
     return (
       <div className="max-w-3xl space-y-4">
         <div>
-          <h1 className="font-display text-[28px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Billing</h1>
+          <h2 className="font-display text-[28px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Billing</h2>
         </div>
         <div className="ui-card p-5">
           <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No subscription configured. Contact support.</p>
@@ -199,7 +199,7 @@ export default function BillingPage() {
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <h1 className="font-display text-[28px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Billing</h1>
+        <h2 className="font-display text-[28px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Billing</h2>
       </div>
 
       {/* Current Plan */}
@@ -217,7 +217,7 @@ export default function BillingPage() {
 
         {(sub.status === "ACTIVE" || sub.status === "TRIAL") && alternativePlans.length > 0 && (
           <div className="mt-4">
-            <div className="ui-mono-label !text-[10px] mb-2">Change plan</div>
+            <div className="ui-mono-label mb-2">Change plan</div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               {alternativePlans.map((p) => (
                 <button data-demo-action="billing.plan"
@@ -232,7 +232,7 @@ export default function BillingPage() {
                 >
                   <div className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>{p.name}</div>
                   <div className="text-xs mt-0.5 tabular-nums" style={{ color: "var(--ck-text-muted)" }}>R{p.monthly_price_zar.toLocaleString()}/mo · {p.included_seats} seat{p.included_seats !== 1 ? "s" : ""}</div>
-                  <div className="ui-mono-label !text-[9px] mt-1.5" style={{ color: "var(--ck-text-muted)" }}>Switch</div>
+                  <div className="ui-mono-label mt-1.5" style={{ color: "var(--ck-text-muted)" }}>Switch</div>
                 </button>
               ))}
             </div>
@@ -241,12 +241,12 @@ export default function BillingPage() {
 
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
           <div className="p-3 rounded-[10px] border" style={{ background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-subtle)" }}>
-            <div className="ui-mono-label !text-[10px]">Seats purchased</div>
+            <div className="ui-mono-label">Seats purchased</div>
             <div className="font-display text-[28px] font-semibold mt-1 leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{sub.seats_purchased}</div>
             <div className="text-xs mt-1.5" style={{ color: "var(--ck-text-muted)" }}>{usedSeats} active admin{usedSeats !== 1 ? "s" : ""}</div>
           </div>
           <div className="p-3 rounded-[10px] border" style={{ background: "var(--ck-surface-sunken)", borderColor: "var(--ck-border-subtle)" }}>
-            <div className="ui-mono-label !text-[10px]">This month</div>
+            <div className="ui-mono-label">This month</div>
             <div className="font-display text-[28px] font-semibold mt-1 leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{monthly.toLocaleString()}</div>
             <div className="text-xs mt-1.5 tabular-nums break-words" style={{ color: "var(--ck-text-muted)" }}>{sub.billing_cycle_start} → {sub.billing_cycle_end}</div>
           </div>

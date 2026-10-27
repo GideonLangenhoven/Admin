@@ -266,7 +266,7 @@ export default function BookingsMonthCalendar({ businessId, tours, selectedDate,
         onClick={(e) => e.stopPropagation()}
       >
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="ui-mono-label !text-[10px]">Confirmed bookings · {format(displayMonth, "MMMM yyyy")}{loading ? " · loading…" : ""}</span>
+        <span className="ui-mono-label">Confirmed bookings · {format(displayMonth, "MMMM yyyy")}{loading ? " · loading…" : ""}</span>
         <div className="flex items-center gap-1.5">
           <button onClick={() => setFullscreen(true)} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs">Full screen</button>
           <button onClick={onClose} className="ui-btn ui-btn-ghost !h-7 !px-2.5 !text-xs" aria-label="Close month view">✕</button>

@@ -1566,7 +1566,7 @@ export default function SettingsPage() {
             <div className="max-w-2xl">
                 <div className="anim-fade-up mb-6">
                     <p className="ui-mono-label mb-2">Admin Console</p>
-                    <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Settings</h1>
+                    <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Settings</h2>
                 </div>
                 <div className="ui-card anim-fade-up anim-d1">
                     <div className="ui-empty">
@@ -1583,7 +1583,7 @@ export default function SettingsPage() {
             <div className="anim-fade-up mb-6 flex flex-wrap items-end justify-between gap-3">
                 <div>
                 <p className="ui-mono-label mb-2">Admin Console</p>
-                <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Settings</h1>
+                <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Settings</h2>
                 </div>
                 {isPrivileged(role) && <a href="#add-admin" onClick={() => setOpenSections(prev => ({ ...prev, admins: true }))} className="ui-btn ui-btn-primary">Add admin</a>}
             </div>
@@ -1847,7 +1847,7 @@ export default function SettingsPage() {
                     {/* Tour List */}
                     <div>
                         <div className="flex items-center justify-between mb-3">
-                            <span className="ui-mono-label !text-[10px]">{tours.length} tour{tours.length !== 1 ? "s" : ""}</span>
+                            <span className="ui-mono-label">{tours.length} tour{tours.length !== 1 ? "s" : ""}</span>
                             <button onClick={resetTourForm} className="text-xs font-medium text-[var(--ck-accent)] hover:underline">+ New Tour</button>
                         </div>
                         <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] overflow-hidden">

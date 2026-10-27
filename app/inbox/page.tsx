@@ -34,7 +34,7 @@ function MessageList({
           <div key={m.id}>
             {showDate && (
               <div className="text-center my-2">
-                <span className="font-mono text-[11px] px-3 py-1 rounded-full" style={{ background: "var(--ck-surface-sunken)", color: "var(--ck-text-muted)" }}>{fmtDate(m.created_at)}</span>
+                <span className="tabular-nums text-[11px] px-3 py-1 rounded-full" style={{ background: "var(--ck-surface-sunken)", color: "var(--ck-text-muted)" }}>{fmtDate(m.created_at)}</span>
               </div>
             )}
             <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
@@ -63,7 +63,7 @@ const needsAttention = (c: any) => c.status === "HUMAN" || c.status === "AGENT_P
 function ConvoRow({ c, isSelected, onClick }: { c: any; isSelected: boolean; onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={isSelected}
-      className={`block w-full text-left p-3 border-b border-[var(--ck-border-subtle)] cursor-pointer transition-colors ${isSelected ? "bg-[var(--ck-accent-soft)]" : "hover:bg-[var(--ck-surface-sunken)]"}`}>
+      className={`block w-full text-left px-4 py-3 border-b border-[var(--ck-border-subtle)] cursor-pointer transition-colors ${isSelected ? "bg-[var(--ck-accent-soft)]" : "hover:bg-[var(--ck-surface-sunken)]"}`}>
       <div className="flex items-center gap-2">
         {needsAttention(c) && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ck-accent)]" aria-hidden="true" />}
         <p className="font-semibold text-sm truncate" style={{ color: "var(--ck-text-strong)" }}>{c.customer_name || "Unknown"}</p>
@@ -73,7 +73,7 @@ function ConvoRow({ c, isSelected, onClick }: { c: any; isSelected: boolean; onC
         </span>
       </div>
       <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{c.phone}</p>
-      <p className="font-mono text-[11px] mt-1" style={{ color: "var(--ck-text-muted)" }}>{new Date(c.updated_at).toLocaleString("en-ZA", { timeZone: getAdminTimezone() })}</p>
+      <p className="tabular-nums text-[11px] mt-1" style={{ color: "var(--ck-text-muted)" }}>{new Date(c.updated_at).toLocaleString("en-ZA", { timeZone: getAdminTimezone() })}</p>
     </button>
   );
 }
@@ -367,7 +367,7 @@ function InboxContent() {
 
   return (
     <div className="h-full min-h-0 flex flex-col">
-      <h1 className="sr-only">Conversations</h1>
+      <h2 className="sr-only">Conversations</h2>
 
       {loading ? <div className="space-y-3"><div className="ui-skeleton h-20 !rounded-xl" /><div className="ui-skeleton h-20 !rounded-xl" /><div className="ui-skeleton h-20 !rounded-xl" /></div> : (
         <div className="flex min-h-0 flex-1 flex-col gap-0 lg:gap-4">
@@ -377,7 +377,7 @@ function InboxContent() {
             <div className={`w-full min-h-0 lg:w-72 shrink-0 flex flex-col ui-card rounded-none border-0 lg:rounded-2xl lg:border overflow-hidden ${selected ? "hidden lg:flex" : "flex"}`}>
               <div className="shrink-0 p-2 lg:p-3 border-b border-[var(--ck-border-subtle)] bg-[var(--ck-surface-sunken)] lg:space-y-2">
                 <div className="hidden lg:flex items-center justify-between">
-                  <p className="ui-mono-label !text-[10px]">{attentionCount} need attention · {convos.length} total</p>
+                  <p className="ui-mono-label">{attentionCount} need attention · {convos.length} total</p>
                   <button onClick={loadConvos} className="ui-btn ui-btn-ghost !h-7 !px-2.5 text-[11px]">Refresh</button>
                 </div>
                 <input

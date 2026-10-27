@@ -8,7 +8,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
   return (
     <div className="max-w-7xl space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="font-display text-[24px] font-semibold leading-none md:text-[28px]" style={{ color: "var(--ck-text-strong)" }}>Marketing</h1>
+        <h2 className="font-display text-[24px] font-semibold leading-none md:text-[28px]" style={{ color: "var(--ck-text-strong)" }}>Marketing</h2>
         {!contactsPage && <SectionTabs section="marketing" display="mobile" />}
       </div>
 

@@ -926,7 +926,7 @@ function Slots() {
             </p>
 
             <div className="mb-4 rounded-xl p-3 text-sm" style={{ background: "var(--ck-surface-sunken)", border: "1px solid var(--ck-border-subtle)" }}>
-              <div className="ui-mono-label !text-[10px]">Available</div>
+              <div className="ui-mono-label">Available</div>
               <div className="font-display mt-1 text-2xl font-semibold leading-none tabular-nums" style={{ color: availability > 0 ? "var(--ck-success)" : "var(--ck-text-muted)" }}>{availability}</div>
             </div>
 
@@ -978,7 +978,7 @@ function Slots() {
 
             {/* Availability vs Cancellation — two clearly separated actions */}
             <div className="mt-5 border-t pt-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
-              <p className="ui-mono-label !text-[10px] mb-2">Manage this slot</p>
+              <p className="ui-mono-label mb-2">Manage this slot</p>
               <div className="space-y-2">
                 {selectedSlot.status === "OPEN" ? (
                   <button data-demo-action="slot.close"

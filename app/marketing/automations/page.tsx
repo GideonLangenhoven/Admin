@@ -681,15 +681,15 @@ export default function AutomationsPage() {
           <table role="table" className="ui-responsive-table w-full text-sm min-w-[1050px]">
             <thead>
               <tr style={{ background: "var(--ck-surface-sunken)" }}>
-                <th scope="col" className="text-left px-4 py-3 ui-mono-label !text-[10px]">Name</th>
-                <th scope="col" className="text-left px-4 py-3 ui-mono-label !text-[10px]">Trigger</th>
-                <th scope="col" className="text-left px-4 py-3 ui-mono-label !text-[10px]">Flow</th>
-                <th scope="col" className="text-center px-4 py-3 ui-mono-label !text-[10px]">Status</th>
-                <th scope="col" className="text-center px-4 py-3 ui-mono-label !text-[10px]">Enrolled</th>
-                <th scope="col" className="text-center px-4 py-3 ui-mono-label !text-[10px]">Completed</th>
-                <th scope="col" className="text-center px-4 py-3 ui-mono-label !text-[10px]">Sent (7d)</th>
-                <th scope="col" className="text-left px-4 py-3 ui-mono-label !text-[10px]">Created</th>
-                <th scope="col" className="text-right px-4 py-3 ui-mono-label !text-[10px]">Actions</th>
+                <th scope="col" className="text-left px-4 py-3 ui-mono-label">Name</th>
+                <th scope="col" className="text-left px-4 py-3 ui-mono-label">Trigger</th>
+                <th scope="col" className="text-left px-4 py-3 ui-mono-label">Flow</th>
+                <th scope="col" className="text-center px-4 py-3 ui-mono-label">Status</th>
+                <th scope="col" className="text-center px-4 py-3 ui-mono-label">Enrolled</th>
+                <th scope="col" className="text-center px-4 py-3 ui-mono-label">Completed</th>
+                <th scope="col" className="text-center px-4 py-3 ui-mono-label">Sent (7d)</th>
+                <th scope="col" className="text-left px-4 py-3 ui-mono-label">Created</th>
+                <th scope="col" className="text-right px-4 py-3 ui-mono-label">Actions</th>
               </tr>
             </thead>
             <tbody>

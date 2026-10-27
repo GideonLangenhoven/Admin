@@ -199,7 +199,7 @@ export default function MarketingOverview() {
         ].map((kpi) => (
           <div key={kpi.label} className="ui-card ui-card-hover p-5">
             <div className="mb-4 flex items-center gap-2.5">
-              <span className="ui-mono-label !text-[10px]">{kpi.label}</span>
+              <span className="ui-mono-label">{kpi.label}</span>
             </div>
             <p className="font-display text-[30px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{kpi.value}</p>
             {kpi.delta && <p className="mt-1.5 text-xs" style={{ color: "var(--ck-text-muted)" }}>{kpi.delta}</p>}
@@ -377,14 +377,14 @@ export default function MarketingOverview() {
               <table role="table" className="ui-responsive-table w-full min-w-[700px] text-sm">
                 <thead>
                   <tr>
-                    <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Campaign</th>
-                    <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Status</th>
-                    <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Sent</th>
-                    <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Opens</th>
-                    <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Clicks</th>
-                    <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Unsub</th>
-                    <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Date</th>
-                    <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Actions</th>
+                    <th scope="col" className="ui-mono-label border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Campaign</th>
+                    <th scope="col" className="ui-mono-label border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Status</th>
+                    <th scope="col" className="ui-mono-label border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Sent</th>
+                    <th scope="col" className="ui-mono-label border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Opens</th>
+                    <th scope="col" className="ui-mono-label border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Clicks</th>
+                    <th scope="col" className="ui-mono-label border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Unsub</th>
+                    <th scope="col" className="ui-mono-label border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Date</th>
+                    <th scope="col" className="ui-mono-label border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>

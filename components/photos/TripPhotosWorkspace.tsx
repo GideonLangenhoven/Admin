@@ -390,7 +390,7 @@ export default function TripPhotosWorkspace({ initialSlotId }: { initialSlotId?:
             <div className="space-y-2 max-h-[50vh] overflow-auto">
               {slots.map(group => (
                 <div key={group.date}>
-                  <p className="ui-mono-label mb-1 !text-[10px]">{group.label}</p>
+                  <p className="ui-mono-label mb-1">{group.label}</p>
                   {group.slots.map(s => {
                     const isSelected = selectedSlot?.id === s.id;
                     return (
@@ -501,7 +501,7 @@ export default function TripPhotosWorkspace({ initialSlotId }: { initialSlotId?:
                 <p className="mb-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>Paste share links from any host. For uploads, connect Google Drive in Settings.</p>
                 <div className="mb-4 rounded-xl border border-dashed p-3" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-sunken)" }}>
                   <div className="flex items-center justify-between gap-3">
-                    <p className="ui-mono-label !text-[10px]">Bulk import</p>
+                    <p className="ui-mono-label">Bulk import</p>
                     <button data-demo-action="photo.links" type="button" disabled={sending || loadingPhotos} onClick={importBulkUrls} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs">
                       Import links
                     </button>
@@ -569,7 +569,7 @@ export default function TripPhotosWorkspace({ initialSlotId }: { initialSlotId?:
       <div className="ui-card anim-fade-up anim-d2 p-4">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Recent Photo Links</h2>
-          <span className="ui-mono-label !text-[10px]"><span className="tabular-nums">{sentHistory.length}</span> items</span>
+          <span className="ui-mono-label"><span className="tabular-nums">{sentHistory.length}</span> items</span>
         </div>
         {sentHistory.length === 0 ? (
           <div className="ui-empty mt-3">            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Nothing sent yet</p>
