@@ -92,16 +92,17 @@ describe("item 30 — operator-cancellation remediation", () => {
     expect(readFileSync("supabase/migrations/20260911150000_booking_cancellation.sql","utf8")).toContain("paid AND b.source NOT LIKE 'OTA_%'");
   });
 
-  it("the refund queue only shows customer-chosen refunds, never pending decisions", () => {
-    // Same rule everywhere an operator sees a refund count: queue, nav badge, dashboard tile
-    for (const f of ["app/refunds/page.tsx", "components/RefundBadge.tsx"]) {
-      const src = readFileSync(f, "utf8");
-      expect(src, f).not.toContain('"ACTION_REQUIRED"');
-      expect(src, f).toMatch(/\.(?:eq|in)\("refund_status", (?:\[)?"REQUESTED"/);
-    }
-    const dashboard = readFileSync("supabase/migrations/20260922110000_operator_dashboard_snapshot.sql", "utf8");
-    expect(dashboard).not.toContain("ACTION_REQUIRED");
-    expect(dashboard).toContain("b.refund_status in ('REQUESTED', 'REFUND_PENDING', 'MANUAL_EFT_REQUIRED', 'FAILED')");
+  it("pending decisions are counted and shown apart, never paid out by Submit all", () => {
+    // H7 (go-live 2026-10-27): money parked by a weather cancel is owed, so the
+    // queue, nav badge and dashboard tile all count it; only guest-chosen
+    // refunds enter the payable queue.
+    const owed = '.in("refund_status", ["REQUESTED", "REFUND_PENDING", "MANUAL_EFT_REQUIRED", "FAILED", "ACTION_REQUIRED"])';
+    for (const f of ["app/refunds/page.tsx", "components/RefundBadge.tsx"]) expect(readFileSync(f, "utf8"), f).toContain(owed);
+    const queue = readFileSync("app/refunds/page.tsx", "utf8");
+    expect(queue).toContain('setRefunds((pending || []).filter(b => b.refund_status !== "ACTION_REQUIRED"));');
+    expect(queue).toContain("const queued = [...refunds];");
+    const dashboard = readFileSync("supabase/migrations/20261027160000_refunds_awaiting_choice_visible.sql", "utf8");
+    expect(dashboard).toContain("''REQUESTED'', ''REFUND_PENDING'', ''MANUAL_EFT_REQUIRED'', ''FAILED'', ''ACTION_REQUIRED'')");
   });
 
   it("the slot cancel action doesn't promise a refund — the guest chooses", () => {

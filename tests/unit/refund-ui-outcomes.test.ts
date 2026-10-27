@@ -397,7 +397,8 @@ describe("refund queue routing", () => {
   it("routes individual, manual and all-item submissions through the shared outcome action", () => {
     const source = readFileSync("app/refunds/page.tsx", "utf8");
     expect(source).toContain('import { processRefundAction');
-    expect(source.match(/processRefundAction\(/g)).toHaveLength(3);
+    // individual, manual, Submit all, and Refund now on a booking waiting for a decision (H7)
+    expect(source.match(/processRefundAction\(/g)).toHaveLength(4);
     expect(source).not.toContain('functions.invoke("process-refund"');
     expect(source).not.toContain('fetch(SU + "/functions/v1/process-refund"');
     expect(source).not.toContain("Pending provider confirmation");
