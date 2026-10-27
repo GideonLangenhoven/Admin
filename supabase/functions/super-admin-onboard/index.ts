@@ -22,37 +22,6 @@ function respond(status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: corsHeaders });
 }
 
-async function requireCredentialMfa(req: Request, adminId: string, userId: string) {
-  const token = (req.headers.get("authorization") || "").match(/^Bearer\s+(\S+)$/i)?.[1];
-  if (!token) return { error: "Sign in again before linking credentials", status: 401 } as const;
-  let userResult;
-  try { userResult = await supabase.auth.getUser(token); }
-  catch { return { error: "MFA verification is temporarily unavailable. Nothing was changed.", status: 503 } as const; }
-  const user = userResult.data.user;
-  if (userResult.error || !user || user.id !== userId) return { error: "Sign in again before linking credentials", status: 401 } as const;
-
-  let assurance;
-  try { assurance = await supabase.auth.mfa.getAuthenticatorAssuranceLevel(token); }
-  catch { return { error: "MFA verification is temporarily unavailable. Nothing was changed.", status: 503 } as const; }
-  if (assurance.error || !assurance.data) return { error: "MFA verification is temporarily unavailable. Nothing was changed.", status: 503 } as const;
-  const factors = (user.factors || []).filter((factor: any) => factor.status === "verified" && factor.factor_type === "totp");
-  const { data: recovery, error: recoveryError } = await supabase.from("mfa_recovery_state")
-    .select("status, completed_at").eq("admin_id", adminId).maybeSingle();
-  if (recoveryError) return { error: "Recovery status could not be verified. Nothing was changed.", status: 503 } as const;
-  if (recovery && recovery.status !== "COMPLETED") return { error: "MFA recovery must finish before credentials can be linked", status: 423 } as const;
-  if (recovery?.status === "COMPLETED") {
-    const completedAt = Date.parse(recovery.completed_at || "");
-    const freshFactor = factors.some((factor: any) => Date.parse(factor.updated_at || factor.created_at || "") > completedAt);
-    const freshChallenge = (assurance.data.currentAuthenticationMethods || []).some((method: any) =>
-      typeof method !== "string" && String(method.method).includes("totp") && Number(method.timestamp) * 1000 > completedAt
-    );
-    if (!freshFactor || !freshChallenge) return { error: "Enroll and verify a new authenticator after recovery", status: 403 } as const;
-  }
-  if (!factors.length) return { error: "Set up an authenticator before linking credentials", status: 403 } as const;
-  if (assurance.data.currentLevel !== "aal2") return { error: "Enter a current authenticator code before linking credentials", status: 403 } as const;
-  return { ok: true } as const;
-}
-
 // Removed: two-step encryption context pattern was replaced with key-as-parameter RPCs.
 
 Deno.serve(withSentry("super-admin-onboard", async (req) => {
@@ -113,10 +82,6 @@ Deno.serve(withSentry("super-admin-onboard", async (req) => {
     }
     if (Object.keys(credentials).length && SETTINGS_ENCRYPTION_KEY.length < 32) throw new Error("Credential encryption is not configured");
     if (yocoSecretKey && !yocoSecretKey.startsWith("sk_live_")) return respond(400, { success: false, error: "This field is for the live Yoco key. Configure test keys separately in Settings." });
-    if (Object.keys(credentials).length) {
-      const mfa = await requireCredentialMfa(req, requester.id, auth.userId);
-      if ("error" in mfa) return respond(mfa.status, { success: false, code: "MFA_REQUIRED", error: mfa.error });
-    }
     // Saving a key is not a payment verification. No surprise checkout is
     // created, and the readiness checklist keeps the provider test outstanding.
     const { data, error } = await supabase.rpc("platform_onboard_business_audited", {

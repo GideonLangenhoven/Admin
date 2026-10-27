@@ -79,8 +79,8 @@ export default React.memo(function WeekView({ slots, currentDate, onSlotClick, s
     });
 
     return (
-        <div className="overflow-x-auto rounded-xl border border-gray-200">
-            <div className="grid min-w-[720px] grid-cols-7 divide-x divide-gray-200 bg-white md:min-w-[800px]">
+        <div className="rounded-xl border border-gray-200">
+            <div className="grid grid-cols-1 divide-y divide-gray-200 bg-white sm:grid-cols-2 xl:grid-cols-7 xl:divide-x xl:divide-y-0">
                 {days.map((day) => {
                     const dateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
                     const isSelected = selectedCancelDates?.includes(dateStr);

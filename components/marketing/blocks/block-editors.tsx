@@ -360,11 +360,12 @@ function SocialEditor({ block, onUpdate }: { block: SocialBlock; onUpdate: (u: P
           <button
             key={key}
             onClick={() => togglePlatform(key)}
-            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-all ${key in block.platforms ? "ring-2 shadow-sm" : "opacity-40 grayscale"}`}
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition-all ${key in block.platforms ? "ring-2 shadow-sm" : "opacity-40 grayscale"} ${key === "whatsapp" ? "min-h-11 min-w-11 justify-center" : ""}`}
+            title={p.label}
             style={{ borderColor: key in block.platforms ? p.brandColor : "var(--ck-border-subtle)", color: "var(--ck-text)", outlineColor: key in block.platforms ? p.brandColor : undefined }}
           >
             <img src={p.icon} alt="" width="18" height="18" className="rounded" />
-            {p.label}
+            <span className={key === "whatsapp" ? "sr-only" : undefined}>{p.label}</span>
           </button>
         ))}
       </div>
@@ -372,8 +373,8 @@ function SocialEditor({ block, onUpdate }: { block: SocialBlock; onUpdate: (u: P
         {Object.entries(block.platforms).map(([key, url]) => (
           <div key={key} className="flex items-center gap-2">
             <img src={SOCIAL_PLATFORMS[key]?.icon} alt="" width="22" height="22" className="rounded" />
-            <span className="w-16 text-[11px] font-semibold" style={{ color: SOCIAL_PLATFORMS[key]?.brandColor || "var(--ck-text-muted)" }}>{SOCIAL_PLATFORMS[key]?.label || key}</span>
-            <input value={url} onChange={(e) => updateUrl(key, e.target.value)} placeholder="URL" className={`flex-1 ${inputCls}`} style={inputStyle} />
+            <span className={key === "whatsapp" ? "sr-only" : "w-16 text-[11px] font-semibold"} style={{ color: SOCIAL_PLATFORMS[key]?.brandColor || "var(--ck-text-muted)" }}>{SOCIAL_PLATFORMS[key]?.label || key}</span>
+            <input value={url} onChange={(e) => updateUrl(key, e.target.value)} aria-label={`${SOCIAL_PLATFORMS[key]?.label || key} URL`} placeholder="URL" className={`flex-1 ${inputCls}`} style={inputStyle} />
           </div>
         ))}
       </div>
@@ -565,19 +566,20 @@ function FooterEditor({ block, onUpdate }: { block: FooterBlock; onUpdate: (u: P
               <button
                 key={key}
                 onClick={() => toggleSocial(key)}
-                className={`flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-medium transition-all ${key in (block.socials || {}) ? "ring-2 shadow-sm" : "opacity-40 grayscale"}`}
+                className={`flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-medium transition-all ${key in (block.socials || {}) ? "ring-2 shadow-sm" : "opacity-40 grayscale"} ${key === "whatsapp" ? "min-h-11 min-w-11 justify-center" : ""}`}
+                title={p.label}
                 style={{ borderColor: key in (block.socials || {}) ? p.brandColor : "var(--ck-border-subtle)", color: "var(--ck-text)", outlineColor: key in (block.socials || {}) ? p.brandColor : undefined }}
               >
                 <img src={p.icon} alt="" width="16" height="16" className="rounded" />
-                {p.label}
+                <span className={key === "whatsapp" ? "sr-only" : undefined}>{p.label}</span>
               </button>
             ))}
           </div>
           {Object.entries(block.socials || {}).map(([key, url]) => (
             <div key={key} className="mt-1 flex items-center gap-2">
               <img src={SOCIAL_PLATFORMS[key]?.icon} alt="" width="20" height="20" className="rounded" />
-              <span className="w-16 text-[10px] font-semibold" style={{ color: SOCIAL_PLATFORMS[key]?.brandColor }}>{SOCIAL_PLATFORMS[key]?.label || key}</span>
-              <input value={url} onChange={(e) => updateSocial(key, e.target.value)} placeholder="URL" className={`flex-1 ${inputCls}`} style={inputStyle} />
+              <span className={key === "whatsapp" ? "sr-only" : "w-16 text-[10px] font-semibold"} style={{ color: SOCIAL_PLATFORMS[key]?.brandColor }}>{SOCIAL_PLATFORMS[key]?.label || key}</span>
+              <input value={url} onChange={(e) => updateSocial(key, e.target.value)} aria-label={`${SOCIAL_PLATFORMS[key]?.label || key} URL`} placeholder="URL" className={`flex-1 ${inputCls}`} style={inputStyle} />
             </div>
           ))}
         </div>

@@ -4,6 +4,9 @@ import { useParams, useRouter } from "next/navigation";
 import { supabase } from "../../../lib/supabase";
 import { confirmAction, notify } from "../../../lib/app-notify";
 import { resolveMarketingTestRecipient } from "../../../lib/marketing-test-recipient";
+import { journeyContract } from "../../../lib/marketing-journey";
+import { getAuthHeaders } from "../../../lib/admin-auth";
+import { isMarketingSetup } from "../../../lib/marketing-setup";
 import { stepSentence, triggerSentence, validateAutomation } from "../../../lib/automation-copy";
 import { useBusinessContext } from "../../../../components/BusinessContext";
 import { Plus, Trash, CaretUp, CaretDown, MagnifyingGlass, X, Envelope, CheckCircle, Circle } from "@phosphor-icons/react";
@@ -22,6 +25,7 @@ interface Automation {
   trigger_type: string;
   trigger_config: any;
   status: string;
+  revision?: number;
 }
 
 interface Template {
@@ -69,16 +73,18 @@ const stepTypeInfo: Record<string, { label: string }> = {
 };
 
 export default function AutomationBuilderPage() {
-  const { businessId } = useBusinessContext();
+  const { businessId, timezone, role, readOnly } = useBusinessContext();
   const params = useParams();
   const router = useRouter();
   const automationId = params?.id as string;
 
+  const loadedDraftKey = useRef("");
   const [automation, setAutomation] = useState<Automation | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [cacheConflict, setCacheConflict] = useState(false);
 
   // Manual enrollment state
   const [enrollSearch, setEnrollSearch] = useState("");
@@ -114,10 +120,17 @@ export default function AutomationBuilderPage() {
     if (businessId && automationId) {
       loadAutomation();
       loadTemplates();
-      loadEnrollments();
-      loadLogs();
+      if (automationId !== "new") { loadEnrollments(); loadLogs(); }
     }
   }, [businessId, automationId]);
+
+  useEffect(() => {
+    const key = "marketing-draft/" + businessId + "/" + automationId;
+    if (!loading && automation && loadedDraftKey.current === key) {
+      try { sessionStorage.setItem(key, JSON.stringify({ automation, steps })); }
+      catch { /* Edits remain in memory when browser session storage is unavailable. */ }
+    }
+  }, [automation, steps, loading, businessId, automationId]);
 
   async function loadLogs() {
     setLogsLoading(true);
@@ -204,10 +217,20 @@ export default function AutomationBuilderPage() {
 
   async function loadAutomation() {
     setLoading(true);
+    loadedDraftKey.current = "";
+    const cacheKey = "marketing-draft/" + businessId + "/" + automationId;
+    let cached: { automation: Automation; steps: Step[] } | null = null;
+    try { cached = JSON.parse(sessionStorage.getItem(cacheKey) || "null"); } catch { /* unusable draft cache */ }
+    if (automationId === "new" && cached?.automation && Array.isArray(cached.steps)) { loadedDraftKey.current = cacheKey; setCacheConflict(false); setAutomation(cached.automation); setSteps(cached.steps); setLoading(false); return; }
+    if (automationId === "new") {
+      loadedDraftKey.current = cacheKey;
+      setAutomation({ id: "new", name: "New automation", description: null, trigger_type: "manual", trigger_config: {}, status: "draft", revision: 0 });
+      setSteps([]); setLoading(false); return;
+    }
     const { data: autoData } = await supabase
       .from("marketing_automations")
-      .select("id, name, description, trigger_type, trigger_config, status")
-      .eq("id", automationId)
+      .select("id, name, description, trigger_type, trigger_config, status, revision")
+      .eq("id", automationId).eq("business_id", businessId)
       .single();
 
     if (!autoData) {
@@ -215,14 +238,17 @@ export default function AutomationBuilderPage() {
       router.push("/marketing/automations");
       return;
     }
-    setAutomation(autoData as Automation);
+    const hasCachedEdits = cached?.automation && Array.isArray(cached.steps);
+    setCacheConflict(Boolean(hasCachedEdits && (cached!.automation.revision !== autoData.revision || cached!.automation.status !== autoData.status)));
+    setAutomation(hasCachedEdits ? { ...cached!.automation, status: autoData.status } : autoData as Automation);
 
     const { data: stepData } = await supabase
       .from("marketing_automation_steps")
       .select("id, position, step_type, config")
       .eq("automation_id", automationId)
       .order("position", { ascending: true });
-    setSteps((stepData as Step[]) || []);
+    setSteps(hasCachedEdits ? cached!.steps : (stepData as Step[]) || []);
+    loadedDraftKey.current = cacheKey;
     setLoading(false);
   }
 
@@ -235,52 +261,23 @@ export default function AutomationBuilderPage() {
     setTemplates((data as Template[]) || []);
   }
 
-  async function saveAutomation() {
-    if (!automation) return;
-    if (!String(automation.name || "").trim()) {
-      notify({ title: "Name required", message: "Give the automation a descriptive name before saving.", tone: "warning" });
-      return;
-    }
+  async function saveAutomation(): Promise<string | null> {
+    if (!automation || saving) return null;
     setSaving(true);
-
-    // Save automation metadata
-    const { error: autoErr } = await supabase
-      .from("marketing_automations")
-      .update({
-        name: automation.name.trim(),
-        description: automation.description,
-        trigger_type: automation.trigger_type,
-        trigger_config: automation.trigger_config,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", automationId);
-
-    if (autoErr) {
-      notify({ message: autoErr.message, tone: "error" });
-      setSaving(false);
-      return;
-    }
-
-    // Delete existing steps and re-insert
-    await supabase.from("marketing_automation_steps").delete().eq("automation_id", automationId);
-
-    if (steps.length > 0) {
-      const stepRows = steps.map((s, i) => ({
-        automation_id: automationId,
-        position: i,
-        step_type: s.step_type,
-        config: s.config,
-      }));
-      const { error: stepErr } = await supabase.from("marketing_automation_steps").insert(stepRows);
-      if (stepErr) {
-        notify({ message: stepErr.message, tone: "error" });
-        setSaving(false);
-        return;
-      }
-    }
-
-    notify({ message: "Automation saved.", tone: "success" });
+    const { data, error } = await supabase.rpc("save_marketing_draft", {
+      p_business_id: businessId, p_id: automationId === "new" ? null : automationId,
+      p_expected_revision: automation.revision || 0,
+      p_automation: { name: automation.name.trim(), description: automation.description,
+        trigger_type: automation.trigger_type, trigger_config: automation.trigger_config },
+      p_steps: steps.map(s => ({ step_type: s.step_type, config: s.config })),
+    });
     setSaving(false);
+    if (error || !data?.id) { notify({ title: "Draft not saved", message: error?.message || "Please retry.", tone: "error" }); return null; }
+    sessionStorage.removeItem("marketing-draft/" + businessId + "/" + automationId);
+    setAutomation({ ...automation, id: data.id, revision: data.revision });
+    if (automationId === "new") router.replace("/marketing/automations/" + data.id);
+    notify({ message: "Draft saved. Saving does not activate it.", tone: "success" });
+    return data.id;
   }
 
   async function archiveAutomation() {
@@ -313,6 +310,9 @@ export default function AutomationBuilderPage() {
 
   async function deleteAutomation() {
     if (!automation) return;
+    if (automationId === "5bb1d74b-8634-4fec-9c42-f6f13cc1c33f") {
+      notify({ message: "This review draft is protected. Archive preserves its history.", tone: "warning" }); return;
+    }
     if (!await confirmAction({
       title: "Delete automation",
       message: "Delete \"" + (automation.name || "this automation") + "\" permanently? Enrollment history and analytics will be destroyed. If you might want this back later, Archive instead.",
@@ -344,21 +344,37 @@ export default function AutomationBuilderPage() {
         ? `${existing} existing contact${existing === 1 ? "" : "s"} tagged "${tag}" will enroll immediately, plus anyone tagged "${tag}" from now on.`
         : `No contacts are currently tagged "${tag}" — they'll enroll automatically as soon as they get that tag.`;
     }
-    if (automation.trigger_type === "contact_added") return "Every new contact from now on will enroll.";
+    if (automation.trigger_type === "contact_added") return "New contacts can receive this sequence only with recorded marketing permission and no existing reservation.";
     if (automation.trigger_type === "post_booking") return "Every completed booking from now on will enroll.";
+    if (automation.trigger_type === "booking_inactive") return triggerSentence(automation);
     if (automation.trigger_type === "date_field") return "Contacts will enroll automatically as their date approaches.";
     return "No one enrolls automatically — you enroll contacts yourself below.";
   }
 
   async function toggleAutomationStatus() {
-    if (!automation) return;
+    if (!automation || cacheConflict || saving || activating || readOnly || !["MAIN_ADMIN", "SUPER_ADMIN"].includes(role)) return;
     const newStatus = automation.status === "active" ? "paused" : "active";
 
     // V-1: Pre-activation validation — block before flipping status to active
     // if the automation isn't actually runnable. Without this the operator
     // sees "Active" and waits for emails that can't ever fire.
     if (newStatus === "active") {
+      setActivating(true);
+      try {
+        const response = await fetch("/api/marketing/setup", { headers: await getAuthHeaders(businessId), cache: "no-store" });
+        const setup: unknown = await response.json();
+        if (!response.ok || !isMarketingSetup(setup)) throw new Error("Email setup could not be checked. Try again.");
+        if (!setup.email_service_configured || !setup.email_feedback_configured || !["eligible", "quiet_hours"].includes(setup.operator_status)) {
+          throw new Error("Complete email setup before activating.");
+        }
+        if (automation.trigger_type === "booking_inactive" && !setup.welcome_back_available) throw new Error("Welcome-back sequences are not available yet.");
+      } catch (error) {
+        notify({ message: error instanceof Error ? error.message : "Email setup could not be checked.", tone: "warning" });
+        return;
+      } finally { setActivating(false); }
       const issues = validateAutomation(automation, steps);
+      if (["tag_added", "date_field", "post_booking"].includes(automation.trigger_type)) issues.push("This trigger is not available for automatic delivery yet.");
+      if (steps.some(step => ["generate_voucher", "generate_promo"].includes(step.step_type))) issues.push("Automatic offers are unavailable. Remove offer steps and email references before activating.");
       if (issues.length > 0) {
         notify({
           title: "Cannot activate: fix " + issues.length + " issue" + (issues.length === 1 ? "" : "s"),
@@ -381,19 +397,19 @@ export default function AutomationBuilderPage() {
       if (!confirmed) return;
     }
 
-    // Save first, then toggle
-    await saveAutomation();
-
+    // Pause immediately; activation must stop if the atomic save fails.
+    const savedId = newStatus === "active" ? await saveAutomation() : automationId;
+    if (!savedId || savedId === "new") return;
     const { error } = await supabase
       .from("marketing_automations")
       .update({ status: newStatus, updated_at: new Date().toISOString() })
-      .eq("id", automationId);
+      .eq("id", savedId).eq("business_id", businessId);
 
     if (error) {
       notify({ message: error.message, tone: "error" });
       return;
     }
-    setAutomation({ ...automation!, status: newStatus });
+    setAutomation(prev => prev ? { ...prev, status: newStatus } : prev);
     notify({ message: newStatus === "active" ? "Automation activated." : "Automation paused.", tone: "success" });
   }
 
@@ -431,13 +447,13 @@ export default function AutomationBuilderPage() {
       .map((s, i) => ({ s, i }))
       .filter(({ s }) => s.step_type === "send_email" && s.config?.template_id);
     if (emailSteps.length === 0) {
-      notify({ title: "Nothing to send", message: "Add a Send Email step with a template selected first.", tone: "warning" });
+      notify({ title: "Nothing to send", message: "Add a Send Email step and select a template.", tone: "warning" });
       return;
     }
     setTestSending(true);
     const { email: testEmail, name: testName } = await resolveMarketingTestRecipient(supabase, businessId);
     if (!testEmail) {
-      notify({ message: "Could not determine your email address. Please log out and back in.", tone: "error" });
+      notify({ message: "Email unavailable. Sign out and back in.", tone: "error" });
       setTestSending(false);
       return;
     }
@@ -520,6 +536,7 @@ export default function AutomationBuilderPage() {
   }
 
   async function enrollContact(contactId: string) {
+    if (automationId === "new") { notify({ message: "Save a draft before enrolling contacts.", tone: "warning" }); return; }
     setEnrolling(true);
     // Check if already enrolled
     const { data: existing } = await supabase
@@ -596,6 +613,21 @@ export default function AutomationBuilderPage() {
         Back to automations
       </button>
 
+      <p role="status" className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
+        {automationId === "new" ? "Unsaved draft. Choose Save to keep it." : "Unsaved edits are kept in this session."}
+        {" "}Times shown in {timezone}.
+      </p>
+      {cacheConflict && <div role="alert" className="ui-card p-5 space-y-2">
+        <p>Changed elsewhere. Your edits are kept; reload the saved version before saving or activating.</p>
+        <button className="ui-btn ui-btn-soft" onClick={() => {
+          sessionStorage.removeItem("marketing-draft/" + businessId + "/" + automationId);
+          void loadAutomation();
+        }}>Discard edits & reload</button>
+      </div>}
+      <details className="ui-card p-5 space-y-2">
+        <summary className="cursor-pointer font-semibold">Sending rules</summary>
+        {Object.entries(journeyContract(automation, steps, timezone)).filter(([key]) => !["version", "steps"].includes(key)).map(([key,value]) => <p key={key} className="text-sm"><strong>{({trigger:"Starts",eligibility:"Send to",goal:"Stops",timing:"Send time",frequency:"How often",reentry:"Repeat",stop:"Do not send"} as Record<string,string>)[key]}:</strong> {String(value)}</p>)}
+      </details>
       {/* Automation metadata */}
       <div className="anim-fade-up anim-d1 ui-card p-5 space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -604,6 +636,7 @@ export default function AutomationBuilderPage() {
               Automation Name
             </label>
             <input
+              aria-label="Automation Name"
               value={automation.name}
               onChange={(e) => setAutomation({ ...automation!, name: e.target.value })}
               className="ui-control w-full"
@@ -614,6 +647,7 @@ export default function AutomationBuilderPage() {
               Description (optional)
             </label>
             <input
+              aria-label="Description (optional)"
               value={automation.description || ""}
               onChange={(e) => setAutomation({ ...automation!, description: e.target.value || null })}
               className="ui-control w-full"
@@ -629,12 +663,13 @@ export default function AutomationBuilderPage() {
             </label>
             <select
               value={automation.trigger_type}
-              onChange={(e) => setAutomation({ ...automation!, trigger_type: e.target.value, trigger_config: {} })}
+              onChange={(e) => setAutomation({ ...automation!, trigger_type: e.target.value, trigger_config: e.target.value === "booking_inactive" ? { days_since_last_booking: 90 } : {} })}
               className="ui-control w-full"
             >
               <option value="contact_added">Contact Added</option>
               <option value="tag_added">Tag Added</option>
               <option value="post_booking">Post Booking</option>
+              <option value="booking_inactive">Welcome back — time since last booking</option>
               <option value="date_field">Date Field</option>
               <option value="manual">Manual</option>
             </select>
@@ -659,6 +694,14 @@ export default function AutomationBuilderPage() {
               />
             </div>
           )}
+
+          {automation.trigger_type === "booking_inactive" && <label className="block text-sm">
+            Days since last paid booking
+            <input className="ui-control mt-1 w-full" type="number" min={1} max={3650} step={1}
+              value={automation.trigger_config?.days_since_last_booking ?? 90}
+              onChange={event => setAutomation({ ...automation, trigger_config: { days_since_last_booking: Number(event.target.value) } })} />
+            <span className="mt-2 block text-xs" style={{ color: "var(--ck-text-muted)" }}>Email only. Enrolls active contacts once per last-booking date. Stops on a new or upcoming booking. Add emails and delays below; automatic offers are unavailable.</span>
+          </label>}
 
           {automation.trigger_type === "date_field" && (
             <>
@@ -704,7 +747,7 @@ export default function AutomationBuilderPage() {
         <div className="flex flex-wrap items-center gap-3 pt-2">
           <button data-demo-action="automation.save"
             onClick={saveAutomation}
-            disabled={saving}
+            disabled={cacheConflict || saving || automation.status === "active" || readOnly || !["MAIN_ADMIN", "SUPER_ADMIN"].includes(role)}
             className="ui-btn ui-btn-primary disabled:opacity-50"
           >
             {saving ? "Saving..." : "Save"}
@@ -712,7 +755,8 @@ export default function AutomationBuilderPage() {
           {automation.status !== "archived" && (
             <button data-demo-action={automation.status === "active" ? "automation.pause" : "automation.activate"}
               onClick={toggleAutomationStatus}
-              disabled={activating}
+              disabled={cacheConflict || activating || saving || readOnly || !["MAIN_ADMIN", "SUPER_ADMIN"].includes(role)}
+              title={automation.status === "active" ? "Pause promotional delivery" : "Check email setup and activate this sequence"}
               className={`ui-btn ${automation.status === "active" ? "ui-btn-danger" : "ui-btn-soft"} disabled:opacity-50`}
             >
               {activating ? "Checking…" : automation.status === "active" ? "Pause" : "Activate"}
@@ -740,9 +784,9 @@ export default function AutomationBuilderPage() {
                 onClick={testSendAllSteps}
                 disabled={testSending}
                 className="ui-btn ui-btn-soft !h-9 disabled:opacity-50"
-                title="Send every linked email in this workflow to your own inbox"
+                title="Send all steps to your inbox"
               >
-                {testSending ? "Sending…" : "Email me all steps"}
+                {testSending ? "Sending…" : "Send test emails"}
               </button>
             )}
             {automation.status === "active" && (
@@ -750,11 +794,12 @@ export default function AutomationBuilderPage() {
                 onClick={runDispatchNow}
                 disabled={dispatching}
                 className="ui-btn ui-btn-soft !h-9 disabled:opacity-50"
-                title="Manually fire the dispatch worker (useful for date_field triggers and stalled enrollments)"
+                title="Run pending automation steps now"
               >
                 {dispatching ? "Dispatching…" : "Run dispatch now"}
               </button>
             )}
+            {automationId !== "new" && <>
             {automation.status === "archived" ? (
               <button data-demo-action="automation.restore"
                 onClick={unarchiveAutomation}
@@ -772,13 +817,14 @@ export default function AutomationBuilderPage() {
                 Archive
               </button>
             )}
-            <button data-demo-action="automation.delete"
+            {(!automation.revision && automationId !== "5bb1d74b-8634-4fec-9c42-f6f13cc1c33f") && <button data-demo-action="automation.delete"
               onClick={deleteAutomation}
               className="ui-btn ui-btn-danger !h-9"
               title="Delete permanently"
             >
               Delete
-            </button>
+            </button>}
+            </>}
           </div>
         </div>
       </div>
@@ -791,10 +837,10 @@ export default function AutomationBuilderPage() {
         <div className="anim-fade-up anim-d2 ui-card p-5 space-y-3">
           <div>
             <h2 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>
-              Before you activate
+              Review your emails
             </h2>
             <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
-              Review each email and confirm the trigger, then activate when you're ready.
+              Preview emails, then save and activate. Sending checks email setup and permission.
             </p>
           </div>
           <div className="space-y-2">
@@ -835,7 +881,8 @@ export default function AutomationBuilderPage() {
           </div>
           <button data-demo-action="automation.activate"
             onClick={toggleAutomationStatus}
-            disabled={activating}
+            disabled={cacheConflict || activating || saving || readOnly || !["MAIN_ADMIN", "SUPER_ADMIN"].includes(role)}
+            title="Check email setup and activate this sequence"
             className="ui-btn ui-btn-primary disabled:opacity-50"
           >
             {activating ? "Checking…" : "Activate"}
@@ -1026,7 +1073,7 @@ export default function AutomationBuilderPage() {
                       />
                     </div>
                     <p className="text-xs sm:col-span-2" style={{ color: "var(--ck-text-muted)" }}>
-                      If true, the contact continues to the next step. If false, the contact exits the automation.
+                      Matching contacts continue. Others exit.
                     </p>
                   </div>
                 )}
@@ -1160,7 +1207,7 @@ export default function AutomationBuilderPage() {
 
         {steps.length === 0 && (
           <p className="text-xs pl-2" style={{ color: "var(--ck-text-muted)" }}>
-            No steps yet. Click + to add your first workflow step.
+            No steps yet. Choose + to add one.
           </p>
         )}
 
@@ -1183,7 +1230,7 @@ export default function AutomationBuilderPage() {
             Manual Enrollment
           </h3>
           <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>
-            Search for contacts and enroll them into this automation.
+            Find contacts to enroll.
           </p>
           <div className="flex gap-2">
             <div className="relative flex-1">
@@ -1257,18 +1304,18 @@ export default function AutomationBuilderPage() {
         </div>
         {enrollments.length === 0 ? (
           <div className="rounded-lg border border-dashed px-4 py-6 text-center text-xs" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-muted)" }}>
-            No enrollments yet. When the trigger fires for a matching contact, they will appear here.
+            No enrollments yet. Matching contacts appear when triggered.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border" style={{ borderColor: "var(--ck-border-subtle)" }}>
-            <table className="w-full text-xs">
+          <div className="ui-table-container overflow-x-auto rounded-lg border" style={{ borderColor: "var(--ck-border-subtle)" }}>
+            <table role="table" className="ui-responsive-table w-full text-xs">
               <thead>
                 <tr style={{ background: "var(--ck-bg)" }}>
-                  <th className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Contact</th>
-                  <th className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Status</th>
-                  <th className="text-right px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Step</th>
-                  <th className="text-right px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Next action</th>
-                  <th className="text-right px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Enrolled</th>
+                  <th scope="col" className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Contact</th>
+                  <th scope="col" className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Status</th>
+                  <th scope="col" className="text-right px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Step</th>
+                  <th scope="col" className="text-right px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Next action</th>
+                  <th scope="col" className="text-right px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Enrolled</th>
                 </tr>
               </thead>
               <tbody>
@@ -1278,19 +1325,19 @@ export default function AutomationBuilderPage() {
                   const enrolled = new Date(e.created_at);
                   return (
                     <tr key={e.id} className="border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                      <td className="px-3 py-2" style={{ color: "var(--ck-text)" }}>
+                      <td data-label="Contact" className="px-3 py-2" style={{ color: "var(--ck-text)" }}>
                         {c?.email || e.contact_id.slice(0, 8)}
                         {c?.first_name ? <span className="ml-1.5 text-[11px]" style={{ color: "var(--ck-text-muted)" }}>({c.first_name}{c.last_name ? " " + c.last_name : ""})</span> : null}
                       </td>
-                      <td className="px-3 py-2">
+                      <td data-label="Status" className="px-3 py-2">
                         <span className={`ui-status ${e.status === "active" ? "ui-pill-ocean" : e.status === "completed" ? "ui-pill-success" : e.status === "paused" ? "ui-pill-warning" : "ui-pill-neutral"}`}>{e.status}</span>
                       </td>
-                      <td className="px-3 py-2 text-right font-mono" style={{ color: "var(--ck-text)" }}>{e.current_step + 1}/{steps.length}</td>
-                      <td className="px-3 py-2 text-right" style={{ color: "var(--ck-text-muted)" }}>
-                        {e.status === "completed" ? "—" : next ? next.toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
+                      <td data-label="Step" className="px-3 py-2 text-right font-mono" style={{ color: "var(--ck-text)" }}>{e.current_step + 1}/{steps.length}</td>
+                      <td data-label="Next action" className="px-3 py-2 text-right" style={{ color: "var(--ck-text-muted)" }}>
+                        {e.status === "completed" ? "—" : next ? next.toLocaleString("en-ZA", { timeZone: timezone, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}
                       </td>
-                      <td className="px-3 py-2 text-right" style={{ color: "var(--ck-text-muted)" }}>
-                        {enrolled.toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      <td data-label="Enrolled" className="px-3 py-2 text-right" style={{ color: "var(--ck-text-muted)" }}>
+                        {enrolled.toLocaleString("en-ZA", { timeZone: timezone, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                       </td>
                     </tr>
                   );
@@ -1314,7 +1361,7 @@ export default function AutomationBuilderPage() {
           <div>
             <h3 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>Step execution log</h3>
             <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
-              Latest 200 events from the automation dispatcher. New events appear after each cron run or manual dispatch.
+              Latest 200 events. Updates after scheduled or manual runs.
             </p>
           </div>
           <button
@@ -1328,19 +1375,19 @@ export default function AutomationBuilderPage() {
         </div>
         {logs.length === 0 ? (
           <div className="rounded-lg border border-dashed px-4 py-6 text-center text-xs" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-muted)" }}>
-            No events yet. Activate the automation and trigger an enrollment. The dispatcher will populate this log on its next run.
+            No events yet. Activate and enroll a contact; events appear after the next run.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-lg border" style={{ borderColor: "var(--ck-border-subtle)" }}>
-            <table className="w-full text-xs">
+          <div className="ui-table-container overflow-x-auto rounded-lg border" style={{ borderColor: "var(--ck-border-subtle)" }}>
+            <table role="table" className="ui-responsive-table w-full text-xs">
               <thead>
                 <tr style={{ background: "var(--ck-bg)" }}>
-                  <th className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>When</th>
-                  <th className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Contact</th>
-                  <th className="text-right px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Step</th>
-                  <th className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Type</th>
-                  <th className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Outcome</th>
-                  <th className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Detail</th>
+                  <th scope="col" className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>When</th>
+                  <th scope="col" className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Contact</th>
+                  <th scope="col" className="text-right px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Step</th>
+                  <th scope="col" className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Type</th>
+                  <th scope="col" className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Outcome</th>
+                  <th scope="col" className="text-left px-3 py-2 font-medium" style={{ color: "var(--ck-text-muted)" }}>Detail</th>
                 </tr>
               </thead>
               <tbody>
@@ -1359,23 +1406,23 @@ export default function AutomationBuilderPage() {
                     if (meta.code) detailBits.push("code: " + String(meta.code));
                     if (meta.resend_id) detailBits.push("resend: " + String(meta.resend_id).slice(0, 12));
                     if (meta.template_id && !meta.subject) detailBits.push("template: " + String(meta.template_id).slice(0, 8));
-                    if (meta.delay_until) detailBits.push("until " + new Date(String(meta.delay_until)).toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }));
+                    if (meta.delay_until) detailBits.push("until " + new Date(String(meta.delay_until)).toLocaleString("en-ZA", { timeZone: timezone, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }));
                   }
                   return (
                     <tr key={log.id} className="border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                      <td className="px-3 py-2 whitespace-nowrap" style={{ color: "var(--ck-text-muted)" }}>
-                        {when.toLocaleString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      <td data-label="When" className="px-3 py-2 whitespace-nowrap" style={{ color: "var(--ck-text-muted)" }}>
+                        {when.toLocaleString("en-ZA", { timeZone: timezone, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                       </td>
-                      <td className="px-3 py-2" style={{ color: "var(--ck-text)" }}>
+                      <td data-label="Contact" className="px-3 py-2" style={{ color: "var(--ck-text)" }}>
                         {c?.email || log.contact_id.slice(0, 8)}
                         {c?.first_name ? <span className="ml-1.5 text-[11px]" style={{ color: "var(--ck-text-muted)" }}>({c.first_name})</span> : null}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono" style={{ color: "var(--ck-text)" }}>{log.step_position + 1}</td>
-                      <td className="px-3 py-2" style={{ color: "var(--ck-text-muted)" }}>{log.step_type}</td>
-                      <td className="px-3 py-2">
+                      <td data-label="Step" className="px-3 py-2 text-right font-mono" style={{ color: "var(--ck-text)" }}>{log.step_position + 1}</td>
+                      <td data-label="Type" className="px-3 py-2" style={{ color: "var(--ck-text-muted)" }}>{log.step_type}</td>
+                      <td data-label="Outcome" className="px-3 py-2">
                         <span className={`ui-status ${isFailure ? "ui-pill-danger" : isSuccess ? "ui-pill-success" : "ui-pill-neutral"}`}>{log.action}</span>
                       </td>
-                      <td className="px-3 py-2 text-[11px]" style={{ color: "var(--ck-text-muted)" }} title={meta ? JSON.stringify(meta) : ""}>
+                      <td data-label="Detail" className="px-3 py-2 text-[11px]" style={{ color: "var(--ck-text-muted)" }} title={meta ? JSON.stringify(meta) : ""}>
                         {detailBits.length > 0 ? detailBits.join(" · ") : "—"}
                       </td>
                     </tr>

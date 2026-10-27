@@ -56,6 +56,23 @@ Deno.serve(async (req: Request) => {
     return new Response("Not found", { status: 404 });
   }
 
+  // Resolve every supplied identifier to the same tenant and relationship
+  // before counters/logs. A queue/campaign ID cannot authorise a foreign contact.
+  const { data: boundContact } = await supabase.from("marketing_contacts").select("id")
+    .eq("id", contactId).eq("business_id", businessId).maybeSingle();
+  if (!boundContact) return new Response("Not found", { status: 404 });
+  if (campaignId) {
+    if (!queueId) return new Response("Invalid tracking identity", { status: 400 });
+    const { data: boundQueue } = await supabase.from("marketing_queue").select("id")
+      .eq("id", queueId).eq("business_id", businessId).eq("campaign_id", campaignId).eq("contact_id", contactId).maybeSingle();
+    if (!boundQueue) return new Response("Not found", { status: 404 });
+  }
+  if (automationId) {
+    const { data: boundEnrollment } = await supabase.from("marketing_automation_enrollments").select("id")
+      .eq("id", enrollmentId).eq("business_id", businessId).eq("automation_id", automationId).eq("contact_id", contactId).maybeSingle();
+    if (!boundEnrollment) return new Response("Not found", { status: 404 });
+  }
+
   if (type === "open") {
     // Record open event
     await supabase.from("marketing_events").insert({
@@ -71,7 +88,7 @@ Deno.serve(async (req: Request) => {
     await supabase.rpc("increment_contact_counter", { p_contact_id: contactId, p_column: "total_opens" });
     await supabase.from("marketing_contacts").update({
       last_open_at: new Date().toISOString(),
-    }).eq("id", contactId);
+    }).eq("id", contactId).eq("business_id", businessId);
 
     // Log to automation logs if this is an automation-sourced event
     if (automationId && businessId) {
@@ -139,7 +156,7 @@ Deno.serve(async (req: Request) => {
     await supabase.rpc("increment_contact_counter", { p_contact_id: contactId, p_column: "total_clicks" });
     await supabase.from("marketing_contacts").update({
       last_click_at: new Date().toISOString(),
-    }).eq("id", contactId);
+    }).eq("id", contactId).eq("business_id", businessId);
 
     // Increment campaign unique click counter
     if (campaignId) {

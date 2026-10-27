@@ -9,7 +9,7 @@ export default function NotFound() {
         </div>
         <h1 className="font-display mb-2 text-[22px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Page not found</h1>
         <p className="mb-7 text-sm" style={{ color: "var(--ck-text-muted)" }}>
-          This page doesn&apos;t exist or has been moved.
+          Page not found.
         </p>
         <Link href="/" className="ui-btn ui-btn-primary inline-flex !px-6">
           Back to Dashboard

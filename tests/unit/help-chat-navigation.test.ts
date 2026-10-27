@@ -34,9 +34,10 @@ describe("help assistant survives following its own links", () => {
     expect(chips[0]).not.toContain("setOpen(false)");
   });
 
-  it("only closes on the mobile breakpoint", () => {
+  it("only closes below the desktop panel breakpoint", () => {
     const fn = SRC.slice(SRC.indexOf("function handleNavigate()"), SRC.indexOf("async function ask"));
-    expect(fn).toContain('matchMedia("(min-width: 768px)")');
+    expect(fn).toContain('matchMedia("(min-width: 1024px)")');
+    expect(SRC).toContain("lg:inset-x-auto");
     expect(fn).toContain("setOpen(false)");
   });
 

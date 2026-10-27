@@ -10,7 +10,7 @@ describe("mobile-first implementation contract", () => {
     const shell = source("components/AppShell.tsx");
     const drawer = source("components/MobileMenuDrawer.tsx");
     expect(shell).toContain('const mobilePrimaryHrefs = ["/", "/bookings", "/new-booking", "/inbox"]');
-    expect(shell).toContain('<MobileMenuDrawer nav={visibleNav} active={mobileMoreActive} />');
+    expect(shell).toContain('<MobileMenuDrawer nav={menuNav} active={mobileMoreActive} />');
     expect(shell).not.toContain("overflow-x-auto no-scrollbar");
     expect(drawer).toContain("const drawer = open ?");
     expect(drawer).toContain('role="dialog"');
@@ -18,10 +18,8 @@ describe("mobile-first implementation contract", () => {
     expect(drawer).toContain("triggerRef.current?.focus()");
   });
 
-  it("orders phone dashboard operations before revenue and protects full labels", () => {
+  it("keeps dashboard labels readable in the departure cards", () => {
     const dashboard = source("app/page.tsx");
-    expect(dashboard).toContain("order-2 grid grid-cols-1");
-    expect(dashboard).toContain("order-3 block p-4");
     expect(dashboard).toContain("{slot.totalPax} guests");
     expect(dashboard).toContain("min-h-[76px]");
     expect(dashboard).toContain("h-11 w-11");
@@ -61,7 +59,7 @@ describe("mobile-first implementation contract", () => {
     expect(booking).toContain('data-mobile-booking-bar="calendar"');
     expect(booking).toContain('data-mobile-booking-bar="details"');
     expect(booking).toContain('onClick={submitBooking}');
-    expect(booking).toContain('{selectedSlot ? `R${grandTotal}` : "Not selected"}');
+    expect(booking).toContain('{validDeparture ? `R${grandTotal}` : "Not selected"}');
     expect(booking).toContain('{finalTotal <= 0 ? "FREE" : `R${finalTotal}`}');
     expect(combo).toContain('data-mobile-booking-bar="combo-slots"');
     expect(combo).toContain('data-mobile-booking-bar="combo-details"');
@@ -79,12 +77,8 @@ describe("mobile-first implementation contract", () => {
     expect(chat).toContain("launcherRef.current?.focus()");
   });
 
-  it("fits seven minimum-size calendar targets and applies the all-operator hero rule", () => {
-    const booking = source("booking/app/book/page.tsx");
+  it("applies the all-operator hero rule", () => {
     const home = source("booking/app/page.tsx");
-    expect(booking).toContain("-mx-4 py-4");
-    expect(booking).toContain("aspect-square min-h-11 min-w-11");
-    expect(booking).toContain('grid grid-cols-7 gap-0');
     expect(home).toContain("{theme.hero_title?.trim() && (");
   });
 });

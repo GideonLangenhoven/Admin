@@ -2,18 +2,22 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import { supabase } from "./lib/supabase";
 import { confirmAction, notify } from "./lib/app-notify";
+import { groupDepartureBookings, nextManifestDepartures, operatorDashboardRange, arrivalReadiness, type ArrivalBooking } from "./lib/operator-day";
+import { bookingResolutionUrl, businessDateKey } from "./lib/simple-view";
 import { getAdminTimezone } from "./lib/admin-timezone";
-import { customerNotesTooltip } from "./lib/customer-notes";
 import { useBusinessContext } from "../components/BusinessContext";
-import { isPrivilegedRole } from "./lib/role-utils";
-import { isSectionHidden } from "./lib/operator-sections";
 import { setArrivedCountAction } from "./lib/booking-actions";
 import { bookingRealtimeFilter } from "./lib/bookings-realtime";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import styles from "./dashboard.module.css";
+import DashboardComposition from "../components/DashboardComposition";
+import DashboardContact from "../components/DashboardContact";
+import PaymentRecoveryPanel from "../components/PaymentRecoveryPanel";
+import ArrivalCountLink from "../components/booking/ArrivalCountLink";
 import {
     CaretLeft, CaretRight, Check,
-    X, Trash, MapPin, ArrowsClockwise,
+    X, Trash, MapPin, ArrowsClockwise, Minus, ArrowUDownLeft, ChatText,
 } from "@phosphor-icons/react";
 
 /* ── helpers ── */
@@ -131,10 +135,11 @@ const WindguruWidget = dynamic(() => import("../components/WindguruWidget"), {
 });
 
 /* ── types ── */
-interface ManifestBooking {
+interface ManifestBooking extends ArrivalBooking {
     id: string;
     customer_name: string;
     phone: string;
+    email: string | null;
     qty: number;
     slot_id: string;
     arrived_count: number;
@@ -148,6 +153,7 @@ interface ManifestBooking {
 }
 
 interface SlotSummary {
+    id: string;
     time: string;
     timeRaw: string;
     tourName: string;
@@ -197,54 +203,11 @@ function TrailMotif({ className = "" }: { className?: string }) {
     );
 }
 
-/* ── hand-rolled revenue sparkline — no chart dependency ── */
-function Sparkline({ data }: { data: number[] }) {
-    const series = data.length === 1 ? [0, ...data] : data;
-    if (series.length < 2) return null;
-    const w = 100, h = 34;
-    const max = Math.max(...series, 1);
-    const pts = series.map((v, i) => [
-        (i / (series.length - 1)) * w,
-        h - 3 - (v / max) * (h - 8),
-    ] as const);
-    const line = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p[0].toFixed(2)} ${p[1].toFixed(2)}`).join(" ");
-    const area = `${line} L${w} ${h} L0 ${h} Z`;
-    const last = pts[pts.length - 1];
-    return (
-        <div className="relative w-full">
-            <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-14 w-full">
-                <defs>
-                    <linearGradient id="rev-spark" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" style={{ stopColor: "var(--ck-accent)", stopOpacity: 0.20 }} />
-                        <stop offset="100%" style={{ stopColor: "var(--ck-accent)", stopOpacity: 0 }} />
-                    </linearGradient>
-                </defs>
-                <path d={area} fill="url(#rev-spark)" />
-                <path d={line} fill="none" style={{ stroke: "var(--ck-accent)" }} strokeWidth="1.6" vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
-            </svg>
-            <span
-                className="absolute h-2 w-2 rounded-full translate-x-1/2 -translate-y-1/2"
-                style={{ right: 0, top: `${(last[1] / h) * 100}%`, background: "var(--ck-amber-bright)", boxShadow: "0 0 0 3px var(--ck-amber-soft)" }}
-                aria-hidden="true"
-            />
-        </div>
-    );
-}
-
 /* ── main component ── */
 export default function Dashboard() {
-    const { businessId, role } = useBusinessContext();
+    const { businessId, timezone, readOnly } = useBusinessContext();
     const activeBusinessRef = useRef(businessId);
     activeBusinessRef.current = businessId;
-    // Main Admin can hide the revenue panel from operator-level admins.
-    const [hideRevenue, setHideRevenue] = useState(false);
-    useEffect(() => {
-        if (isPrivilegedRole(role)) { setHideRevenue(false); return; }
-        try {
-            const perms = JSON.parse(localStorage.getItem("ck_admin_settings_perms") || "{}");
-            setHideRevenue(isSectionHidden(perms, "dashboard_reports"));
-        } catch { setHideRevenue(false); }
-    }, [role]);
     const [refundCount, setRefundCount] = useState(0);
     const [refundTotal, setRefundTotal] = useState(0);
     const [inboxCount, setInboxCount] = useState(0);
@@ -255,16 +218,14 @@ export default function Dashboard() {
     const [tomorrowManifest, setTomorrowManifest] = useState<ManifestBooking[]>([]);
     const [manifestDate, setManifestDate] = useState<"TODAY" | "TOMORROW">("TODAY");
     const [tomorrowPax, setTomorrowPax] = useState(0);
-    const [revToday, setRevToday] = useState(0);
-    const [revWeek, setRevWeek] = useState(0);
-    const [revMonth, setRevMonth] = useState(0);
-    const [revSeries, setRevSeries] = useState<number[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState("");
+    const loadSequence = useRef(0);
+    const arrivalBusy = useRef(new Set<string>());
     const realtimeRefreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Roll call state
-    const [activeSlotIdx, setActiveSlotIdx] = useState(0);
-    const [manualSlotNav, setManualSlotNav] = useState(false);
+    const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
     const [now, setNow] = useState(() => Date.now());
 
     // Weather location
@@ -273,9 +234,11 @@ export default function Dashboard() {
 
     // Weather management
     const [editingLocs, setEditingLocs] = useState(false);
+    const [weatherProvider, setWeatherProvider] = useState<"windguru" | "windy">("windguru");
     const [wgRefreshKey, setWgRefreshKey] = useState(0);
     const [windyRefreshKey, setWindyRefreshKey] = useState(0);
     const [savingLocations, setSavingLocations] = useState(false);
+    const locationSaveBusy = useRef(false);
     const [newLocName, setNewLocName] = useState("");
     const [newLocLat, setNewLocLat] = useState("");
     const [newLocLon, setNewLocLon] = useState("");
@@ -288,6 +251,8 @@ export default function Dashboard() {
     }, []);
 
     const saveLocations = async (locs: WeatherLocation[]) => {
+        if (readOnly || locationSaveBusy.current) throw new Error("Weather settings cannot be saved right now.");
+        locationSaveBusy.current = true;
         setSavingLocations(true);
         try {
             const normalized = locs.map((loc, index) => ({ ...loc, isDefault: loc.isDefault || (index === 0 && !locs.some((item) => item.isDefault)) }));
@@ -303,6 +268,7 @@ export default function Dashboard() {
             notify({ title: "Save failed", message: "Could not save weather locations for this business.", tone: "error" });
             throw e;
         } finally {
+            locationSaveBusy.current = false;
             setSavingLocations(false);
         }
     };
@@ -320,7 +286,7 @@ export default function Dashboard() {
         const next = locations.filter(l => l.id !== id);
         if (next.length > 0 && !next.find(l => l.isDefault)) next[0].isDefault = true;
         await saveLocations(next);
-        notify({ title: "Location removed", message: "The weather location was removed from this business dashboard.", tone: "success" });
+        notify({ title: "Location removed", message: "Weather location removed.", tone: "success" });
     };
 
     const handleGeocode = async () => {
@@ -367,7 +333,7 @@ export default function Dashboard() {
                     }
                 }
             } else {
-                notify({ title: "Coordinates not found", message: "Could not find location coordinates automatically. Please enter them manually.", tone: "warning" });
+                notify({ title: "Coordinates not found", message: "Location not found. Enter coordinates manually.", tone: "warning" });
             }
         } catch (e) {
             notify({ title: "Location lookup failed", message: "Error finding location.", tone: "error" });
@@ -394,17 +360,13 @@ export default function Dashboard() {
     // Group manifest into slots
     const activeManifest = manifestDate === "TODAY" ? manifest : tomorrowManifest;
     const slotGroups: SlotSummary[] = useMemo(() => {
-        const groups = new Map<string, ManifestBooking[]>();
-        for (const b of activeManifest) {
-            const key = b.slots?.start_time || "unknown";
-            if (!groups.has(key)) groups.set(key, []);
-            groups.get(key)!.push(b);
-        }
         const result: SlotSummary[] = [];
-        for (const [timeRaw, bookings] of groups) {
+        for (const bookings of groupDepartureBookings(activeManifest)) {
+            const timeRaw = bookings[0].slots?.start_time || "unknown";
             const totalPax = bookings.reduce((s, b) => s + b.qty, 0);
             const checkedIn = bookings.reduce((s, b) => s + b.arrived_count, 0);
             result.push({
+                id: bookings[0].slot_id,
                 time: timeRaw !== "unknown" ? fmtTime(timeRaw) : "—",
                 timeRaw,
                 tourName: bookings[0]?.tours?.name || "Tour",
@@ -415,30 +377,14 @@ export default function Dashboard() {
             });
         }
         result.sort((a, b) => a.timeRaw.localeCompare(b.timeRaw));
-        return result;
-    }, [manifest, tomorrowManifest, manifestDate]);
+        return nextManifestDepartures(result, now);
+    }, [activeManifest, timezone, now]);
 
-    // Auto-advance roll call: show next slot 4 min after its time
-    useEffect(() => {
-        if (manualSlotNav || slotGroups.length === 0) return;
-        function findCurrentSlot() {
-            const now = new Date();
-            const buffer = 4 * 60 * 1000; // 4 minutes
-            let idx = 0;
-            for (let i = 0; i < slotGroups.length; i++) {
-                const slotTime = new Date(slotGroups[i].timeRaw);
-                if (now.getTime() >= slotTime.getTime() + buffer && i + 1 < slotGroups.length) {
-                    idx = i + 1;
-                }
-            }
-            setActiveSlotIdx(idx);
-        }
-        findCurrentSlot();
-        const timer = setInterval(findCurrentSlot, 30000);
-        return () => clearInterval(timer);
-    }, [slotGroups, manualSlotNav]);
+    const nextDeparture = manifest
+        .filter((booking) => new Date(booking.slots?.start_time || "").getTime() >= now)
+        .sort((a, b) => (a.slots?.start_time || "").localeCompare(b.slots?.start_time || ""))[0];
 
-    useEffect(() => { if (businessId) void load(); }, [businessId]);
+    useEffect(() => { if (businessId) void load(); return () => { loadSequence.current++; }; }, [businessId, timezone]);
 
     // Realtime: refresh dashboard when bookings change (refund processed, new booking, etc.)
     useEffect(() => {
@@ -459,25 +405,26 @@ export default function Dashboard() {
         };
     }, [businessId]);
 
+    useEffect(() => {
+        if (!businessId) return;
+        const refresh=()=>void load();
+        const offline=()=>setLoadError("Connection lost. Refresh after reconnecting before changing arrivals.");
+        window.addEventListener("online",refresh);window.addEventListener("offline",offline);
+        const timer=setInterval(refresh,60_000);
+        return()=>{clearInterval(timer);window.removeEventListener("online",refresh);window.removeEventListener("offline",offline);};
+    },[businessId,timezone]);
+
     async function load() {
         setLoading(true);
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-        const dayAfter = new Date(tomorrow); dayAfter.setDate(dayAfter.getDate() + 1);
-        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-        const nowDate = new Date();
+        const request = ++loadSequence.current;
+        setLoadError("");
         const { data, error } = await supabase.rpc("get_operator_dashboard", {
-            p_business_id: businessId,
-            p_today_start: today.toISOString(),
-            p_tomorrow_start: tomorrow.toISOString(),
-            p_day_after: dayAfter.toISOString(),
-            p_week_ago: new Date(nowDate.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-            p_month_start: monthStart.toISOString(),
-            p_now: nowDate.toISOString(),
-        });
+            p_business_id: businessId, ...operatorDashboardRange(timezone),
+        }).then(result => result, () => ({ data: null, error: { message: "Connection unavailable" } }));
+        if (request !== loadSequence.current) return;
         if (activeBusinessRef.current !== businessId) return;
         if (error || !data || data.business_id !== businessId) {
-            console.error("Failed to load dashboard snapshot:", error || "tenant mismatch");
+            setLoadError("Dashboard unavailable. Refresh to load counts and actions.");
             setLoading(false);
             return;
         }
@@ -504,11 +451,6 @@ export default function Dashboard() {
         // Photos outstanding
         setPhotosOutstanding(Number(snapshot.photos_outstanding || 0));
 
-        setRevToday(Number(snapshot.revenue?.today || 0));
-        setRevWeek(Number(snapshot.revenue?.week || 0));
-        setRevMonth(Number(snapshot.revenue?.month || 0));
-        setRevSeries((snapshot.revenue?.series || []).map(Number));
-
         const stored = Array.isArray(snapshot.weather_widget_locations) && snapshot.weather_widget_locations.length > 0
             ? snapshot.weather_widget_locations as WeatherLocation[]
             : DEFAULT_LOCATIONS;
@@ -519,6 +461,8 @@ export default function Dashboard() {
     }
 
     async function toggleCheckIn(booking: ManifestBooking) {
+        if (readOnly || arrivalBusy.current.has(booking.id) || (!booking.checked_in && !arrivalReadiness(booking).canIncrease)) return;
+        arrivalBusy.current.add(booking.id);
         const targetCount = booking.checked_in ? 0 : booking.qty;
         const newValue = targetCount === booking.qty;
         // Optimistic update
@@ -555,13 +499,21 @@ export default function Dashboard() {
             notify({ title: "Check-in not saved", message: result.error || "Refresh and try again.", tone: "error" });
             if (result.data?.code === "STALE" || result.data?.code === "STALE_SLOT") load();
         }
+        arrivalBusy.current.delete(booking.id);
     }
 
-    const activeSlot = slotGroups[activeSlotIdx] || null;
+    const activeSlot = slotGroups.find(slot => slot.id === selectedSlotId) || slotGroups[0] || null;
+    const activeSlotIdx = slotGroups.findIndex(slot => slot.id === activeSlot?.id);
+
+    if (loadError && !loading) return <div className={`${styles.workspace} ui-card p-6`} role="alert">
+        <h1 className="text-xl font-semibold">Daily dashboard unavailable</h1><p className="mt-2">{loadError}</p>
+        <button className="ui-btn ui-btn-primary mt-4" onClick={() => load()}>Try again</button>
+        <Link className="ui-btn ui-btn-soft mt-4 ml-2" href="/simple">Simple View</Link>
+    </div>;
 
     /* ── skeleton — mirrors the real layout, no spinners ── */
     if (loading) return (
-        <div className="flex max-w-[1400px] flex-col gap-4 pb-10 lg:mx-auto lg:gap-6">
+        <div className={`${styles.workspace} flex max-w-[1400px] flex-col gap-4 pb-10 lg:mx-auto lg:gap-6`}>
             <div className="flex items-end justify-between gap-4 pt-2 mb-8">
                 <div className="space-y-2.5">
                     <div className="ui-skeleton h-3 w-44" />
@@ -586,135 +538,53 @@ export default function Dashboard() {
     );
 
     return (
-        <div className="flex max-w-[1400px] flex-col gap-4 pb-10 lg:mx-auto lg:gap-6">
+        <div className={`${styles.workspace} flex max-w-[1400px] flex-col gap-4 pb-10 lg:mx-auto lg:gap-6`}>
             {/* Dashboard Header */}
-            <div className="anim-fade-up order-0 flex items-end justify-between gap-4 pt-1 lg:pt-2">
-                <div>
+            <div className="anim-fade-up flex flex-wrap items-end justify-between gap-4 pt-1 lg:pt-2">
+                <div className="min-w-0">
                     <p className="ui-mono-label mb-2">
                         {new Date(now).toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long", timeZone: getAdminTimezone() })}
                     </p>
-                    <h2 className="font-display text-[28px] md:text-[32px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Dashboard</h2>
+                    <h2 className="font-display text-[1.75rem] md:text-[2rem] font-semibold leading-tight text-balance" style={{ color: "var(--ck-text-strong)" }}>Dashboard</h2>
                 </div>
-                <div className="hidden items-center gap-3 sm:flex">
+                <div className="flex flex-wrap items-center gap-3">
                     <Link href="/new-booking" className="ui-btn ui-btn-primary">
                         Add Booking
                     </Link>
                 </div>
             </div>
 
-            {/* ── Hero band: north-star pax + revenue with sparkline ── */}
-            <div className="contents lg:grid lg:grid-cols-5 lg:gap-6">
-                {/* Today's Pax — the north-star number on the night surface */}
-                <Link href="/bookings" className="bg-bt-dark ui-card-hover anim-fade-up anim-d1 group relative order-1 block overflow-hidden rounded-2xl p-4 text-white lg:order-none lg:col-span-2 lg:p-6" style={{ border: "1px solid rgba(244, 241, 232, 0.09)", boxShadow: "var(--ck-shadow-hero)" }}>
+            <DashboardComposition tiles={{
+                next_departure: (<section aria-label="Next departure" className="ui-card flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+                <h3 className="ui-mono-label">Next departure</h3>
+                {nextDeparture ? (
+                    <p className="min-w-0 text-base font-semibold [overflow-wrap:anywhere]" style={{ color: "var(--ck-text-strong)" }}>
+                        <span className="tabular-nums">{fmtTime(nextDeparture.slots!.start_time!)}</span> · {nextDeparture.tours?.name || "Tour"}
+                    </p>
+                ) : (
+                    <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No more booked departures today</p>
+                )}
+            </section>),
+                guests: (<Link href="/bookings" className={`${styles.paxSummary} bg-bt-dark ui-card-hover anim-fade-up anim-d1 group relative block min-w-0 overflow-hidden rounded-2xl p-4 text-white lg:p-5`} style={{ border: "1px solid rgba(244, 241, 232, 0.09)", boxShadow: "var(--ck-shadow-hero)" }}>
                     <TopoLines className="absolute inset-0 hidden h-full w-full lg:block" />
                     <TrailMotif className="absolute right-5 top-5 hidden h-14 w-14 lg:block" />
                     <div className="relative">
-                        <span className="ui-mono-label !text-white/60">Today&apos;s Pax</span>
-                        <div className="font-display my-2 text-[38px] font-semibold leading-none tabular-nums text-white lg:mb-4 lg:mt-6 lg:text-[56px]">
+                        <span className="ui-mono-label !text-white/60">Today&apos;s guests</span>
+                        <div className="font-display my-2 text-[38px] font-semibold leading-none tabular-nums text-white">
                             {todayPax}
                         </div>
-                        <div className="flex items-center gap-2 text-[12.5px] text-white/55">
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-white/55">
                             <span className="h-[5px] w-[5px] rounded-full bg-[#D9822F]" aria-hidden="true" />
                             <span className="font-mono text-[12px] font-medium text-white/90">{todayBookings}</span>
-                            trips · {tomorrowPax} pax tomorrow
+                            {todayBookings === 1 ? "booking" : "bookings"} · {tomorrowPax} {tomorrowPax === 1 ? "guest" : "guests"} tomorrow
                         </div>
                     </div>
-                </Link>
-
-                {/* Revenue at a glance — today, last 7 days, this month + month sparkline */}
-                {!hideRevenue && (
-                <Link href="/reports" className="ui-card ui-card-hover anim-fade-up anim-d1 group order-3 block p-4 lg:order-none lg:col-span-3 lg:p-6">
-                    <div className="mb-3 flex items-center justify-between lg:mb-5">
-                        <h3 className="ui-mono-label">Revenue</h3>
-                        <span className="ui-mono-label !tracking-[0.06em] flex items-center gap-1.5 transition-colors group-hover:!text-[var(--ck-text-strong)]">
-                            View reports
-                        </span>
-                    </div>
-                    <div className="divide-y lg:grid lg:grid-cols-3 lg:divide-x lg:divide-y-0" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                        <div className="flex items-baseline justify-between py-2 lg:block lg:py-0 lg:pr-4">
-                            <p className="ui-mono-label !text-[11px]">Today</p>
-                            <p className="font-display text-[20px] font-semibold leading-tight tabular-nums lg:mt-1.5 lg:text-[28px]" style={{ color: "var(--ck-text-strong)" }}>R{revToday.toLocaleString("en-ZA", { maximumFractionDigits: 2 })}</p>
-                        </div>
-                        <div className="flex items-baseline justify-between py-2 lg:block lg:px-4 lg:py-0">
-                            <p className="ui-mono-label !text-[11px]">Last 7 days</p>
-                            <p className="font-display text-[20px] font-semibold leading-tight tabular-nums lg:mt-1.5 lg:text-[28px]" style={{ color: "var(--ck-text-strong)" }}>R{revWeek.toLocaleString("en-ZA", { maximumFractionDigits: 2 })}</p>
-                        </div>
-                        <div className="flex items-baseline justify-between py-2 lg:block lg:py-0 lg:pl-4">
-                            <p className="ui-mono-label !text-[11px]">This month</p>
-                            <p className="font-display text-[20px] font-semibold leading-tight tabular-nums lg:mt-1.5 lg:text-[28px]" style={{ color: "var(--ck-text-strong)" }}>R{revMonth.toLocaleString("en-ZA", { maximumFractionDigits: 2 })}</p>
-                        </div>
-                    </div>
-                    {revSeries.length > 0 && (
-                        <div className="mt-3 hidden border-t pt-4 sm:block lg:mt-5" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                            <Sparkline data={revSeries} />
-                            <p className="ui-mono-label mt-1.5 !text-[9.5px]">This month, daily</p>
-                        </div>
-                    )}
-                </Link>
-                )}
-            </div>
-
-            {/* ── KPI row ── */}
-            <div className="anim-fade-up anim-d2 order-4 grid grid-cols-1 gap-4 sm:grid-cols-3 lg:order-none lg:gap-6">
-                {/* Refunds */}
-                <Link href="/refunds" className="ui-card ui-card-hover group block p-5">
-                    <div className="flex items-start justify-between mb-5">
-                        <div className="flex items-center gap-3">
-                            <span className="ui-mono-label">Pending Refunds</span>
-                        </div>
-                    </div>
-                    <div className="font-display mb-3 text-[34px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
-                        {refundCount > 0 ? `R${refundTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : "0"}
-                    </div>
-                    <div className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>
-                        <span className="h-[5px] w-[5px] rounded-full" style={{ background: refundCount > 0 ? "var(--ck-warning)" : "var(--ck-success)" }} aria-hidden="true" />
-                        <span className="font-mono text-[12px] font-medium" style={{ color: "var(--ck-text-strong)" }}>{refundCount}</span>
-                        awaiting approval
-                    </div>
-                </Link>
-
-                {/* Inbox */}
-                <Link href="/inbox" className="ui-card ui-card-hover group block p-5">
-                    <div className="flex items-start justify-between mb-5">
-                        <div className="flex items-center gap-3">
-                            <span className="ui-mono-label">Inbox Action</span>
-                        </div>
-                    </div>
-                    <div className="font-display mb-3 flex items-baseline gap-1.5 text-[34px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
-                        {inboxCount} <span className="text-[15px] font-medium tracking-normal" style={{ color: "var(--ck-text-muted)" }}>msgs</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>
-                        <span className="h-[5px] w-[5px] rounded-full" style={{ background: inboxCount > 0 ? "var(--ck-warning)" : "var(--ck-success)" }} aria-hidden="true" />
-                        <span className="font-mono text-[12px] font-medium" style={{ color: "var(--ck-text-strong)" }}>{inboxCount > 0 ? "waiting" : "clear"}</span>
-                        conversations
-                    </div>
-                </Link>
-
-                {/* Photos */}
-                <Link href="/photos" className="ui-card ui-card-hover group block p-5">
-                    <div className="flex items-start justify-between mb-5">
-                        <div className="flex items-center gap-3">
-                            <span className="ui-mono-label">Photos Out</span>
-                        </div>
-                    </div>
-                    <div className="font-display mb-3 flex items-baseline gap-1.5 text-[34px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
-                        {photosOutstanding} <span className="text-[15px] font-medium tracking-normal" style={{ color: "var(--ck-text-muted)" }}>trips</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>
-                        <span className="h-[5px] w-[5px] rounded-full" style={{ background: photosOutstanding > 0 ? "var(--ck-warning)" : "var(--ck-success)" }} aria-hidden="true" />
-                        <span className="font-mono text-[12px] font-medium" style={{ color: "var(--ck-text-strong)" }}>{photosOutstanding > 0 ? "missing" : "clear"}</span>
-                        photo uploads
-                    </div>
-                </Link>
-            </div>
-
-            <div className="anim-fade-up anim-d3 order-2 grid grid-cols-1 gap-4 lg:order-none lg:grid-cols-2 lg:gap-6">
-                {/* ── Today's Manifest (pax per slot) ── */}
-                <div className="ui-card flex flex-col overflow-hidden">
+                </Link>),
+                manifest: (<section aria-label="Manifest" className={`${styles.card} ui-card flex flex-col`}>
                     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-4 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
                         <div>
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                                <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>
+                                <h3 className={styles.sectionTitle} style={{ color: "var(--ck-text-strong)" }}>
                                     Manifest
                                 </h3>
                                 <div className="ui-seg">
@@ -722,7 +592,8 @@ export default function Dashboard() {
                                         type="button"
                                         className="ui-seg-item"
                                         data-active={manifestDate === "TODAY"}
-                                        onClick={() => { setManifestDate("TODAY"); setActiveSlotIdx(0); }}
+                                        aria-pressed={manifestDate === "TODAY"}
+                                        onClick={() => { setManifestDate("TODAY"); setSelectedSlotId(null); }}
                                     >
                                         Today
                                     </button>
@@ -730,45 +601,45 @@ export default function Dashboard() {
                                         type="button"
                                         className="ui-seg-item"
                                         data-active={manifestDate === "TOMORROW"}
-                                        onClick={() => { setManifestDate("TOMORROW"); setActiveSlotIdx(0); }}
+                                        aria-pressed={manifestDate === "TOMORROW"}
+                                        onClick={() => { setManifestDate("TOMORROW"); setSelectedSlotId(null); }}
                                     >
                                         Tomorrow
                                     </button>
                                 </div>
                             </div>
-                            <p className="ui-mono-label !text-[10px] mt-1">Pax per slot</p>
+                            <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>Next departure</p>
                         </div>
-                        <Link href="/new-booking" className="ui-btn ui-btn-primary !h-8 !px-3 !text-[12.5px] hidden sm:inline-flex">
-                            Add Booking
-                        </Link>
                     </div>
 
-                    <div className="flex-1 overflow-x-auto">
+                    <div className="min-w-0 flex-1">
                         {slotGroups.length === 0 ? (
                             <div className="ui-empty">
-                                <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>
-                                    {manifestDate === "TODAY" ? "No bookings today" : "No bookings tomorrow"}
+                                <p className="text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>
+                                    {manifestDate === "TODAY" ? "No more booked departures today" : "No bookings tomorrow"}
                                 </p>
-                                <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>New bookings will appear here as they come in.</p>
+                                <Link href="/bookings" className="text-sm underline">View bookings</Link>
                             </div>
                         ) : (
                             <>
-                            <div className="divide-y md:hidden" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
+                            <div className={`${styles.mobileRows} divide-y`} style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
                                 {slotGroups.map((slot, i) => {
-                                    const isPast = manifestDate === "TODAY" && (new Date(slot.timeRaw).getTime() + 4 * 60 * 1000 < now);
                                     const complete = slot.checkedIn === slot.totalPax && slot.totalPax > 0;
                                     return (
                                         <button
-                                            key={slot.timeRaw}
+                                            key={slot.id}
+                                            data-slot-id={slot.id}
+                                            data-selected={i === activeSlotIdx}
+                                            aria-pressed={i === activeSlotIdx}
                                             type="button"
-                                            onClick={() => { setActiveSlotIdx(i); setManualSlotNav(true); }}
-                                            className="flex min-h-[76px] w-full items-center justify-between gap-4 px-4 py-3 text-left transition-colors hover:bg-[var(--ck-surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ck-accent)]"
-                                            style={{ opacity: isPast ? 0.62 : 1 }}
+                                            onClick={() => { setSelectedSlotId(slot.id); }}
+                                            className="flex min-h-[76px] w-full flex-wrap items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--ck-surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ck-accent)]"
                                             aria-label={`${slot.time}, ${slot.tourName}, ${slot.totalPax} guests, ${slot.checkedIn} checked in`}
                                         >
-                                            <span className="min-w-0">
+                                            <span className="min-w-0 flex-1 basis-36 [overflow-wrap:anywhere]">
                                                 <span className="block text-base font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{slot.time}</span>
                                                 <span className="mt-1 block text-sm font-medium leading-snug" style={{ color: "var(--ck-text)" }}>{slot.tourName}</span>
+                                                <span className="mt-1 block text-sm" style={{ color: "var(--ck-text-muted)" }}>{slot.bookingCount} {slot.bookingCount === 1 ? "booking" : "bookings"}</span>
                                             </span>
                                             <span className="shrink-0 text-right">
                                                 <span className="block text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{slot.totalPax} guests</span>
@@ -780,43 +651,44 @@ export default function Dashboard() {
                                     );
                                 })}
                             </div>
-                            <table className="hidden w-full text-sm md:table">
+                            <table aria-label="Manifest departures" className={`${styles.table} text-sm`}>
+                                <colgroup><col style={{ width: "14%" }} /><col style={{ width: "26%" }} /><col style={{ width: "18%" }} /><col style={{ width: "14%" }} /><col style={{ width: "28%" }} /></colgroup>
                                 <thead>
                                     <tr>
-                                        <th className="px-5 py-3.5 text-left text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Time</th>
-                                        <th className="px-5 py-3.5 text-left text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Tour</th>
-                                        <th className="px-5 py-3.5 text-right text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Bookings</th>
-                                        <th className="px-5 py-3.5 text-right text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Pax</th>
-                                        <th className="px-5 py-3.5 text-right text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Checked In</th>
+                                        <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Time</th>
+                                        <th className="px-5 py-3.5 text-left text-xs font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Tour</th>
+                                        <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Bookings</th>
+                                        <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Guests</th>
+                                        <th className="px-5 py-3.5 text-right text-xs font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Checked In</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
                                     {slotGroups.map((slot, i) => {
-                                        const isPast = manifestDate === "TODAY" && (new Date(slot.timeRaw).getTime() + 4 * 60 * 1000 < now);
                                         const complete = slot.checkedIn === slot.totalPax && slot.totalPax > 0;
                                         const pct = slot.totalPax > 0 ? Math.round((slot.checkedIn / slot.totalPax) * 100) : 0;
                                         return (
                                             <tr
-                                                key={slot.timeRaw}
+                                                key={slot.id}
+                                                data-slot-id={slot.id}
+                                                data-selected={i === activeSlotIdx}
                                                 className="transition-colors cursor-pointer hover:bg-[var(--ck-surface-sunken)]"
-                                                style={{ opacity: isPast ? 0.5 : 1 }}
-                                                onClick={() => { setActiveSlotIdx(i); setManualSlotNav(true); }}
+                                                onClick={() => { setSelectedSlotId(slot.id); }}
                                             >
                                                 <td className="px-5 py-4">
-                                                    <div className="font-semibold text-[14px] tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{slot.time}</div>
+                                                    <button type="button" aria-label={`Select ${slot.time}, ${slot.tourName}`} aria-pressed={i === activeSlotIdx} className="min-h-11 font-semibold text-sm tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{slot.time}</button>
                                                 </td>
                                                 <td className="px-5 py-4">
-                                                    <div className="text-[13px] font-medium max-w-[120px] truncate" style={{ color: "var(--ck-text-muted)" }} title={slot.tourName}>{slot.tourName}</div>
+                                                    <div className="text-sm font-medium" style={{ color: "var(--ck-text)" }}>{slot.tourName}</div>
                                                 </td>
                                                 <td className="px-5 py-4 text-right">
-                                                    <div className="text-[13px] font-medium tabular-nums" style={{ color: "var(--ck-text)" }}>{slot.bookingCount}</div>
+                                                    <div className="text-sm font-medium tabular-nums" style={{ color: "var(--ck-text)" }}>{slot.bookingCount}</div>
                                                 </td>
                                                 <td className="px-5 py-4 text-right">
                                                     <div className="font-bold text-[16px] tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{slot.totalPax}</div>
                                                 </td>
                                                 <td className="px-5 py-4">
-                                                    <div className="flex items-center justify-end gap-2.5">
-                                                        <div className="ui-progress w-14 hidden sm:block"><div className="ui-progress-fill" style={{ width: `${pct}%` }} /></div>
+                                                    <div className="flex flex-wrap items-center justify-end gap-2.5">
+                                                        <div className={`${styles.attendanceTrack} ui-progress w-14`}><div className="ui-progress-fill" style={{ width: `${pct}%` }} /></div>
                                                         <span className={`ui-status ${complete ? "ui-pill-success" : "ui-pill-amber"}`}>
                                                             {slot.checkedIn}/{slot.totalPax}
                                                         </span>
@@ -826,112 +698,97 @@ export default function Dashboard() {
                                         );
                                     })}
                                 </tbody>
-                                <tfoot>
-                                    <tr className="border-t-2" style={{ borderColor: "var(--ck-border-strong)" }}>
-                                        <td colSpan={3} className="px-5 py-3 text-[12px] font-semibold uppercase tracking-wider" style={{ color: "var(--ck-text-muted)" }}>Totals</td>
-                                        <td className="px-5 py-3 text-right font-bold text-[16px] tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
-                                            {manifestDate === "TODAY" ? todayPax : tomorrowPax}
-                                        </td>
-                                        <td className="px-5 py-3">
-                                            <div className="flex items-center justify-end">
-                                                <span className="ui-status ui-pill-neutral">
-                                                    {activeManifest.reduce((s, b) => s + b.arrived_count, 0)}/{manifestDate === "TODAY" ? todayPax : tomorrowPax}
-                                                </span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tfoot>
                             </table>
                             </>
                         )}
                     </div>
-                </div>
-
-                {/* ── Roll Call ── */}
-                <div className="ui-card flex flex-col overflow-hidden">
-                    <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
-                        <div>
-                            <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Roll Call</h3>
-                            <p className="text-[12px] font-medium mt-0.5" style={{ color: "var(--ck-text-muted)" }}>
-                                {activeSlot ? `${activeSlot.time} · ${activeSlot.tourName}` : "No slots today"}
+                </section>),
+                roll_call: (<section aria-label="Roll Call" className={`${styles.card} ui-card flex flex-col`}>
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
+                        <div className="min-w-0 flex-1 basis-44">
+                            <h3 className={styles.sectionTitle} style={{ color: "var(--ck-text-strong)" }}>Roll Call</h3>
+                            <p className="text-sm font-medium mt-0.5 [overflow-wrap:anywhere]" style={{ color: "var(--ck-text-muted)" }}>
+                                {activeSlot ? `${activeSlot.time} · ${activeSlot.tourName}` : manifestDate === "TODAY" ? "No more departures today" : "No departures tomorrow"}
                             </p>
                         </div>
                         {slotGroups.length > 1 && (
-                            <div className="flex items-center gap-1.5">
+                            <nav aria-label="Departures" className="flex flex-wrap items-center gap-1.5">
                                 <button
-                                    onClick={() => { setActiveSlotIdx(Math.max(0, activeSlotIdx - 1)); setManualSlotNav(true); }}
+                                    type="button"
+                                    aria-label="Previous departure"
+                                    onClick={() => { setSelectedSlotId(slotGroups[Math.max(0, activeSlotIdx - 1)].id); }}
                                     disabled={activeSlotIdx === 0}
-                                    className="p-1.5 rounded-lg border transition-colors disabled:opacity-30 hover:bg-[var(--ck-surface-sunken)]"
+                                    className="flex h-11 w-11 items-center justify-center rounded-lg border transition-colors disabled:opacity-30 hover:bg-[var(--ck-surface-sunken)]"
                                     style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)" }}
                                 >
                                     <CaretLeft size={16} />
                                 </button>
-                                <span className="font-mono text-[11.5px] font-semibold px-1.5 tabular-nums" style={{ color: "var(--ck-text-muted)" }}>
-                                    {activeSlotIdx + 1} / {slotGroups.length}
+                                <span className="font-mono text-xs font-semibold px-1.5 tabular-nums" style={{ color: "var(--ck-text-muted)" }}>
+                                    Departure {activeSlotIdx + 1} of {slotGroups.length}
                                 </span>
                                 <button
-                                    onClick={() => { setActiveSlotIdx(Math.min(slotGroups.length - 1, activeSlotIdx + 1)); setManualSlotNav(true); }}
+                                    type="button"
+                                    aria-label="Next departure"
+                                    onClick={() => { setSelectedSlotId(slotGroups[Math.min(slotGroups.length - 1, activeSlotIdx + 1)].id); }}
                                     disabled={activeSlotIdx >= slotGroups.length - 1}
-                                    className="p-1.5 rounded-lg border transition-colors disabled:opacity-30 hover:bg-[var(--ck-surface-sunken)]"
+                                    className="flex h-11 w-11 items-center justify-center rounded-lg border transition-colors disabled:opacity-30 hover:bg-[var(--ck-surface-sunken)]"
                                     style={{ borderColor: "var(--ck-border-strong)", color: "var(--ck-text)" }}
                                 >
                                     <CaretRight size={16} />
                                 </button>
-                                {manualSlotNav && (
-                                    <button
-                                        onClick={() => setManualSlotNav(false)}
-                                        className="ui-btn ui-btn-soft ml-1 !h-7 !px-2.5 !text-[11px] font-mono uppercase tracking-[0.08em]"
-                                        title="Resume auto-advance"
-                                    >
-                                        Auto
-                                    </button>
-                                )}
-                            </div>
+                            </nav>
                         )}
                     </div>
 
-                    <div className="flex-1 overflow-x-auto">
+                    <div className="min-w-0 flex-1">
                         {!activeSlot ? (
                             <div className="ui-empty">
-                                <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No bookings today</p>
-                                <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Roll call opens when the first booking lands.</p>
+                                <p className="text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>{manifestDate === "TODAY" ? "No more booked departures today" : "No bookings tomorrow"}</p>
+                                <Link href="/bookings" className="text-sm underline">View bookings</Link>
                             </div>
                         ) : (
                             <>
-                                <div className="divide-y md:hidden" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
+                                <div className={`${styles.mobileRows} ${styles.rollCallRows}`}>
                                     {activeSlot.bookings.map((b) => (
-                                        <div key={b.id} className="flex min-h-[72px] items-center gap-3 px-4 py-3" style={{ background: b.checked_in ? "var(--ck-success-soft)" : "" }}>
-                                            <button data-demo-action={b.checked_in ? "dashboard.uncheck" : "dashboard.checkin"}
-                                                type="button"
-                                                role="checkbox"
-                                                aria-checked={b.checked_in ? true : b.arrived_count > 0 ? "mixed" : false}
-                                                aria-label={b.checked_in ? `Mark ${b.customer_name} as not present` : `Mark all of ${b.customer_name}'s group as present`}
-                                                onClick={() => toggleCheckIn(b)}
-                                                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ck-accent)]"
-                                                style={b.checked_in
-                                                    ? { background: "var(--ck-success)", borderColor: "var(--ck-success)" }
-                                                    : { background: "var(--ck-surface)", borderColor: "var(--ck-border-strong)" }}
-                                            >
-                                                {b.checked_in && <Check size={18} weight="bold" color="#ffffff" />}
-                                            </button>
-                                            <div className="min-w-0 flex-1">
-                                                <p className={`text-base font-semibold leading-snug ${b.checked_in ? "line-through opacity-70" : ""}`} style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</p>
-                                                <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "No mobile number"} · {b.qty} {b.qty === 1 ? "guest" : "guests"}</p>
+                                        <div key={b.id} className={styles.rollCallGuest} style={{ background: b.checked_in ? "var(--ck-success-soft)" : undefined }}>
+                                            <div className={styles.guestIdentity}>
+                                                <Link className={`${styles.guestName} no-underline ${b.checked_in ? "line-through opacity-70" : ""}`} href={`/bookings/${b.id}`}>{b.customer_name}</Link>
+                                                <DashboardContact booking={b} requestWaiver />
                                             </div>
-                                            <span className={`ui-status shrink-0 ${b.checked_in ? "ui-pill-success" : b.status === "PAID" || b.status === "CONFIRMED" ? "ui-pill-accent" : "ui-pill-amber"}`}>
-                                                {b.checked_in ? "Present" : b.arrived_count > 0 ? `${b.arrived_count}/${b.qty} arrived` : b.status}
-                                            </span>
+                                            <div className={styles.rollCallAttendance}>
+                                                <button data-demo-action={b.checked_in ? "dashboard.uncheck" : "dashboard.checkin"}
+                                                    type="button"
+                                                    role="checkbox"
+                                                    aria-checked={b.checked_in ? true : b.arrived_count > 0 ? "mixed" : false}
+                                                    aria-label={b.checked_in ? `Mark ${b.customer_name} as not present` : `Mark all of ${b.customer_name}'s group as present`}
+                                                    onClick={() => toggleCheckIn(b)}
+                                                    disabled={readOnly || (!b.checked_in && !arrivalReadiness(b).canIncrease)}
+                                                    title={!b.checked_in ? arrivalReadiness(b).resolutionLabel : undefined}
+                                                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ck-accent)]"
+                                                    style={b.checked_in
+                                                        ? { background: "var(--ck-success)", borderColor: "var(--ck-success)" }
+                                                        : { background: "var(--ck-surface)", borderColor: "var(--ck-border-strong)" }}
+                                                >
+                                                    {b.checked_in ? <Check size={18} weight="bold" color="#ffffff" /> : b.arrived_count > 0 ? <Minus size={18} weight="bold" /> : null}
+                                                </button>
+                                                <ArrivalCountLink booking={b} date={businessDateKey(timezone, new Date(activeSlot.timeRaw))} slotId={b.slot_id} />
+                                                <span className={`ui-status shrink-0 ${b.checked_in ? "ui-pill-success" : b.status === "PAID" || b.status === "CONFIRMED" ? "ui-pill-accent" : "ui-pill-amber"}`}>
+                                                    {b.checked_in ? "Present" : b.arrived_count > 0 ? `${b.arrived_count}/${b.qty} arrived` : b.status}
+                                                </span>
+                                            </div>
+                                            {!b.checked_in && !arrivalReadiness(b).canIncrease && <p id={`arrival-${b.id}`} className={`${styles.prose} mt-2`}><Link className="no-underline" href={bookingResolutionUrl(b.id, "/", arrivalReadiness(b).resolutionSection)}>{arrivalReadiness(b).resolutionLabel}</Link></p>}
+                                            {b.add_ons?.map((ao, idx) => <span key={idx} className="mr-2 text-sm">{ao.qty > 1 ? `${ao.qty}× ` : "+ "}{ao.name}</span>)}
                                         </div>
                                     ))}
                                 </div>
-                                <table className="hidden w-full text-sm md:table">
+                                <table aria-label="Roll Call guests" className={`${styles.table} text-sm`}>
+                                    <colgroup><col style={{ width: "4rem" }} /><col /><col style={{ width: "22%" }} /><col style={{ width: "20%" }} /></colgroup>
                                     <thead>
                                         <tr>
-                                            <th className="w-12 px-3 py-3.5 text-center text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}></th>
-                                            <th className="px-4 py-3.5 text-left text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Customer</th>
-                                            <th className="px-4 py-3.5 text-left text-[10.5px] font-medium uppercase tracking-[0.1em] border-b hidden sm:table-cell" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Phone</th>
-                                            <th className="px-4 py-3.5 text-right text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Pax</th>
-                                            <th className="px-4 py-3.5 text-right text-[10.5px] font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Status</th>
+                                            <th className="w-12 px-3 py-3.5 text-center text-xs font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}><span className="sr-only">Check in</span></th>
+                                            <th className="px-4 py-3.5 text-left text-xs font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Customer</th>
+                                            <th className="px-4 py-3.5 text-right text-xs font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Guests</th>
+                                            <th className="px-4 py-3.5 text-right text-xs font-medium uppercase tracking-[0.1em] border-b" style={{ color: "var(--ck-text-muted)", borderColor: "var(--ck-border-subtle)" }}>Status</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
@@ -948,39 +805,34 @@ export default function Dashboard() {
                                                         aria-checked={b.checked_in ? true : b.arrived_count > 0 ? "mixed" : false}
                                                         aria-label={b.checked_in ? `Mark ${b.customer_name} as not present` : `Mark all of ${b.customer_name}'s group as present`}
                                                         onClick={() => toggleCheckIn(b)}
-                                                        className="mx-auto flex h-[22px] w-[22px] items-center justify-center rounded-full border-2 transition-all"
+                                                disabled={readOnly || (!b.checked_in && !arrivalReadiness(b).canIncrease)}
+                                                title={!b.checked_in ? arrivalReadiness(b).resolutionLabel : undefined}
+                                                        className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ck-accent)]"
                                                         style={b.checked_in
                                                             ? { background: "var(--ck-success)", borderColor: "var(--ck-success)" }
                                                             : { background: "var(--ck-surface)", borderColor: "var(--ck-border-strong)" }}
                                                     >
-                                                        {b.checked_in && <Check size={13} weight="bold" color="#ffffff" />}
+                                                        {b.checked_in ? <Check size={13} weight="bold" color="#ffffff" /> : b.arrived_count > 0 ? <Minus size={18} weight="bold" /> : null}
                                                     </button>
                                                 </td>
                                                 <td className="px-4 py-3.5">
-                                                    <div className={`font-semibold text-[14px] ${b.checked_in ? "line-through opacity-70" : ""}`} style={{ color: "var(--ck-text-strong)" }}>
-                                                        <span
-                                                            title={customerNotesTooltip(b.custom_fields)}
-                                                            className={customerNotesTooltip(b.custom_fields) ? "cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2" : undefined}
-                                                        >{b.customer_name}</span>
-                                                        {customerNotesTooltip(b.custom_fields) && (
-                                                            <span title={customerNotesTooltip(b.custom_fields)} className="ml-1 text-[12px] cursor-help" aria-label="Customer added notes">📝</span>
-                                                        )}
+                                                    <div className={styles.guestIdentity}>
+                                                        <Link className={`${styles.guestName} no-underline ${b.checked_in ? "line-through opacity-70" : ""}`} href={`/bookings/${b.id}`}>{b.customer_name}</Link>
+                                                        <DashboardContact booking={b} requestWaiver />
                                                     </div>
+                                                    {!b.checked_in && !arrivalReadiness(b).canIncrease && <p className={`${styles.prose} mt-1`}><Link className="no-underline" href={bookingResolutionUrl(b.id, "/", arrivalReadiness(b).resolutionSection)}>{arrivalReadiness(b).resolutionLabel}</Link></p>}
                                                     {b.add_ons && b.add_ons.length > 0 && (
                                                         <div className="mt-1 flex flex-wrap gap-1">
                                                             {b.add_ons.map((ao, idx) => (
-                                                                <span key={idx} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
+                                                                <span key={idx} className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
                                                                     {ao.qty > 1 ? `${ao.qty}× ` : "+ "}{ao.name}
                                                                 </span>
                                                             ))}
                                                         </div>
                                                     )}
                                                 </td>
-                                                <td className="px-4 py-3.5 hidden sm:table-cell">
-                                                    <div className="text-[13px] font-medium tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "—"}</div>
-                                                </td>
                                                 <td className="px-4 py-3.5 text-right">
-                                                    <div className="font-bold text-[14px] tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{b.qty}</div>
+                                                    <div className="flex justify-end font-bold text-sm tabular-nums" style={{ color: "var(--ck-text-strong)" }}><ArrivalCountLink booking={b} date={businessDateKey(timezone, new Date(activeSlot.timeRaw))} slotId={b.slot_id} /></div>
                                                 </td>
                                                 <td className="px-4 py-3.5 text-right">
                                                     <span className={`ui-status ${
@@ -996,9 +848,9 @@ export default function Dashboard() {
                                     </tbody>
                                 </table>
                                 <div className="px-5 py-3.5 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                                    <div className="flex items-center justify-between gap-4">
-                                        <span className="text-[13px] font-medium shrink-0" style={{ color: "var(--ck-text-muted)" }}>
-                                            {activeSlot.checkedIn} of {activeSlot.totalPax} pax checked in
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <span className="text-sm font-medium" style={{ color: "var(--ck-text-muted)" }}>
+                                            {activeSlot.checkedIn} of {activeSlot.totalPax} guests arrived
                                         </span>
                                         {activeSlot.checkedIn === activeSlot.totalPax && activeSlot.totalPax > 0 ? (
                                             <span className="flex items-center gap-1.5 text-[12px] font-bold shrink-0" style={{ color: "var(--ck-success)" }}>
@@ -1014,31 +866,56 @@ export default function Dashboard() {
                             </>
                         )}
                     </div>
-                </div>
-            </div>
-
-            <div className="order-5 grid grid-cols-1 gap-6 lg:order-none">
-                {/* ── Weather Block ── */}
-                <div className="ui-card flex flex-col overflow-hidden">
-                    <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
-                        <div>
-                            <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>Weather</h3>
-                            <p className="ui-mono-label !text-[10px] mt-0.5">Wind &amp; sea conditions</p>
+                </section>),
+                refunds: (<section className="ui-card p-5" aria-label="Attention">
+                    <h3 className={styles.sectionTitle}>Attention</h3>
+                    <div className="mt-3 divide-y">
+                        <Link href="/refunds" className={styles.attentionRow}>
+                            <ArrowUDownLeft size={22} aria-hidden="true" />
+                            <span className="min-w-0 flex-1">Refunds needing action <span className="block text-sm" style={{ color: "var(--ck-text-muted)" }}>Requested, pending, manual transfer or failed</span></span>
+                            <span className="text-right"><strong className="block tabular-nums">{refundCount}</strong><span className="text-sm tabular-nums">R{refundTotal.toLocaleString("en-ZA", { maximumFractionDigits: 2 })}</span></span>
+                        </Link>
+                        <Link href="/inbox" className={styles.attentionRow}>
+                            <ChatText size={22} aria-hidden="true" /><span className="min-w-0 flex-1">Inbox <span className="block text-sm" style={{ color: "var(--ck-text-muted)" }}>Conversations handled by a human</span></span><strong className="tabular-nums">{inboxCount}</strong>
+                        </Link>
+                    </div>
+                </section>),
+                photos: (<Link href="/photos" className="ui-card ui-card-hover group block p-5">
+                    <div className="flex items-start justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                            <span className="ui-mono-label">Photo upload backlog</span>
                         </div>
-                        <button onClick={() => setEditingLocs(!editingLocs)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-[12.5px]">
+                    </div>
+                    <div className="font-display mb-3 flex items-baseline gap-1.5 text-[34px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>
+                        {photosOutstanding} <span className="text-[15px] font-medium tracking-normal" style={{ color: "var(--ck-text-muted)" }}>trips</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm" style={{ color: "var(--ck-text-muted)" }}>
+                        <span className="h-[5px] w-[5px] rounded-full" style={{ background: photosOutstanding > 0 ? "var(--ck-warning)" : "var(--ck-success)" }} aria-hidden="true" />
+                        <span>{photosOutstanding > 0 ? "Without photos · last 7 days" : "All booked trips have photos · last 7 days"}</span>
+                    </div>
+                </Link>),
+                payment_recovery: (<PaymentRecoveryPanel dashboard />),
+                weather: (<div className="ui-card flex flex-col overflow-hidden">
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b" style={{ borderColor: 'var(--ck-border-subtle)' }}>
+                        <div>
+                            <h3 className={styles.sectionTitle} style={{ color: "var(--ck-text-strong)" }}>Weather &amp; Trail Conditions</h3>
+                            <p className="ui-mono-label mt-0.5">Wind &amp; sea forecasts</p>
+                        </div>
+                        <button onClick={() => setEditingLocs(!editingLocs)} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-sm">
                             Manage Locations
                         </button>
                     </div>
 
                     <div className="p-5 flex-1 flex flex-col min-h-0 relative">
-                        <div className="mb-4 flex items-center gap-2">
+                        <div className="mb-4 flex flex-wrap items-center gap-2">
                             <select
+                                aria-label="Weather place"
                                 value={location?.id || ""}
                                 onChange={(e) => {
                                     const loc = locations.find(l => l.id === e.target.value);
                                     if (loc) setLocation(loc);
                                 }}
-                                className="ui-control flex-1 min-w-0 appearance-none !px-4 !py-2 text-[14px] font-medium"
+                                className="ui-control flex-1 min-w-0 appearance-none !px-4 !py-2 text-sm font-medium"
                                 style={{ backgroundImage: `url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2366736B%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 1rem top 50%", backgroundSize: "0.65rem auto" }}
                                 disabled={locations.length === 0}
                             >
@@ -1052,45 +929,54 @@ export default function Dashboard() {
                                 ))}
                             </select>
                             {location && !location.isDefault && (
-                                <button data-demo-action="weather.default" onClick={setDefaultLocation} disabled={savingLocations} className="ui-btn ui-btn-ghost !h-9 !px-3 !text-[12.5px] whitespace-nowrap">
-                                    {savingLocations ? "Saving..." : "Set as default"}
+                                <button data-demo-action="weather.default" onClick={setDefaultLocation} disabled={savingLocations || readOnly} className="ui-btn ui-btn-ghost !h-9 !px-3 !text-sm whitespace-nowrap">
+                                    {savingLocations ? "Saving..." : "Save as default"}
                                 </button>
                             )}
                         </div>
 
+                        <div role="tablist" aria-label="Weather provider" className="ui-seg mb-4 w-fit" onKeyDown={event => {
+                            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+                            event.preventDefault();
+                            const next = event.key === "Home" ? "windguru" : event.key === "End" ? "windy" : weatherProvider === "windguru" ? "windy" : "windguru";
+                            setWeatherProvider(next); document.getElementById(`weather-tab-${next}`)?.focus();
+                        }}>
+                            {(["windguru", "windy"] as const).map(provider => <button key={provider} id={`weather-tab-${provider}`} type="button" role="tab" aria-selected={weatherProvider === provider} aria-controls={`weather-${provider}`} tabIndex={weatherProvider === provider ? 0 : -1} data-active={weatherProvider === provider} className="ui-seg-item min-h-11" onClick={() => setWeatherProvider(provider)}>{provider === "windguru" ? "Windguru" : "Windy"}</button>)}
+                        </div>
+                        <p className="mb-3 text-sm" style={{ color: "var(--ck-text-muted)" }}>Forecast source and model times are shown by each provider. Business timezone: {timezone}. Refresh reloads the selected provider; it does not confirm forecast freshness.</p>
                         {/* Windguru */}
-                        <div className="rounded-xl overflow-hidden border mb-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                            <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-warm)" }}>
-                                <span className="text-[13px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Windguru{location ? ` · ${location.name}` : ""}</span>
-                                <div className="flex items-center gap-3">
-                                    <button onClick={() => setWgRefreshKey(k => k + 1)} className="p-1 rounded-md transition-colors hover:opacity-70" title="Refresh Windguru" style={{ color: "var(--ck-text-muted)" }}><ArrowsClockwise size={14} /></button>
-                                    {location && <a href={`https://www.windguru.cz/${location.wgSpot}`} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold hover:underline" style={{ color: "var(--ck-accent)" }}>Open ↗</a>}
+                        <div id="weather-windguru" role="tabpanel" aria-labelledby="weather-tab-windguru" hidden={weatherProvider !== "windguru"} className="rounded-xl overflow-hidden border mb-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-warm)" }}>
+                                <span className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>Windguru{location ? ` · ${location.name}` : ""}</span>
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <button onClick={() => setWgRefreshKey(k => k + 1)} className="ui-btn ui-btn-ghost min-h-11 min-w-11 !px-3" aria-label="Refresh Windguru" title="Refresh Windguru" style={{ color: "var(--ck-text-muted)" }}><ArrowsClockwise size={18} aria-hidden="true" /> Refresh</button>
+                                    {location?.wgSpot && <a href={`https://www.windguru.cz/${location.wgSpot}`} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold hover:underline" style={{ color: "var(--ck-accent)" }}>Open Windguru ↗</a>}
                                 </div>
                             </div>
                             <div className="relative min-h-[350px]" style={{ background: "var(--ck-surface)" }}>
                                 {location ? (
                                     location.wgSpot ? (
-                                        <WindguruWidget spotId={location.wgSpot} refreshKey={wgRefreshKey} />
+                                        <WindguruWidget key={location.wgSpot} spotId={location.wgSpot} refreshKey={wgRefreshKey} />
                                     ) : (
                                         <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-                                            <p className="text-[13px] font-medium" style={{ color: "var(--ck-text-muted)" }}>This location does not have a Windguru spot ID assigned.</p>
+                                            <p className="text-sm font-medium" style={{ color: "var(--ck-text-muted)" }}>This location does not have a Windguru spot ID assigned.</p>
                                         </div>
                                     )
                                 ) : (
                                     <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
-                                        <p className="text-[13px] font-medium" style={{ color: "var(--ck-text-muted)" }}>No location selected</p>
+                                        <p className="text-sm font-medium" style={{ color: "var(--ck-text-muted)" }}>No location selected</p>
                                     </div>
                                 )}
                             </div>
                         </div>
 
                         {/* Windy */}
-                        <div className="rounded-xl overflow-hidden border mb-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                            <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-warm)" }}>
-                                <span className="text-[13px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Windy{location ? ` · ${location.name}` : ""}</span>
-                                <div className="flex items-center gap-3">
-                                    <button onClick={() => setWindyRefreshKey(k => k + 1)} className="p-1 rounded-md transition-colors hover:opacity-70" title="Refresh Windy" style={{ color: "var(--ck-text-muted)" }}><ArrowsClockwise size={14} /></button>
-                                    {location && <a href={`https://www.windy.com/${location.lat}/${location.lon}`} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold hover:underline" style={{ color: "var(--ck-accent)" }}>Open ↗</a>}
+                        <div id="weather-windy" role="tabpanel" aria-labelledby="weather-tab-windy" hidden={weatherProvider !== "windy"} className="rounded-xl overflow-hidden border mb-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface-warm)" }}>
+                                <span className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>Windy{location ? ` · ${location.name}` : ""}</span>
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <button onClick={() => setWindyRefreshKey(k => k + 1)} className="ui-btn ui-btn-ghost min-h-11 min-w-11 !px-3" aria-label="Refresh Windy" title="Refresh Windy" style={{ color: "var(--ck-text-muted)" }}><ArrowsClockwise size={18} aria-hidden="true" /> Refresh</button>
+                                    {location && <a href={`https://www.windy.com/${location.lat}/${location.lon}`} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold hover:underline" style={{ color: "var(--ck-accent)" }}>Open Windy ↗</a>}
                                 </div>
                             </div>
                             {location ? (
@@ -1105,16 +991,16 @@ export default function Dashboard() {
                                 />
                             ) : (
                                 <div className="flex items-center justify-center p-6 text-center h-[350px]">
-                                    <p className="text-[13px] font-medium" style={{ color: "var(--ck-text-muted)" }}>No location selected</p>
+                                    <p className="text-sm font-medium" style={{ color: "var(--ck-text-muted)" }}>No location selected</p>
                                 </div>
                             )}
                         </div>
 
                         {editingLocs && (
-                            <div className="absolute inset-0 z-20 backdrop-blur-sm p-5 flex flex-col rounded-b-2xl" style={{ background: "color-mix(in srgb, var(--ck-surface) 95%, transparent)" }}>
+                            <div className="mt-4 border-t p-4 flex flex-col" style={{ background: "color-mix(in srgb, var(--ck-surface) 95%, transparent)" }}>
                                 <div className="flex justify-between items-center mb-4">
-                                    <h4 className="text-[14px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Manage Locations</h4>
-                                    <button onClick={() => setEditingLocs(false)} className="p-1.5 rounded-md transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ color: "var(--ck-text-muted)" }}><X size={18} /></button>
+                                    <h4 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>Manage Locations</h4>
+                                    <button onClick={() => setEditingLocs(false)} aria-label="Close location manager" className="min-h-11 min-w-11 p-1.5 rounded-md transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ color: "var(--ck-text-muted)" }}><X size={18} /></button>
                                 </div>
                                 <div className="flex-1 overflow-y-auto pr-1 mb-4">
                                     <div className="space-y-2">
@@ -1125,34 +1011,34 @@ export default function Dashboard() {
                                                     {locs.map(l => (
                                                         <div key={l.id} className="flex items-center justify-between rounded-lg border p-3 text-sm" style={{ borderColor: "var(--ck-border-subtle)", background: "var(--ck-surface)", boxShadow: "var(--ck-shadow-sm)" }}>
                                                             <div>
-                                                                <span className="font-semibold text-[13px]" style={{ color: "var(--ck-text-strong)" }}>{l.name}</span>
+                                                                <span className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>{l.name}</span>
                                                                 <div className="text-[11px] font-medium mt-0.5 font-mono" style={{ color: "var(--ck-text-muted)" }}>{l.lat}, {l.lon} <span className="ml-2">WG: {l.wgSpot || "None"}</span></div>
                                                             </div>
                                                             <div className="flex items-center gap-3">
                                                                 {l.isDefault && <span className="ui-status ui-pill-success">Default</span>}
-                                                                <button data-demo-action="weather.remove" onClick={() => removeLocation(l.id)} className="transition-colors hover:!text-[var(--ck-danger)]" style={{ color: "var(--ck-text-muted)" }}><Trash size={16} /></button>
+                                                                <button data-demo-action="weather.remove" onClick={() => void removeLocation(l.id).catch(() => {})} disabled={savingLocations || readOnly} aria-label={`Remove ${l.name}`} className="min-h-11 min-w-11 transition-colors hover:!text-[var(--ck-danger)]" style={{ color: "var(--ck-text-muted)" }}><Trash size={16} /></button>
                                                             </div>
                                                         </div>
                                                     ))}
                                                 </div>
                                             </div>
                                         ))}
-                                        {locations.length === 0 && <p className="text-[13px]" style={{ color: "var(--ck-text-muted)" }}>No locations added.</p>}
+                                        {locations.length === 0 && <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>No locations added.</p>}
                                     </div>
                                 </div>
 
-                                <form data-demo-submit="weather.add" onSubmit={handleAddLocation} className="border-t pt-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                                    <input required value={newLocName} onChange={e => setNewLocName(e.target.value)} onBlur={() => { if (newLocName.trim() && !newLocLat && !newLocLon) handleGeocode(); }} className="ui-control w-full text-[13px] font-medium mb-2" placeholder="Name (e.g. Cape Town)" />
+                                <form data-demo-submit="weather.add" onSubmit={event => void handleAddLocation(event).catch(() => {})} className="border-t pt-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
+                                    <input aria-label="Location name" required value={newLocName} onChange={e => setNewLocName(e.target.value)} onBlur={() => { if (newLocName.trim() && !newLocLat && !newLocLon) handleGeocode(); }} className="ui-control w-full text-sm font-medium mb-2" placeholder="Name (e.g. Cape Town)" />
                                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
-                                        <input required type="number" step="any" value={newLocLat} onChange={e => setNewLocLat(e.target.value)} className="ui-control w-full text-[13px] font-medium" placeholder="Lat (-33.9)" />
-                                        <input required type="number" step="any" value={newLocLon} onChange={e => setNewLocLon(e.target.value)} className="ui-control w-full text-[13px] font-medium" placeholder="Lon (18.4)" />
-                                        <input type="number" step="any" value={newLocWg} onChange={e => setNewLocWg(e.target.value)} className="ui-control w-full lg:col-span-2 text-[13px] font-medium" placeholder="Windguru Spot ID (optional)" />
+                                        <input aria-label="Latitude" required type="number" step="any" value={newLocLat} onChange={e => setNewLocLat(e.target.value)} className="ui-control w-full text-sm font-medium" placeholder="Lat (-33.9)" />
+                                        <input aria-label="Longitude" required type="number" step="any" value={newLocLon} onChange={e => setNewLocLon(e.target.value)} className="ui-control w-full text-sm font-medium" placeholder="Lon (18.4)" />
+                                        <input aria-label="Windguru spot ID" type="number" step="any" value={newLocWg} onChange={e => setNewLocWg(e.target.value)} className="ui-control w-full lg:col-span-2 text-sm font-medium" placeholder="Windguru Spot ID (optional)" />
                                     </div>
                                     <div className="flex gap-2">
-                                        <button type="button" onClick={handleGeocode} disabled={geocoding || !newLocName} className="ui-btn ui-btn-ghost !px-4" title="Look up coordinates">
+                                        <button type="button" onClick={handleGeocode} disabled={geocoding || !newLocName} className="ui-btn ui-btn-ghost !px-4" aria-label="Look up coordinates" title="Look up coordinates">
                                             <MapPin size={16} />
                                         </button>
-                                        <button type="submit" disabled={savingLocations} className="ui-btn ui-btn-primary flex-1">
+                                        <button type="submit" disabled={savingLocations || readOnly} className="ui-btn ui-btn-primary flex-1">
                                             Add Location
                                         </button>
                                     </div>
@@ -1160,8 +1046,8 @@ export default function Dashboard() {
                             </div>
                         )}
                     </div>
-                </div>
-            </div>
+                </div>),
+            }} />
         </div >
     );
 }

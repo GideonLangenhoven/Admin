@@ -58,7 +58,7 @@ it.each(["viator-webhook", "getyourguide-webhook", "viator-availability-sync", "
     "../_shared/tenant.ts": { createServiceClient: () => ({ from }), fetchAllRows },
     "../_shared/sentry.ts": { withSentry: (_name: string, fn: unknown) => fn },
     "../_shared/ota-readiness.ts": readiness,
-    "../_shared/viator.ts": {}, "../_shared/getyourguide.ts": {},
+    "../_shared/ota-runtime.ts": {}, "../_shared/viator.ts": {}, "../_shared/getyourguide.ts": {},
   }, { SETTINGS_ENCRYPTION_KEY: "configured" });
   const response = await handler(new Request("https://fixture.invalid?b=operator", { method: "POST", body: "{}" }));
   expect(response.status).toBe(503);

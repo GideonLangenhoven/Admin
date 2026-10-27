@@ -62,9 +62,9 @@ export default function NotificationsPage() {
     setRetrying(null);
     if (r.ok) {
       if (data.outcome === "queued") {
-        notify({ title: "Queued", message: "The email is queued for the next notification worker run.", tone: "success" });
+        notify({ title: "Queued", message: "Email queued for the next run.", tone: "success" });
       } else if (data.outcome === "queued_window_closed") {
-        notify({ title: "Queued", message: "WhatsApp window is closed — it will send when the customer next messages you.", tone: "success" });
+        notify({ title: "Queued", message: "WhatsApp queued until the customer messages you again.", tone: "success" });
       } else {
         notify({ title: "Sent", message: "Delivered via your WhatsApp number.", tone: "success" });
       }
@@ -96,8 +96,7 @@ export default function NotificationsPage() {
         <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Failed Notifications</h1>
       </div>
       <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
-        WhatsApp outbox messages and transactional email jobs. Failed rows exhausted their automatic retry budget.
-        Retry sends WhatsApp immediately and queues email for the next worker run.
+        Failed WhatsApp and booking emails have no retries left. Retry sends WhatsApp now and queues email for the next run.
       </p>
 
       <div className="ui-seg anim-fade-up anim-d1">

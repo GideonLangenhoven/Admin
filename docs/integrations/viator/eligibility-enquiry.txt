@@ -1,0 +1,26 @@
+To: supplierAPI@viator.com
+Subject: BookingTours — eligibility enquiry for reservation-system connectivity
+
+Hello Viator API Integrations Team,
+
+I am developing BookingTours, a pre-launch reservation system for tour and activity operators. We would like to understand the eligibility requirements for a future integration with the Viator Reservation System API.
+
+We do not currently have a confirmed Viator-registered pilot operator, and BookingTours has not been approved for technical evaluation. We understand that your published prerequisites require registered Viator operators using the reservation system.
+
+Before progressing further, could you please confirm:
+
+1. Whether you accept eligibility enquiries from pre-launch reservation systems, and the required operator/product prerequisites for technical evaluation.
+2. Whether a newly registered operator genuinely using BookingTours, or a single existing Viator operator authorising a pilot, could qualify. Are there any minimum operator, product or booking-volume requirements?
+3. Which company information, demonstration, operator authorisations and technical documents you require for evaluation.
+4. Whether a proposed initial scope of scheduled departures with per-person pricing would be acceptable, and which capabilities would be mandatory for that scope.
+5. The steps for formal approval to proceed, test-environment access, issued credentials, contract testing and certification.
+
+We have preliminary internal connector code, but it has not been validated with Viator and is not enabled for live marketplace traffic. We will not represent BookingTours as a certified connectivity partner without your approval.
+
+Website: https://admin.bookingtours.co.za
+
+Thank you,
+[Your name]
+[Legal business name]
+[Commercial contact email]
+[Technical contact email]

@@ -10,6 +10,7 @@ export interface AdminVoucherPurchaseInput {
   value: string;
   expiresAt: string;
   giftMessage: string;
+  giftTourId?: string;
 }
 
 export function buildAdminVoucherPurchase(input: AdminVoucherPurchaseInput) {
@@ -33,6 +34,7 @@ export function buildAdminVoucherPurchase(input: AdminVoucherPurchaseInput) {
       current_balance: 0,
       expires_at: expiresAt,
       gift_message: input.giftMessage.trim() || null,
+      gift_tour_id: input.giftTourId || null,
     },
     checkoutBody: {
       voucher_code: code,

@@ -173,6 +173,28 @@ header.sticky-nav.scrolled {
   text-decoration: none;
   display: inline-block;
 }
+.nav-my-bookings {
+  background: rgba(255, 255, 255, 0.4);
+  color: var(--ink);
+  padding: 0.7rem 1.3rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border: 1px solid var(--border-alpha);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.nav-my-bookings:hover {
+  background: var(--surface);
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
 
 /* Hero: Vertical Panorama scrolls up mountain face as user scrolls down */
 .hero {
@@ -208,34 +230,39 @@ header.sticky-nav.scrolled {
 .hero-content {
   position: relative;
   z-index: 3;
-  max-width: 1200px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 0 2rem;
-  display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  gap: 4rem;
+  padding: 130px 1.5rem 5rem;
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  text-align: center;
   width: 100%;
 }
 .hero-text {
-  text-align: left;
+  text-align: center;
+  max-width: 840px;
+  margin: 0 auto;
 }
 .hero-text h2 {
-  font-size: clamp(2.6rem, 6vw, 5rem);
-  line-height: 1.05;
+  font-size: clamp(2.4rem, 5.5vw, 4.4rem);
+  line-height: 1.08;
   margin: 1rem 0;
 }
 .hero-text p {
   font-size: 1.15rem;
   opacity: 0.9;
-  max-width: 44rem;
-  margin-bottom: 2rem;
+  max-width: 46rem;
+  margin: 0 auto 2rem;
 }
 .hero-widget-box {
   width: 100%;
-  border-radius: 12px;
-  padding: 2rem;
-  box-shadow: 0 20px 40px rgba(0,0,0,0.25);
+  max-width: 1000px;
+  border-radius: 20px;
+  padding: 1.5rem 1.75rem;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+  margin-top: 2.5rem;
+  text-align: left;
 }
 
 /* Hover-Reveal Destinations List (Niarra Device - Sharp Peak) */
@@ -631,7 +658,10 @@ header.sticky-nav.scrolled {
       <a href="#about">Philosophy</a>
       <a href="#experiences">Ascents</a>
       <a href="#ladder">Difficulty Ladder</a>
-      <a href="{{booking_url}}" class="cta-button">Book Ascent</a>
+      {{#if my_bookings_url}}
+      <a href="{{my_bookings_url}}" class="nav-my-bookings" target="_blank" rel="noopener">My Bookings</a>
+      {{/if}}
+      <a href="{{#if has_widget}}#book{{else}}{{booking_url}}{{/if}}" class="cta-button">Book Ascent</a>
     </nav>
   </div>
 </header>
@@ -657,16 +687,38 @@ header.sticky-nav.scrolled {
       <span class="mono-label" style="color:#fff;">{{hero_eyebrow}}</span>
       <h2>{{#if hero_title}}{{hero_title}}{{else}}Grade 4. Your legs will complain. Your photos won't.{{/if}}</h2>
       <p>{{hero_subtitle}}</p>
-      <a href="{{booking_url}}" class="cta-button" style="background-color: var(--accent);">Book your ascent</a>
+      <div style="display: flex; gap: 1rem; align-items: center; justify-content: center; flex-wrap: wrap;">
+        <a href="{{#if has_widget}}#book{{else}}{{booking_url}}{{/if}}" class="cta-button" style="background-color: var(--accent);">Book your ascent ↓</a>
+        {{#if my_bookings_url}}
+        <a href="{{my_bookings_url}}" class="nav-my-bookings" style="background: rgba(255,255,255,0.15); color: #fff; border-color: rgba(255,255,255,0.35);" target="_blank" rel="noopener">My Bookings Portal ↗</a>
+        {{/if}}
+      </div>
     </div>
     
+    <!-- Honest booking CTA card / Live Widget Frame -->
+    {{#if has_widget}}
+    <div class="hero-widget-box glass-panel" id="book" style="color: var(--ink);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; padding: 0 0.25rem;">
+        <div>
+          <span class="mono-label" style="color: var(--accent);">Live Availability</span>
+          <h3 style="font-family: var(--font-display); font-size: 1.4rem; color: var(--ink); margin-top: 2px;">Instant Online Booking</h3>
+        </div>
+        <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--cta); background: rgba(12, 138, 89, 0.1); padding: 3px 9px; border-radius: 9999px;">
+          <span style="width: 7px; height: 7px; border-radius: 50%; background: var(--cta); display: inline-block;"></span>
+          Real-Time
+        </span>
+      </div>
+      {{widget_embed}}
+    </div>
+    {{else}}
     <!-- Honest booking CTA card -->
-    <div class="hero-widget-box glass-panel" style="color: var(--ink);">
+    <div class="hero-widget-box glass-panel" style="color: var(--ink); max-width: 480px; margin: 2.5rem auto 0;">
       <span class="mono-label">Book direct</span>
       <h3 style="font-family: var(--font-display); font-size: 1.6rem; margin: 0.4rem 0 0.6rem; color: var(--ink);">Rope in</h3>
       <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 1.5rem;">Grade 4. Your legs will complain. Your photos won't. Pick your date and line — we rig the rest.</p>
       <a href="{{booking_url}}" class="cta-button" style="width: 100%; text-align: center;">Check availability</a>
     </div>
+    {{/if}}
   </div>
 </section>
 
@@ -800,7 +852,12 @@ header.sticky-nav.scrolled {
     <span class="rail-label">Guided alpine ascents</span>
     <span class="rail-price">Ready when you are</span>
   </div>
-  <a href="{{booking_url}}" class="cta-button">Reserve Ascent</a>
+  <div style="display: flex; gap: 0.75rem; align-items: center;">
+    {{#if my_bookings_url}}
+    <a href="{{my_bookings_url}}" class="nav-my-bookings" target="_blank" rel="noopener">My Bookings</a>
+    {{/if}}
+    <a href="{{#if has_widget}}#book{{else}}{{booking_url}}{{/if}}" class="cta-button">Reserve Ascent</a>
+  </div>
 </div>
 
 <script>

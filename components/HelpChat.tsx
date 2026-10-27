@@ -4,7 +4,8 @@
 // Y work" questions via the admin-help-chat edge function, which retrieves
 // from the platform help KB (docs/admin-help) — role-filtered server-side.
 // Mounted once in AppShell so it's available on every admin page.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ChatCircleDots, PaperPlaneRight, X } from "@phosphor-icons/react";
@@ -38,7 +39,7 @@ const DEMO_SUGGESTED = [
 ].map((q) => ({ q }));
 
 const GREETING =
-  "Hi! I can explain how the dashboard works, open the right page for you, and even fill things in. Ask me anything, or try one of these:";
+  "I can explain tasks, open pages and fill forms. What do you need?";
 
 const LINK_SPLIT_RE = /(\[[^\]]+\]\(\/[a-zA-Z0-9\-/_?=&#]*\))/g;
 const LINK_MATCH_RE = /^\[([^\]]+)\]\((\/[a-zA-Z0-9\-/_?=&#]*)\)$/;
@@ -118,11 +119,12 @@ function AnswerText({ text, onNavigate, readOnly }: { text: string; onNavigate: 
   );
 }
 
-export default function HelpChat() {
+export default function HelpChat({ inline = false }: { inline?: boolean }) {
   const { businessId, role, readOnly } = useBusinessContext();
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [panelBounds, setPanelBounds] = useState({ top: 0, maxHeight: 0 });
   const [hidden, setHidden] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
 
@@ -132,8 +134,27 @@ export default function HelpChat() {
   }
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const launcherRef = useRef<HTMLButtonElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !inline) return;
+    const viewport = window.visualViewport;
+    function positionPanel() {
+      const top = (launcherRef.current?.getBoundingClientRect().bottom ?? 0) + 8;
+      setPanelBounds({ top, maxHeight: Math.max(0, (viewport?.height ?? window.innerHeight) + (viewport?.offsetTop ?? 0) - top - 16) });
+    }
+    positionPanel();
+    window.addEventListener("resize", positionPanel);
+    viewport?.addEventListener("resize", positionPanel);
+    viewport?.addEventListener("scroll", positionPanel);
+    return () => {
+      window.removeEventListener("resize", positionPanel);
+      viewport?.removeEventListener("resize", positionPanel);
+      viewport?.removeEventListener("scroll", positionPanel);
+    };
+  }, [open, inline]);
 
   // Per-admin "hide the bubble" preference (admin_users.help_chat_hidden),
   // toggled under Settings → Dashboard Preferences. The custom event makes
@@ -201,7 +222,7 @@ export default function HelpChat() {
     }
     if (fills.length === 0 && !submit) return;
     if (readOnly) {
-      setMessages((m) => [...m, { role: "assistant", content: "This is the shared demo, so I can open pages and explain the workflow, but I will not fill or submit actions that could affect operator or guest data." }]);
+      setMessages((m) => [...m, { role: "assistant", content: "In this demo I can open pages and explain tasks. Forms and data stay unchanged." }]);
       return;
     }
     const missed: string[] = [];
@@ -231,7 +252,7 @@ export default function HelpChat() {
       }
       status = pressed
         ? (filled ? `Filled ${filled} field${filled === 1 ? "" : "s"} and submitted it. The page is saving now.` : "Submitted it for you. The page is saving now.")
-        : "I couldn't find the button to press on this page. Please press it yourself.";
+        : "Button not found. Please use the page's button.";
     } else if (filled) {
       status = `Filled ${filled} field${filled === 1 ? "" : "s"} for you. Check the values, then press the page's own button to save.`;
     }
@@ -266,13 +287,18 @@ export default function HelpChat() {
 
   return (
     <>
-      {/* Launcher — above the mobile bottom nav, corner on desktop */}
-      {!open && (
+      {/* The dashboard mounts its launcher in the toolbar, clear of actions. */}
+      {(inline || !open) && (
         <button
+          ref={launcherRef}
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => setOpen((value) => !value)}
           aria-label={readOnly ? "Open AI bot" : "Open AI help"}
-          className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full transition-transform hover:scale-105 lg:bottom-6 lg:right-6 lg:h-12 lg:w-auto lg:gap-2 lg:px-4"
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          className={inline
+            ? "flex h-11 shrink-0 items-center justify-center gap-2 rounded-full px-3 transition-colors"
+            : "fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full transition-transform hover:scale-105 lg:bottom-6 lg:right-6 lg:h-12 lg:w-auto lg:gap-2 lg:px-4"}
           style={{ background: "var(--ck-accent)", color: "#fff", boxShadow: "var(--ck-shadow-lg)" }}
         >
           <ChatCircleDots size={22} weight="fill" />
@@ -280,15 +306,18 @@ export default function HelpChat() {
         </button>
       )}
 
-      {open && (
+      {/* Render outside the blurred toolbar, which contains fixed descendants. */}
+      {open && createPortal(
         <div
           role="dialog"
           aria-label={readOnly ? "AI bot" : "AI help"}
-          className="fixed inset-x-0 bottom-0 z-50 flex max-h-[75dvh] flex-col overflow-hidden rounded-t-2xl lg:inset-x-auto lg:bottom-6 lg:right-6 lg:h-[560px] lg:max-h-[calc(100dvh-48px)] lg:w-[380px] lg:rounded-2xl"
-          style={{ background: "var(--ck-surface)", border: "1px solid var(--ck-border-subtle)", boxShadow: "var(--ck-shadow-lg)" }}
+          className={inline
+            ? "fixed right-4 z-50 flex h-[560px] w-[380px] max-w-[calc(100%-2rem)] flex-col overflow-hidden rounded-2xl"
+            : "fixed inset-x-0 bottom-0 z-50 flex max-h-[75dvh] flex-col overflow-hidden rounded-t-2xl lg:inset-x-auto lg:bottom-6 lg:right-6 lg:h-[560px] lg:max-h-[calc(100dvh-48px)] lg:w-[380px] lg:rounded-2xl"}
+          style={{ background: "var(--ck-surface)", border: "1px solid var(--ck-border-subtle)", boxShadow: "var(--ck-shadow-lg)", ...(inline ? panelBounds : {}) }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3" style={{ background: "var(--ck-accent)", color: "#fff" }}>
+          <div className="flex shrink-0 items-center justify-between px-4 py-3" style={{ background: "var(--ck-accent)", color: "#fff" }}>
             <div className="flex items-center gap-2">
               <div>
                 <div className="text-sm font-semibold leading-tight">{readOnly ? "AI bot" : "AI help"}</div>
@@ -301,9 +330,9 @@ export default function HelpChat() {
           </div>
 
           {/* Thread */}
-          <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+          <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
             <div className="text-sm" style={{ color: "var(--ck-text)" }}>{readOnly
-              ? "Hi! I am the demo AI bot. Ask how any feature works, what the operator does, or what the guest experiences. I can open the right page, but I will not change or send anything."
+              ? "Ask how a feature works. I can open pages; this demo saves and sends nothing."
               : GREETING}</div>
             {messages.length === 0 && (
               <div className="flex flex-col items-start gap-2">
@@ -313,7 +342,7 @@ export default function HelpChat() {
                   className="rounded-full border px-3 py-1.5 text-left text-[13px] font-semibold transition-colors hover:border-transparent"
                   style={{ borderColor: "var(--ck-accent)", color: "var(--ck-accent)", background: "var(--ck-success-soft, rgba(18,94,64,0.06))" }}
                 >
-                  {readOnly ? "Give me the full product tour" : "Show me around the dashboard"}
+                  {readOnly ? "Product tour" : "Dashboard tour"}
                 </button>
                 {suggestions.map((s) => (
                   <button
@@ -371,7 +400,7 @@ export default function HelpChat() {
           {/* Composer */}
           <form
             onSubmit={(e) => { e.preventDefault(); ask(input); }}
-            className="flex items-center gap-2 border-t px-3 py-3"
+            className="flex shrink-0 items-center gap-2 border-t px-3 py-3"
             style={{ borderColor: "var(--ck-border-subtle)" }}
           >
             <input
@@ -380,7 +409,7 @@ export default function HelpChat() {
               onChange={(e) => setInput(e.target.value)}
               placeholder="e.g. How do I refund a booking?"
               maxLength={1000}
-              className="ui-control flex-1 text-[16px] md:text-sm"
+              className="ui-control min-w-0 flex-1 text-[16px] md:text-sm"
               aria-label="Your question"
             />
             <button
@@ -393,7 +422,7 @@ export default function HelpChat() {
               <PaperPlaneRight size={16} weight="fill" />
             </button>
           </form>
-        </div>
+        </div>, document.body
       )}
     </>
   );

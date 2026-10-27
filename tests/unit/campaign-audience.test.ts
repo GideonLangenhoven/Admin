@@ -17,7 +17,7 @@ function campaignFixture(failAt: "audience" | "queue" | "ready" | null = null) {
       let patch: any, insertion: any;
       const execute = async () => {
         queries.push({ table, calls });
-        if (table === "marketing_contacts") {
+        if (table === "marketing_eligible_contacts") {
           expect(calls).toContainEqual(["eq", "business_id", "operator-a"]);
           expect(calls).toContainEqual(["eq", "status", "active"]);
           expect(calls).toContainEqual(["overlaps", "tags", ["regular"]]);
@@ -60,6 +60,8 @@ describe("complete campaign audience", () => {
   it("queues all 2,101 matching contacts before making the campaign eligible", async () => {
     const f = campaignFixture();
     await f.send();
+    expect(f.queries.some(query => query.table === "marketing_eligible_contacts")).toBe(true);
+    expect(f.queries.some(query => query.table === "marketing_contacts")).toBe(false);
     expect(f.queued).toHaveLength(2101);
     expect(new Set(f.queued.map(row => row.contact_id)).size).toBe(2101);
     expect(f.campaign).toMatchObject({ status: "scheduled", total_recipients: 2101 });

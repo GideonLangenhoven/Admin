@@ -393,7 +393,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
           <div>
             <h2 className="text-lg font-semibold text-[var(--ck-text-strong)]">External Booking API</h2>
             <p className="text-xs text-[var(--ck-text-muted)] mt-1">
-              For custom partners implementing the BookingTours API. Each API key identifies one business. A source name or product mapping does not connect Viator, GetYourGuide or another marketplace.
+              For custom API partners. Each key identifies one business. Marketplace names and product mappings alone do not create a connection.
             </p>
           </div>
           <div className="rounded-xl border border-[var(--ck-border-subtle)] bg-[var(--ck-surface-sunken)] px-3 py-2 text-xs text-[var(--ck-text-muted)]">
@@ -446,7 +446,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
             <form data-demo-submit="external.save-key" onSubmit={handleSaveCredential} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
               <div>
                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">{editingCredentialId ? "Edit Credential" : "Create Credential"}</h3>
-                <p className="text-xs text-[var(--ck-text-muted)] mt-1">Each business/source pair gets its own API key. HMAC is required to create, change or cancel bookings. Without HMAC, only availability checks are allowed.</p>
+                <p className="text-xs text-[var(--ck-text-muted)] mt-1">One API key per business and source. HMAC is required for booking changes; without it, only availability checks work.</p>
               </div>
 
               <div>
@@ -537,7 +537,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
               {loadingMappings ? (
                 <div className="p-4 text-sm text-[var(--ck-text-muted)]">Loading mappings...</div>
               ) : mappings.length === 0 ? (
-                <div className="p-4 text-sm text-[var(--ck-text-muted)]">No mappings yet. Add your first supplier product mapping.</div>
+                <div className="p-4 text-sm text-[var(--ck-text-muted)]">No product mappings. Add one below.</div>
               ) : (
                 <div className="divide-y divide-[var(--ck-border-subtle)]">
                   {mappings.map((row) => (
@@ -574,7 +574,7 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
             <form data-demo-submit="external.save-map" onSubmit={handleSaveMapping} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
               <div>
                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">{editingMappingId ? "Edit Mapping" : "Add Mapping"}</h3>
-                <p className="text-xs text-[var(--ck-text-muted)] mt-1">You only need one of Product ID, Product Code, or Product Name for matching.</p>
+                <p className="text-xs text-[var(--ck-text-muted)] mt-1">Match by Product ID, Code or Name. Only one is needed.</p>
               </div>
 
               <div>

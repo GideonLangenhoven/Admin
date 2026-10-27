@@ -18,7 +18,7 @@ describe("support business targeting",()=>{
   });
   it("captures a browser target before asynchronous session refresh",async()=>{
     let target=A; let resolve:(value:any)=>void=()=>{};
-    const fn=sourceFunction("app/lib/admin-auth.ts","getAuthHeaders",{window:{},localStorage:{getItem:()=>target},supabase:{auth:{getSession:()=>new Promise(r=>resolve=r)}}});
+    const fn=sourceFunction("app/lib/admin-auth.ts","getAuthHeaders",{window:{},authStorage:{getItem:()=>target},supabase:{auth:{getSession:()=>new Promise(r=>resolve=r)}}});
     const pending=fn();target=B;resolve({data:{session:{access_token:"fixture"}}});
     expect(await pending).toMatchObject({"x-admin-business-id":A});
   });

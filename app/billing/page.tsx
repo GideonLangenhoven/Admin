@@ -19,26 +19,10 @@ type Subscription = {
   billing_cycle_end: string;
   paused_at: string | null;
   resumed_at: string | null;
-  payment_method_last4: string | null;
-  payment_provider: string | null;
   plans: Plan | null;
 };
 
-type LineItem = {
-  id: string;
-  invoice_period_start: string;
-  invoice_period_end: string;
-  line_type: string;
-  quantity: number;
-  unit_amount_zar: number;
-  total_amount_zar: number;
-  billing_status: string;
-  created_at: string;
-};
-
 type EmailUsage = {
-  sent: number;
-  included: number;
   overage_emails: number;
   overage_rate_zar: number;
   overage_charge_zar: number;
@@ -50,8 +34,7 @@ export default function BillingPage() {
   const [usedSeats, setUsedSeats] = useState(0);
   const [monthly, setMonthly] = useState(0);
   const [emailUsage, setEmailUsage] = useState<EmailUsage | null>(null);
-  const [history, setHistory] = useState<LineItem[]>([]);
-  const [plansAvailable, setPlansAvailable] = useState<Array<{ id: string; name: string; monthly_price_zar: number; included_seats: number; current: boolean }>>([]);
+  const [plansAvailable, setPlansAvailable] = useState<Array<{ id: string; name: string; monthly_price_zar: number; extra_seat_price_zar: number; included_seats: number; current: boolean }>>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,10 +43,7 @@ export default function BillingPage() {
     setLoading(true);
     const headers = await getAuthHeaders(businessId);
 
-    const [subRes, histRes] = await Promise.all([
-      fetch("/api/billing/subscription", { headers }),
-      fetch("/api/billing/history", { headers }),
-    ]);
+    const subRes = await fetch("/api/billing/subscription", { headers });
 
     if (subRes.ok) {
       const data = await subRes.json();
@@ -72,10 +52,6 @@ export default function BillingPage() {
       setMonthly(data.monthly_total_zar);
       setEmailUsage(data.email_usage ?? null);
       setPlansAvailable(data.plans_available ?? []);
-    }
-    if (histRes.ok) {
-      const data = await histRes.json();
-      setHistory(data.line_items ?? []);
     }
     setLoading(false);
   }
@@ -152,7 +128,7 @@ export default function BillingPage() {
     setError(null);
     const confirmed = await confirmAction({
       title: "Pause subscription",
-      message: "Pause your subscription for off-season? Your team can still sign in and view data, but new bookings, marketing, and broadcasts will be disabled. You won't be billed while paused. Resume any time.",
+      message: "Pause billing? Your team can view data, but new bookings, marketing and broadcasts stop. Resume any time.",
       tone: "warning",
       confirmLabel: "Pause subscription",
     });
@@ -176,7 +152,7 @@ export default function BillingPage() {
     setActionLoading(false);
 
     if (!r.ok) { setError(data.error); return; }
-    notify({ title: "Subscription resumed", message: "You're back in action. Billing resumes this cycle.", tone: "success" });
+    notify({ title: "Subscription resumed", message: "Subscription resumed. Billing restarts this cycle.", tone: "success" });
     load();
   }
 
@@ -198,7 +174,6 @@ export default function BillingPage() {
     return (
       <div className="max-w-3xl space-y-4">
         <div>
-          <p className="ui-mono-label mb-2">Revenue</p>
           <h1 className="font-display text-[28px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Billing</h1>
         </div>
         <div className="ui-card p-5">
@@ -215,11 +190,15 @@ export default function BillingPage() {
     SUSPENDED: "ui-pill-danger",
     TRIAL: "ui-pill-accent",
   };
+  const alternativePlans = [...new Map(plansAvailable.filter(p => !p.current && !(
+    p.name.trim().toLowerCase() === sub.plans?.name.trim().toLowerCase()
+    && p.monthly_price_zar === sub.plans?.monthly_price_zar && p.included_seats === sub.plans?.included_seats
+    && p.extra_seat_price_zar === sub.plans?.extra_seat_price_zar
+  )).map(p => [`${p.name.trim().toLowerCase()}:${p.monthly_price_zar}:${p.included_seats}:${p.extra_seat_price_zar}`, p])).values()];
 
   return (
     <div className="max-w-3xl space-y-6">
       <div>
-        <p className="ui-mono-label mb-2">Revenue</p>
         <h1 className="font-display text-[28px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Billing</h1>
       </div>
 
@@ -236,24 +215,24 @@ export default function BillingPage() {
           R{sub.plans?.monthly_price_zar ?? 2000}/month base · R{sub.plans?.extra_seat_price_zar ?? 500}/additional seat
         </p>
 
-        {(sub.status === "ACTIVE" || sub.status === "TRIAL") && plansAvailable.length > 1 && (
+        {(sub.status === "ACTIVE" || sub.status === "TRIAL") && alternativePlans.length > 0 && (
           <div className="mt-4">
             <div className="ui-mono-label !text-[10px] mb-2">Change plan</div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {plansAvailable.map((p) => (
+              {alternativePlans.map((p) => (
                 <button data-demo-action="billing.plan"
                   key={p.id}
-                  onClick={() => !p.current && changePlan(p.id, p.name, p.monthly_price_zar)}
-                  disabled={actionLoading || p.current}
+                  onClick={() => changePlan(p.id, p.name, p.monthly_price_zar)}
+                  disabled={actionLoading}
                   className="p-3 rounded-[10px] border text-left transition-colors disabled:cursor-default hover:border-[var(--ck-accent)]"
                   style={{
-                    background: p.current ? "var(--ck-accent-soft)" : "var(--ck-surface-sunken)",
-                    borderColor: p.current ? "var(--ck-accent)" : "var(--ck-border-subtle)",
+                    background: "var(--ck-surface-sunken)",
+                    borderColor: "var(--ck-border-subtle)",
                   }}
                 >
                   <div className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>{p.name}</div>
                   <div className="text-xs mt-0.5 tabular-nums" style={{ color: "var(--ck-text-muted)" }}>R{p.monthly_price_zar.toLocaleString()}/mo · {p.included_seats} seat{p.included_seats !== 1 ? "s" : ""}</div>
-                  <div className="ui-mono-label !text-[9px] mt-1.5" style={{ color: p.current ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>{p.current ? "Current" : "Switch"}</div>
+                  <div className="ui-mono-label !text-[9px] mt-1.5" style={{ color: "var(--ck-text-muted)" }}>Switch</div>
                 </button>
               ))}
             </div>
@@ -325,22 +304,7 @@ export default function BillingPage() {
             <h2 className="text-lg font-bold" style={{ color: "var(--ck-text-strong)" }}>Marketing email usage</h2>
             <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>this billing period</span>
           </div>
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            <div className="p-3 rounded-lg" style={{ background: "var(--ck-bg)" }}>
-              <div className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Sent / Included</div>
-              <div className="text-2xl font-bold mt-0.5" style={{ color: "var(--ck-text-strong)" }}>
-                {emailUsage.sent.toLocaleString()} / {emailUsage.included.toLocaleString()}
-              </div>
-              <div className="mt-2 h-2 w-full rounded-full" style={{ background: "var(--ck-border-subtle)" }}>
-                <div
-                  className="h-2 rounded-full"
-                  style={{
-                    width: emailUsage.included > 0 ? Math.min(100, (emailUsage.sent / emailUsage.included) * 100) + "%" : "0%",
-                    background: emailUsage.overage_emails > 0 ? "#f59e0b" : "var(--ck-accent, #059669)",
-                  }}
-                />
-              </div>
-            </div>
+          <div className="mt-4 text-sm">
             <div className="p-3 rounded-lg" style={{ background: "var(--ck-bg)" }}>
               <div className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Overage</div>
               <div className="text-2xl font-bold mt-0.5" style={{ color: emailUsage.overage_charge_zar > 0 ? "#b45309" : "var(--ck-text-strong)" }}>
@@ -357,55 +321,6 @@ export default function BillingPage() {
           </div>
         </section>
       )}
-
-      {/* Payment Method */}
-      <section className="p-5 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" }}>
-        <h2 className="text-lg font-bold" style={{ color: "var(--ck-text-strong)" }}>Payment method</h2>
-        <p className="text-sm mt-1" style={{ color: "var(--ck-text-muted)" }}>
-          {sub.payment_method_last4
-            ? <>Card ending in <strong>{sub.payment_method_last4}</strong> via {sub.payment_provider}</>
-            : "No card on file. Invoices are sent manually; contact support to set up automatic payments."}
-        </p>
-      </section>
-
-      {/* Billing History */}
-      <section className="p-5 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" }}>
-        <h2 className="text-lg font-bold" style={{ color: "var(--ck-text-strong)" }}>Billing history</h2>
-        {history.length === 0 ? (
-          <p className="text-sm mt-2" style={{ color: "var(--ck-text-muted)" }}>No billing records yet.</p>
-        ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs" style={{ color: "var(--ck-text-muted)" }}>
-                  <th className="pb-2 pr-3">Period</th>
-                  <th className="pb-2 pr-3">Type</th>
-                  <th className="pb-2 pr-3">Qty</th>
-                  <th className="pb-2 pr-3">Amount</th>
-                  <th className="pb-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((h) => (
-                  <tr key={h.id} className="border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                    <td className="py-2 pr-3" style={{ color: "var(--ck-text)" }}>{h.invoice_period_start || "—"}</td>
-                    <td className="py-2 pr-3" style={{ color: "var(--ck-text)" }}>{h.line_type || "—"}</td>
-                    <td className="py-2 pr-3" style={{ color: "var(--ck-text)" }}>{h.quantity}</td>
-                    <td className="py-2 pr-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>R{h.total_amount_zar}</td>
-                    <td className="py-2">
-                      <span className={`text-xs px-1.5 py-0.5 rounded ${
-                        h.billing_status === "PAID" ? "bg-emerald-100 text-emerald-700" :
-                        h.billing_status === "PENDING" ? "bg-amber-100 text-amber-700" :
-                        "bg-gray-100 text-gray-700"
-                      }`}>{h.billing_status}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
     </div>
   );
 }

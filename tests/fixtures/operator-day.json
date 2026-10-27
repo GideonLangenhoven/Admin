@@ -1,0 +1,392 @@
+{
+  "business_id": "10000000-0000-4000-8000-000000000001",
+  "slots": [
+    {
+      "id": "10000000-0000-4000-8000-000000000004",
+      "business_id": "10000000-0000-4000-8000-000000000001",
+      "tour_id": "10000000-0000-4000-8000-000000000003",
+      "start_time": "2026-10-15T08:00:00Z",
+      "capacity_total": 20,
+      "booked": 8,
+      "held": 2,
+      "status": "OPEN",
+      "tours": {
+        "name": "Harbour paddle"
+      }
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000006",
+      "business_id": "10000000-0000-4000-8000-000000000001",
+      "tour_id": "10000000-0000-4000-8000-000000000008",
+      "start_time": "2026-10-15T08:00:00Z",
+      "capacity_total": 8,
+      "booked": 4,
+      "held": 0,
+      "status": "OPEN",
+      "tours": {
+        "name": "Coastal walk"
+      }
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000007",
+      "business_id": "10000000-0000-4000-8000-000000000001",
+      "tour_id": "10000000-0000-4000-8000-000000000003",
+      "start_time": "2026-10-15T14:00:00Z",
+      "capacity_total": 8,
+      "booked": 0,
+      "held": 0,
+      "status": "OPEN",
+      "tours": {
+        "name": "Harbour paddle"
+      }
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000005",
+      "business_id": "10000000-0000-4000-8000-000000000001",
+      "tour_id": "10000000-0000-4000-8000-000000000003",
+      "start_time": "2026-10-16T08:00:00Z",
+      "capacity_total": 20,
+      "booked": 3,
+      "held": 0,
+      "status": "OPEN",
+      "tours": {
+        "name": "Harbour paddle"
+      }
+    }
+  ],
+  "bookings": [
+    {
+      "id": "10000000-0000-4000-8000-000000000020",
+      "business_id": "10000000-0000-4000-8000-000000000001",
+      "slot_id": "10000000-0000-4000-8000-000000000004",
+      "tour_id": "10000000-0000-4000-8000-000000000003",
+      "customer_name": "Alex Example",
+      "email": "guest20@example.invalid",
+      "phone": "27825550020",
+      "qty": 3,
+      "status": "PAID",
+      "total_amount": 300,
+      "original_total": 300,
+      "total_captured": 300,
+      "total_refunded": 0,
+      "refund_amount": 0,
+      "voucher_amount_paid": 0,
+      "waiver_status": "SIGNED",
+      "arrived_count": 0,
+      "checked_in": false,
+      "checked_in_at": null,
+      "party_composition": {
+        "adults": 2,
+        "children": 1
+      },
+      "allow_unpaid": false,
+      "ota_channel": null,
+      "unpaid_arrival_approved": false,
+      "custom_fields": {
+        "safety": "Synthetic answer"
+      },
+      "created_at": "2026-10-01T08:00:00Z",
+      "source": "ADMIN",
+      "slots": {
+        "id": "10000000-0000-4000-8000-000000000004",
+        "start_time": "2026-10-15T08:00:00Z"
+      },
+      "tours": {
+        "name": "Harbour paddle"
+      },
+      "add_ons": [],
+      "payment_deadline": null
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000021",
+      "business_id": "10000000-0000-4000-8000-000000000001",
+      "slot_id": "10000000-0000-4000-8000-000000000004",
+      "tour_id": "10000000-0000-4000-8000-000000000003",
+      "customer_name": "Pending Example",
+      "email": "guest21@example.invalid",
+      "phone": "27825550021",
+      "qty": 2,
+      "status": "PENDING",
+      "total_amount": 200,
+      "original_total": 200,
+      "total_captured": 0,
+      "total_refunded": 0,
+      "refund_amount": 0,
+      "voucher_amount_paid": 0,
+      "waiver_status": "PENDING",
+      "arrived_count": 0,
+      "checked_in": false,
+      "checked_in_at": null,
+      "party_composition": {
+        "adults": 2,
+        "children": 0
+      },
+      "allow_unpaid": false,
+      "ota_channel": null,
+      "unpaid_arrival_approved": false,
+      "custom_fields": {
+        "safety": "Synthetic answer"
+      },
+      "created_at": "2026-10-01T08:00:00Z",
+      "source": "ADMIN",
+      "slots": {
+        "id": "10000000-0000-4000-8000-000000000004",
+        "start_time": "2026-10-15T08:00:00Z"
+      },
+      "tours": {
+        "name": "Harbour paddle"
+      },
+      "add_ons": [],
+      "payment_deadline": "2026-10-15T18:00:00Z"
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000022",
+      "business_id": "10000000-0000-4000-8000-000000000001",
+      "slot_id": "10000000-0000-4000-8000-000000000004",
+      "tour_id": "10000000-0000-4000-8000-000000000003",
+      "customer_name": "Partial Example",
+      "email": "guest22@example.invalid",
+      "phone": "27825550022",
+      "qty": 2,
+      "status": "CONFIRMED",
+      "total_amount": 200,
+      "original_total": 200,
+      "total_captured": 100,
+      "total_refunded": 0,
+      "refund_amount": 0,
+      "voucher_amount_paid": 0,
+      "waiver_status": "SIGNED",
+      "arrived_count": 0,
+      "checked_in": false,
+      "checked_in_at": null,
+      "party_composition": {
+        "adults": 2,
+        "children": 0
+      },
+      "allow_unpaid": false,
+      "ota_channel": null,
+      "unpaid_arrival_approved": false,
+      "custom_fields": {
+        "safety": "Synthetic answer"
+      },
+      "created_at": "2026-10-01T08:00:00Z",
+      "source": "ADMIN",
+      "slots": {
+        "id": "10000000-0000-4000-8000-000000000004",
+        "start_time": "2026-10-15T08:00:00Z"
+      },
+      "tours": {
+        "name": "Harbour paddle"
+      },
+      "add_ons": [],
+      "payment_deadline": null
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000023",
+      "business_id": "10000000-0000-4000-8000-000000000001",
+      "slot_id": "10000000-0000-4000-8000-000000000004",
+      "tour_id": "10000000-0000-4000-8000-000000000003",
+      "customer_name": "Waiver Example",
+      "email": "guest23@example.invalid",
+      "phone": "27825550023",
+      "qty": 1,
+      "status": "PAID",
+      "total_amount": 100,
+      "original_total": 100,
+      "total_captured": 100,
+      "total_refunded": 0,
+      "refund_amount": 0,
+      "voucher_amount_paid": 0,
+      "waiver_status": "PENDING",
+      "arrived_count": 0,
+      "checked_in": false,
+      "checked_in_at": null,
+      "party_composition": {
+        "adults": 1,
+        "children": 0
+      },
+      "allow_unpaid": false,
+      "ota_channel": null,
+      "unpaid_arrival_approved": false,
+      "custom_fields": {
+        "safety": "Synthetic answer"
+      },
+      "created_at": "2026-10-01T08:00:00Z",
+      "source": "ADMIN",
+      "slots": {
+        "id": "10000000-0000-4000-8000-000000000004",
+        "start_time": "2026-10-15T08:00:00Z"
+      },
+      "tours": {
+        "name": "Harbour paddle"
+      },
+      "add_ons": [],
+      "payment_deadline": null
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000024",
+      "business_id": "10000000-0000-4000-8000-000000000001",
+      "slot_id": "10000000-0000-4000-8000-000000000004",
+      "tour_id": "10000000-0000-4000-8000-000000000003",
+      "customer_name": "Account Example",
+      "email": "guest24@example.invalid",
+      "phone": "27825550024",
+      "qty": 2,
+      "status": "CONFIRMED",
+      "total_amount": 200,
+      "original_total": 200,
+      "total_captured": 0,
+      "total_refunded": 0,
+      "refund_amount": 0,
+      "voucher_amount_paid": 0,
+      "waiver_status": "SIGNED",
+      "arrived_count": 0,
+      "checked_in": false,
+      "checked_in_at": null,
+      "party_composition": {
+        "adults": 2,
+        "children": 0
+      },
+      "allow_unpaid": true,
+      "ota_channel": "SYNTHETIC_RESELLER",
+      "unpaid_arrival_approved": false,
+      "custom_fields": {
+        "safety": "Synthetic answer"
+      },
+      "created_at": "2026-10-01T08:00:00Z",
+      "source": "ADMIN",
+      "slots": {
+        "id": "10000000-0000-4000-8000-000000000004",
+        "start_time": "2026-10-15T08:00:00Z"
+      },
+      "tours": {
+        "name": "Harbour paddle"
+      },
+      "add_ons": [],
+      "payment_deadline": null
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000025",
+      "business_id": "10000000-0000-4000-8000-000000000001",
+      "slot_id": "10000000-0000-4000-8000-000000000006",
+      "tour_id": "10000000-0000-4000-8000-000000000008",
+      "customer_name": "Group Example",
+      "email": "guest25@example.invalid",
+      "phone": "27825550025",
+      "qty": 4,
+      "status": "PAID",
+      "total_amount": 400,
+      "original_total": 400,
+      "total_captured": 400,
+      "total_refunded": 0,
+      "refund_amount": 0,
+      "voucher_amount_paid": 0,
+      "waiver_status": "SIGNED",
+      "arrived_count": 0,
+      "checked_in": false,
+      "checked_in_at": null,
+      "party_composition": {
+        "adults": 4,
+        "children": 0
+      },
+      "allow_unpaid": false,
+      "ota_channel": null,
+      "unpaid_arrival_approved": false,
+      "custom_fields": {
+        "safety": "Synthetic answer"
+      },
+      "created_at": "2026-10-01T08:00:00Z",
+      "source": "ADMIN",
+      "slots": {
+        "id": "10000000-0000-4000-8000-000000000006",
+        "start_time": "2026-10-15T08:00:00Z"
+      },
+      "tours": {
+        "name": "Coastal walk"
+      },
+      "add_ons": [],
+      "payment_deadline": null
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000026",
+      "business_id": "10000000-0000-4000-8000-000000000001",
+      "slot_id": "10000000-0000-4000-8000-000000000004",
+      "tour_id": "10000000-0000-4000-8000-000000000003",
+      "customer_name": "Cancelled Example",
+      "email": "guest26@example.invalid",
+      "phone": "27825550026",
+      "qty": 1,
+      "status": "CANCELLED",
+      "total_amount": 100,
+      "original_total": 100,
+      "total_captured": 0,
+      "total_refunded": 0,
+      "refund_amount": 0,
+      "voucher_amount_paid": 0,
+      "waiver_status": "PENDING",
+      "arrived_count": 0,
+      "checked_in": false,
+      "checked_in_at": null,
+      "party_composition": null,
+      "allow_unpaid": false,
+      "ota_channel": null,
+      "unpaid_arrival_approved": false,
+      "custom_fields": {
+        "safety": "Synthetic answer"
+      },
+      "created_at": "2026-10-01T08:00:00Z",
+      "source": "ADMIN",
+      "slots": {
+        "id": "10000000-0000-4000-8000-000000000004",
+        "start_time": "2026-10-15T08:00:00Z"
+      },
+      "tours": {
+        "name": "Harbour paddle"
+      },
+      "add_ons": [],
+      "payment_deadline": null
+    },
+    {
+      "id": "10000000-0000-4000-8000-000000000027",
+      "business_id": "10000000-0000-4000-8000-000000000001",
+      "slot_id": "10000000-0000-4000-8000-000000000005",
+      "tour_id": "10000000-0000-4000-8000-000000000003",
+      "customer_name": "Alex Example",
+      "email": "guest27@example.invalid",
+      "phone": "27825550027",
+      "qty": 3,
+      "status": "CONFIRMED",
+      "total_amount": 300,
+      "original_total": 300,
+      "total_captured": 0,
+      "total_refunded": 0,
+      "refund_amount": 0,
+      "voucher_amount_paid": 0,
+      "waiver_status": "PENDING",
+      "arrived_count": 0,
+      "checked_in": false,
+      "checked_in_at": null,
+      "party_composition": {
+        "adults": 2,
+        "children": 1
+      },
+      "allow_unpaid": false,
+      "ota_channel": null,
+      "unpaid_arrival_approved": false,
+      "custom_fields": {
+        "safety": "Synthetic answer"
+      },
+      "created_at": "2026-10-01T08:00:00Z",
+      "source": "ADMIN",
+      "slots": {
+        "id": "10000000-0000-4000-8000-000000000005",
+        "start_time": "2026-10-16T08:00:00Z"
+      },
+      "tours": {
+        "name": "Harbour paddle"
+      },
+      "add_ons": [],
+      "payment_deadline": null
+    }
+  ]
+}

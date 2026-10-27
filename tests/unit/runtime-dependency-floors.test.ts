@@ -32,21 +32,21 @@ const versionAtLeast = (version: string | undefined, floor: string) => {
 
 describe("runtime dependency security floors", () => {
   it("keeps the direct Next toolchain exactly aligned", () => {
-    expect(manifest.dependencies?.next).toBe("16.3.3");
-    expect(manifest.dependencies?.["@next/bundle-analyzer"]).toBe("16.3.3");
-    expect(manifest.devDependencies?.["eslint-config-next"]).toBe("16.3.3");
+    expect(manifest.dependencies?.next).toBe("16.3.8");
+    expect(manifest.dependencies?.["@next/bundle-analyzer"]).toBe("16.3.8");
+    expect(manifest.devDependencies?.["eslint-config-next"]).toBe("16.3.8");
 
     const root = lock.packages[""];
-    expect(root.dependencies?.next).toBe("16.3.3");
-    expect(root.dependencies?.["@next/bundle-analyzer"]).toBe("16.3.3");
-    expect(root.devDependencies?.["eslint-config-next"]).toBe("16.3.3");
+    expect(root.dependencies?.next).toBe("16.3.8");
+    expect(root.dependencies?.["@next/bundle-analyzer"]).toBe("16.3.8");
+    expect(root.devDependencies?.["eslint-config-next"]).toBe("16.3.8");
 
-    expect(lock.packages["node_modules/next"].version).toBe("16.3.3");
-    expect(lock.packages["node_modules/@next/bundle-analyzer"].version).toBe("16.3.3");
-    expect(lock.packages["node_modules/eslint-config-next"].version).toBe("16.3.3");
-    expect(installedVersion("next")).toBe("16.3.3");
-    expect(installedVersion("@next/bundle-analyzer")).toBe("16.3.3");
-    expect(installedVersion("eslint-config-next")).toBe("16.3.3");
+    expect(lock.packages["node_modules/next"].version).toBe("16.3.8");
+    expect(lock.packages["node_modules/@next/bundle-analyzer"].version).toBe("16.3.8");
+    expect(lock.packages["node_modules/eslint-config-next"].version).toBe("16.3.8");
+    expect(installedVersion("next")).toBe("16.3.8");
+    expect(installedVersion("@next/bundle-analyzer")).toBe("16.3.8");
+    expect(installedVersion("eslint-config-next")).toBe("16.3.8");
   });
 
   it("locks and installs patched PostCSS and Sharp versions", () => {
@@ -59,7 +59,7 @@ describe("runtime dependency security floors", () => {
     expect(lock.packages[""].dependencies?.sharp).toBe("0.35.4");
     expect(installedVersion("sharp")).toBe("0.35.4");
     expect(lockedVersions("sharp").every((version) => versionAtLeast(version, "0.35.4"))).toBe(true);
-    expect(lockedVersions("next").every((version) => versionAtLeast(version, "16.3.3"))).toBe(true);
+    expect(lockedVersions("next").every((version) => versionAtLeast(version, "16.3.8"))).toBe(true);
   });
 
   it("uses patched test tooling and replaces the vulnerable xlsx reader", () => {
@@ -73,5 +73,10 @@ describe("runtime dependency security floors", () => {
     expect(manifest.dependencies?.["read-excel-file"]).toBe("^9.3.10");
     expect(lock.packages[""].dependencies?.["read-excel-file"]).toBe("^9.3.10");
     expect(installedVersion("read-excel-file")).toBe("9.3.10");
+  });
+
+  it("locks and installs the DOMPurify security patch used by PDF exports", () => {
+    expect(versionAtLeast(installedVersion("dompurify"), "3.4.16")).toBe(true);
+    expect(lockedVersions("dompurify").every((version) => versionAtLeast(version, "3.4.16"))).toBe(true);
   });
 });

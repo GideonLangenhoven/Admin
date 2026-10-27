@@ -119,7 +119,7 @@ test.describe("admin mobile layout", () => {
   test("Today exposes the first departure before revenue", async ({ page }) => {
     const manifest = page.getByRole("heading", { name: "Manifest" });
     await expect(manifest).toBeVisible();
-    const revenue = page.getByRole("heading", { name: "Revenue" });
+    const revenue = page.getByRole("heading", { name: "Booking value" });
     const manifestBox = await manifest.boundingBox();
     const revenueBox = await revenue.boundingBox();
     expect(manifestBox?.y).toBeLessThan(revenueBox?.y || Infinity);

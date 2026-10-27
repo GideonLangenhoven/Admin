@@ -88,15 +88,25 @@ function paymentFixture(overrides: Record<string, any> = {}) {
   const refund = sourceHandler("supabase/functions/process-refund/index.ts", mocks, env, gateway);
   return {
     booking, calls, gateway, reissueVoucherPortion,
-    webhook: (amount: any, metadata: any = {}) => webhook(new Request("https://fixture.invalid/yoco", {
+    webhook: (amount: any, metadata: any = {}, event = "payment.succeeded") => webhook(new Request("https://fixture.invalid/yoco", {
       method: "POST", headers: { "webhook-signature": "fixture-verified" },
-      body: JSON.stringify({ type: "payment.succeeded", payload: { id: "payment-a", amount, currency: "ZAR", metadata: { checkoutId: "checkout-a", type: "BOOKING", ...metadata } } }),
+      body: JSON.stringify({ type: event, payload: { id: "payment-a", amount, currency: "ZAR", metadata: { checkoutId: "checkout-a", type: "BOOKING", ...metadata } } }),
     })),
     refund: (amount?: number) => refund(new Request("https://fixture.invalid/refund", { method: "POST", headers: { authorization: "Bearer " + serviceKey }, body: JSON.stringify({ booking_id: booking.id, ...(amount !== undefined ? { amount } : {}) }) })),
   };
 }
 
 describe("R13 real handler cash/voucher accounting", () => {
+  it("records verified failed attempts even without customer contact details", async () => {
+    const f = paymentFixture({ email: null, payment_url: null });
+    expect((await f.webhook(60000, {}, "payment.failed")).status).toBe(200);
+    expect(f.calls).toContainEqual({ name: "record_booking_payment_failure", args: {
+      p_booking_id: "booking-a", p_business_id: "a", p_checkout_id: "checkout-a", p_payment_id: "payment-a",
+      p_reason: "Payment was not completed",
+    } });
+    expect(f.calls.filter(call => call.table === "bookings")).toEqual([]);
+    expect(f.gateway).not.toHaveBeenCalled();
+  });
   it.each([0, null, undefined])("never infers refundable cash from the ticket price when capture is %s", async captured => {
     const f = paymentFixture({ total_captured: captured, payment_status: "CAPTURED" });
     expect((await f.refund()).status).toBe(409);

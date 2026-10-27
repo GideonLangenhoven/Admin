@@ -4,17 +4,17 @@ route: /settings/chat-faq
 required_role: MAIN_ADMIN
 ---
 
-Chat FAQ is its own page in the sidebar, listed under the Admin group as "Chat FAQ". It is not a section inside the Settings page.
+Open [AI](/ai-usage) in the Growth group, then choose the **Chat FAQ** tab. The page is at /settings/chat-faq; it is not a section inside Settings or a standalone sidebar item.
 
-Here you maintain Quick Answers: verified question-and-answer pairs the customer chat assistant (WhatsApp bot and website chat) uses before anything else. The bot treats these as ground truth, so keep them accurate and current.
+Here you maintain Quick Answers for the customer WhatsApp bot and website chat. These are separate from the dashboard help assistant's product guide. Keep answers accurate and disable outdated rules.
 
 ## Adding a Quick Answer
 
-Open the Chat FAQ page, add the customer question the way a customer would phrase it, write the verified answer, and save. The bot starts using it immediately for matching customer questions.
+Choose **Add Quick Answer**, select the intent, enter a question pattern, comma-separated matching keywords and the approved answer, then save. Enabled rules can answer matching customer questions using that wording.
 
 ## Editing and removing
 
-Edit a pair in place to correct or update it. Remove pairs that no longer apply; an outdated Quick Answer is worse than none because the bot repeats it with confidence.
+Edit a rule to update its question, keywords, intent or answer. Toggle it off to stop using it without deleting it, or delete it with confirmation. The table shows usage count and last-used time, which help identify rules customers actually use.
 
 ## Who can manage Quick Answers
 

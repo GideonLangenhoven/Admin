@@ -195,7 +195,9 @@ export default function PartnershipsPage() {
     if (!r.ok || d.error) {
       notify({ title: "Invite failed", message: d.error || "Unknown error", tone: "error" });
     } else {
-      notify({ title: "Invite sent", message: "Your partner will receive an email with an approval link.", tone: "success" });
+      notify(d.email_sent
+        ? { title: "Invite sent", message: "Invitation emailed to your partner.", tone: "success" }
+        : { title: "Invitation saved; email not sent", message: "Partner can accept on their Partners page. Revoke and reinvite to resend the email.", tone: "warning" });
       setInviteEmail("");
       load();
     }
@@ -389,7 +391,7 @@ export default function PartnershipsPage() {
         <p className="ui-mono-label mb-2">Growth · Partners</p>
         <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Partners &amp; Combos</h2>
         <p className="mt-2 text-[13px]" style={{ color: "var(--ck-text-muted)" }}>
-          Team up with another operator, sell bundled tours, and track who owes whom.
+          Bundle tours with partners and track payments owed.
         </p>
       </div>
 
@@ -397,7 +399,7 @@ export default function PartnershipsPage() {
         <div className="anim-fade-up ui-card p-4" style={{ borderColor: "var(--ck-warning, #d9822f)" }}>
           <p className="text-[13px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Combo deals are not switched on yet</p>
           <p className="mt-1 text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>
-            You can set up partnerships and offers now; customers will see combo deals once the platform enables the feature.
+            Set up partners and offers now. Combo sales start when the platform enables them.
           </p>
         </div>
       )}
@@ -422,7 +424,7 @@ export default function PartnershipsPage() {
           </button>
         </div>
         <p className="text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
-          They get an email with a one-click approval link. Once accepted, you can build combo offers together.
+          Your partner gets an email invitation. Once accepted, you can create combos.
         </p>
 
         {partnerships.length === 0 ? (
@@ -460,7 +462,7 @@ export default function PartnershipsPage() {
           <button
             onClick={() => setShowOfferForm((v) => !v)}
             className="ui-btn ui-btn-primary !py-1.5 text-[12px]"
-            title="Bundle your own tours, or partner tours once a partnership is active"
+            title="Bundle your tours or active partners' tours."
           >
             {showOfferForm ? "Close" : "New Combo Offer"}
           </button>
@@ -551,7 +553,7 @@ export default function PartnershipsPage() {
                   onClick={() => setOfferRows((rows) => [...rows, { partner_id: "", tour_id: "", share: "" }])}
                   className="ui-btn !py-1.5 text-[12px]"
                 >
-                  + Add another tour
+                  Add tour
                 </button>
               )}
             </div>
@@ -578,7 +580,7 @@ export default function PartnershipsPage() {
         {offers.length === 0 ? (
           <div className="ui-empty">
             <p className="text-[13px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No combo offers</p>
-            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Bundle one of your tours with a partner&rsquo;s tour at a package price.</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Bundle your tour with a partner&apos;s at one price.</p>
           </div>
         ) : (
           <div className="divide-y" style={{ borderColor: "var(--ck-border)" }}>
@@ -622,16 +624,12 @@ export default function PartnershipsPage() {
         <div className="flex items-center justify-between">
           <h3 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Settlements</h3>
         </div>
-        <p className="text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
-          For combos paid into one operator&rsquo;s account, this ledger tracks each side&rsquo;s share — everything unsettled, broken down by week, plus the last 7 days of settled history. If you&rsquo;re owed money, generate a Yoco payment link: it&rsquo;s emailed to your partner and flips to Paid automatically when they pay. You can also mark bookings settled manually (e.g. EFT). Everything is stamped into the settlement register (Reports → Settlement Register).
-        </p>
-
         {settlements === null ? (
-          <div className="ui-empty"><p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Settlement tracking becomes available once combo deals are enabled on the platform.</p></div>
+          <div className="ui-empty"><p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Settlements are available when the platform enables combos.</p></div>
         ) : settlements.length === 0 ? (
           <div className="ui-empty">
             <p className="text-[13px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Nothing to settle</p>
-            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Paid combo bookings from the last 7 days will appear here.</p>
+            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>No paid combos in the last 7 days.</p>
           </div>
         ) : settlements.map((s: any) => (
           <div key={s.partner_id} className="space-y-3 rounded-xl border p-4" style={{ borderColor: "var(--ck-border)" }}>
@@ -654,24 +652,24 @@ export default function PartnershipsPage() {
               </div>
             </div>
             {(s.weekly || []).length > 0 && (
-              <div className="overflow-x-auto">
+              <div className="ui-table-container overflow-x-auto">
                 <p className="ui-mono-label !text-[10px] mb-1">Owed by week (all unsettled combos)</p>
-                <table className="w-full text-left text-[12.5px]">
+                <table role="table" className="ui-responsive-table w-full text-left text-[12.5px]">
                   <thead>
                     <tr className="ui-mono-label !text-[10px]">
-                      <th className="py-1 pr-3">Week starting</th>
-                      <th className="py-1 pr-3 text-right">Partner owes me</th>
-                      <th className="py-1 pr-3 text-right">I owe partner</th>
-                      <th className="py-1 text-right">Combos</th>
+                      <th scope="col" className="py-1 pr-3">Week starting</th>
+                      <th scope="col" className="py-1 pr-3 text-right">Partner owes me</th>
+                      <th scope="col" className="py-1 pr-3 text-right">I owe partner</th>
+                      <th scope="col" className="py-1 text-right">Combos</th>
                     </tr>
                   </thead>
                   <tbody>
                     {s.weekly.map((w: any) => (
                       <tr key={w.week_start} style={{ color: "var(--ck-text)" }}>
-                        <td className="py-1.5 pr-3 whitespace-nowrap">{fmtDate(w.week_start)}</td>
-                        <td className="py-1.5 pr-3 text-right tabular-nums">R{Number(w.owed_to_me).toLocaleString()}</td>
-                        <td className="py-1.5 pr-3 text-right tabular-nums">R{Number(w.owed_to_partner).toLocaleString()}</td>
-                        <td className="py-1.5 text-right tabular-nums">{w.count}</td>
+                        <td data-label="Week starting" className="py-1.5 pr-3 whitespace-nowrap">{fmtDate(w.week_start)}</td>
+                        <td data-label="Partner owes me" className="py-1.5 pr-3 text-right tabular-nums">R{Number(w.owed_to_me).toLocaleString()}</td>
+                        <td data-label="I owe partner" className="py-1.5 pr-3 text-right tabular-nums">R{Number(w.owed_to_partner).toLocaleString()}</td>
+                        <td data-label="Combos" className="py-1.5 text-right tabular-nums">{w.count}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -679,27 +677,27 @@ export default function PartnershipsPage() {
               </div>
             )}
             {(s.bookings || []).length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-[12.5px]">
+              <div className="ui-table-container overflow-x-auto">
+                <table role="table" className="ui-responsive-table w-full text-left text-[12.5px]">
                   <thead>
                     <tr className="ui-mono-label !text-[10px]">
-                      <th className="py-1 pr-3">Date</th>
-                      <th className="py-1 pr-3">Combo</th>
-                      <th className="py-1 pr-3 text-right">Total</th>
-                      <th className="py-1 pr-3 text-right">My share</th>
-                      <th className="py-1 pr-3 text-right">Partner share</th>
-                      <th className="py-1">Status</th>
+                      <th scope="col" className="py-1 pr-3">Date</th>
+                      <th scope="col" className="py-1 pr-3">Combo</th>
+                      <th scope="col" className="py-1 pr-3 text-right">Total</th>
+                      <th scope="col" className="py-1 pr-3 text-right">My share</th>
+                      <th scope="col" className="py-1 pr-3 text-right">Partner share</th>
+                      <th scope="col" className="py-1">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {s.bookings.map((b: any) => (
                       <tr key={b.id} style={{ color: "var(--ck-text)" }}>
-                        <td className="py-1.5 pr-3 whitespace-nowrap">{fmtDate(b.date)}</td>
-                        <td className="py-1.5 pr-3">{b.combo_name}</td>
-                        <td className="py-1.5 pr-3 text-right tabular-nums">R{Number(b.total).toLocaleString()}</td>
-                        <td className="py-1.5 pr-3 text-right tabular-nums">R{Number(b.my_share).toLocaleString()}</td>
-                        <td className="py-1.5 pr-3 text-right tabular-nums">R{Number(b.partner_share).toLocaleString()}</td>
-                        <td className="py-1.5"><span className={"ui-status " + (b.settled ? "ui-pill-success" : "ui-pill-warning")}>{b.settled ? "Settled" : "Open"}</span></td>
+                        <td data-label="Date" className="py-1.5 pr-3 whitespace-nowrap">{fmtDate(b.date)}</td>
+                        <td data-label="Combo" className="py-1.5 pr-3">{b.combo_name}</td>
+                        <td data-label="Total" className="py-1.5 pr-3 text-right tabular-nums">R{Number(b.total).toLocaleString()}</td>
+                        <td data-label="My share" className="py-1.5 pr-3 text-right tabular-nums">R{Number(b.my_share).toLocaleString()}</td>
+                        <td data-label="Partner share" className="py-1.5 pr-3 text-right tabular-nums">R{Number(b.partner_share).toLocaleString()}</td>
+                        <td data-label="Status" className="py-1.5"><span className={"ui-status " + (b.settled ? "ui-pill-success" : "ui-pill-warning")}>{b.settled ? "Settled" : "Open"}</span></td>
                       </tr>
                     ))}
                   </tbody>

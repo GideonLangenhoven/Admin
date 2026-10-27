@@ -1,0 +1,41 @@
+{
+  "marketing_automations": [
+    "revision"
+  ],
+  "marketing_deliveries": [
+    "id",
+    "business_id",
+    "contact_id",
+    "delivery_key",
+    "queue_id",
+    "enrollment_id",
+    "payload",
+    "status",
+    "provider_id",
+    "created_at",
+    "updated_at",
+    "provider_started_at"
+  ],
+  "marketing_permission_events": [
+    "id",
+    "business_id",
+    "contact_id",
+    "identity_hash",
+    "channel",
+    "purpose",
+    "decision",
+    "source",
+    "evidence_at",
+    "notice_version",
+    "evidence_ref",
+    "recorded_at"
+  ],
+  "marketing_eligible_contacts": [
+    "id",
+    "business_id",
+    "email",
+    "first_name",
+    "tags",
+    "status"
+  ]
+}

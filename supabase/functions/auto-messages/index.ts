@@ -4,7 +4,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, fetchAllRows, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, getTenantByBusinessId as getTenantContext, resolveManageBookingsUrl, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
 import { resolveWaiverLink } from "../_shared/waiver.ts";
 import { withSentry } from "../_shared/sentry.ts";
-import { requireAuth } from "../_shared/auth.ts";
+import { requireAuth, canAccessBusiness } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -288,6 +288,9 @@ async function orchestrateTripRemindersForBusiness(businessId: string) {
 }
 
 async function sendReviewRequestsForBusiness(businessId: string) {
+  // Promotional WhatsApp has no channel-evidence gate or durable outcome recovery.
+  return 0;
+
   const tenant = await getTenantByBusinessId(db, businessId);
   const brandName = getBusinessDisplayName(tenant.business);
   const now = Date.now();
@@ -350,6 +353,9 @@ async function sendReviewRequestsForBusiness(businessId: string) {
 }
 
 async function sendReviewRemindersForBusiness(businessId: string) {
+  // Promotional WhatsApp has no channel-evidence gate or durable outcome recovery.
+  return 0;
+
   const tenant = await getTenantByBusinessId(db, businessId);
   const brandName = getBusinessDisplayName(tenant.business);
   const now = new Date();
@@ -399,6 +405,14 @@ async function sendReviewRemindersForBusiness(businessId: string) {
 }
 
 async function sendReEngagementForBusiness(businessId: string) {
+  // Promotional WhatsApp and its email fallback need channel evidence and the
+  // durable marketing queue. Booking-update jobs continue independently.
+  return 0;
+  // An operator's email sequence replaces the legacy fixed WhatsApp win-back.
+  const configured = await db.from("marketing_automations").select("id")
+    .eq("business_id", businessId).eq("trigger_type", "booking_inactive").in("status", ["active", "paused"]).limit(1);
+  if (configured.error) throw new Error("Could not check welcome-back settings");
+  if (configured.data?.length) return 0;
   const tenant = await getTenantByBusinessId(db, businessId);
   const brandName = getBusinessDisplayName(tenant.business);
   const now = new Date();
@@ -533,22 +547,7 @@ async function autoExpireBookingsForBusiness(businessId: string) {
     // Release held capacity
     await db.from("holds").update({ status: "EXPIRED" }).eq("booking_id", booking.id).eq("status", "ACTIVE");
 
-    // No email on auto-expire — only send a friendly WhatsApp nudge if they have a phone
-    if (booking.phone && bookingSiteUrl) {
-      try {
-        const firstName = (booking.customer_name || "").split(" ")[0] || "Hi";
-        await sendWhatsappTextForTenant(
-          tenant,
-          booking.phone,
-          firstName + ", looks like you didn't finish booking your " +
-            (booking?.tours?.name || "trip") + ". No worries, spots are still available!\n\n" +
-            "Book again here: " + bookingSiteUrl,
-          undefined,
-        );
-      } catch (error) {
-        console.error("AUTO_EXPIRE_WA_ERR", businessId, booking.id, error);
-      }
-    }
+    // An expired checkout is not marketing permission. Rebooking nudges remain held.
 
     await logSent(businessId, booking.id, booking.phone || "", "AUTO_CANCEL");
     cancelled++;
@@ -579,7 +578,7 @@ async function sendPaymentRemindersForBusiness(businessId: string): Promise<numb
 
   // Unpaid, upcoming (within 24h), not overridden, with a payment link.
   const { data: bookings } = await db.from("bookings")
-    .select("id, business_id, customer_name, phone, email, qty, total_amount, payment_url, allow_unpaid, status, slot_id, tours(name), slots!inner(start_time)")
+    .select("id, business_id, customer_name, phone, email, qty, total_amount, payment_url, allow_unpaid, status, source, payment_deadline, slot_id, tours(name), slots!inner(start_time)")
     .eq("business_id", businessId)
     .in("status", ["PENDING", "CONFIRMED", "HELD"])
     .eq("allow_unpaid", false)
@@ -589,6 +588,7 @@ async function sendPaymentRemindersForBusiness(businessId: string): Promise<numb
 
   for (const booking of (bookings || [])) {
     const b: any = booking;
+    if (b.source === "ADMIN" && b.payment_deadline) continue; // The deadline queue owns manual-booking reminders.
     const startTime = b?.slots?.start_time;
     if (!startTime || !b.payment_url) continue;
     const firstName = String(b.customer_name || "").split(" ")[0] || "there";
@@ -651,7 +651,7 @@ async function sendPaymentRemindersForBusiness(businessId: string): Promise<numb
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_SERVICE_ROLE_KEY },
           body: JSON.stringify({ type: "PAYMENT_REMINDER", data: {
-            business_id: businessId, email: b.email, customer_name: b.customer_name,
+            business_id: businessId, booking_id: b.id, email: b.email, customer_name: b.customer_name,
             tour_name: tourName, start_time: startTime, qty: b.qty,
             payment_url: b.payment_url, cancel_phrase: cancelPhrase, total_amount: b.total_amount,
           } }),
@@ -669,7 +669,7 @@ async function sendPaymentRemindersForBusiness(businessId: string): Promise<numb
 // records a PAYMENT_REMINDER so the automated sweep won't pile a duplicate on top.
 async function sendOnePaymentReminder(bookingId: string, businessId: string | null): Promise<{ ok: boolean; error?: string }> {
   let query = db.from("bookings")
-    .select("id, business_id, customer_name, phone, email, qty, total_amount, payment_url, tours(name), slots(start_time)")
+    .select("id, business_id, customer_name, phone, email, qty, total_amount, payment_url, payment_deadline, tours(name), slots(start_time)")
     .eq("id", bookingId);
   if (businessId) query = query.eq("business_id", businessId);
   const { data: b } = await query.maybeSingle();
@@ -690,8 +690,9 @@ async function sendOnePaymentReminder(bookingId: string, businessId: string | nu
     "Friendly reminder that your " + tourName + " is coming up:\n" + timeStr + "\n" +
     bk.qty + " guest" + (Number(bk.qty || 0) === 1 ? "" : "s") + "\n\n" +
     "We haven't received your payment yet. To lock in your spot, you can pay securely here:\n" + bk.payment_url + "\n\n" +
-    "Just so you know: if payment isn't made, the booking will be automatically cancelled about " + cancelPhrase +
-    " before the trip so the spot can be freed up. Having any trouble paying? Reply here and we'll sort it out. \u{1F60A}";
+    (bk.payment_deadline
+      ? "Payment is due by " + formatTenantDateTime(tenant.business, bk.payment_deadline) + ". Your payment link will expire at the deadline. Reply here if you need help."
+      : "Just so you know: if payment isn't made, the booking will be automatically cancelled about " + cancelPhrase + " before the trip so the spot can be freed up. Having any trouble paying? Reply here and we'll sort it out.");
   if (bk.phone) { try { await sendWhatsappTextForTenant(tenant, bk.phone, message); } catch (_e) { /* best effort */ } }
   if (bk.email) {
     try {
@@ -699,7 +700,7 @@ async function sendOnePaymentReminder(bookingId: string, businessId: string | nu
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_SERVICE_ROLE_KEY },
         body: JSON.stringify({ type: "PAYMENT_REMINDER", data: {
-          business_id: bk.business_id, email: bk.email, customer_name: bk.customer_name,
+          business_id: bk.business_id, booking_id: bk.id, email: bk.email, customer_name: bk.customer_name,
           tour_name: tourName, start_time: bk.slots?.start_time, qty: bk.qty,
           payment_url: bk.payment_url, cancel_phrase: cancelPhrase, total_amount: bk.total_amount,
         } }),
@@ -707,6 +708,38 @@ async function sendOnePaymentReminder(bookingId: string, businessId: string | nu
     } catch (_e) { /* best effort */ }
   }
   await logSent(bk.business_id, bk.id, bk.phone || "", "PAYMENT_REMINDER");
+  return { ok: true };
+}
+
+// Only the stored booking address/link may be used for operator recovery emails.
+async function sendPaymentRecoveryEmail(bookingId: string, requestedBusinessId: string, auth: Awaited<ReturnType<typeof requireAuth>>) {
+  if (!canAccessBusiness(auth, requestedBusinessId)) return { ok: false, error: "Booking not accessible" };
+  const prepared = await db.rpc("prepare_payment_recovery", { p_booking_id: bookingId, p_business_id: requestedBusinessId });
+  if (prepared.error) throw new Error("Could not check the payment reservation. Please try again.");
+  if (!prepared.data?.ok) return { ok: false, error: prepared.data?.error || "Payment recovery is unavailable" };
+  const { data: b, error } = await db.from("bookings")
+    .select("id, business_id, status, email, customer_name, qty, total_amount, total_captured, payment_failed_at, payment_url, tours(name), slots(start_time)")
+    .eq("id", bookingId).eq("business_id", requestedBusinessId).maybeSingle();
+  if (error) throw new Error("Could not load the booking. Please try again.");
+  if (!b || !["HELD", "PENDING", "PENDING PAYMENT", "CONFIRMED"].includes(b.status) || Number(b.total_captured) > 0) return { ok: false, error: "Review the booking's payment status before sending a payment link." };
+  const tenant = await getTenantContext(db, requestedBusinessId);
+  const bk: any = b;
+  const response = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_SERVICE_ROLE_KEY },
+    body: JSON.stringify({ type: b.payment_failed_at ? "PAYMENT_FAILED" : "PAYMENT_LINK", data: {
+      business_id: requestedBusinessId, booking_id: b.id, email: b.email,
+      customer_name: b.customer_name || "there", ref: b.id.slice(0, 8).toUpperCase(),
+      tour_name: bk.tours?.name || "your booking",
+      tour_date: bk.slots?.start_time ? formatTenantDateTime(tenant.business, bk.slots.start_time) : "",
+      qty: b.qty, total_amount: Number(b.total_amount).toFixed(2), payment_url: b.payment_url,
+    } }),
+  });
+  const delivered = await response.json().catch(() => ({}));
+  if (!response.ok || delivered.ok !== true) return { ok: false, error: "The email could not be sent. Please try again." };
+  const saved = await db.from("bookings").update({ payment_recovery_emailed_at: new Date().toISOString() })
+    .eq("id", b.id).eq("business_id", requestedBusinessId);
+  if (saved.error) return { ok: true, warning: "Email sent, but its sent time could not be saved. Refresh before sending again." };
   return { ok: true };
 }
 
@@ -721,6 +754,14 @@ Deno.serve(withSentry("auto-messages", async (req) => {
   try {
     const body = await req.json().catch(() => ({}));
     const action = String(body.action || "all");
+
+    if (action === "payment_recovery_email") {
+      const bookingId = String(body.booking_id || "");
+      const targetBusinessId = String(body.business_id || auth.businessId || "");
+      if (!bookingId || !targetBusinessId) return new Response(JSON.stringify({ ok: false, error: "Booking and business are required" }), { status: 400, headers: getHeaders(req.headers.get("origin")) });
+      const r = await sendPaymentRecoveryEmail(bookingId, targetBusinessId, auth);
+      return new Response(JSON.stringify(r), { status: r.ok ? 200 : 400, headers: getHeaders(req.headers.get("origin")) });
+    }
 
     // Manual, single-booking payment reminder from the Bookings action menu.
     if (action === "payment_reminder_one") {

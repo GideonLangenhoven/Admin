@@ -8,7 +8,7 @@ A quick reference for the booking lifecycle across the whole dashboard.
 
 ## Booking statuses
 
-- **Held / Pending** — seats reserved, payment not yet received. Online checkouts hold seats for about 15 minutes; manual bookings hold for the duration you set (default 24 hours). Unpaid holds release automatically.
+- **Held / Pending** — seats reserved, payment not yet received. Online checkouts hold seats for about 15 minutes; manual bookings hold for the duration you set (default 7 days). Unpaid holds release automatically.
 - **Paid** — payment confirmed (card payment webhook, or marked paid manually for EFT/cash).
 - **Confirmed** — confirmed to run.
 - **Completed** — the trip happened.
@@ -20,15 +20,17 @@ At checkout the customer gets a secure card-payment page. Payment confirmation a
 
 ## Rescheduling (rebooking)
 
-Moving a booking to a different slot or tour handles money automatically: same price swaps immediately; a more expensive slot asks the customer to pay the difference before the move; a cheaper slot refunds the difference. Customers can also reschedule themselves from their My Bookings page or by chatting with the assistant.
+Moving a booking to a different slot or tour checks availability and the price difference. A same-price move can complete immediately. For a more expensive departure, the original booking stays in place until the customer pays the extra amount. A cheaper move can require a choice between voucher credit and a refund; follow the options shown rather than assuming money has already been returned. Customers can also use My Bookings or the customer chatbot.
+
+Last-minute prices sell unsold seats. An existing paid booking does not automatically get that discount when rescheduling.
 
 ## Guest count changes
 
-Increasing guests on a paid booking requires paying for the extra seats (and re-signing waivers where applicable); decreasing refunds the difference and returns capacity to the slot.
+Increasing guests on a paid booking reserves extra seats pending payment and can require new waiver information. Decreasing guests releases capacity and handles any excess value through the available voucher/refund options. An unpaid booking is repriced without returning money that was never received.
 
 ## Cancellations and refunds
 
-When a booking is cancelled, the seats always go back to the slot. What the customer gets back follows your cancellation policy's time-based tiers — unless it's a weather cancellation you initiated, in which case they choose between reschedule, voucher, or refund. Refund requests land in the Refund Queue for your decision.
+Cancelling a booking releases its reserved seats. Customer cancellations follow the configured time-based policy. Operator/weather cancellation can offer eligible paid guests reschedule, voucher or refund choices. Voucher-funded value is returned as voucher credit rather than a card refund. See [Refunds](/refunds) for requested refunds and pending provider outcomes; submitting a refund is not the same as completing one.
 
 ## Customer self-service
 

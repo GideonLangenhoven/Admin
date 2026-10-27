@@ -15,16 +15,16 @@ describe("marketing unsubscribe (item 10)", () => {
   const dispatch = readFileSync("supabase/functions/marketing-dispatch/index.ts", "utf8");
   const automationDispatch = readFileSync("supabase/functions/marketing-automation-dispatch/index.ts", "utf8");
 
-  it("the unsubscribe endpoint checks the status-update error before claiming success", () => {
-    expect(unsubscribeFn).toContain('const { error: statusErr } = await supabase.from("marketing_contacts")');
-    expect(unsubscribeFn).toContain("if (statusErr)");
-    expect(unsubscribeFn).toContain("console.error(\"UNSUBSCRIBE_STATUS_UPDATE_FAILED");
+  it("the unsubscribe endpoint requires an atomic, tenant-bound transaction before claiming success", () => {
+    expect(unsubscribeFn).toContain('supabase.rpc("consume_marketing_unsubscribe"');
+    expect(unsubscribeFn).toContain('if (error || !["processed", "already_processed"].includes(result))');
+    expect(unsubscribeFn).toContain('"UNSUBSCRIBE_TRANSACTION_FAILED"');
+    expect(unsubscribeFn).toContain('.eq("business_id", tokenRow.business_id)');
   });
 
-  it("failed unsubscribe attempts are logged, not silently discarded", () => {
-    expect(unsubscribeFn).toContain("UNSUBSCRIBE_TOKEN_MARK_FAILED");
-    expect(unsubscribeFn).toContain("UNSUBSCRIBE_EVENT_LOG_FAILED");
-    expect(unsubscribeFn).toContain("UNSUBSCRIBE_COUNTER_FAILED");
+  it("unsubscribe logs never contain the bearer token", () => {
+    expect(unsubscribeFn).not.toContain('" token=" + token');
+    expect(unsubscribeFn).not.toContain('metadata: { reason, token }');
   });
 
   it("broadcast excludes unsubscribed contacts before sending email", () => {

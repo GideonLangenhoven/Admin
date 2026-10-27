@@ -36,8 +36,8 @@ function photoFixture(options: { failQuery?: string; responses?: Response[]; boo
       return query;
     },
   };
-  const send = sourceFunction("app/photos/page.tsx", "sendPhotos", {
-    supabase, fetch, ...setters, SU: "https://fixture.invalid", selectedSlot: slot, sending: false,
+  const send = sourceFunction("components/photos/TripPhotosWorkspace.tsx", "sendPhotos", {
+    supabase, fetch, ...setters, SU: "https://fixture.invalid", selectedSlot: slot, sending: false, isGuide: false,
     urls: [" " + photoUrls[0] + " ", photoUrls[1], photoUrls[0]], businessId: "a",
     notify: vi.fn(), confirmAction: async () => true, loadHistory: vi.fn(),
   });
@@ -93,8 +93,8 @@ describe("trip photo delivery", () => {
     const uploadDriveMedia = vi.fn()
       .mockResolvedValueOnce(undefined)
       .mockRejectedValueOnce(new Error("Drive rejected the file"));
-    const upload = sourceFunction("app/photos/page.tsx", "uploadToDrive", {
-      ...setters, notify, selectedSlot: slot, uploadFiles: files, uploading: false, businessId: "a", uploadDriveMedia,
+    const upload = sourceFunction("components/photos/TripPhotosWorkspace.tsx", "uploadToDrive", {
+      ...setters, notify, selectedSlot: slot, uploadFiles: files, uploading: false, businessId: "a", uploadDriveMedia, isGuide: false,
       fmtDate: () => "10 Sep", loadHistory: vi.fn(),
       supabase: {
         functions: { invoke: async (_name: string, { body }: any) => ({ data: body.action === "token" ? { access_token: "fixture" } : { folder_id: "folder-two", folder_url: photoUrls[1] } }) },
@@ -111,36 +111,20 @@ describe("trip photo delivery", () => {
   });
 });
 
-describe("guide photo callers", () => {
-  const file = "app/guide/photos/[slotId]/page.tsx";
-  const getAuthHeaders = async () => ({ Authorization: "Bearer signed-in-guide", "Content-Type": "application/json" });
-
-  it("authenticates a multipart upload and surfaces failed files", async () => {
-    const setUploadStatus = vi.fn();
-    const upload = sourceFunction(file, "onPickPhotos", {
-      getAuthHeaders, uploading: false, slotId: slot.id, FormData,
-      setUploading: vi.fn(), setUploadStatus, setProgress: vi.fn(), reload: vi.fn(),
-      fetch: async (_url: string, init: RequestInit) => {
-        expect(init.headers).toEqual({ Authorization: "Bearer signed-in-guide" });
-        expect((init.body as FormData).get("slot_id")).toBe(slot.id);
-        return Response.json({ error: "Drive disconnected" }, { status: 400 });
-      },
-    });
-    await upload([new File(["photo"], "trip.jpg")]);
-    expect(setUploadStatus).toHaveBeenLastCalledWith("0 of 1 photos uploaded. Please retry: trip.jpg");
-  });
-
-  it("authenticates email sending and shows partial failures", async () => {
-    const setEmailStatus = vi.fn();
-    const send = sourceFunction(file, "sendThankYou", {
-      getAuthHeaders, slotId: slot.id, setEmailStatus,
-      fetch: async (_url: string, init: RequestInit) => {
-        expect(init.headers).toEqual(await getAuthHeaders());
-        return Response.json({ ok: false, recipient_count: 1, failed: [{ booking_id: "booking-b" }] });
-      },
+describe("shared guide photo sending", () => {
+  it("uses the same confirmation and displays partial delivery without clearing the links", async () => {
+    const state: Record<string, any> = {};
+    const guideRequest = vi.fn(async () => ({ sent: 1, failures: ["Guest B (email)"] }));
+    const setters = Object.fromEntries(["Sending", "Result", "SendProgress", "Urls", "SelectedSlot"].map(key => ["set" + key, (value: unknown) => { state[key] = value; }]));
+    const confirmAction = vi.fn(async () => true);
+    const send = sourceFunction("components/photos/TripPhotosWorkspace.tsx", "sendPhotos", {
+      ...setters, isGuide: true, selectedSlot: slot, sending: false, urls: photoUrls, guideRequest, confirmAction, loadHistory: vi.fn(), notify: vi.fn(),
     });
     await send();
-    expect(setEmailStatus).toHaveBeenLastCalledWith("Sent to 1 customer(s); 1 failed. Check customer contact details before sending again.");
+    expect(confirmAction).toHaveBeenCalledWith(expect.objectContaining({ confirmLabel: "Send now" }));
+    expect(guideRequest).toHaveBeenCalledWith("/api/guide/send-thank-you", { slot_id: slot.id, photo_urls: photoUrls });
+    expect(state.Result).toEqual({ sent: 1, failures: ["Guest B (email)"] });
+    expect(state.Urls).toBeUndefined(); expect(state.Sending).toBe(false);
   });
 });
 
@@ -164,6 +148,7 @@ it("the guide email uses every photo from this trip and reports provider rejecti
   const handler = sourceHandler("app/api/guide/send-thank-you/route.ts", {
     "@/app/lib/api-auth": { getCallerAdmin: async () => ({ business_id: "a", id: "guide-a" }) },
     "@supabase/supabase-js": { createClient: () => db },
+    "@/app/lib/guide-api-auth": { getCallerGuide: async () => null },
   }, {}, async (_url, init) => {
     expect(JSON.parse(init!.body as string).data).toMatchObject({ business_id: "a", photo_urls: photoUrls });
     return Response.json({ ok: false, error: "invalid_email" });

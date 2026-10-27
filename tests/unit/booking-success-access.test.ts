@@ -136,6 +136,7 @@ function checkoutFixture(webhookSecret = "fixture-webhook-secret", credentialOve
   }, env);
   const gateway = vi.fn<typeof fetch>(async () => Response.json({ id: "checkout-fixture", redirectUrl: "https://pay.fixture.invalid" }));
   const handler = sourceHandler("supabase/functions/create-checkout/index.ts", {
+    "../_shared/booking-custom-fields.ts": sourceExports("supabase/functions/_shared/booking-custom-fields.ts", {}),
     "../_shared/auth.ts": auth, "../_shared/booking-success.ts": tokens,
     "../_shared/subscription.ts": { blockIfNotTrading: async () => null },
     "../_shared/tenant.ts": {

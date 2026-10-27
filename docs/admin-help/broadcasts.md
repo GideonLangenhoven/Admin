@@ -13,12 +13,10 @@ Broadcasts sends a message to every guest booked on the slots you select — by 
 3. Compose your message — use the {name} tag to personalise with the guest's name.
 4. Send. The result reports how many were delivered per channel, with a failure breakdown.
 
-WhatsApp delivery is best-effort: it depends on the customer's number being on WhatsApp and the 24-hour messaging window. Recipients whose window is closed get a pre-approved "please reply" template instead; the actual broadcast message is delivered automatically the moment they reply. Email is sent to everyone regardless.
+WhatsApp delivery depends on the customer's number, credentials and service window. Where configured, a pre-approved reply-request template can reopen the conversation and queued text can send after the customer responds. Email is attempted for guests with an email address. Check the returned per-channel results and failures; a send attempt does not guarantee everyone received the notice.
 
 ## Weather Mode — cancelling slots
 
-Toggle **Weather Mode** to turn the broadcast into a cancellation: the selected slots are cancelled, capacity is released, bookings are cancelled, and every affected customer gets a WhatsApp and email with self-service options to **reschedule, take a voucher, or request a refund**. No refund is issued automatically — the customer chooses, and refund requests then appear in your Refund Queue.
+MAIN_ADMIN or SUPER_ADMIN can use **Weather Mode** to cancel selected departures through the cancellation service. Affected bookings are cancelled and notification attempts offer eligible paid guests **reschedule, voucher or refund** choices. No refund completes merely because the slots were cancelled. Operations staff should ask their main admin to perform the cancellation. Sending a normal broadcast does not cancel bookings.
 
-## History
-
-The history list shows past sends, marked BC for normal broadcasts and WX for weather cancellations.
+On mobile, **Weather Cancel** is directly below the calendar. On desktop, it is beside the page heading.

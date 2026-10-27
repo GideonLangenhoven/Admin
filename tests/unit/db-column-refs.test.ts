@@ -20,6 +20,34 @@ import { describe, expect, it } from "vitest";
 const SCHEMA: Record<string, string[]> = JSON.parse(
   readFileSync("tests/fixtures/db-columns.json", "utf8"),
 );
+// This disabled service targets an undeployed local candidate. Keep the live
+// snapshot intact; the disposable PostgreSQL test verifies these extra columns.
+const AGENT_LOCAL_SCHEMA: Record<string, string[]> = JSON.parse(
+  readFileSync("tests/fixtures/agent-columns.local.json", "utf8"),
+);
+const OTA_LOCAL_SCHEMA: Record<string, string[]> = JSON.parse(
+  readFileSync("tests/fixtures/ota-columns.local.json", "utf8"),
+);
+// Additive local migration columns are checked by marketing-safety-local.mjs;
+// the hosted schema snapshot is deliberately unchanged.
+const MARKETING_LOCAL_ADDITIONS: Record<string, string[]> = JSON.parse(
+  readFileSync("tests/fixtures/marketing-columns.local.json", "utf8"),
+);
+const MARKETING_LOCAL_SCHEMA = Object.fromEntries(Object.entries(MARKETING_LOCAL_ADDITIONS)
+  .map(([table, columns]) => [table, [...(SCHEMA[table] || []), ...columns]]));
+// Applied and verified in operator-usability-local.mjs; do not rewrite the hosted schema snapshot.
+const OPERATOR_LOCAL_ADDITIONS: Record<string,string[]> = JSON.parse(readFileSync("tests/fixtures/operator-columns.local.json","utf8"));
+const OPERATOR_LOCAL_SCHEMA = Object.fromEntries(Object.entries(OPERATOR_LOCAL_ADDITIONS).map(([table,columns])=>[table,[...(SCHEMA[table]||[]),...columns]]));
+// Verified by guide-access-local.mjs; shared guides never receive admin tenant grants.
+const GUIDE_ADDITIONS: Record<string,string[]> = JSON.parse(readFileSync("tests/fixtures/guide-columns.local.json","utf8"));
+const GUIDE_SCHEMA = Object.fromEntries(Object.entries(GUIDE_ADDITIONS).map(([table,columns])=>[table,[...(SCHEMA[table]||[]),...columns]]));
+const baseSchemaFor = (file: string) => ["components/booking/ArrivalApproval.tsx", "components/PaymentRecoveryPanel.tsx"].includes(file) ? {...SCHEMA,...OPERATOR_LOCAL_SCHEMA} : file === "app/lib/agent-read-service.ts"
+  ? { ...SCHEMA, ...AGENT_LOCAL_SCHEMA }
+  : /^supabase\/functions\/_shared\/ota-(backend|runtime|availability)\.ts$/.test(file)
+    ? { ...SCHEMA, ...OTA_LOCAL_SCHEMA }
+    : file.startsWith("app/marketing/") || file === "supabase/functions/_shared/marketing-delivery.ts"
+      ? { ...SCHEMA, ...MARKETING_LOCAL_SCHEMA } : SCHEMA;
+const schemaFor = (file: string) => ({...baseSchemaFor(file),...GUIDE_SCHEMA});
 
 const ROOTS = ["supabase/functions", "app", "booking/app", "components"];
 
@@ -60,6 +88,7 @@ function collectRefs(): Ref[] {
   const refs: Ref[] = [];
 
   for (const file of files) {
+    const schema = schemaFor(file);
     const src = readFileSync(file, "utf8");
     // Comments describe intentions, not queries — a TODO naming a column that
     // does not exist yet is not a bug.
@@ -67,7 +96,7 @@ function collectRefs(): Ref[] {
     for (const m of code.matchAll(fromRe)) {
       const table = m[1];
       const body = m[2];
-      if (!SCHEMA[table]) continue;
+      if (!schema[table]) continue;
 
       for (const f of body.matchAll(filterRe)) refs.push({ table, column: f[1], file });
 
@@ -108,19 +137,18 @@ describe("database column references in code exist in the schema", () => {
   // A gap in the snapshot must fail, not quietly reduce coverage.
   it("the fixture covers every table the code queries", () => {
     const fromRe = /\.from\(\s*"([a-z_]+)"\s*\)/g;
-    const referenced = new Set<string>();
+    const missing = new Set<string>();
     for (const file of ROOTS.flatMap((r) => walk(r))) {
       const src = readFileSync(file, "utf8")
         .replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-      for (const m of src.matchAll(fromRe)) referenced.add(m[1]);
+      for (const m of src.matchAll(fromRe)) if (!schemaFor(file)[m[1]]) missing.add(m[1]);
     }
-    const missing = [...referenced].filter((t) => !SCHEMA[t]).sort();
-    expect(missing).toEqual([]);
+    expect([...missing].sort()).toEqual([]);
   });
 
   it("every referenced table.column exists", () => {
     const bad = refs
-      .filter((r) => !SCHEMA[r.table].includes(r.column))
+      .filter((r) => !schemaFor(r.file)[r.table].includes(r.column))
       .map((r) => `${r.table}.${r.column}  (${r.file})`);
     expect([...new Set(bad)].sort()).toEqual([]);
   });

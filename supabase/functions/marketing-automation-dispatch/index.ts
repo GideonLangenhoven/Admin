@@ -8,6 +8,9 @@ import { nonTradingBusinessIds } from "../_shared/subscription.ts";
 import { fillMarketingTokens } from "../_shared/marketing-tokens.ts";
 import { replaceLegacyMarketingSocialIcons } from "../_shared/marketing-email-html.ts";
 
+import { marketingCalendarDate } from "../_shared/marketing-calendar.ts";
+import { confirmMarketingDelivery, reserveMarketingDelivery, finishMarketingDelivery, marketingDeliveryOutcome } from "../_shared/marketing-delivery.ts";
+
 const RAW_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "";
 // Refuse to use the Resend developer sandbox even if it's pasted into the env
 // — that domain rate-limits hard and routes to spam (U-6 / V-12).
@@ -43,20 +46,23 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
   const businessId = auth.isServiceRole || auth.role === "SUPER_ADMIN" ? null : auth.businessId;
 
   try {
-    const results = { date_enrolled: 0, processed: 0, sent: 0, delayed: 0, conditions: 0, vouchers: 0, promos: 0, completed: 0, errors: 0 };
+    const results = { welcome_back_enrolled: 0, date_enrolled: 0, processed: 0, sent: 0, delayed: 0, conditions: 0, vouchers: 0, promos: 0, completed: 0, errors: 0 };
+
+    const welcomeBack = await supabase.rpc("enroll_welcome_back_sequences", { p_business_id: businessId, p_limit: 100 });
+    if (welcomeBack.error) throw new Error("Welcome-back enrollment failed: " + welcomeBack.error.message);
+    results.welcome_back_enrolled = Number(welcomeBack.data || 0);
 
     // ── 1. Date-field triggers: enroll contacts whose date matches today ──
     const today = new Date();
     const dateAutomations = await fetchAllRows((from, to) => {
       let query = supabase.from("marketing_automations")
-        .select("id, business_id, trigger_config")
+        .select("id, business_id, trigger_config, businesses(timezone)")
         .eq("status", "active").eq("trigger_type", "date_field")
         .order("id").range(from, to);
       if (businessId) query = query.eq("business_id", businessId);
       return query;
     });
 
-    const currentYear = today.getFullYear();
 
     // Fix 3b: no new automation enrolments for a paused or suspended operator.
     const pausedForDates = await nonTradingBusinessIds(
@@ -71,11 +77,14 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
       if (field !== "date_of_birth" && field !== "anniversary_date") continue;
       const daysBefore = auto.trigger_config?.days_before || 0;
 
-      // Calculate target date (today + days_before offset)
-      const targetDate = new Date(today);
-      targetDate.setDate(targetDate.getDate() + daysBefore);
-      const targetMonth = targetDate.getMonth() + 1;
-      const targetDay = targetDate.getDate();
+      const zone = auto.businesses?.timezone;
+      if (!zone) { results.errors++; continue; }
+      let target;
+      try { target = marketingCalendarDate(today, zone, daysBefore); }
+      catch { results.errors++; continue; }
+      const currentYear = marketingCalendarDate(today, zone).year;
+      const targetMonth = target.month;
+      const targetDay = target.day;
 
       // Fetch contacts with their date field in one query (avoid N+1)
       const matchingContacts = await fetchAllRows((from, to) => supabase
@@ -90,8 +99,8 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
         if (!contact[field]) continue;
 
         // Check month+day match
-        const contactDate = new Date(contact[field]);
-        if (contactDate.getMonth() + 1 !== targetMonth || contactDate.getDate() !== targetDay) continue;
+        const [, month, day] = String(contact[field]).split("-").map(Number);
+        if (month !== targetMonth || day !== targetDay) continue;
 
         // Check if already enrolled this year (allow annual re-enrollment)
         const { data: existing } = await supabase
@@ -103,7 +112,7 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
 
         if (existing) {
           // Re-enroll if the last enrollment was from a previous year and is completed/exited
-          const enrolledYear = new Date(existing.created_at).getFullYear();
+          const enrolledYear = marketingCalendarDate(new Date(existing.created_at), zone).year;
           if (enrolledYear >= currentYear) continue; // Already enrolled this year
           if (existing.status === "active") continue; // Still in progress
 
@@ -176,7 +185,7 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
         // Load automation
         const { data: automation } = await supabase
           .from("marketing_automations")
-          .select("id, status, business_id")
+          .select("id, status, business_id, trigger_type")
           .eq("id", enrollment.automation_id)
           .eq("business_id", enrollment.business_id)
           .single();
@@ -184,6 +193,12 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
         if (!automation || automation.status !== "active") {
           // Skip paused/archived automations
           continue;
+        }
+
+        if (automation.trigger_type === "booking_inactive") {
+          const eligible = await supabase.rpc("validate_welcome_back_enrollment", { p_enrollment_id: enrollment.id, p_business_id: enrollment.business_id });
+          if (eligible.error) throw new Error("Could not verify welcome-back eligibility");
+          if (eligible.data !== true) continue;
         }
 
         const { data: bizRow } = await supabase.from("businesses").select("business_name, subdomain, booking_site_url").eq("id", enrollment.business_id).maybeSingle();
@@ -243,6 +258,23 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
           continue;
         }
 
+        const eligibility = await supabase.rpc("marketing_step_eligibility", {
+          p_business_id: enrollment.business_id, p_contact_id: contact.id, p_enrollment_id: enrollment.id,
+        });
+        if (eligibility.error) throw new Error("Marketing eligibility unavailable");
+        if (["first_booking_policy_pending", "offer_issuance_unavailable", "domain_event_binding_unavailable"].includes(eligibility.data)) {
+          results.delayed++;
+          continue;
+        }
+        if (eligibility.data !== "eligible") {
+          await supabase.from("marketing_automation_enrollments").update({ status: "exited", updated_at: new Date().toISOString() })
+            .eq("id", enrollment.id).eq("business_id", enrollment.business_id);
+          await supabase.from("marketing_automation_logs").insert({ business_id: enrollment.business_id,
+            automation_id: enrollment.automation_id, enrollment_id: enrollment.id, contact_id: contact.id,
+            step_position: currentStep.position, step_type: currentStep.step_type, action: "excluded",
+            metadata: { reason: eligibility.data } });
+          continue;
+        }
         const metadata = enrollment.metadata || {};
 
         // Process step
@@ -289,12 +321,13 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
 
             // Generate unsubscribe token
             const unsubToken = crypto.randomUUID();
-            await supabase.from("marketing_unsubscribe_tokens").insert({
+            const { error: unsubError } = await supabase.from("marketing_unsubscribe_tokens").insert({
               business_id: enrollment.business_id,
               contact_id: contact.id,
               token: unsubToken,
               // campaign_id is null for automation-sourced emails (no campaign)
             });
+            if (unsubError) throw new Error("Could not create unsubscribe link");
             const unsubscribeUrl = SUPABASE_URL + "/functions/v1/marketing-unsubscribe?token=" + unsubToken;
             html = html.replace(/\{\{unsubscribe_url\}\}/g, unsubscribeUrl);
 
@@ -310,25 +343,39 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
               return '<a ' + pre + 'href="' + trackedUrl + '"' + post + '>';
             });
 
-            // Send via Resend
-            const res = await fetch("https://api.resend.com/emails", {
-              method: "POST",
-              headers: {
-                Authorization: "Bearer " + RESEND_API_KEY,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                from: bizFromEmail,
-                to: [contact.email],
-                subject,
-                html,
-              }),
-            });
+            const payload = { from: bizFromEmail, to: [contact.email], subject, html,
+              headers: { "List-Unsubscribe": "<" + unsubscribeUrl + ">", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } };
+            const delivery = await reserveMarketingDelivery(supabase, { businessId: enrollment.business_id,
+              contactId: contact.id, enrollmentId: enrollment.id,
+              key: "automation/" + enrollment.id + "/" + enrollment.created_at + "/" + currentStep.position, payload });
+            if (delivery.reason !== "reserved") {
+              await supabase.from("marketing_automation_logs").insert({ business_id: enrollment.business_id,
+                automation_id: enrollment.automation_id, enrollment_id: enrollment.id, contact_id: contact.id,
+                step_position: currentStep.position, step_type: "send_email", action: "dispatch_held",
+                metadata: { reason: delivery.reason } });
+              break;
+            }
+            const finalReason = await confirmMarketingDelivery(supabase, enrollment.business_id, delivery.id!);
+            if (finalReason !== "eligible") throw new Error("Dispatch blocked: " + finalReason);
+            let res: Response;
+            try {
+              res = await fetch("https://api.resend.com/emails", {
+                method: "POST", signal: AbortSignal.timeout(15000),
+                headers: { Authorization: "Bearer " + RESEND_API_KEY, "Content-Type": "application/json",
+                  "Idempotency-Key": "marketing/" + delivery.id },
+                body: JSON.stringify(payload),
+              });
+            } catch {
+              await finishMarketingDelivery(supabase, enrollment.business_id, delivery.id!, "reconcile");
+              throw new Error("Provider outcome unknown; reconciliation required before any retry");
+            }
 
             // V-17a: capture the actual Resend error body when sending fails
             // so the Step Execution Log can show *why* — previously the only
             // signal was a red "email_failed" chip with no diagnostic.
             const sendBody = await res.json().catch(() => ({} as any));
+            const outcome = marketingDeliveryOutcome(res.ok, res.status, sendBody?.id);
+            await finishMarketingDelivery(supabase, enrollment.business_id, delivery.id!, outcome, sendBody?.id);
             const logMeta: Record<string, unknown> = { template_id: templateId, subject, from: bizFromEmail };
             if (!res.ok) {
               logMeta.error = sendBody?.message || sendBody?.error || ("HTTP " + res.status);
@@ -344,11 +391,11 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
               business_id: enrollment.business_id,
               step_position: currentStep.position,
               step_type: "send_email",
-              action: res.ok ? "email_sent" : "email_failed",
+              action: outcome === "sent" ? "email_sent" : outcome === "reconcile" ? "reconciliation_required" : "email_failed",
               metadata: logMeta,
             });
 
-            if (res.ok) {
+            if (outcome === "sent") {
               // Increment usage
               const currentPeriod = new Date().toISOString().slice(0, 7);
               await supabase.rpc("increment_marketing_monthly_usage", {
@@ -388,7 +435,7 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
             } else {
               console.error("AUTOMATION_SEND_FAIL:", enrollment.id, JSON.stringify(sendBody));
               results.errors++;
-              // Email failed — do NOT advance. Enrollment stays on current step for retry on next dispatch cycle.
+              // Do not advance or resend. The durable delivery requires reconciliation or explicit operator recovery.
             }
             break;
           }
@@ -449,14 +496,14 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
               const { count } = await supabase
                 .from("marketing_events")
                 .select("id", { count: "exact", head: true })
-                .eq("contact_id", contact.id)
+                .eq("contact_id", contact.id).eq("business_id", enrollment.business_id)
                 .eq("event_type", "open");
               conditionMet = (count || 0) > 0;
             } else if (condType === "clicked_link") {
               const { count } = await supabase
                 .from("marketing_events")
                 .select("id", { count: "exact", head: true })
-                .eq("contact_id", contact.id)
+                .eq("contact_id", contact.id).eq("business_id", enrollment.business_id)
                 .eq("event_type", "click");
               conditionMet = (count || 0) > 0;
             }
@@ -503,6 +550,9 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
           }
 
           case "generate_voucher": {
+            const approval = await supabase.rpc("marketing_offer_allowed", { p_business_id: enrollment.business_id,
+              p_automation_id: enrollment.automation_id, p_step_type: currentStep.step_type, p_config: currentStep.config });
+            if (approval.error || approval.data !== true) throw new Error("Voucher issuance is held pending approved limits and supported semantics");
             const config = currentStep.config as any;
             const prefix = config?.code_prefix || "GIFT";
             const amount = Number(config?.amount) || 100;
@@ -535,6 +585,7 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
             const { error: voucherInsertErr } = await supabase.from("vouchers").insert(voucherRow);
             if (voucherInsertErr) {
               console.error("AUTOMATION_VOUCHER_INSERT_ERR:", voucherInsertErr.message);
+              throw new Error("Voucher could not be created; sequence has not advanced");
             }
 
             // Store in enrollment metadata for next email step
@@ -584,6 +635,9 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
           }
 
           case "generate_promo": {
+            const approval = await supabase.rpc("marketing_offer_allowed", { p_business_id: enrollment.business_id,
+              p_automation_id: enrollment.automation_id, p_step_type: currentStep.step_type, p_config: currentStep.config });
+            if (approval.error || approval.data !== true) throw new Error("Promo issuance is held pending approved limits");
             const config = currentStep.config as any;
             const prefix = config?.code_prefix || "PROMO";
             const discountType = config?.discount_type || "PERCENT";
@@ -597,7 +651,7 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
 
             // Insert into promotions table
             const validUntil = new Date(Date.now() + validDays * 86400000).toISOString();
-            await supabase.from("promotions").insert({
+            const { error: promoError } = await supabase.from("promotions").insert({
               business_id: enrollment.business_id,
               code,
               description: "Auto-generated promo for " + (contact.email || "contact"),
@@ -608,6 +662,8 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
               max_uses: maxUses,
               active: true,
             });
+
+            if (promoError) throw new Error("Promo code could not be created: " + promoError.message);
 
             // Store in enrollment metadata for subsequent email steps
             const promoDiscount = discountType === "PERCENT" ? discountValue + "%" : "R" + discountValue;

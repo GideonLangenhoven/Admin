@@ -1,3 +1,4 @@
+import { renderGiftVoucherFace, type GiftVoucherFace } from "../_shared/gift-voucher-face.ts";
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -11,6 +12,7 @@ import { tourEndDate } from "../_shared/duration.ts";
 import { fillMarketingTokens } from "../_shared/marketing-tokens.ts";
 import { replaceLegacyMarketingSocialIcons } from "../_shared/marketing-email-html.ts";
 import { requireAuth, canAccessBusiness } from "../_shared/auth.ts";
+import { paymentDeadlineUrl } from "../_shared/payment-deadline.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 // Leave the outer cron worker one second to receive and persist Resend's
@@ -163,22 +165,49 @@ function heroImg(key: string, alt: string, bgColor = "#1b3b36") {
 
 const MANAGE_BOOKING_URL = "";
 
+async function queueBookingConfirmation(d: Record<string, unknown>) {
+  if (!supabase || !d.business_id) throw new Error("Booking business required");
+  const stored = await supabase.from("bookings").select("id, business_id, email, status")
+    .eq("id", String(d.booking_id)).eq("business_id", String(d.business_id)).maybeSingle();
+  if (stored.error || !stored.data) throw new Error("Booking could not be verified");
+  const booking = stored.data;
+  if (["CANCELLED", "EXPIRED"].includes(booking.status)) throw new Error("Booking is no longer confirmed");
+  const recipient = String(booking.email || "").trim();
+  if (!isValidEmail(recipient)) throw new Error("Booking email is missing or invalid");
+  // The existing minute worker sends after the guest has had time to sign.
+  // Ignore duplicates so webhook retries cannot postpone or repeat the email.
+  const queued = await supabase.from("notification_jobs").upsert({
+    business_id: booking.business_id,
+    booking_id: booking.id,
+    source_type: "BOOKING_CONFIRMATION",
+    source_id: booking.id,
+    template_type: "BOOKING_CONFIRM",
+    recipient,
+    payload: { ...d, email: recipient },
+    dedupe_key: "booking-confirmation/" + booking.id,
+    next_attempt_at: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+  }, { onConflict: "dedupe_key", ignoreDuplicates: true });
+  if (queued.error) throw new Error(queued.error.message);
+}
+
 async function enrichWaiverEmailData(d: Record<string, unknown>) {
   if (!supabase) return d;
   try {
     const ctx = await getWaiverContext(supabase, {
       businessId: String(d.business_id || ""),
       bookingId: String(d.booking_id || ""),
-      waiverStatus: String(d.waiver_status || ""),
-      waiverToken: String(d.waiver_token || ""),
+      // Booking-backed emails must read the current status, not the payment snapshot.
+      waiverStatus: d.booking_id ? undefined : String(d.waiver_status || ""),
+      waiverToken: d.booking_id ? undefined : String(d.waiver_token || ""),
     });
     return {
       ...d,
-      waiver_status: d.waiver_status || ctx.waiverStatus,
-      waiver_url: d.waiver_url || ctx.waiverLink,
+      waiver_status: ctx.waiverStatus,
+      waiver_url: ctx.waiverLink || d.waiver_url,
     };
   } catch (error) {
     console.error("WAIVER_EMAIL_CONTEXT_ERR:", error);
+    if (d.booking_id) throw error;
     return d;
   }
 }
@@ -447,7 +476,7 @@ function buildSocialIconsHtml(branding: { socialFacebook: string; socialInstagra
   return `<table cellpadding="0" cellspacing="0" style="margin: 14px auto 0;"><tr><td style="text-align: center;">${links.join(separator)}</td></tr></table>`;
 }
 
-function applyBranding(subject: string, html: string, branding: Awaited<ReturnType<typeof loadEmailBranding>>) {
+function applyBranding(subject: string, html: string, branding: Awaited<ReturnType<typeof loadEmailBranding>>, includeSocialLinks = true) {
   let brandedHtml = html;
 
   // Safety: NEVER produce empty URLs — Gmail strips href="" making buttons unclickable
@@ -555,7 +584,7 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
   // NOT one of the ordinary per-tenant `branding` fields above — it isn't
   // read from any business setting, so no operator config can omit or
   // override it, and it must render even when a tenant has zero social links.
-  const socialHtml = buildSocialIconsHtml(branding);
+  const socialHtml = includeSocialLinks ? buildSocialIconsHtml(branding) : "";
   // The mark carries alt="" and sits beside the text rather than replacing it:
   // most clients block remote images by default, and a blocked decorative image
   // collapses to nothing while "Powered by BookingTours" still reads. Ivory
@@ -612,6 +641,10 @@ function applyBranding(subject: string, html: string, branding: Awaited<ReturnTy
   return { subject: brandedSubject, html: brandedHtml };
 }
 
+function paymentDueHtml(d: Record<string, unknown>) {
+  return d.payment_due_label ? `<p style="font-size:16px;line-height:1.6;color:#1b3b36;background:#F7F7F6;padding:16px;border-radius:8px;">Payment due: <strong>${d.payment_due_label}</strong>${d.payment_url ? "<br>This payment link will expire at that time." : ""}</p>` : "";
+}
+
 function paymentLinkHtml(d: Record<string, unknown>) {
   return `
     <!DOCTYPE html>
@@ -634,7 +667,9 @@ function paymentLinkHtml(d: Record<string, unknown>) {
           <td style="padding: 40px 40px 10px; text-align: center;">
             <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Hi ${d.customer_name},</h2>
             <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">${d.intro || ("You're almost there. Please complete your payment below to secure your spots for the <strong>" + d.tour_name + "</strong>.")}</p>
-            ${d.cancel_phrase ? `<p style="font-size: 14px; line-height: 1.6; color: #B45309; background:#FEF3C7; border-radius:8px; padding:12px 16px; margin: 0 0 20px 0;">Heads up: if payment isn't made, this booking will be automatically cancelled about <strong>${d.cancel_phrase} before the trip</strong> so the spot can be released. Any trouble paying? Just reply to this email.</p>` : ""}
+            ${paymentDueHtml(d)}
+            ${d.partial_payment ? "<p>Thank you for your part payment. Please contact the operator to settle the remaining balance before the deadline.</p>" : ""}
+            ${d.cancel_phrase && !d.payment_due_label ? `<p style="font-size: 14px; line-height: 1.6; color: #B45309; background:#FEF3C7; border-radius:8px; padding:12px 16px; margin: 0 0 20px 0;">Heads up: if payment isn't made, this booking will be automatically cancelled about <strong>${d.cancel_phrase} before the trip</strong> so the spot can be released. Any trouble paying? Just reply to this email.</p>` : ""}
           </td>
         </tr>
         <!-- Details Box -->
@@ -663,7 +698,7 @@ function paymentLinkHtml(d: Record<string, unknown>) {
         <!-- CTA -->
         <tr>
           <td style="padding: 0 40px 40px; text-align: center;">
-            <a href="${d.payment_url}" style="display: inline-block; background-color: #1b3b36; color: #ffffff !important; text-decoration: none; padding: 16px 32px; border-radius: 30px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Pay Securely Now</a>
+            ${d.payment_url ? `<a href="${d.payment_url}" style="display: inline-block; background-color: #1b3b36; color: #ffffff !important; text-decoration: none; padding: 16px 32px; border-radius: 30px; font-weight: 600; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Pay Securely Now</a>` : ""}
             <p style="font-size: 13px; color: #888; margin-top: 25px;">This payment link is unique to your booking and will expire.</p>
           </td>
         </tr>
@@ -753,19 +788,7 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
           </td>
         </tr>
       `
-    : `
-        <tr>
-          <td style="padding: 0 40px 24px;">
-            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F7F7F6; border: 1px solid #A8C2B8; border-radius: 12px;">
-              <tr>
-                <td style="padding: 18px 22px; text-align: center;">
-                  <p style="margin: 0; font-size: 14px; color: #1b3b36; line-height: 1.6;"><strong>Waiver status:</strong> Completed for this booking.</p>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      `;
+    : "";
   // Operator-set tagline wins; otherwise guess a flavor line from the tour name
   const tourLower = String(d.tour_name || "").toLowerCase();
   let activityFlavor = String(d._emailTagline || "") || "Get ready for an unforgettable experience.";
@@ -804,8 +827,9 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
         <!-- Content -->
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
-            <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">We can't wait to see you, ${d.customer_name}.</h2>
+            <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">${d.returning_customer ? 'Welcome back' : 'We can\'t wait to see you'}, ${d.customer_name}.</h2>
             <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">Your spots for the <strong>${d.tour_name}</strong> are officially locked in. ${activityFlavor}</p>
+            ${paymentDueHtml(d)}
           </td>
         </tr>
         <!-- Details Box -->
@@ -829,8 +853,11 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
                 <td width="60%" style="padding: 18px 20px; border-bottom: 1px solid #E5E5E5; color: #1b3b36; font-size: 15px; font-weight: 400; text-align: right;">${d.qty}</td>
               </tr>
               <tr>
-                <td width="40%" style="padding: 18px 20px; color: #1b3b36; font-size: 16px; font-weight: 400;">Amount Paid:</td>
+                <td width="40%" style="padding: 18px 20px; color: #1b3b36; font-size: 16px; font-weight: 400;">Booking total:</td>
                 <td width="60%" style="padding: 18px 20px; color: #1b3b36; font-size: 16px; font-weight: 400; text-align: right;">${String(d.total_amount).match(/^[0-9]/) ? "R" + d.total_amount : d.total_amount}</td>
+              </tr>
+              <tr><td style="padding: 12px 20px;">Payment received:</td><td style="padding: 12px 20px; text-align: right;">${d.amount_paid == null ? "Not verified" : "R" + Number(d.amount_paid).toFixed(2)}</td></tr>
+              <tr><td style="padding: 12px 20px;">Balance due:</td><td style="padding: 12px 20px; text-align: right;">${d.amount_due == null ? "Check booking history" : "R" + Number(d.amount_due).toFixed(2)}</td>
               </tr>
             </table>
           </td>
@@ -1104,6 +1131,7 @@ function invoiceHtml(d: Record<string, unknown>, invCtx?: InvoiceContext) {
             </table>
           </td>
         </tr>
+        <tr><td style="padding:0 40px 20px;">${paymentDueHtml(d)}</td></tr>
         <!-- Invoice Table -->
         <tr>
           <td style="padding: 0 40px 20px;">
@@ -1246,64 +1274,38 @@ function platformInvoiceOutstandingHtml(d: Record<string, unknown>, platCtx: Pla
     </html>`;
 }
 
-function giftVoucherHtml(d: Record<string, unknown>) {
-  // Redesigned as a premium, celebratory gift-card experience instead of a
-  // plain transactional layout. Framing adapts to who's actually reading it
-  // — a real gift ("You've received a gift!") when it lands in the
-  // recipient's own inbox (recipient_email supplied at purchase); a short,
-  // reassuring receipt when the buyer gets a copy alongside it; or, when no
-  // recipient email was given, an honest "forward this on" framing for the
-  // buyer rather than pretending it's a receipt for themselves.
+function giftVoucherHtml(d: Record<string, unknown>, face: string) {
+  // Buyers receive a purchase confirmation; recipients still receive a gift.
   const mode = String(d.gift_recipient_mode || "buyer_forward");
   const recipientName = String(d.recipient_name || "your friend");
   const buyerName = String(d.buyer_name || "Someone special");
 
-  const heroEyebrow = mode === "recipient" ? "You've Received a Gift" : mode === "buyer_receipt" ? "Gift Sent" : "A Gift For Someone Special";
-  const heroTitle = mode === "recipient" ? "🎁 Surprise, " + recipientName + "!" : mode === "buyer_receipt" ? "🎁 On Its Way!" : "🎁 Your Gift Voucher";
+  const heroEyebrow = mode === "recipient" ? "You've Received a Gift" : "Gift voucher";
+  const heroTitle = mode === "recipient" ? "🎁 Surprise, " + recipientName + "!" : "Purchase confirmed";
 
   const introHtml = mode === "recipient"
     ? `<h2 style="font-size: 26px; font-family: Georgia, serif; margin: 0 0 12px 0; color: #1b3b36;">Hi ${recipientName},</h2>
        <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;"><strong>${buyerName}</strong> just sent you a gift: an adventure, on them. Your voucher is below.</p>`
     : mode === "buyer_receipt"
       ? `<h2 style="font-size: 26px; font-family: Georgia, serif; margin: 0 0 12px 0; color: #1b3b36;">Hi ${buyerName},</h2>
-         <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">Your gift for <strong>${recipientName}</strong> is on its way to their inbox right now. Here's a copy for your records.</p>`
+         <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">Your gift voucher purchase for <strong>${recipientName}</strong> is confirmed. Keep this copy for your records.</p>`
       : `<h2 style="font-size: 26px; font-family: Georgia, serif; margin: 0 0 12px 0; color: #1b3b36;">Hi ${buyerName},</h2>
-         <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">Your gift voucher for <strong>${recipientName}</strong> is ready below. <strong>Forward this email</strong> to give it to them, or print it as a card to hand over in person.</p>`;
-
-  // Elegant quote card in the brand palette (applyBranding recolors #1b3b36).
-  const messageBlock = d.gift_message
-    ? (mode === "recipient"
-        ? `<tr><td style="padding: 0 32px 24px;">
-            <div style="background: #F7F7F6; border-radius: 14px; padding: 24px; text-align: center; border: 1px solid #e6e6e3;">
-              <p style="margin: 0 0 10px 0; font-size: 17px; line-height: 1.6; font-style: italic; color: #1b3b36;">&ldquo;${d.gift_message}&rdquo;</p>
-              <p style="margin: 0; font-size: 13px; font-weight: 600; color: #6b7280;">From ${buyerName}</p>
-            </div>
-          </td></tr>`
-        : `<tr><td style="padding: 0 32px 20px;">
-            <div style="background: #F7F7F6; border-radius: 10px; padding: 16px 20px; font-size: 13px; color: #6b7280;">Your message to ${recipientName}: <em>&ldquo;${d.gift_message}&rdquo;</em></div>
-          </td></tr>`)
-    : "";
+         <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">Your gift voucher purchase for <strong>${recipientName}</strong> is confirmed. Save the attached voucher image to share it with them or print it as a card.</p>`;
 
   // How to give / redeem the gift, tailored to who's reading.
   const forwardNote = mode === "recipient"
     ? `<tr><td style="padding: 0 32px 4px; text-align: center;"><p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6b7280;">Quote your code above when you book online or over WhatsApp. The balance is applied to your trip.</p></td></tr>`
     : mode === "buyer_receipt"
       ? ""
-      : `<tr><td style="padding: 0 32px 4px; text-align: center;"><p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6b7280;"><strong>To gift it:</strong> forward this email to ${recipientName}, or print this page as a card. They redeem the code when booking online or over WhatsApp.</p></td></tr>`;
+      : `<tr><td style="padding: 0 32px 4px; text-align: center;"><p style="margin: 0; font-size: 14px; line-height: 1.6; color: #6b7280;">${recipientName} can redeem the code when <a href="{{BOOKING_URL}}" style="color:#1b3b36;">booking online</a> or over WhatsApp.</p></td></tr>`;
 
-  const ctaLabel = mode === "recipient" ? "Redeem Your Gift" : "View Booking Site";
-  const ctaBlock = `<tr><td style="padding: 20px 40px 12px; text-align: center;">
+  const ctaBlock = mode === "recipient" ? `<tr><td style="padding: 20px 40px 12px; text-align: center;">
       <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; display: inline-table;"><tr>
         <td align="center" bgcolor="#1b3b36" style="border-radius: 999px;">
-          <a href="{{BOOKING_URL}}" target="_blank" style="display: inline-block; padding: 16px 36px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 999px; letter-spacing: 0.03em; text-transform: uppercase;">${ctaLabel}</a>
+          <a href="{{BOOKING_URL}}" target="_blank" style="display: inline-block; padding: 16px 36px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 999px; letter-spacing: 0.03em; text-transform: uppercase;">Redeem Your Gift</a>
         </td>
       </tr></table>
-    </td></tr>`;
-
-  // Deliverability nudge — recipient gift emails often land in Promotions/Spam.
-  const spamNote = mode === "buyer_receipt"
-    ? ""
-    : `<tr><td style="padding: 0 40px 24px; text-align: center;"><p style="margin: 0; font-size: 12px; color: #9ca3af;">Don't see it in your inbox? Check your <strong>spam / promotions</strong> folder.</p></td></tr>`;
+    </td></tr>` : "";
 
   return `
     <!DOCTYPE html>
@@ -1317,7 +1319,6 @@ function giftVoucherHtml(d: Record<string, unknown>) {
             <h1 style="margin: 12px 0 0 0; font-size: 32px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">${heroTitle}</h1>
           </td>
         </tr>
-        ${heroImg("IMG_GIFT", "Cape Kayak")}
         <tr>
           <td style="padding: 36px 40px 10px; text-align: center;">
             ${introHtml}
@@ -1325,32 +1326,16 @@ function giftVoucherHtml(d: Record<string, unknown>) {
         </tr>
         <tr>
           <td style="padding: 0 32px 8px;">
-            <!-- The voucher itself, styled as a physical gift card / ticket. -->
-            <table width="100%" cellpadding="0" cellspacing="0" style="background: #ffffff; border: 2px dashed #1b3b36; border-radius: 20px;">
-              <tr><td style="padding: 30px 24px 8px; text-align: center;">
-                <p style="margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 3px; color: #1b3b36; opacity: 0.6;">Gift Voucher</p>
-                <p style="margin: 10px 0 0; font-size: 52px; font-weight: 800; color: #1b3b36; line-height: 1;">R${d.value}</p>
-                ${d.tour_name ? `<p style="margin: 8px 0 0; font-size: 14px; color: #6b7280;">${d.tour_name}</p>` : ""}
-              </td></tr>
-              <tr><td style="padding: 18px 24px 6px;">
-                <div style="border-top: 2px dashed #d7ddd9;"></div>
-              </td></tr>
-              <tr><td style="padding: 6px 24px 30px; text-align: center;">
-                <p style="margin: 0; font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #9ca3af;">Voucher Code</p>
-                <p style="margin: 10px 0 0; font-family: 'Courier New', Courier, monospace; font-size: 34px; font-weight: 800; letter-spacing: 6px; color: #1b3b36;">${d.code}</p>
-                <p style="margin: 14px 0 0; font-size: 12px; color: #9ca3af;">Valid until ${d.expires_at}</p>
-              </td></tr>
-            </table>
+            ${face}
           </td>
         </tr>
-        ${messageBlock}
         ${forwardNote}
         ${ctaBlock}
-        ${spamNote}
+        <tr><td style="padding: 20px 32px 28px; text-align: center;"><p style="margin: 0; font-size: 14px; line-height: 1.6; color: #555;">Attached: your voucher as a PNG image, with all voucher details included. Save or share the image on its own.</p></td></tr>
         <tr>
           <td style="background-color: #1b3b36; text-align: center; padding: 30px;">
             <p style="font-family: Georgia, serif; font-size: 18px; color: #F7F7F6; margin: 0 0 15px 0;">Cape Kayak</p>
-            <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">Three Anchor Bay, Sea Point, Cape Town<br>Book at {{BOOKING_URL}} or WhatsApp us.</p>
+            <p style="color: #A8C2B8; font-size: 12px; line-height: 1.5; margin: 0;">For help with your voucher, reply to this email.</p>
           </td>
         </tr>
       </table>
@@ -1359,20 +1344,21 @@ function giftVoucherHtml(d: Record<string, unknown>) {
 }
 
 function cancellationHtml(d: Record<string, unknown>) {
+  const notificationOnly = d.notification_only === true;
   const isWeather = d.is_weather === true || (typeof d.reason === "string" && d.reason.toLowerCase().includes("weather"));
   // When a voucher was issued (customer chose it, or voucher-paid booking),
   // the email confirms the voucher — it must NOT re-offer the three options.
-  const hasVoucher = Boolean(d.voucher_code);
+  const hasVoucher = !notificationOnly && Boolean(d.voucher_code);
   // Cancelled within 24h of the trip start: booking is forfeited, so the
   // email must NOT offer reschedule/voucher/refund options.
-  const isForfeit = d.is_forfeit === true;
+  const isForfeit = !notificationOnly && d.is_forfeit === true;
   // The reschedule/voucher/refund choice is OPT-IN: only operator-initiated
   // cancellations that still need a customer decision set offer_choice. Every
   // other cancellation email (refund already chosen or processed) must confirm
   // the outcome, never re-offer the three options.
-  const offerChoice = d.offer_choice === true;
+  const offerChoice = d.offer_choice === true && !notificationOnly;
   const refundAmt = d.refund_amount != null && d.refund_amount !== "" ? String(d.refund_amount) : "";
-  const isRefundConfirmed = !hasVoucher && !isForfeit && !offerChoice && refundAmt !== "";
+  const isRefundConfirmed = !notificationOnly && !hasVoucher && !isForfeit && !offerChoice && refundAmt !== "";
   const cancelText = hasVoucher
     ? "Your booking has been cancelled and its value converted to a voucher. The code is below; use it any time on your next booking."
     : isForfeit
@@ -1380,7 +1366,7 @@ function cancellationHtml(d: Record<string, unknown>) {
     : isRefundConfirmed
     ? "Your booking has been cancelled and your refund is on its way. The details are below."
     : isWeather
-    ? "Unfortunately, your trip has been cancelled due to weather conditions. The ocean wasn't playing along! We sincerely apologise for the disappointment."
+    ? "Unfortunately, your trip has been cancelled due to weather conditions. The ocean wasn't playing along! We sincerely apologise for the disappointment." + (notificationOnly ? " Please contact the operator to discuss your rescheduling options." : "")
     : "Unfortunately, your trip has been cancelled. We sincerely apologise for the inconvenience.";
 
   const amountRow = d.total_amount ? `<tr>
@@ -1403,7 +1389,7 @@ function cancellationHtml(d: Record<string, unknown>) {
   }
 
   // Weather cancellations get a prominent self-service block
-  const optionsBlock = isForfeit
+  const optionsBlock = notificationOnly || isForfeit
     ? ""
     : isRefundConfirmed
     ? `
@@ -1438,7 +1424,7 @@ function cancellationHtml(d: Record<string, unknown>) {
           </td>
         </tr>
       `
-    : isWeather
+    : isWeather && offerChoice
     ? `
         <tr>
           <td style="padding: 0 40px 10px;">
@@ -1559,7 +1545,7 @@ function indemnityHtml(d: Record<string, unknown>) {
         <tr>
           <td style="background-color: #1b3b36; padding: 30px 30px 20px; text-align: center;">
             <p style="margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 2px; color: #A8C2B8;">Cape Kayak Adventures</p>
-            <h1 style="margin: 10px 0 0 0; font-size: 28px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">${d.first_operator_booking ? "Your trip is coming up" : "Your trip is tomorrow"}</h1>
+            <h1 style="margin: 10px 0 0 0; font-size: 28px; font-weight: 500; font-family: Georgia, serif; color: #F7F7F6;">${d.manual_waiver_request ? "Please complete your waiver" : d.first_operator_booking ? "Your trip is coming up" : "Your trip is tomorrow"}</h1>
           </td>
         </tr>
         <!-- Hero Image -->
@@ -1568,7 +1554,7 @@ function indemnityHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
             <h2 style="font-size: 22px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Hi ${d.customer_name},</h2>
-            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 10px 0;">Your <strong>${d.tour_name}</strong> is ${d.first_operator_booking ? "coming up soon" : "tomorrow"}. This is a reminder to arrive early and finish any outstanding pre-trip steps.</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 10px 0;">${d.manual_waiver_request ? `Please complete the waiver for your <strong>${d.tour_name}</strong> booking before you arrive.` : `Your <strong>${d.tour_name}</strong> is ${d.first_operator_booking ? "coming up soon" : "tomorrow"}. This is a reminder to arrive early and finish any outstanding pre-trip steps.`}</p>
             <p style="font-size: 15px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">${waiverPending ? "Your waiver is still outstanding. Please complete it before the trip so check-in stays quick on the day." : "Your waiver has already been completed. You are all set for check-in."}</p>
           </td>
         </tr>
@@ -2662,6 +2648,32 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       : undefined;
     delete d.delivery_idempotency_key;
 
+    if (type === "BOOKING_CONFIRM" && serviceCaller && d.booking_id && !deliveryIdempotencyKey) {
+      try {
+        await queueBookingConfirmation(d);
+        return new Response(JSON.stringify({ ok: true, queued: true }), { status: 202, headers: getCors(req) });
+      } catch (error) {
+        console.error("CONFIRMATION_QUEUE_ERR:", error);
+        return new Response(JSON.stringify({ ok: false, error: "Confirmation could not be queued" }), { status: 503, headers: getCors(req) });
+      }
+    }
+
+    if (type === "WAIVER_REQUEST") {
+      if (!d.booking_id || !d.business_id || !supabase) return new Response(JSON.stringify({ ok: false, error: "Booking required" }), { status: 400, headers: getCors(req) });
+      const stored = await supabase.from("bookings").select("id,business_id,email,customer_name,qty,status,waiver_status,waiver_token,waiver_token_expires_at,tours(name),slots(start_time)")
+        .eq("id", String(d.booking_id)).eq("business_id", String(d.business_id)).maybeSingle();
+      const b = stored.data as any;
+      if (stored.error || !b) return new Response(JSON.stringify({ ok: false, error: "Could not load the booking" }), { status: 503, headers: getCors(req) });
+      if (b.waiver_status === "SIGNED" || ["CANCELLED", "EXPIRED"].includes(b.status)) return new Response(JSON.stringify({ ok: false, error: "This booking does not need a waiver request" }), { status: 409, headers: getCors(req) });
+      if (b.waiver_token_expires_at && Date.parse(b.waiver_token_expires_at) <= Date.now()) return new Response(JSON.stringify({ ok: false, error: "The waiver signing window has closed for this booking." }), { status: 409, headers: getCors(req) });
+      d = { business_id: b.business_id, booking_id: b.id, email: b.email, customer_name: b.customer_name, qty: b.qty, waiver_status: b.waiver_status, waiver_token: b.waiver_token,
+        tour_name: (Array.isArray(b.tours) ? b.tours[0] : b.tours)?.name || "your activity",
+        start_time: (Array.isArray(b.slots) ? b.slots[0] : b.slots)?.start_time, ref: b.id.slice(0,8).toUpperCase(), manual_waiver_request: true };
+    }
+
+    // Preserve raw gift text for the self-escaping voucher face renderer.
+    const giftFaceData = type === "GIFT_VOUCHER" ? { ...d } : {};
+
     // Escape user-controlled fields to prevent HTML injection in email templates
     const fieldsToEscape = ["customer_name", "recipient_name", "buyer_name", "gift_message", "reason", "cancel_reason", "ref", "tour_name", "invoice_number", "note", "intro", "heading", "customer_phone", "customer_email", "business_name", "plan_name"];
     for (let fi = 0; fi < fieldsToEscape.length; fi++) {
@@ -2678,19 +2690,73 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       branding = { businessId: "", brandName: fb, timezone: "UTC", shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", locationPhrase: "", emailTagline: "", logoUrl: "", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
     }
 
-    if (type === "BOOKING_CONFIRM" || type === "INDEMNITY" || type === "REMINDER" || type === "FIRST_BOOKING_TRIP") {
-      try { d = await enrichWaiverEmailData(d); } catch (wErr) { console.error("WAIVER_ENRICH_ERR:", wErr); }
+    if (type === "BOOKING_CONFIRM" || type === "INDEMNITY" || type === "REMINDER" || type === "FIRST_BOOKING_TRIP" || type === "WAIVER_REQUEST") {
+      try { d = await enrichWaiverEmailData(d); } catch (wErr) {
+        console.error("WAIVER_ENRICH_ERR:", wErr);
+        return new Response(JSON.stringify({ ok: false, error: "Waiver status could not be verified" }), { status: 503, headers: getCors(req) });
+      }
+    }
+
+    if (type === "WAIVER_REQUEST" && !d.waiver_url) return new Response(JSON.stringify({ ok: false, error: "Waiver link unavailable. Check the booking-site configuration." }), { status: 409, headers: getCors(req) });
+
+    // Payment dates and expiring links always come from the saved tenant booking.
+    delete d.payment_due_label;
+    const paymentEmail = ["PAYMENT_LINK", "PAYMENT_FAILED", "PAYMENT_REMINDER", "PAYMENT_EXPIRING"].includes(type);
+    if (paymentEmail && d.booking_id && supabase && branding.businessId) {
+      const stored = await supabase.from("bookings").select("id,business_id,source,status,total_amount,total_captured,payment_status,payment_deadline,payment_url,allow_unpaid")
+        .eq("id", String(d.booking_id)).eq("business_id", branding.businessId).maybeSingle();
+      const b = stored.data;
+      if (stored.error || !b) return new Response(JSON.stringify({ ok: false, error: "Payment deadline could not be verified" }), { status: 503, headers: getCors(req) });
+      if (b.source === "ADMIN" && b.payment_deadline) {
+        if (!["PENDING", "HELD", "CONFIRMED"].includes(b.status) || Number(b.total_amount) <= Number(b.total_captured || 0)
+          || ["CAPTURED", "MISMATCH_QUARANTINE"].includes(b.payment_status) || Date.parse(b.payment_deadline) <= Date.now()
+          || (type === "PAYMENT_EXPIRING" && (b.allow_unpaid || Date.parse(String(d.payment_deadline)) !== Date.parse(b.payment_deadline)))) {
+          return new Response(JSON.stringify({ ok: false, error: "This booking is no longer eligible for a payment email" }), { status: 409, headers: getCors(req) });
+        }
+        d.payment_due_label = escHtml(formatTenantDateTime({ id: branding.businessId, timezone: branding.timezone }, b.payment_deadline, { year: "numeric" }) + " (" + branding.timezone + ")");
+        d.total_amount = Math.max(0, Number(b.total_amount) - Number(b.total_captured || 0)).toFixed(2);
+        d.partial_payment = Number(b.total_captured || 0) > 0;
+        d.payment_url = d.partial_payment ? "" : await paymentDeadlineUrl(SUPABASE_URL, b.id, b.business_id, b.payment_deadline);
+      }
+    }
+
+    if ((type === "BOOKING_CONFIRM" || type === "INVOICE") && d.booking_id && supabase && branding.businessId) {
+      const stored = await supabase.from("bookings").select("id, business_id, email, phone, created_at, status, total_amount, total_captured, payment_method, payment_deadline")
+        .eq("id", String(d.booking_id)).eq("business_id", branding.businessId).maybeSingle();
+      if (stored.error || !stored.data || stored.data.total_amount == null || !stored.data.status) {
+        return new Response(JSON.stringify({ ok: false, error: "booking_payment_unavailable", message: "Booking payment details could not be verified. No email was sent." }), { status: 503, headers: getCors(req) });
+      }
+      if (type === "BOOKING_CONFIRM" && ["CANCELLED", "EXPIRED"].includes(stored.data.status)) {
+        return new Response(JSON.stringify({ ok: false, error: "Booking is no longer confirmed" }), { status: 409, headers: getCors(req) });
+      }
+      const total = Number(stored.data.total_amount);
+      const captured = Number(stored.data.total_captured || 0);
+      // Preserve the established legacy PAID/COMPLETED fallback; CONFIRMED never proves payment.
+      d.total_amount = total;
+      d.amount_paid = captured > 0 ? captured : ["PAID", "COMPLETED"].includes(stored.data.status) ? total : 0;
+      d.amount_due = Math.max(0, total - Number(d.amount_paid));
+      if (Number(d.amount_due) > 0.005 && stored.data.payment_deadline) d.payment_due_label = escHtml(formatTenantDateTime({ id: branding.businessId, timezone: branding.timezone }, stored.data.payment_deadline, { year: "numeric" }) + " (" + branding.timezone + ")");
+      d.payment_method = stored.data.payment_method || (Number(d.amount_due) > 0.005 ? "Pending" : "Unrecorded");
+      if (type === "BOOKING_CONFIRM") {
+        d.returning_customer = false;
+        const history = await supabase.rpc("customer_booking_history", {
+          p_business_id: branding.businessId, p_phone: stored.data.phone, p_email: stored.data.email,
+          p_before: stored.data.created_at, p_exclude_booking_id: stored.data.id,
+        });
+        if (!history.error) d.returning_customer = Boolean(history.data?.last_booking_at);
+        else console.error("RETURN_HISTORY_ERR", history.error.message);
+      }
     }
 
     // Validate recipient email before processing the template
     const recipientEmail = String(d.email || "").trim();
     if (!recipientEmail || !isValidEmail(recipientEmail)) {
-      console.warn("SEND_EMAIL_SKIP type=" + type + " invalid_email=" + recipientEmail);
+      console.warn("SEND_EMAIL_SKIP type=" + type + " invalid_email");
       return new Response(JSON.stringify({ ok: false, error: "invalid_email", message: "Recipient email '" + recipientEmail + "' is missing or invalid" }), { status: 200, headers: getCors(req) });
     }
     d.email = recipientEmail;
 
-    console.log("SEND_EMAIL type=" + type + " to=" + (d.email || "?") + " biz=" + branding.businessId + " manage=" + branding.manageBookingUrl + " site=" + branding.bookingSiteUrl);
+    console.log("SEND_EMAIL type=" + type + " biz=" + branding.businessId);
 
     // Inject resolved URLs into data so templates can use them directly via ${d._manageUrl}
     // This avoids relying solely on the {{BOOKING_URL}} placeholder replacement in applyBranding
@@ -2773,6 +2839,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     let subject = "";
     let html = "";
     let bcc: string | undefined;
+    let giftImage: GiftVoucherFace | undefined;
 
     switch (type) {
       case "MY_BOOKINGS_OTP":
@@ -2782,6 +2849,18 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       case "PAYMENT_LINK":
         subject = "Cape Kayak - Payment Link (Ref: " + d.ref + ")";
         html = paymentLinkHtml(d);
+        break;
+      case "PAYMENT_FAILED":
+        subject = "Payment unsuccessful — complete your booking (Ref: " + d.ref + ")";
+        html = paymentLinkHtml({
+          ...d,
+          heading: "Complete your payment",
+          intro: "We see that your payment was rejected or could not be completed. Please use the secure Yoco link below to complete payment for your booking. If you need help, reply to this email.",
+        });
+        break;
+      case "PAYMENT_EXPIRING":
+        subject = "Payment due soon — your payment link will expire (Ref: " + d.ref + ")";
+        html = paymentLinkHtml({ ...d, heading: "Your payment link will expire", intro: "Payment is still outstanding for your <strong>" + (d.tour_name || "booking") + "</strong>. Please pay before the deadline below. Your payment link will expire at that time. If you need help, reply to this email." });
         break;
       case "PAYMENT_REMINDER":
         subject = "Reminder: payment outstanding for your upcoming " + (d.tour_name || "booking");
@@ -2828,16 +2907,31 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         const gvMode = String(d.gift_recipient_mode || "buyer_forward");
         subject = gvMode === "recipient"
           ? "🎁 " + d.recipient_name + ", you've received a gift!"
-          : gvMode === "buyer_receipt"
-            ? "Your gift for " + d.recipient_name + " is on its way"
-            : "🎁 Cape Kayak - Your gift voucher for " + d.recipient_name;
-        html = giftVoucherHtml(d);
+          : "Cape Kayak — Gift voucher purchase confirmed";
+        branding.fromEmail = branding.brandName + " <vouchers@bookingtours.co.za>";
+        giftImage = {
+          imageUrl: giftFaceData.gift_image_url as string | null,
+          logoUrl: branding.logoUrl,
+          businessName: branding.brandName,
+          experienceName: String(giftFaceData.gift_tour_name || giftFaceData.tour_name || ""),
+          recipientName: String(giftFaceData.recipient_name || ""),
+          buyerName: String(giftFaceData.buyer_name || ""),
+          message: String(giftFaceData.gift_message || ""),
+          value: String(giftFaceData.value ?? ""), code: String(giftFaceData.code || ""),
+          expiresLabel: giftFaceData.expires_at ? "Valid until " + giftFaceData.expires_at : undefined,
+          monetary: giftFaceData.voucher_type === "MONETARY",
+        };
+        html = giftVoucherHtml(d, renderGiftVoucherFace(giftImage));
         bcc = d.admin_email as string;
         break;
       }
       case "CANCELLATION":
         subject = "Cape Kayak - Booking Cancelled (Ref: " + d.ref + ")";
         html = cancellationHtml(d);
+        break;
+      case "WAIVER_REQUEST":
+        subject = "Please complete your waiver (Ref: " + d.ref + ")";
+        html = indemnityHtml(d);
         break;
       case "INDEMNITY":
         subject = "Cape Kayak - Indemnity & Waiver (Ref: " + d.ref + ")";
@@ -2958,6 +3052,20 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
 
     // Build tax invoice PDF attachment for INVOICE and BOOKING_CONFIRM emails
     let attachments: Array<{ filename: string; content: string }> | undefined;
+    if (giftImage) {
+      const image = await fetch("https://admin.bookingtours.co.za/api/internal/voucher-image", {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_SERVICE_ROLE_KEY },
+        body: JSON.stringify(giftImage), signal: AbortSignal.timeout(20_000),
+      });
+      if (!image.ok || image.headers.get("content-type") !== "image/png") {
+        return new Response(JSON.stringify({ ok: false, error: "Voucher image could not be generated" }), { status: 503, headers: getCors(req) });
+      }
+      const bytes = new Uint8Array(await image.arrayBuffer());
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const code = String(giftImage.code || "gift").replace(/[^A-Za-z0-9_-]/g, "").slice(0,64) || "gift";
+      attachments = [{ filename: "Voucher-" + code + ".png", content: btoa(binary) }];
+    }
     if (type === "INVOICE" || type === "BOOKING_CONFIRM") {
       try {
         if (d.invoice_number) {
@@ -2975,7 +3083,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     }
 
     console.log("BRANDING_URLS type=" + type + " biz=" + branding.businessId + " manage=" + branding.manageBookingUrl + " site=" + branding.bookingSiteUrl);
-    const branded = applyBranding(subject, html, branding);
+    const branded = applyBranding(subject, html, branding, type !== "GIFT_VOUCHER");
     // Marketing-class email types get a List-Unsubscribe header so mailbox
     // providers don't dump them in spam. The header URL is the same as the
     // footer link the caller already passed in (no per-recipient token

@@ -48,7 +48,7 @@ function ChangePasswordForm() {
         const admin = await validateAdminSetupToken(setupEmailParam, token);
         if (!admin) {
           setTokenValid(false);
-          setError("This password setup link is invalid or has expired.");
+          setError("Setup link invalid or expired.");
         } else {
           setTokenValid(true);
           setSetupName(admin.name || "");
@@ -105,7 +105,7 @@ function ChangePasswordForm() {
         return setError("Enter and confirm your new password.");
       }
       if (newPass.length < 8) {
-        return setError("New password must be at least 8 characters.");
+        return setError("Use at least 8 characters.");
       }
       if (newPass !== confirmPass) {
         return setError("New passwords do not match.");
@@ -126,7 +126,7 @@ function ChangePasswordForm() {
       return setError("All fields are required.");
     }
     if (newPass.length < 8) {
-      return setError("New password must be at least 8 characters.");
+      return setError("Use at least 8 characters.");
     }
     if (newPass !== confirmPass) {
       return setError("New passwords do not match.");
@@ -176,8 +176,8 @@ function ChangePasswordForm() {
           </h1>
           <p className="mb-6 text-sm" style={{ color: "var(--ck-text-muted)" }}>
             {setupMode
-              ? "Your password has been created successfully. You can now sign in."
-              : "Your password has been changed successfully. You can now sign in with your new password."}
+              ? "Password created. You can sign in."
+              : "Password changed. Sign in with your new password."}
           </p>
           <a href="/" className="ui-btn ui-btn-primary w-full !h-11 !rounded-xl text-sm font-semibold">
             Go to Dashboard
@@ -210,7 +210,7 @@ function ChangePasswordForm() {
             {error && <p className="text-xs font-medium text-[var(--ck-danger)]">{error}</p>}
             <div className="rounded-xl border border-[var(--ck-border-subtle)] bg-[var(--ck-bg)] p-4">
               <p className="text-sm font-medium text-[var(--ck-text-strong)]">Need a fresh password link?</p>
-              <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Enter your admin email and we will send a new password reset link.</p>
+              <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Enter your admin email for a new reset link.</p>
               <input
                 type="email"
                 value={resetEmail}
@@ -225,12 +225,12 @@ function ChangePasswordForm() {
                 disabled={loading}
                 className="mt-3 ui-btn ui-btn-primary w-full !h-11 !rounded-xl text-sm font-semibold disabled:opacity-50"
               >
-                {loading ? "Sending..." : "Email New Reset Link"}
+                {loading ? "Sending..." : "Send reset link"}
               </button>
               {resetSent && <p className="mt-3 text-xs text-[var(--ck-success)]">A password reset link has been sent.</p>}
             </div>
             <p className="text-center text-xs text-[var(--ck-text-muted)]">
-              <a href="/" className="hover:underline">Back to sign in</a>
+              <a href="/" className="hover:underline">Sign in</a>
             </p>
           </div>
         ) : (
@@ -318,7 +318,7 @@ function ChangePasswordForm() {
             )}
 
             <p className="mt-4 text-center text-xs text-[var(--ck-text-muted)]">
-              <a href="/" className="hover:underline">Back to sign in</a>
+              <a href="/" className="hover:underline">Sign in</a>
             </p>
           </>
         )}

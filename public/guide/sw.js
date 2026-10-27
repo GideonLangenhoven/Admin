@@ -1,6 +1,7 @@
-const CACHE_NAME = 'guide-v6';
-const PRECACHE = ['/guide', '/guide/manifest.webmanifest'];
-const DB_NAME = 'guide-queue-v2';
+const SHARED_GUIDE = new URL(self.location.href).searchParams.get('session') === 'guide';
+const CACHE_NAME = SHARED_GUIDE ? 'shared-guide-v1' : 'guide-v6';
+const PRECACHE = SHARED_GUIDE ? [] : ['/guide', '/guide/manifest.webmanifest'];
+const DB_NAME = SHARED_GUIDE ? 'shared-guide-queue-v2' : 'guide-queue-v2';
 const LEGACY_DB_NAME = 'guide-queue';
 const DB_VERSION = 1;
 const STORE = 'check-ins';
@@ -21,7 +22,7 @@ self.addEventListener('install', function(event) {
 self.addEventListener('activate', function(event) {
   event.waitUntil(
     caches.keys().then(function(keys) {
-      return Promise.all(keys.filter(function(k) { return k !== CACHE_NAME && k.indexOf('guide-') === 0; }).map(function(k) { return caches.delete(k); }));
+      return Promise.all(keys.filter(function(k) { return k !== CACHE_NAME && k.indexOf(SHARED_GUIDE ? 'shared-guide-' : 'guide-') === 0; }).map(function(k) { return caches.delete(k); }));
     }).then(function() { return self.clients.claim(); })
       .then(function() { return invalidateLegacyAuthContext(); })
       .then(function() { return migrateLegacyQueue(); })
@@ -486,6 +487,7 @@ function idbResolveGuideQueueIssue(db, message, action) {
 }
 
 async function invalidateLegacyAuthContext() {
+  if (SHARED_GUIDE) return;
   const db = await openDb();
   const current = await idbGetAuthState(db);
   if ((!current.authorityId && (current.context || current.generation))
@@ -635,6 +637,7 @@ function openLegacyDb() {
 }
 
 async function migrateLegacyQueue() {
+  if (SHARED_GUIDE) return;
   const legacyDb = await openLegacyDb();
   const legacyItems = await idbGetAll(legacyDb);
   if (legacyItems.length === 0) {

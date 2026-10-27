@@ -1,4 +1,4 @@
-// Human duration for tours: "90 min", "2 hours", "3 days".
+// Human duration for tours: "45 min", "2 hours 30 min", "3 days".
 export function formatDuration(minutes: number | null | undefined): string {
   const m = Number(minutes || 0);
   if (m >= 1440) {
@@ -6,9 +6,10 @@ export function formatDuration(minutes: number | null | undefined): string {
     const n = Number.isInteger(d) ? d : Math.round(d * 10) / 10;
     return n + (n === 1 ? " day" : " days");
   }
-  if (m >= 60 && m % 60 === 0) {
-    const h = m / 60;
-    return h + (h === 1 ? " hour" : " hours");
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    const mins = m % 60;
+    return h + (h === 1 ? " hour" : " hours") + (mins ? ` ${mins} min` : "");
   }
   return m + " min";
 }

@@ -1,18 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useSyncExternalStore } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { CaretDown } from "@phosphor-icons/react";
 import { isDemoPathVisible } from "@/app/lib/demo-guide";
-import { isSectionHidden } from "@/app/lib/operator-sections";
 import { useBusinessContext } from "./BusinessContext";
 
-type Section = "broadcasts" | "reports" | "marketing" | "ai";
+type Section = "broadcasts" | "marketing" | "ai";
 type Tab = { href: string; label: string; privilegedOnly?: boolean };
 
 const TABS: Record<Section, Tab[]> = {
   broadcasts: [{ href: "/broadcasts", label: "Broadcasts" }, { href: "/notifications", label: "Failed Notifications", privilegedOnly: true }],
-  reports: [{ href: "/reports", label: "Reports" }, { href: "/reviews", label: "Reviews" }],
   marketing: [
     { href: "/marketing", label: "Overview" },
     { href: "/marketing/contacts", label: "Contacts" },
@@ -24,28 +22,27 @@ const TABS: Record<Section, Tab[]> = {
   ai: [{ href: "/ai-usage", label: "AI Usage" }, { href: "/settings/chat-faq", label: "Chat FAQ" }],
 };
 
-export default function SectionTabs({ section }: { section: Section }) {
+export default function SectionTabs({ section, display = "responsive" }: { section: Section; display?: "responsive" | "mobile" | "desktop" }) {
   const pathname = usePathname() || "";
-  const { role, readOnly, subscriptionStatus } = useBusinessContext();
-  const hideReviews = useSyncExternalStore((onChange) => {
-    window.addEventListener("storage", onChange);
-    return () => window.removeEventListener("storage", onChange);
-  }, () => {
-    try {
-      return isSectionHidden(JSON.parse(localStorage.getItem("ck_admin_settings_perms") || "{}"), "/reviews");
-    } catch { return false; }
-  }, () => false);
+  const router = useRouter();
+  const { role, readOnly } = useBusinessContext();
 
   const tabs = TABS[section].filter((tab) =>
     (!tab.privilegedOnly || role === "MAIN_ADMIN" || role === "SUPER_ADMIN") &&
-    (!readOnly || isDemoPathVisible(tab.href)) &&
-    (tab.href !== "/reviews" || subscriptionStatus !== "SUSPENDED" || role === "SUPER_ADMIN") &&
-    (tab.href !== "/reviews" || !hideReviews || role === "MAIN_ADMIN" || role === "SUPER_ADMIN")
+    (!readOnly || isDemoPathVisible(tab.href))
   );
+  const activeTab = tabs.find(tab => pathname === tab.href || (tab.href !== "/marketing" && pathname.startsWith(tab.href + "/")));
+  const mobileDropdown = section === "marketing" && display !== "desktop";
 
   return (
-    <nav aria-label={`${section === "ai" ? "AI" : section[0].toUpperCase() + section.slice(1)} sections`} className="-mx-4 overflow-x-auto border-b px-4 sm:mx-0 sm:px-0" style={{ borderColor: "var(--ck-border-subtle)" }}>
-      <div className="flex w-max gap-1">
+    <nav aria-label={`${section === "ai" ? "AI" : section[0].toUpperCase() + section.slice(1)} sections`} className={`${display === "mobile" ? "md:hidden" : display === "desktop" ? "hidden border-b md:block" : section === "marketing" ? "md:border-b" : "border-b"}`} style={{ borderColor: "var(--ck-border-subtle)" }}>
+      {mobileDropdown && <div className="relative w-40 max-w-full md:hidden">
+        <select aria-label="Marketing section" value={activeTab?.href || tabs[0]?.href || ""} onChange={event => router.push(event.target.value)} className="ui-control min-h-11 w-full appearance-none !pr-9">
+          {tabs.map(tab => <option key={tab.href} value={tab.href}>{tab.label}</option>)}
+        </select>
+        <CaretDown size={14} aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
+      </div>}
+      {display !== "mobile" && <div className={`${section === "marketing" ? "hidden md:flex" : "flex"} flex-wrap gap-1`}>
         {tabs.map((tab) => {
           const active = pathname === tab.href || (tab.href !== "/marketing" && pathname.startsWith(tab.href + "/"));
           return (
@@ -57,7 +54,7 @@ export default function SectionTabs({ section }: { section: Section }) {
             </Link>
           );
         })}
-      </div>
+      </div>}
     </nav>
   );
 }

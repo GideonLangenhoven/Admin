@@ -26,7 +26,7 @@ describe("admin canonical-host handling", () => {
   // Two hosts each holding a session for the other's tenant used to redirect at
   // each other forever, and a bounce landed on an origin with no session at all.
   it("never moves the browser between tenant hosts on its own", () => {
-    expect(gate).not.toContain("window.location.replace");
+    expect(gate.match(/window\.location\.replace\([^)]*\)/g)).toEqual(["window.location.replace(window.location.href)"]);
     expect(gate).not.toContain("window.location.assign");
   });
 

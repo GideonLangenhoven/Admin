@@ -1,3 +1,4 @@
+import { authStorage } from "./browser-session";
 import { supabase } from "./supabase";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -5,7 +6,7 @@ const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 export type RefundOutcome = "completed" | "pending" | "manual_action" | "failed" | "unknown" | "unprocessed";
 export type ActionResult = { ok: boolean; outcome?: RefundOutcome; error?: string; message?: string; data?: any };
 
-export async function cancelBookingAction(bookingId: string, opts: { reason?: string; weather?: boolean } = {}): Promise<ActionResult> {
+export async function cancelBookingAction(bookingId: string, opts: { reason?: string; weather?: boolean; offerChoice?: boolean } = {}): Promise<ActionResult> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return { ok: false, error: "Session expired" };
@@ -13,7 +14,7 @@ export async function cancelBookingAction(bookingId: string, opts: { reason?: st
     const res = await fetch(SU + "/functions/v1/cancel-booking", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + session.access_token },
-      body: JSON.stringify({ booking_id: bookingId, reason: (opts.weather ? "Weather cancellation: " : "") + (opts.reason || "Cancelled by admin"), allow_late_choice: opts.weather === true }),
+      body: JSON.stringify({ booking_id: bookingId, reason: (opts.weather ? "Weather cancellation: " : "") + (opts.reason || "Cancelled by admin"), allow_late_choice: opts.weather === true, offer_choice: opts.offerChoice !== false }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data?.error) return { ok: false, error: data?.error || res.statusText };
@@ -120,12 +121,13 @@ export async function setArrivedCountAction(params: {
   slotId?: string | null;
   source?: "simple-view" | "dashboard" | "bookings";
   notes?: string;
+  guide?: boolean;
 }): Promise<ActionResult> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return { ok: false, error: "Session expired" };
     const source = params.source || "simple-view";
-    const res = await fetch("/api/check-ins?source=" + encodeURIComponent(source), {
+    const res = await fetch((params.guide ? "/api/guide/check-ins" : "/api/check-ins") + "?source=" + encodeURIComponent(source), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -154,7 +156,7 @@ export async function checkInAction(
   businessId = "",
   opts: { expectedArrivedCount?: number | null; slotId?: string | null } = {},
 ): Promise<ActionResult> {
-  const resolvedBusinessId = businessId || (typeof window !== "undefined" ? localStorage.getItem("ck_admin_business_id") || "" : "");
+  const resolvedBusinessId = businessId || (typeof window !== "undefined" ? authStorage.getItem("ck_admin_business_id") || "" : "");
   if (!resolvedBusinessId) return { ok: false, error: "Business context is unavailable" };
   return setArrivedCountAction({
     bookingId,

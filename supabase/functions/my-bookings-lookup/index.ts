@@ -112,6 +112,7 @@ const BOOKING_SELECT = [
   "converted_to_voucher_id",
   "cancelled_at",
   "cancellation_reason",
+  "cancellation_self_service",
   "waiver_status",
   "waiver_token",
   "yoco_payment_id",

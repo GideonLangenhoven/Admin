@@ -99,7 +99,7 @@ export default function WhatsAppBotSection() {
       <section className="p-6 rounded-xl border" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" }}>
         <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
           {loadError === "sign-in"
-            ? "Please sign out and sign back in to manage WhatsApp auto-replies."
+            ? "Sign in again to manage WhatsApp auto-replies."
             : "Could not load WhatsApp settings. Try refreshing the page."}
         </p>
         <button onClick={() => { setLoading(true); load(); }} className="mt-3 text-sm text-emerald-600 hover:underline">
@@ -123,7 +123,7 @@ export default function WhatsAppBotSection() {
         <div>
           <h3 className="text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>WhatsApp auto-reply</h3>
           <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>
-            Choose when the AI assistant replies to incoming WhatsApp messages.
+            Choose when WhatsApp replies automatically.
           </p>
         </div>
         <LiveStatusBadge active={state.currentlyActive} mode={state.mode} />
@@ -135,7 +135,7 @@ export default function WhatsAppBotSection() {
           checked={selectedMode === "ALWAYS_ON"}
           onChange={setSelectedMode}
           title="Always on"
-          description="The assistant answers FAQs instantly, 24/7. Complex questions still go to your inbox."
+          description="Answers FAQs 24/7. Complex questions go to Inbox."
           disabled={!isPrivileged}
         />
         <ModeOption
@@ -151,7 +151,7 @@ export default function WhatsAppBotSection() {
           checked={selectedMode === "OFF"}
           onChange={setSelectedMode}
           title="Off"
-          description="Every WhatsApp message goes to your inbox. No AI replies. Works like a normal WhatsApp inbox."
+          description="All messages go to Inbox for staff to answer."
           disabled={!isPrivileged}
         />
       </div>
@@ -161,7 +161,7 @@ export default function WhatsAppBotSection() {
           <div>
             <h4 className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>WhatsApp support hours</h4>
             <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>
-              When set to outside-hours mode, the assistant replies outside these times.
+              In outside-hours mode, auto-replies run outside these times.
             </p>
           </div>
           <span className="rounded-full px-2.5 py-1 text-[11px] font-medium" style={{ background: "rgba(16, 185, 129, 0.12)", color: "var(--ck-accent)" }}>
@@ -231,7 +231,7 @@ export default function WhatsAppBotSection() {
 
       {state.mode === "OUTSIDE_HOURS" && hasSavedBusinessHours && (
         <p className="mt-4 text-xs" style={{ color: "var(--ck-text-muted)" }}>
-          The assistant uses these support hours to decide when to reply.
+          Support hours control auto-reply times.
         </p>
       )}
     </section>

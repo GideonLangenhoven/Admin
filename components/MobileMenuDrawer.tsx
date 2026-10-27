@@ -16,7 +16,7 @@ import {
   Circle, SquaresFour, Clipboard, PlusSquare, CalendarBlank, Bank,
   ChatText, Ticket, Receipt, Camera, Megaphone,
   CurrencyCircleDollar, ChartLine, Envelope, GearSix, ShieldCheck,
-  UsersThree, GlobeSimple, WarningCircle, DotsThree, ListChecks,
+  UsersThree, GlobeSimple, WarningCircle, DotsThree, ListChecks, CaretDown,
 } from "@phosphor-icons/react";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 
@@ -55,7 +55,7 @@ const DRAWER_BG = [
   "linear-gradient(180deg, var(--ck-sidebar-grad-top) 0%, var(--ck-sidebar-grad-bottom) 100%)",
 ].join(", ");
 
-export default function MobileMenuDrawer({ nav, active = false }: { nav: NavItem[]; active?: boolean }) {
+export default function MobileMenuDrawer({ nav, active = false, collapsedGroups, onToggleGroup }: { nav: NavItem[]; active?: boolean; collapsedGroups: Set<string>; onToggleGroup: (label: string) => void }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -86,7 +86,7 @@ export default function MobileMenuDrawer({ nav, active = false }: { nav: NavItem
       if (event.key !== "Tab" || !panel) return;
       const focusable = Array.from(panel.querySelectorAll<HTMLElement>(
         'a[href], button:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      ));
+      )).filter(element => element.getClientRects().length > 0);
       if (!focusable.length) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -149,11 +149,14 @@ export default function MobileMenuDrawer({ nav, active = false }: { nav: NavItem
 
         <div className="flex-1 overflow-y-auto px-3 pb-4">
           {groupedNav(nav).map((group) => (
-            <section key={group.label} aria-labelledby={`mobile-menu-${group.label.toLowerCase()}`}>
-              <h2 id={`mobile-menu-${group.label.toLowerCase()}`} className="ui-mono-label mb-1 mt-5 px-3 !text-[11px]" style={{ color: "var(--ck-sidebar-muted)" }}>
-                {group.label}
+            <section key={group.label} aria-labelledby={`mobile-menu-${group.label.toLowerCase().replaceAll(" ", "-")}`}>
+              <h2 id={`mobile-menu-${group.label.toLowerCase().replaceAll(" ", "-")}`} className="ui-mono-label mb-1 mt-3 px-3 !text-[11px]" style={{ color: "var(--ck-sidebar-muted)" }}>
+                <button type="button" className="flex min-h-11 w-full items-center justify-between text-left" aria-expanded={!collapsedGroups.has(group.label)} aria-controls={`mobile-links-${group.label.toLowerCase().replaceAll(" ", "-")}`} onClick={() => onToggleGroup(group.label)}>
+                  <span>{group.label}</span>
+                  <CaretDown size={12} aria-hidden="true" style={{ transform: collapsedGroups.has(group.label) ? "rotate(-90deg)" : undefined }} />
+                </button>
               </h2>
-              <nav className="space-y-1" aria-label={group.label}>
+              <nav id={`mobile-links-${group.label.toLowerCase().replaceAll(" ", "-")}`} hidden={collapsedGroups.has(group.label)} className="space-y-1" aria-label={group.label}>
               {group.items.map((n) => {
                 const Icon = iconMap[n.icon] || Circle;
                 const itemActive = isNavItemActive(pathname || "", n.href, nav.map((x) => x.href));
@@ -161,6 +164,7 @@ export default function MobileMenuDrawer({ nav, active = false }: { nav: NavItem
               <Link
                 key={n.href}
                 href={n.href}
+                aria-current={itemActive ? "page" : undefined}
                 target={n.external ? "_blank" : undefined}
                 rel={n.external ? "noopener noreferrer" : undefined}
                 className={`relative flex min-h-12 items-center gap-3 rounded-[10px] px-3 text-base ${

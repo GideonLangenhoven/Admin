@@ -1,7 +1,7 @@
 import { zonedToUtc } from "./admin-timezone";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const SIMPLE_RETURN_PATHS = new Set(["/simple", "/simple/calendar", "/simple/check-ins"]);
+const SIMPLE_RETURN_PATHS = new Set(["/simple", "/simple/calendar", "/simple/check-ins", "/simple/bookings", "/simple/help", "/simpleguide", "/simpleguide/check-ins"]);
 
 export function isDateKey(value: string | null | undefined): value is string {
   if (!value || !DATE_RE.test(value)) return false;
@@ -60,9 +60,28 @@ export function walkInUrl(params: { date?: string; tourId?: string; slotId?: str
   return "/simple/new-booking?" + query.toString();
 }
 
-export function checkInsUrl(date: string, slotId?: string) {
+export function checkInsUrl(date: string, slotId?: string, guide = false) {
   const query = new URLSearchParams();
   if (isDateKey(date)) query.set("date", date);
   if (slotId) query.set("slot", slotId);
-  return "/simple/check-ins?" + query.toString();
+  return (guide ? "/simpleguide/check-ins?" : "/simple/check-ins?") + query.toString();
+}
+
+export function bookingResolutionUrl(bookingId: string, returnTo: string, section: "waiver" | "payment" | "summary" = "summary") {
+  const query = new URLSearchParams({ returnTo: safeSimpleReturn(returnTo, returnTo === "/" ? "/" : "/simple") });
+  return `/bookings/${encodeURIComponent(bookingId)}?${query}#${section}`;
+}
+
+export function rememberReturnPosition(businessId: string, returnTo: string) {
+  try { sessionStorage.setItem(`operator-return:${businessId}:${returnTo}`, String(window.scrollY)); } catch { /* Navigation remains available when storage is disabled. */ }
+}
+
+export function restoreReturnPosition(businessId: string, returnTo: string) {
+  try {
+    const key=`operator-return:${businessId}:${returnTo}`;
+    const stored=sessionStorage.getItem(key);
+    sessionStorage.removeItem(key);
+    const position=Number(stored);
+    if(stored!==null && Number.isFinite(position) && position>=0) requestAnimationFrame(()=>window.scrollTo(0,position));
+  } catch { /* No offline or durable restoration is promised. */ }
 }

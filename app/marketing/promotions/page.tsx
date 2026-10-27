@@ -5,6 +5,8 @@ import { confirmAction, notify } from "../../lib/app-notify";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { Trash, Copy, ArrowsClockwise } from "@phosphor-icons/react";
 
+import BookingDiscountSettings from "../../../components/marketing/BookingDiscountSettings";
+
 interface Promotion {
   id: string;
   code: string;
@@ -109,7 +111,7 @@ export default function PromotionsPage() {
     if (!validUntil) {
       const ok = await confirmAction({
         title: "No expiry set",
-        message: "This promo has no end date. It will keep applying forever unless you set max_uses or deactivate it. Continue?",
+        message: "No end date. Set a use limit or deactivate to stop this promo. Continue?",
         tone: "warning",
         confirmLabel: "Save without expiry",
         cancelLabel: "Go back",
@@ -181,7 +183,7 @@ export default function PromotionsPage() {
     const usesNote = p.used_count > 0 ? " It has " + p.used_count + " recorded use" + (p.used_count === 1 ? "" : "s") + "; that history will be lost." : "";
     if (!await confirmAction({
       title: "Delete promo code",
-      message: "Delete \"" + p.code + "\"? This cannot be undone." + usesNote + " If you want to stop new uses but keep history, toggle the status to Paused instead.",
+      message: "Delete \"" + p.code + "\"? This cannot be undone." + usesNote + " Pause to stop new uses and keep history.",
       tone: "warning",
       confirmLabel: "Delete promo",
     })) return;
@@ -211,7 +213,6 @@ export default function PromotionsPage() {
       <div className="anim-fade-up flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Promo Codes</h2>
-          <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>Create and manage discount codes for customers</p>
         </div>
         <button
           onClick={() => { resetForm(); setShowForm(true); }}
@@ -220,6 +221,8 @@ export default function PromotionsPage() {
           New Promo
         </button>
       </div>
+
+      <BookingDiscountSettings />
 
       {/* Create / Edit form */}
       {showForm && (
@@ -346,22 +349,21 @@ export default function PromotionsPage() {
         <div className="ui-card anim-fade-up anim-d1">
           <div className="ui-empty">
             <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No promo codes yet</p>
-            <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Create your first discount code.</p>
           </div>
         </div>
       ) : promos.length > 0 && (
         <div className="ui-card anim-fade-up anim-d1 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="ui-table-container overflow-x-auto">
+            <table role="table" className="ui-responsive-table w-full text-sm">
               <thead>
                 <tr style={{ background: "var(--ck-surface-sunken)" }}>
-                  <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Code</th>
-                  <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Description</th>
-                  <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Discount</th>
-                  <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Valid</th>
-                  <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Uses</th>
-                  <th className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Status</th>
-                  <th className="text-right px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Actions</th>
+                  <th scope="col" className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Code</th>
+                  <th scope="col" className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Description</th>
+                  <th scope="col" className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Discount</th>
+                  <th scope="col" className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Valid</th>
+                  <th scope="col" className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Uses</th>
+                  <th scope="col" className="text-left px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Status</th>
+                  <th scope="col" className="text-right px-4 py-3 font-medium" style={{ color: "var(--ck-text-muted)" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -370,7 +372,7 @@ export default function PromotionsPage() {
                   const isExhausted = p.max_uses != null && p.used_count >= p.max_uses;
                   return (
                     <tr key={p.id} className="border-t transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                      <td className="px-4 py-3">
+                      <td data-label="Code" className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
                           <span className="font-mono font-semibold" style={{ color: "var(--ck-text-strong)" }}>{p.code}</span>
                           <button onClick={() => copyCode(p.code)} className="opacity-40 hover:opacity-100" title="Copy code">
@@ -378,24 +380,24 @@ export default function PromotionsPage() {
                           </button>
                         </div>
                       </td>
-                      <td className="px-4 py-3" style={{ color: "var(--ck-text)" }}>{p.description || "—"}</td>
-                      <td className="px-4 py-3">
+                      <td data-label="Description" className="px-4 py-3" style={{ color: "var(--ck-text)" }}>{p.description || "—"}</td>
+                      <td data-label="Discount" className="px-4 py-3">
                         <span className={"ui-status " + (p.discount_type === "PERCENT" ? "ui-pill-ocean" : "ui-pill-success")}>
                           {p.discount_type === "PERCENT" ? p.discount_value + "%" : "R" + p.discount_value}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                      <td data-label="Valid" className="px-4 py-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>
                         {p.valid_from ? new Date(p.valid_from).toLocaleDateString() : "—"}
                         {p.valid_until ? (
                           " → " + new Date(p.valid_until).toLocaleDateString()
                         ) : (
-                          <span className="ui-status ui-pill-amber ml-1" title="This promo has no end date. It will keep applying unless deactivated or capped by max_uses.">→ No expiry</span>
+                          <span className="ui-status ui-pill-amber ml-1" title="No end date. Set a use limit or deactivate to stop this promo.">→ No expiry</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-xs" style={{ color: "var(--ck-text)" }}>
+                      <td data-label="Uses" className="px-4 py-3 text-xs" style={{ color: "var(--ck-text)" }}>
                         {p.used_count}{p.max_uses != null ? " / " + p.max_uses : ""}
                       </td>
-                      <td className="px-4 py-3">
+                      <td data-label="Status" className="px-4 py-3">
                         <button data-demo-action={p.active ? "promo.deactivate" : "promo.activate"} onClick={() => toggleActive(p)}>
                           <span className={"ui-status cursor-pointer " +
                             (isExpired ? "ui-pill-danger" :
@@ -405,7 +407,7 @@ export default function PromotionsPage() {
                           </span>
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td data-label="Actions" className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => startEdit(p)}

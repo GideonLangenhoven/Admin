@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { confirmAction, notify } from "../../lib/app-notify";
 import { resolveMarketingTestRecipient } from "../../lib/marketing-test-recipient";
@@ -42,6 +42,8 @@ export default function TemplatesPage() {
   const [sendForm, setSendForm] = useState<SendFormState>({ name: "", subject: "", scheduledAt: "", audienceFilter: "all", selectedTags: [] });
   const [sendingInProgress, setSendingInProgress] = useState(false);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const audienceRequest = useRef(0);
+  const [audienceReasons, setAudienceReasons] = useState<Record<string, number> | null>(null);
   const [audienceCount, setAudienceCount] = useState<number | null>(null);
 
   useEffect(() => {
@@ -80,15 +82,14 @@ export default function TemplatesPage() {
 
   // Compute audience count based on current filter
   async function computeAudienceCount(filter: "all" | "tagged", tags: string[]) {
-    let q = supabase.from("marketing_contacts")
-      .select("id", { count: "exact", head: true })
-      .eq("business_id", businessId)
-      .eq("status", "active");
-    if (filter === "tagged" && tags.length > 0) {
-      q = q.overlaps("tags", tags);
-    }
-    const { count } = await q;
-    setAudienceCount(count || 0);
+    const request = ++audienceRequest.current;
+    setAudienceCount(null); setAudienceReasons(null);
+    const { data, error } = await supabase.rpc("marketing_audience_summary", {
+      p_business_id: businessId, p_tags: filter === "tagged" ? tags : null,
+    });
+    if (request !== audienceRequest.current) return;
+    if (error) { notify({ message: "Audience eligibility is unavailable. Sending is held.", tone: "error" }); return; }
+    setAudienceReasons(data || {}); setAudienceCount(data?.eligible || 0);
   }
 
   async function selectStarterTemplate(tmpl: StarterTemplate) {
@@ -155,7 +156,7 @@ export default function TemplatesPage() {
       const { email: testEmail, name: testName } = await resolveMarketingTestRecipient(supabase, businessId);
 
       if (!testEmail) {
-        notify({ message: "Could not determine your email address. Please log out and back in, or set a test email in Settings.", tone: "error" });
+        notify({ message: "Email unavailable. Sign in again or set a test email in Settings.", tone: "error" });
         return;
       }
 
@@ -207,7 +208,7 @@ export default function TemplatesPage() {
     const isScheduled = !!sendForm.scheduledAt;
 
     const { data: contacts, error: audienceError } = await fetchAllRowsResult((from, to) => {
-      let query = supabase.from("marketing_contacts")
+      let query = supabase.from("marketing_eligible_contacts")
         .select("id, email, first_name").eq("business_id", businessId)
         .eq("status", "active").order("id").range(from, to);
       if (sendForm.audienceFilter === "tagged" && sendForm.selectedTags.length > 0) {
@@ -216,7 +217,7 @@ export default function TemplatesPage() {
       return query;
     });
     if (audienceError || !contacts?.length) {
-      notify({ message: audienceError ? "The audience could not be fully loaded. Please retry." : "No active contacts match the selected audience.", tone: audienceError ? "error" : "warning" });
+      notify({ message: audienceError ? "The audience could not be fully loaded. Please retry." : "No contacts have verified permission for this audience.", tone: audienceError ? "error" : "warning" });
       setSendingInProgress(false);
       return;
     }
@@ -250,7 +251,7 @@ export default function TemplatesPage() {
       const { error: queueErr } = await supabase.from("marketing_queue").insert(queueRows.slice(from, from + 500));
       if (queueErr) {
         await supabase.from("marketing_campaigns").update({ status: "cancelled" }).eq("id", campaign.id).eq("business_id", businessId);
-        notify({ message: "Campaign could not be queued completely. No emails were sent; please retry.", tone: "error" });
+        notify({ message: "Queue incomplete. No emails sent; retry.", tone: "error" });
         setSendingInProgress(false);
         return;
       }
@@ -263,7 +264,7 @@ export default function TemplatesPage() {
       ...(isScheduled ? {} : { started_at: new Date().toISOString() }),
     }).eq("id", campaign.id).eq("business_id", businessId).select("id").single();
     if (readyError) {
-      notify({ message: "Campaign is saved but could not be started. Check Recent Campaigns before trying again.", tone: "error" });
+      notify({ message: "Campaign saved but not started. Check Recent Campaigns before retrying.", tone: "error" });
       setSendingInProgress(false);
       return;
     }
@@ -352,7 +353,7 @@ export default function TemplatesPage() {
       <div className="space-y-4">
         <button onClick={() => { setCreating(false); setEditing(null); setInitialTemplate(null); setInitialBlocks(null); }}
           className="flex items-center gap-1.5 text-sm font-medium" style={{ color: "var(--ck-text-muted)" }}>
-          &larr; Back to templates
+          Back to templates
         </button>
         <EmailBuilder
           businessId={businessId}
@@ -437,7 +438,7 @@ export default function TemplatesPage() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Choose a Template</h3>
-                <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>Start with a pre-built template or create from scratch</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--ck-text-muted)" }}>Choose a template or create one.</p>
               </div>
               <button onClick={() => setShowGallery(false)} className="ui-btn ui-btn-ghost !h-8 !w-8 !px-0" aria-label="Close"><X size={18} /></button>
             </div>
@@ -501,7 +502,7 @@ export default function TemplatesPage() {
                     data-active={sendForm.audienceFilter === "all"}
                     className="ui-seg-item !px-3"
                   >
-                    All active contacts
+                    With marketing permission
                   </button>
                   <button
                     onClick={() => {
@@ -517,7 +518,7 @@ export default function TemplatesPage() {
                 {sendForm.audienceFilter === "tagged" && (
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {availableTags.length === 0 ? (
-                      <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>No tags found. Add tags to contacts first.</p>
+                      <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Add contact tags first.</p>
                     ) : (
                       availableTags.map((tag) => {
                         const selected = sendForm.selectedTags.includes(tag);
@@ -545,11 +546,12 @@ export default function TemplatesPage() {
                 )}
                 {audienceCount !== null && (
                   <p className="text-xs mt-2 font-medium" style={{ color: "var(--ck-accent)" }}>
-                    <span className="font-display tabular-nums">{audienceCount}</span> contact{audienceCount !== 1 ? "s" : ""} will receive this campaign
+                    <span className="font-display tabular-nums">{audienceCount}</span> contact{audienceCount !== 1 ? "s" : ""} eligible now. Sending rechecks permission, suppression, frequency and quiet hours.
                   </p>
                 )}
               </div>
 
+              {audienceReasons && <p className="text-xs">Unknown permission: {audienceReasons.permission_unknown || 0}. Suppressed: {audienceReasons.suppressed || 0}. Other exclusions: {Object.entries(audienceReasons).filter(([reason]) => !["eligible","permission_unknown","suppressed"].includes(reason)).reduce((sum,[,count])=>sum+count,0)}.</p>}
               {/* Schedule */}
               <div>
                 <label className="block text-xs font-medium mb-1" style={{ color: "var(--ck-text-muted)" }}>
@@ -572,7 +574,7 @@ export default function TemplatesPage() {
                 <button onClick={() => setSending(null)} className="ui-btn ui-btn-ghost">Cancel</button>
                 <button data-demo-action={sendForm.scheduledAt ? "template.schedule" : "template.send"}
                   onClick={sendCampaign}
-                  disabled={!sendForm.name.trim() || sendingInProgress || (sendForm.audienceFilter === "tagged" && sendForm.selectedTags.length === 0)}
+                  disabled={!sendForm.name.trim() || audienceCount === null || audienceCount === 0 || sendingInProgress || (sendForm.audienceFilter === "tagged" && sendForm.selectedTags.length === 0)}
                   className="ui-btn ui-btn-primary disabled:opacity-50"
                   style={sendForm.scheduledAt ? { background: "var(--ck-amber-bright)", boxShadow: "none" } : undefined}
                 >

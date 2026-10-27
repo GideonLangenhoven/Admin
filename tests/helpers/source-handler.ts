@@ -30,6 +30,7 @@ function loadSource(
       if (name.startsWith("jsr:") && name.endsWith(".d.ts")) return {};
       // Execute the real telemetry wrapper with delivery disabled unless the
       // test explicitly supplies a DSN and a network stub.
+      if (name === "../_shared/payment-deadline.ts") return loadSource("supabase/functions/_shared/payment-deadline.ts", {}, env, fetchImpl).exports;
       if (name === "../_shared/sentry.ts") return loadSource("supabase/functions/_shared/sentry.ts", {}, env, fetchImpl).exports;
       throw new Error("Unexpected handler import: " + name);
     },

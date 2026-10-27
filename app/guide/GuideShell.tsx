@@ -3,6 +3,7 @@
 import { useRouter, usePathname } from "next/navigation";
 import { useBusinessContext } from "@/components/BusinessContext";
 import { CaretLeft } from "@phosphor-icons/react";
+import GuideServiceWorker from "@/components/GuideServiceWorker";
 
 /**
  * Standalone app chrome for the Guide PWA. Deliberately NOT the admin AppShell —
@@ -15,10 +16,14 @@ import { CaretLeft } from "@phosphor-icons/react";
 export default function GuideShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname() || "";
-  const { businessName } = useBusinessContext();
+  const { businessName, role } = useBusinessContext();
   const isHome = pathname === "/guide";
 
+  if (role === "GUIDE") return <>{children}</>;
+
   return (
+    <>
+    <GuideServiceWorker />
     <div className="min-h-[100dvh]" style={{ background: "var(--ck-bg)", color: "var(--ck-text)" }}>
       {/* Header — the same night surface as the admin hero cards */}
       <header className="relative overflow-hidden bg-bt-dark text-white">
@@ -46,5 +51,6 @@ export default function GuideShell({ children }: { children: React.ReactNode }) 
         {children}
       </main>
     </div>
+    </>
   );
 }

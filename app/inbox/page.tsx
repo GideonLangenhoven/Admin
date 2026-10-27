@@ -7,7 +7,6 @@ import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import IntentBadge from "../../components/inbox/IntentBadge";
-import PhoneAlerts from "../../components/inbox/PhoneAlerts";
 import { Virtuoso } from "react-virtuoso";
 import BotStatusBanner from "./components/BotStatusBanner";
 import { Warning, X as XIcon } from "@phosphor-icons/react";
@@ -39,7 +38,7 @@ function MessageList({
               </div>
             )}
             <div className={`flex ${isOut ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[75%] [overflow-wrap:anywhere] px-3 py-2 rounded-2xl text-sm ${isOut
+              <div className={`max-w-[90%] lg:max-w-[75%] [overflow-wrap:anywhere] px-3 py-2 rounded-2xl text-sm ${isOut
                 ? (isBot
                   ? "bg-[var(--ck-surface-sunken)] border border-[var(--ck-border-subtle)] text-[var(--ck-text-muted)] rounded-br-md"
                   : "bg-[var(--ck-accent-soft)] text-[var(--ck-text-strong)] rounded-br-md")
@@ -63,19 +62,19 @@ const needsAttention = (c: any) => c.status === "HUMAN" || c.status === "AGENT_P
 
 function ConvoRow({ c, isSelected, onClick }: { c: any; isSelected: boolean; onClick: () => void }) {
   return (
-    <div onClick={onClick}
-      className={`p-3 border-b border-[var(--ck-border-subtle)] cursor-pointer transition-colors ${isSelected ? "bg-[var(--ck-accent-soft)] border-l-4 border-l-[var(--ck-accent)]" : "hover:bg-[var(--ck-surface-sunken)]"}`}>
+    <button type="button" onClick={onClick} aria-pressed={isSelected}
+      className={`block w-full text-left p-3 border-b border-[var(--ck-border-subtle)] cursor-pointer transition-colors ${isSelected ? "bg-[var(--ck-accent-soft)]" : "hover:bg-[var(--ck-surface-sunken)]"}`}>
       <div className="flex items-center gap-2">
         {needsAttention(c) && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--ck-accent)]" aria-hidden="true" />}
         <p className="font-semibold text-sm truncate" style={{ color: "var(--ck-text-strong)" }}>{c.customer_name || "Unknown"}</p>
         <IntentBadge intent={c.current_intent} size="xs" />
         <span className={`ui-status ml-auto shrink-0 ${needsAttention(c) ? "ui-pill-warning" : "ui-pill-neutral"}`}>
-          {needsAttention(c) ? "Needs reply" : "Bot"}
+          {needsAttention(c) ? "Needs reply" : c.status === "CLOSED" ? "Conversation closed" : "Bot replying"}
         </span>
       </div>
       <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{c.phone}</p>
       <p className="font-mono text-[11px] mt-1" style={{ color: "var(--ck-text-muted)" }}>{new Date(c.updated_at).toLocaleString("en-ZA", { timeZone: getAdminTimezone() })}</p>
-    </div>
+    </button>
   );
 }
 
@@ -132,7 +131,13 @@ function InboxContent() {
     setLoading(false);
   }, [businessId]);
 
-  useEffect(() => { loadConvos(); }, [loadConvos]);
+  useEffect(() => {
+    const refresh = () => { if (!document.hidden) void loadConvos(); };
+    void loadConvos();
+    const interval = setInterval(refresh, 5000);
+    window.addEventListener("inbox-updated", refresh);
+    return () => { clearInterval(interval); window.removeEventListener("inbox-updated", refresh); };
+  }, [loadConvos]);
 
   // Auto-select conversation from ?phone= query param
   useEffect(() => {
@@ -191,7 +196,7 @@ function InboxContent() {
   }, [selected, businessId]);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [messages]);
 
   // Polling fallback
@@ -236,12 +241,12 @@ function InboxContent() {
       if (res.error) {
         notify({ title: "Reply failed", message: res.error.message, tone: "error" });
         if (/credential|token|whatsapp|wa_token|not configured/i.test(res.error.message)) {
-          setWaWarning("WhatsApp is not configured for this business. Go to Settings to add your WhatsApp token and Phone ID.");
+          setWaWarning("Connect WhatsApp in Settings using your token and Phone ID.");
         }
       } else if (res.data && res.data.ok === false) {
         // 24-hour window — friendly guidance, no generic error toast
         if (res.data.error === "outside_24h_window") {
-          setWaWarning(res.data.message || "WhatsApp requires the customer to message you first. Ask them to send you a WhatsApp message, then you can reply here.");
+          setWaWarning(res.data.message || "Ask the customer to message you on WhatsApp first. Then reply here.");
         } else {
           // message carries the actionable remedy (expired token, test-number
           // allow-list); error is the bare category. Prefer the remedy.
@@ -253,7 +258,7 @@ function InboxContent() {
           }
           notify({ title: "Reply failed", message: msgErr, tone: "error" });
           if (/credential|token|whatsapp|wa_token|not configured/i.test(msgErr)) {
-            setWaWarning("WhatsApp is not configured for this business. Go to Settings to add your WhatsApp token and Phone ID.");
+            setWaWarning("Connect WhatsApp in Settings using your token and Phone ID.");
           }
         }
       } else {
@@ -300,7 +305,7 @@ function InboxContent() {
         // conversations isn't in the realtime publication, so the sidebar
         // badge only hears about status flips via this event.
         window.dispatchEvent(new Event("inbox-updated"));
-        notify({ title: "Returned to bot", message: "The conversation was handed back to the bot.", tone: "success" });
+        notify({ title: "Returned to bot", message: "Bot resumed.", tone: "success" });
       }
     } catch (err: any) {
       notify({ title: "Return to bot failed", message: err.message, tone: "error" });
@@ -313,7 +318,7 @@ function InboxContent() {
     if (!phone) return;
     try {
       const res = await supabase.functions.invoke("admin-reply", {
-        body: { action: "end_chat", phone, message: "Thanks for chatting with us! 🙏 Before you go, please rate how we did.", business_id: businessId },
+        body: { action: "end_chat", phone, message: "Thanks for chatting. How did we do?", business_id: businessId },
       });
       if (res.error || (res.data && res.data.ok === false)) {
         notify({ title: "End chat failed", message: res.error?.message || res.data?.error, tone: "error" });
@@ -322,7 +327,7 @@ function InboxContent() {
         setMessages([]);
         loadConvos();
         window.dispatchEvent(new Event("inbox-updated"));
-        notify({ title: "Chat ended", message: "The visitor was asked to rate the chat.", tone: "success" });
+        notify({ title: "Chat ended", message: "Chat rating requested.", tone: "success" });
       }
     } catch (err: any) {
       notify({ title: "End chat failed", message: err.message, tone: "error" });
@@ -361,26 +366,17 @@ function InboxContent() {
     : convos;
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="anim-fade-up mb-4 flex items-center gap-3">
-        <h1 className="font-display px-1 text-[20px] font-semibold sm:text-[24px]" style={{ color: "var(--ck-text-strong)" }}>Inbox</h1>
-        {attentionCount > 0 && (
-          <span className="inline-flex items-center rounded-full px-2 py-0.5 align-middle font-mono text-xs font-semibold tabular-nums" style={{ background: "var(--ck-accent-soft)", color: "var(--ck-accent)" }}>
-            {attentionCount}
-          </span>
-        )}
-      </div>
-
-      <div className="mb-3"><PhoneAlerts /></div>
+    <div className="h-full min-h-0 flex flex-col">
+      <h1 className="sr-only">Conversations</h1>
 
       {loading ? <div className="space-y-3"><div className="ui-skeleton h-20 !rounded-xl" /><div className="ui-skeleton h-20 !rounded-xl" /><div className="ui-skeleton h-20 !rounded-xl" /></div> : (
-        <div className="anim-fade-up anim-d1 flex min-h-0 flex-1 flex-col gap-3 md:gap-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-0 lg:gap-4">
           <BotStatusBanner />
-          <div className="flex min-h-0 flex-1 gap-3 md:gap-4">
+          <div className="flex min-h-0 flex-1 gap-3 lg:gap-4">
             {/* Conversation list — hidden on mobile when a chat is selected */}
-            <div className={`w-full md:w-72 shrink-0 flex flex-col ui-card overflow-hidden ${selected ? "hidden md:flex" : "flex"}`}>
-              <div className="p-3 border-b border-[var(--ck-border-subtle)] bg-[var(--ck-surface-sunken)] space-y-2">
-                <div className="flex items-center justify-between">
+            <div className={`w-full min-h-0 lg:w-72 shrink-0 flex flex-col ui-card rounded-none border-0 lg:rounded-2xl lg:border overflow-hidden ${selected ? "hidden lg:flex" : "flex"}`}>
+              <div className="shrink-0 p-2 lg:p-3 border-b border-[var(--ck-border-subtle)] bg-[var(--ck-surface-sunken)] lg:space-y-2">
+                <div className="hidden lg:flex items-center justify-between">
                   <p className="ui-mono-label !text-[10px]">{attentionCount} need attention · {convos.length} total</p>
                   <button onClick={loadConvos} className="ui-btn ui-btn-ghost !h-7 !px-2.5 text-[11px]">Refresh</button>
                 </div>
@@ -388,11 +384,12 @@ function InboxContent() {
                   type="search"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  aria-label="Search conversations"
                   placeholder="Search name, number or email…"
-                  className="ui-control w-full !h-8 px-2.5 text-[12.5px] rounded-lg outline-none"
+                  className="ui-control w-full !h-11 lg:!h-8 px-2.5 text-base lg:text-[12.5px] rounded-lg outline-none"
                 />
               </div>
-              <div className="flex-1 overflow-auto">
+              <div className="min-h-0 flex-1 overflow-auto">
                 {visibleConvos.length === 0 ? (
                   <div className="ui-empty">
                     <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{q ? "No matches" : "No conversations yet"}</p>
@@ -414,9 +411,9 @@ function InboxContent() {
 
             {/* Chat panel — full width on mobile */}
             {selected ? (
-              <div className="flex-1 flex flex-col ui-card overflow-hidden">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--ck-border-subtle)] bg-[var(--ck-surface-sunken)] p-3">
-                  <button onClick={() => setSelected(null)} className="ui-btn ui-btn-ghost md:hidden shrink-0 !h-8 !px-2.5 text-xs">
+              <div role="region" aria-label="Conversation" className="min-h-0 min-w-0 flex-1 flex flex-col ui-card rounded-none border-0 lg:rounded-2xl lg:border overflow-hidden">
+                <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--ck-border-subtle)] bg-[var(--ck-surface-sunken)] p-3">
+                  <button onClick={() => setSelected(null)} className="ui-btn ui-btn-ghost lg:hidden shrink-0 !h-8 !px-2.5 text-xs">
                     Back
                   </button>
                   <div className="flex-1 min-w-0">
@@ -428,7 +425,7 @@ function InboxContent() {
                       {/^web(:|$)/.test(String(selected.phone)) && (
                         <button data-demo-action="inbox.end" onClick={() => endChat(selected.phone)}
                           className="ui-btn ui-btn-soft flex-1 !h-8 text-xs sm:flex-none">
-                          End chat &amp; rate
+                          End &amp; rate
                         </button>
                       )}
                       <button data-demo-action="inbox.bot" onClick={() => returnToBot(selected.id, selected.phone)}
@@ -440,7 +437,7 @@ function InboxContent() {
                 </div>
 
                 {customerBookings.length > 0 && (
-                  <div className="flex gap-2 overflow-x-auto border-b border-[var(--ck-border-subtle)] px-3 py-2" style={{ background: "var(--ck-surface-sunken)" }}>
+                  <div className="shrink-0 flex gap-2 overflow-x-auto border-b border-[var(--ck-border-subtle)] px-3 py-2" style={{ background: "var(--ck-surface-sunken)" }}>
                     {customerBookings.map((b: any) => (
                       <Link key={b.id} href={`/bookings/${b.id}`}
                         className="shrink-0 rounded-lg border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] px-2.5 py-1.5 text-[11px] leading-tight transition-colors hover:border-[var(--ck-accent)]">
@@ -452,7 +449,7 @@ function InboxContent() {
                   </div>
                 )}
 
-                <div className="flex-1 overflow-auto p-4 space-y-3" style={{ background: "var(--ck-surface-warm)" }}>
+                <div className="min-h-0 flex-1 overflow-auto p-3 lg:p-4 space-y-3" style={{ background: "var(--ck-surface-warm)" }}>
                   {messages.length === 0 ? (
                     <div className="ui-empty">
                       <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No messages yet</p>
@@ -472,7 +469,7 @@ function InboxContent() {
                   )}
                 </div>
 
-                <div className="border-t border-[var(--ck-border-subtle)]" style={{ background: "var(--ck-surface)" }}>
+                <div className="shrink-0 border-t border-[var(--ck-border-subtle)]" style={{ background: "var(--ck-surface)" }}>
                   {waWarning && (
                     <div className="flex items-start gap-2 border-b px-3 py-2" style={{ background: "var(--ck-amber-soft)", borderColor: "color-mix(in srgb, var(--ck-amber) 25%, transparent)" }}>
                       <span className="shrink-0 mt-0.5" style={{ color: "var(--ck-amber)" }}><Warning size={15} weight="fill" /></span>
@@ -481,26 +478,26 @@ function InboxContent() {
                     </div>
                   )}
                   <div className="p-3">
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <textarea data-demo-enter="inbox.reply" value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={handleKeyDown}
-                        rows={2} placeholder={needsAttention(selected) ? "Type your reply... (Enter to send)" : "Reply to take over from the bot... (Enter to send)"}
-                        className="ui-control flex-1 resize-none outline-none" />
+                    <div className="flex gap-2">
+                      <textarea aria-label="Reply" data-demo-enter="inbox.reply" value={reply} onChange={(e) => setReply(e.target.value)} onKeyDown={handleKeyDown}
+                        rows={2} placeholder={needsAttention(selected) ? "Type your reply... (Enter to send)" : "Reply to take over (Enter to send)"}
+                        className="ui-control min-w-0 flex-1 h-12 lg:h-auto resize-none outline-none" />
                       <button data-demo-action="inbox.reply" onClick={sendReply} disabled={sending || !reply.trim()}
-                        className="ui-btn ui-btn-primary self-stretch !h-auto py-2.5 disabled:opacity-50 sm:self-end sm:!h-9 sm:!py-0">
+                        className="ui-btn ui-btn-primary self-end !h-12 lg:!h-9 py-2.5 disabled:opacity-50 lg:!py-0">
                         {sending ? "..." : "Send"}
                       </button>
                     </div>
                     {!needsAttention(selected) && (
-                      <p className="text-[10px] mt-2" style={{ color: "var(--ck-text-muted)" }}>This chat is being handled by the bot. Replying moves it to human handling.</p>
+                      <p className="text-[10px] mt-2" style={{ color: "var(--ck-text-muted)" }}>Reply to take over from the bot.</p>
                     )}
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="hidden md:flex flex-1 items-center justify-center ui-card">
+              <div className="hidden lg:flex flex-1 items-center justify-center ui-card">
                 <div className="ui-empty">
                   <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No conversation selected</p>
-                  <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Choose a conversation on the left to see its full history.</p>
+                  <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Choose a conversation to see its history.</p>
                 </div>
               </div>
             )}

@@ -40,6 +40,11 @@ export const STALE_SESSION_GREETING =
 // diverted into the booking flow just because they contain a date.
 export function isAvailabilityQuery(text: string): boolean {
   const input = String(text || "").toLowerCase();
+  // "Available" can refer to parking, payment or vouchers, and opening
+  // hours are not open tour slots. Keep those questions in the FAQ path.
+  const otherAvailability = /\b(?:parking|payment (?:methods?|options?)|(?:gift )?vouchers?|(?:opening|business|shop) hours)\b/.test(input);
+  const explicitTourAvailability = /\b(?:tours?|trips?|hikes?|activities|departures?|sessions?)\s+(?:(?:is|are|still)\s+)*(?:availab\w*|open|running)\b/.test(input);
+  if (otherAvailability && !explicitTourAvailability) return false;
   if (/\b(availab\w*|spaces?|slots?|openings?|open spots?)\b/.test(input)) return true;
   const hasDate = /\b(today|tomorrow|weekend|next week|this week|morning|afternoon|evening|sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/.test(input) ||
     /\b\d{1,2}(st|nd|rd|th)?\b/.test(input) || /\b\d{1,2}\s*(am|pm)\b/.test(input);
@@ -86,7 +91,9 @@ export const INJECTION_PATTERNS: Array<{ key: string; re: RegExp }> = [
   { key: "admin_command", re: /^\s*[/\\!]\s*(admin|sudo|root|debug|sys|override|exec|eval)\b/i },
   // "the owner said I get a free tour", "the founder promised me a complimentary tour"
   { key: "free_or_discount_claim", re: /\b(owner|manager|founder|ceo|boss|staff|admin)\s+(said|told|promised|approved|authori[sz]ed|gave|offered)\b.*\b(free|discount|voucher|comp\w*|refund|100\s*%)\b/i },
-  { key: "100_percent_discount", re: /\b(100\s*%|full)\s*(discount|off|free|comp\w*|refund)\b/i },
+  // Asking about a full refund is a normal policy question. Claims that an
+  // owner granted one still match free_or_discount_claim above.
+  { key: "100_percent_discount", re: /\b(100\s*%|full)\s*(discount|off|free|comp\w*)\b/i },
   { key: "exfiltrate_secrets", re: /\b(api[\s_-]?key|secret\s*key|service[-_\s]?role|env(ironment)?\s+variables?|database\s+(password|connection|url)|access[\s_-]?token|bearer[\s_-]?token|connection\s+string)\b/i },
   { key: "promptbreak_markers", re: /\[\[\s*(end|begin|stop|start)\s+(of\s+)?(prompt|instructions?|system)\s*\]\]|<\/?(system|admin|root|prompt)>/i },
   { key: "exec_code", re: /\b(execute|run|eval(uate)?|exec)\s+(this|the\s+following|code|script|sql|shell|command)\b/i },
@@ -116,7 +123,13 @@ export function detectInjection(text: string): InjectionResult {
   if (!text) return { detected: false, matches: [] };
   const matches: string[] = [];
   for (const p of INJECTION_PATTERNS) {
-    if (p.re.test(text)) matches.push(p.key);
+    // Guest instructions for reaching a shop or joining a trip are not the
+    // bot's instructions. Exempt only that scoped phrase; a second request
+    // for hidden/system instructions in the same message is still caught.
+    const probe = p.key === "show_system_prompt" && !/\b(?:system|hidden|internal|secret|prompt|configuration)\b/i.test(text)
+      ? text.replace(/\b(?:instructions?|rules?|guidelines?)\s+(?:to\s+(?:get to|reach|find|arrive)|(?:for|about|on)\s+(?:(?:my|our|the|your|a|an)\s+)*(?:trips?|tours?|safety|arrival|check[ -]?in|boarding|parking|cancellations?|refunds?|bookings?|waivers?|paddling|kayaking))\b/gi, "guest information")
+      : text;
+    if (p.re.test(probe)) matches.push(p.key);
   }
   return { detected: matches.length > 0, matches };
 }

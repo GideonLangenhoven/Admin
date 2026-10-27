@@ -4,7 +4,7 @@ route: /vouchers
 required_role: OPERATOR
 ---
 
-Vouchers cover gifts, credits, and free trips. Each voucher has an 8-character code the recipient redeems when booking. Vouchers are specific to your business — a voucher you issue can only be redeemed on your own tours, never with another operator.
+Open [Marketing](/marketing), then the **Vouchers** tab at /vouchers. Vouchers cover gifts, credits and tour redemption. Each has a code the customer uses when booking with your business. The create form generates an 8-character code and lets you regenerate or edit it.
 
 ## Creating a voucher
 
@@ -12,9 +12,21 @@ Fill in the recipient and buyer details, choose the tour, and pick the type:
 
 - **Gift** — bought by one person for another, with an optional gift message.
 - **Credit** — a monetary amount the recipient can spend on a booking.
-- **Free Trip** — a complimentary booking for a chosen tour.
+- **Free Trip** — a voucher for tour redemption. The dashboard create form still sells it by payment link; selecting this type does not grant unpaid complimentary credit.
 
-The code is generated automatically (you can regenerate it). When you create a paid voucher, the **buyer receives a payment link** — the voucher only becomes ACTIVE once it's paid for. Expiry is set to 3 years automatically.
+Enter a positive rand value and a buyer email, choose the type, and review the buyer, recipient, tour and optional gift message. **Send payment link** emails the buyer a checkout link. Every voucher sold through this form remains PENDING until payment is confirmed. Expiry is set to three years automatically, and the list shows its date.
+
+Recipient email is optional and controls gift delivery. Credit vouchers arising from cancellations or booking changes are a separate recovery flow; creating an order here does not complete a refund.
+
+## Gift voucher photos and messages
+
+1. Open **Settings → Tours & Activities** and edit the experience.
+2. Under **Gift voucher photo**, choose **Upload voucher photo** and select a JPG, PNG or WebP up to 5 MB.
+3. Open **Preview gift voucher** to check the photo with sample details, then save the tour. **Use tour image** removes the separate voucher photo; if neither photo is set, the gift voucher default photo is used.
+
+When creating a voucher, choose the experience under **Gift voucher photo**, enter the recipient and buyer names, and add a **Gift message**. Check the preview before sending the payment link: the names, amount, experience and personal message appear on the photo, with message line breaks preserved. Customers buying online can also choose an experience photo and preview their personal message.
+
+The selected design appears on the confirmation page and gift emails, with the voucher code and expiry after payment. Choosing a photo changes the appearance only; it does not change where the voucher can be redeemed. Updating an experience’s photo affects new vouchers; existing purchases keep their selected photo.
 
 ## Voucher statuses
 

@@ -189,6 +189,8 @@ async function cleanupAbandonedVouchers() {
 }
 
 async function processNotificationJobs() {
+  const queued = await supabase.rpc("enqueue_manual_payment_reminders", { p_limit: 100 });
+  if (queued.error) throw queued.error;
   const claimId = crypto.randomUUID();
   const { data: jobs, error: claimError } = await supabase.rpc("claim_notification_jobs", {
     p_claim_id: claimId,
@@ -634,6 +636,15 @@ Deno.serve(withSentry("cron-tasks", async (req) => {
     results.hold_cleanup = cleanup.hold_cleanup;
   } catch (error) {
     console.error("HOLD_CLEANUP_ERR", error);
+    results.errors.push(error instanceof Error ? error.message : String(error));
+  }
+
+  try {
+    const otaExpiry = await supabase.rpc("ota_expire_reservations");
+    if (otaExpiry.error) throw otaExpiry.error;
+    results.ota_hold_cleanup = Number(otaExpiry.data || 0);
+  } catch (error) {
+    console.error("OTA_HOLD_CLEANUP_ERR", error);
     results.errors.push(error instanceof Error ? error.message : String(error));
   }
 

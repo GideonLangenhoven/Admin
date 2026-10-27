@@ -20,9 +20,9 @@ export default function BotStatusBanner() {
       if (!r.ok) return;
       const data = await r.json();
       if (data.mode === "OFF") {
-        setBannerText("WhatsApp bot is off. Every message goes to this inbox.");
+        setBannerText("WhatsApp auto-replies off. Reply in Inbox.");
       } else if (data.mode === "OUTSIDE_HOURS" && !data.currentlyActive) {
-        setBannerText("WhatsApp bot is paused during business hours.");
+        setBannerText("WhatsApp auto-replies paused during business hours. Staff must reply.");
       }
     })();
   }, [businessId]);
@@ -36,6 +36,7 @@ export default function BotStatusBanner() {
         <a href="/settings" className="underline hover:text-amber-900">Change setting →</a>
       </p>
       <button
+        type="button" aria-label="Dismiss automatic replies notice"
         onClick={() => { setDismissed(true); sessionStorage.setItem("ck_bot_banner_dismissed", "1"); }}
         className="text-amber-600 hover:text-amber-800 text-xs font-bold"
       >

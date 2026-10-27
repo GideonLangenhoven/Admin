@@ -33,6 +33,7 @@
     "onboarding_completed_at",
     "password_hash",
     "password_set_at",
+    "phone",
     "read_only",
     "role",
     "settings_permissions",
@@ -114,6 +115,7 @@
     "arrived_count",
     "business_id",
     "cancellation_reason",
+    "cancellation_self_service",
     "cancelled_at",
     "checked_in",
     "checked_in_at",
@@ -138,6 +140,8 @@
     "email",
     "external_ref",
     "external_source_details",
+    "first_operator_booked_at",
+    "first_operator_booking",
     "id",
     "invoice_id",
     "is_combo",
@@ -151,7 +155,10 @@
     "ota_net_amount",
     "payfast_m_payment_id",
     "payment_deadline",
+    "payment_failed_at",
+    "payment_failure_reason",
     "payment_method",
+    "payment_recovery_emailed_at",
     "payment_status",
     "payment_url",
     "phone",
@@ -191,6 +198,7 @@
     "waiver_status",
     "waiver_token",
     "waiver_token_expires_at",
+    "whatsapp_booking_updates_opt_in",
     "yoco_checkout_id",
     "yoco_mode",
     "yoco_payment_id"
@@ -795,6 +803,22 @@
     "metadata",
     "queue_id"
   ],
+  "marketing_permission_events": [
+    "business_id",
+    "channel",
+    "contact_id",
+    "decision",
+    "evidence_at",
+    "evidence_ref",
+    "id",
+    "identity_hash",
+    "notice_text",
+    "notice_version",
+    "purpose",
+    "recorded_at",
+    "recorded_by",
+    "source"
+  ],
   "marketing_queue": [
     "business_id",
     "campaign_id",
@@ -841,6 +865,15 @@
     "period",
     "updated_at"
   ],
+  "messages": [
+    "body",
+    "channel",
+    "conversation_id",
+    "created_at",
+    "direction",
+    "id",
+    "raw"
+  ],
   "mfa_recovery_state": [
     "actor_id",
     "admin_id",
@@ -856,15 +889,6 @@
     "status",
     "updated_at",
     "verification_reference"
-  ],
-  "messages": [
-    "body",
-    "channel",
-    "conversation_id",
-    "created_at",
-    "direction",
-    "id",
-    "raw"
   ],
   "ngt_intake_submissions": [
     "about_you",
@@ -907,6 +931,38 @@
     "payment_id",
     "status",
     "verified_at"
+  ],
+  "notification_jobs": [
+    "accepted_at",
+    "acceptance_uncertain",
+    "attempts",
+    "booking_id",
+    "business_id",
+    "channel",
+    "claim_id",
+    "claimed_at",
+    "created_at",
+    "dedupe_key",
+    "first_attempt_at",
+    "id",
+    "last_error",
+    "max_attempts",
+    "next_attempt_at",
+    "payload",
+    "provider_message_id",
+    "recipient",
+    "source_id",
+    "source_type",
+    "status",
+    "template_type",
+    "updated_at"
+  ],
+  "operator_dashboard_layouts": [
+    "business_id",
+    "hidden_tiles",
+    "revision",
+    "tile_order",
+    "updated_at"
   ],
   "operator_directory": [
     "booking_site_url",
@@ -966,31 +1022,6 @@
     "run_at",
     "status",
     "status_mismatches"
-  ],
-  "notification_jobs": [
-    "accepted_at",
-    "acceptance_uncertain",
-    "attempts",
-    "booking_id",
-    "business_id",
-    "channel",
-    "claim_id",
-    "claimed_at",
-    "created_at",
-    "dedupe_key",
-    "first_attempt_at",
-    "id",
-    "last_error",
-    "max_attempts",
-    "next_attempt_at",
-    "payload",
-    "provider_message_id",
-    "recipient",
-    "source_id",
-    "source_type",
-    "status",
-    "template_type",
-    "updated_at"
   ],
   "otp_attempts": [
     "attempts",
@@ -1131,6 +1162,7 @@
   ],
   "policies": [
     "business_id",
+    "booking_discount_rules",
     "created_at",
     "free_cancel_hours_before",
     "group_discount_min_qty",
@@ -1191,6 +1223,23 @@
     "referrer_phone",
     "status",
     "uses"
+  ],
+  "refund_operations": [
+    "id",
+    "business_id",
+    "booking_id",
+    "request_id",
+    "source_business_id",
+    "checkout_id",
+    "amount",
+    "currency",
+    "mode",
+    "status",
+    "provider_id",
+    "error",
+    "keep_booking",
+    "created_at",
+    "updated_at"
   ],
   "refund_requests": [
     "booking_id",
@@ -1310,7 +1359,8 @@
     "meeting_point",
     "name",
     "peak_price_per_person",
-    "sort_order"
+    "sort_order",
+    "voucher_image_url"
   ],
   "trip_photos": [
     "business_id",
@@ -1333,6 +1383,16 @@
     "topup_quota_count",
     "updated_at"
   ],
+  "voucher_reservations": [
+    "id",
+    "voucher_id",
+    "booking_id",
+    "business_id",
+    "amount",
+    "status",
+    "created_at",
+    "expires_at"
+  ],
   "vouchers": [
     "business_id",
     "buyer_email",
@@ -1343,7 +1403,10 @@
     "created_at",
     "current_balance",
     "expires_at",
+    "gift_image_url",
     "gift_message",
+    "gift_tour_id",
+    "gift_tour_name",
     "id",
     "pax_limit",
     "payment_reminder_sent_at",
@@ -1398,32 +1461,5 @@
     "last_activity_at",
     "session_id",
     "state_data"
-  ],
-  "refund_operations": [
-    "id",
-    "business_id",
-    "booking_id",
-    "request_id",
-    "source_business_id",
-    "checkout_id",
-    "amount",
-    "currency",
-    "mode",
-    "status",
-    "provider_id",
-    "error",
-    "keep_booking",
-    "created_at",
-    "updated_at"
-  ],
-  "voucher_reservations": [
-    "id",
-    "voucher_id",
-    "booking_id",
-    "business_id",
-    "amount",
-    "status",
-    "created_at",
-    "expires_at"
   ]
 }

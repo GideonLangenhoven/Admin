@@ -12,6 +12,7 @@ import {
 import { blockIfNotTrading } from "../_shared/subscription.ts";
 import { requireAuth, canAccessBusiness } from "../_shared/auth.ts";
 import { bookingSuccessUrl } from "../_shared/booking-success.ts";
+import { applicableBookingQuestions, captureQuestionFields, questionConfigurationChanged, validateQuestionAnswers } from "../_shared/booking-custom-fields.ts";
 
 const BOOKING_SUCCESS_URL = Deno.env.get("BOOKING_SUCCESS_URL") || "";
 const BOOKING_CANCEL_URL = Deno.env.get("BOOKING_CANCEL_URL") || "";
@@ -103,6 +104,7 @@ Deno.serve(withSentry("create-checkout", async (req: any) => {
     // emailed/WhatsApp'd the link up front — the hold-expiry cron chases them
     // only if they abandon or payment lags past the 15-min hold.
     const sendPaymentLink = body.send_payment_link === true;
+    let checkoutBooking: any = null;
 
     if (amount == null || !Number.isFinite(Number(amount)) || Number(amount) < 0) return new Response(JSON.stringify({ error: "Need amount" }), { status: 400, headers: buildCors(req?.headers?.get("origin") || "*") });
 
@@ -111,13 +113,14 @@ Deno.serve(withSentry("create-checkout", async (req: any) => {
     // their insert response. Internal bots and operator actions use real auth.
     if (bookingId) {
       const { data: booking, error } = await supabase.from("bookings")
-        .select("business_id, waiver_token").eq("id", bookingId).maybeSingle();
+        .select("id, business_id, waiver_token, tour_id, qty, status, custom_fields").eq("id", bookingId).maybeSingle();
       if (error) return new Response(JSON.stringify({ error: "Could not verify booking access" }), { status: 503, headers: buildCors(req?.headers?.get("origin")) });
       let allowed = Boolean(booking?.waiver_token && typeof body.booking_token === "string" && body.booking_token === booking.waiver_token);
       if (!allowed && booking) {
         try { allowed = canAccessBusiness(await requireAuth(req), booking.business_id); } catch { /* not an operator or service caller */ }
       }
       if (!allowed) return new Response(JSON.stringify({ error: "Booking verification required" }), { status: 403, headers: buildCors(req?.headers?.get("origin")) });
+      checkoutBooking = booking;
     }
 
     // Fix 3a: a paused or suspended operator takes no new business. Gated here,
@@ -136,6 +139,29 @@ Deno.serve(withSentry("create-checkout", async (req: any) => {
         const blocked = await blockIfNotTrading(supabase, gateBusinessId, buildCors(req?.headers?.get("origin") || "*"));
         if (blocked) return blocked;
       }
+    }
+
+    // Validate against this booking's tenant and tour before reserving seats,
+    // spending voucher credit, or creating even a zero-value payment session.
+    // Paid historical bookings retain their original question snapshot.
+    if (type === "BOOKING" && checkoutBooking && ["DRAFT", "PENDING", "HELD", "PENDING PAYMENT"].includes(checkoutBooking.status)) {
+      const headers = buildCors(req?.headers?.get("origin"));
+      const config = await supabase.from("businesses").select("booking_custom_fields").eq("id", checkoutBooking.business_id).maybeSingle();
+      let questions;
+      try {
+        if (config.error || !config.data) throw new Error("Configuration unavailable");
+        questions = applicableBookingQuestions(config.data.booking_custom_fields, checkoutBooking.tour_id, checkoutBooking.business_id);
+      } catch {
+        return new Response(JSON.stringify({ error: "CUSTOM_QUESTIONS_UNAVAILABLE", reason: "We couldn't load the booking questions. Please try again before paying." }), { status: 503, headers });
+      }
+      const fields = body.custom_fields === undefined ? checkoutBooking.custom_fields || {} : body.custom_fields;
+      if (!fields || typeof fields !== "object" || Array.isArray(fields)) return new Response(JSON.stringify({ error: "CUSTOM_QUESTIONS_INVALID", reason: "Please review your booking answers.", questions }), { status: 422, headers });
+      if (questionConfigurationChanged(fields, questions, checkoutBooking.business_id, checkoutBooking.tour_id)) return new Response(JSON.stringify({ error: "CUSTOM_QUESTIONS_CHANGED", reason: "The operator updated the booking questions. Please review them before paying.", questions }), { status: 409, headers });
+      const validation = validateQuestionAnswers(questions, fields, checkoutBooking.qty);
+      if (validation.errors.length) return new Response(JSON.stringify({ error: "CUSTOM_QUESTIONS_INVALID", reason: "Please complete the booking questions before paying.", field_errors: validation.errors, questions }), { status: 422, headers });
+      const saved = await supabase.from("bookings").update({ custom_fields: captureQuestionFields(questions, validation.answers, checkoutBooking.business_id, checkoutBooking.tour_id, checkoutBooking.custom_fields) })
+        .eq("id", bookingId).eq("business_id", checkoutBooking.business_id).in("status", ["DRAFT", "PENDING", "HELD", "PENDING PAYMENT"]).select("id").maybeSingle();
+      if (saved.error || !saved.data) return new Response(JSON.stringify({ error: "CUSTOM_ANSWERS_SAVE_FAILED", reason: "We couldn't save your booking answers. Please try again before paying." }), { status: 503, headers });
     }
 
     // Price, voucher reservations and the seat hold commit together.

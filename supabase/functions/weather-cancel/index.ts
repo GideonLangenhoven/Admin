@@ -36,6 +36,10 @@ Deno.serve(async (req: any) => {
 
     const body = await req.json();
     let { slot_ids, business_id, booking_ids, reason } = body;
+    if (body.offer_choice !== undefined && typeof body.offer_choice !== "boolean") {
+      return new Response(JSON.stringify({ error: "offer_choice must be a boolean" }), { status: 400, headers: getCors(req) });
+    }
+    const offerChoice = body.offer_choice !== false;
 
     if (!business_id && !auth.isServiceRole) business_id = auth.businessId;
 
@@ -86,7 +90,7 @@ Deno.serve(async (req: any) => {
       const cancelled = await supabase.rpc("cancel_booking_transaction", {
         p_booking_id: b.id, p_business_id: business_id,
         p_reason: (isWeather ? "Weather cancellation: " : "Cancelled by operator: ") + cancelReason,
-        p_allow_late_choice: true, p_weather: true,
+        p_allow_late_choice: true, p_weather: true, p_offer_choice: offerChoice,
       });
       if (cancelled.error || !cancelled.data?.ok) {
         failedCancels.push({ id: b.id, error: cancelled.data?.error || cancelled.error?.message || "Cancellation failed" });
@@ -104,6 +108,7 @@ Deno.serve(async (req: any) => {
       const isPaid = ["PAID", "CONFIRMED"].includes(b.status);
       const isOta = String(b.source || "").startsWith("OTA_");
       const refundAmount = Number(outcomes.get(b.id)?.refund_amount || 0);
+      const customerChoice = outcomes.get(b.id)?.refund_action_required === true;
       const ref = b.id.substring(0, 8).toUpperCase();
       const tourName = b.tours?.name || "Tour";
       const startTime = b.slots?.start_time
@@ -114,14 +119,18 @@ Deno.serve(async (req: any) => {
       if (b.phone) {
         try {
           const firstName = b.customer_name?.split(" ")[0] || "there";
-          const waMessage = isPaid && isOta
+          const waMessage = !offerChoice
+            ? "Trip Cancelled\n\nHi " + firstName + ", your " + tourName + " on " + startTime +
+              " has been cancelled due to " + cancelReason + ".\n\nRef: " + ref +
+              "\n\nIf you have any questions, please contact us directly.\n\n" + brandName
+            : isPaid && isOta
             ? "Trip Cancelled \u26C5\n\n" +
               "Hi " + firstName + ", we\u2019re sorry but your " + tourName + " on " + startTime +
               " has been cancelled due to " + cancelReason + ".\n\n" +
               "Ref: " + ref + "\n\n" +
               "You booked through a travel platform (e.g. Viator/GetYourGuide). They will handle your refund or rebooking. Please contact them directly.\n\n" +
               ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon. " : "We hope to see you again soon. ") + brandName
-            : refundAmount > 0
+            : customerChoice
             ? "Trip Cancelled \u26C5\n\n" +
               "Hi " + firstName + ", we\u2019re sorry but your " + tourName + " on " + startTime +
               " has been cancelled due to " + cancelReason + ".\n\n" +
@@ -167,7 +176,8 @@ Deno.serve(async (req: any) => {
                 total_amount: isPaid && refundAmount > 0 ? refundAmount : null,
                 is_weather: isWeather,
                 is_unpaid: !isPaid,
-                offer_choice: refundAmount > 0,
+                offer_choice: customerChoice,
+                notification_only: !offerChoice,
                 is_ota: isOta,
               },
             }),
@@ -188,7 +198,8 @@ Deno.serve(async (req: any) => {
         slot_ids,
         reason: cancelReason,
         bookings_cancelled: affected.length - failedCancels.length,
-        paid_action_required: affected.filter((b: any) => ["PAID", "CONFIRMED"].includes(b.status) && !failedIds.has(b.id)).length,
+        offer_choice: offerChoice,
+        paid_action_required: [...outcomes.values()].filter(outcome => outcome.refund_action_required === true).length,
         failed_cancels: failedCancels,
       },
     });
@@ -210,6 +221,7 @@ Deno.serve(async (req: any) => {
 
     return new Response(JSON.stringify({
       ok: failedCancels.length === 0,
+      offer_choice: offerChoice,
       slots_closed: slot_ids.length,
       bookings_cancelled: affected.length - failedCancels.length,
       notified,

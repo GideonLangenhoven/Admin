@@ -14,7 +14,7 @@ BookingTours messages your customers automatically at the right moments — this
 - **Review requests** — after the trip.
 - **Cancellation notices** — when you cancel slots (weather or otherwise), with self-service reschedule/voucher/refund options.
 
-Each message goes out once per booking — re-running the schedule never duplicates a reminder. Times are calculated in your business's timezone.
+Automatic jobs track sent messages and retries to avoid duplicate scheduled delivery. A queued job or successful submission is not proof of delivery; failed WhatsApp and transactional email jobs can be inspected in [Broadcasts → Failed Notifications](/notifications) by a main admin. Trip timing uses your business timezone.
 
 ## The WhatsApp 24-hour rule
 
@@ -26,4 +26,4 @@ The AI assistant can answer customer WhatsApp messages automatically — control
 
 ## When WhatsApp fails
 
-Failed WhatsApp sends are tracked on the Failed Notifications page (admins), and important messages fall back to email so the customer still hears from you.
+The Failed Notifications tab under Broadcasts tracks WhatsApp failures and transactional email jobs. Important workflows can fall back to email where configured and valid contact details exist. Review the returned outcome and failure log rather than assuming every guest was reached.

@@ -215,7 +215,7 @@ test.describe("Section C Remaining Verification", () => {
 
     if (ctaMode === "paid") {
       await page.waitForURL(/\/success/, { timeout: 60_000 });
-      const waiverCtaVisible = await page.getByText(/Review & Sign Documents/i).isVisible({ timeout: 8_000 }).catch(() => false);
+      const waiverCtaVisible = await page.getByText(/Sign waiver/i).isVisible({ timeout: 8_000 }).catch(() => false);
       debugLog("tests/e2e/section-c-remaining.spec.ts:95", "H26", "Paid success page waiver CTA", {
         successUrl: page.url(),
         waiverCtaVisible,
@@ -232,7 +232,7 @@ test.describe("Section C Remaining Verification", () => {
       }
     } else {
       await expect(page.getByText(/You're All Set!/i)).toBeVisible({ timeout: 20_000 });
-      const waiverCtaVisible = await page.getByText(/Review & Sign Documents/i).isVisible({ timeout: 8_000 }).catch(() => false);
+      const waiverCtaVisible = await page.getByText(/Sign waiver/i).isVisible({ timeout: 8_000 }).catch(() => false);
       const bookingRefText = await page.locator("text=Reference Tag").locator("..").innerText();
       debugLog("tests/e2e/section-c-remaining.spec.ts:103", "H26", "Free-flow confirmation page", {
         currentUrl: page.url(),

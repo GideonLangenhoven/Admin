@@ -9,121 +9,19 @@ const TARGET = "55555555-5555-4555-8555-555555555555";
 const TARGET_USER = "66666666-6666-4666-8666-666666666666";
 const OPERATION = "77777777-7777-4777-8777-777777777777";
 
-function recoveryHandler(options: {
-  target?: Record<string, unknown>;
-  factors?: Array<{ id: string }>;
-  remaining?: Array<{ id: string }> | null;
-  deleteFailures?: string[];
-  beginError?: { code?: string; message?: string } | null;
-  finishError?: { code?: string; message?: string } | null;
-} = {}) {
-  const target = options.target ?? {
-    id: TARGET, email: "operator@example.test", name: "Operator", role: "MAIN_ADMIN",
-    business_id: BUSINESS, suspended: false, read_only: false, user_id: TARGET_USER,
-  };
-  const factors = options.factors ?? [{ id: "factor-one" }];
-  let listCount = 0;
-  const deleteFactor = vi.fn(async ({ id }: { id: string }) => ({
-    data: options.deleteFailures?.includes(id) ? null : {},
-    error: options.deleteFailures?.includes(id) ? { message: "fixture deletion failure" } : null,
-  }));
-  const rpc = vi.fn(async (name: string) => name === "begin_mfa_recovery"
-    ? { data: options.beginError ? null : OPERATION, error: options.beginError || null }
-    : { data: null, error: options.finishError || null });
-  const db = {
-    from(table: string) {
-      const chain: any = {
-        select: () => chain, eq: () => chain, in: () => chain, order: () => chain,
-        maybeSingle: async () => ({
-          data: table === "businesses" ? { id: BUSINESS, subscription_status: "ACTIVE" } : target,
-          error: null,
-        }),
-      };
-      return chain;
-    },
-    rpc,
-    auth: { admin: {
-      getUserById: vi.fn(async () => ({ data: { user: { id: TARGET_USER, email: "operator@example.test" } }, error: null })),
-      mfa: {
-        listFactors: vi.fn(async () => {
-          listCount += 1;
-          const rows = listCount === 1 ? factors : options.remaining === null ? null : options.remaining ?? [];
-          return rows === null ? { data: null, error: { message: "fixture list failure" } } : { data: { factors: rows }, error: null };
-        }),
-        deleteFactor,
-      },
-    } },
-  };
-  const route = sourceHandler("app/api/mfa/recovery/route.ts", {
-    "@supabase/supabase-js": { createClient: () => db },
-    "../../../lib/api-auth": { getCallerAdmin: async () => ({ id: ACTOR, role: "SUPER_ADMIN", business_id: BUSINESS }) },
-    "../../../lib/mfa-sensitive": { requireSensitiveMfa: async () => ({ ok: true, actor: { id: ACTOR, userId: ACTOR_USER, role: "SUPER_ADMIN" } }) },
-  });
-  const request = (adminId = TARGET) => new Request("https://fixture.invalid/api/mfa/recovery", {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-admin-business-id": BUSINESS },
-    body: JSON.stringify({ business_id: BUSINESS, admin_id: adminId, verification_acknowledged: true, verification_reference: "SUPPORT-12345" }),
-  });
-  return { route, request, rpc, deleteFactor };
-}
-
-describe("verified assisted recovery handler", () => {
-  it("does not delete factors when the durable start record cannot be saved", async () => {
-    const { route, request, deleteFactor } = recoveryHandler({ beginError: { code: "XX000", message: "audit unavailable" } });
-    const response = await route(request());
-    expect(response.status).toBe(503);
-    expect(deleteFactor).not.toHaveBeenCalled();
-  });
-
-  it("rejects an overlapping recovery before factor deletion", async () => {
-    const { route, request, deleteFactor } = recoveryHandler({ beginError: { code: "55P03", message: "busy" } });
-    const response = await route(request());
-    expect(response.status).toBe(409);
-    expect(deleteFactor).not.toHaveBeenCalled();
-  });
-
-  it("reports partial deletion and records a retryable partial state", async () => {
-    const { route, request, rpc } = recoveryHandler({
-      factors: [{ id: "factor-one" }, { id: "factor-two" }],
-      remaining: [{ id: "factor-two" }],
-      deleteFailures: ["factor-two"],
-    });
-    const response = await route(request());
-    expect(response.status).toBe(207);
-    expect(await response.json()).toMatchObject({ deletedCount: 1, failedCount: 1, remainingCount: 1, retryRequired: true });
-    expect(rpc).toHaveBeenLastCalledWith("finish_mfa_recovery", expect.objectContaining({ p_completed: false, p_operation_id: OPERATION }));
-  });
-
-  it("keeps recovery pending when completion audit finalization fails", async () => {
-    const { route, request } = recoveryHandler({ finishError: { code: "XX000", message: "audit unavailable" } });
-    const response = await route(request());
-    expect(response.status).toBe(503);
-    expect(await response.json()).toMatchObject({ deletedCount: 1, retryRequired: true });
-  });
-
-  it("completes an explicit target reset without returning factor identifiers", async () => {
-    const { route, request, rpc } = recoveryHandler({ factors: [{ id: "never-return-this-factor" }], remaining: [] });
-    const response = await route(request());
-    const body = await response.text();
-    expect(response.status).toBe(200);
-    expect(body).not.toContain("never-return-this-factor");
-    expect(rpc).toHaveBeenLastCalledWith("finish_mfa_recovery", expect.objectContaining({ p_completed: true, p_admin_id: TARGET }));
-  });
-
-  it("denies self or peer targets before touching Auth", async () => {
-    const { route, request, deleteFactor } = recoveryHandler({ target: {
-      id: ACTOR, email: "operator@example.test", name: "Peer", role: "SUPER_ADMIN",
-      business_id: BUSINESS, suspended: false, read_only: false, user_id: ACTOR_USER,
-    } });
-    const response = await route(request(ACTOR));
-    expect(response.status).toBe(403);
-    expect(deleteFactor).not.toHaveBeenCalled();
+describe("retired MFA recovery", () => {
+  it("rejects obsolete recovery requests without touching authentication or customer data", async () => {
+    const route = sourceHandler("app/api/mfa/recovery/route.ts", {});
+    const response = await route(new Request("https://fixture.invalid/api/mfa/recovery", { method: "POST" }));
+    expect(response.status).toBe(410);
+    expect(await response.json()).toEqual({ error: "MFA has been removed. Use your normal sign-in." });
   });
 });
 
 function bankHandler(options: {
   role?: string; businessId?: string; suspended?: boolean; readOnly?: boolean;
   currentLevel?: "aal1" | "aal2"; factors?: any[]; userError?: any;
+  subscriptionStatus?: string; recoveryStatus?: string;
 } = {}) {
   const factors = options.factors ?? [{ id: "factor", status: "verified", factor_type: "totp", created_at: "2030-01-01T00:00:00Z" }];
   const rpc = vi.fn(async () => ({ data: null, error: null }));
@@ -137,7 +35,8 @@ function bankHandler(options: {
         data: table === "admin_users" ? {
           id: ACTOR, user_id: ACTOR_USER, role: options.role ?? "MAIN_ADMIN", business_id: options.businessId ?? BUSINESS,
           suspended: options.suspended ?? false, read_only: options.readOnly ?? false,
-        } : table === "businesses" ? { id: BUSINESS, subscription_status: "ACTIVE" } : null,
+        } : table === "businesses" ? { id: BUSINESS, subscription_status: options.subscriptionStatus ?? "ACTIVE" }
+          : options.recoveryStatus ? { status: options.recoveryStatus, completed_at: "2030-01-01T00:00:00Z" } : null,
         error: null,
       }), insert: vi.fn(async () => ({ error: null })) };
       return chain;
@@ -151,23 +50,39 @@ function bankHandler(options: {
     method: "POST", headers: { authorization: "Bearer signed-fixture", ...headers },
     body: JSON.stringify({ action: "set", business_id: BUSINESS, account_owner: "Fixture", account_number: "123" }),
   });
-  return { route, request, rpc };
+  return { route, request, rpc, db };
 }
 
 describe("tenant bank Edge boundary", () => {
   it.each([
-    [{ currentLevel: "aal1" }, 403],
-    [{ factors: [] }, 403],
+    [{ role: "OPERATOR" }, 403],
     [{ role: "ADMIN" }, 403],
     [{ suspended: true }, 403],
     [{ readOnly: true }, 403],
     [{ businessId: OTHER_BUSINESS }, 403],
+    [{ subscriptionStatus: "SUSPENDED" }, 403],
     [{ userError: { message: "expired" } }, 401],
   ] as const)("denies before the bank setter for %j", async (options, status) => {
     const { route, request, rpc } = bankHandler(options as any);
     const response = await route(request());
     expect(response.status).toBe(status);
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, "PENDING", "PARTIAL", "COMPLETED"])("lets an operator owner save without MFA despite recovery status %s", async (recoveryStatus) => {
+    const { route, request, rpc, db } = bankHandler({ currentLevel: "aal1", factors: [], recoveryStatus });
+    const response = await route(request());
+    expect(response.status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("set_business_bank_details_audited", expect.objectContaining({ p_actor_id: ACTOR, p_business_id: BUSINESS }));
+    expect(db.auth.getUser).toHaveBeenCalledOnce();
+    expect(db.auth.mfa.getAuthenticatorAssuranceLevel).not.toHaveBeenCalled();
+  });
+
+  it.each([{ currentLevel: "aal1" as const }, { factors: [] }])("allows Super Admin normal sign-in for %j without MFA", async (options) => {
+    const { route, request, rpc, db } = bankHandler({ role: "SUPER_ADMIN", ...options });
+    expect((await route(request({ "x-admin-business-id": BUSINESS }))).status).toBe(200);
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(db.auth.mfa.getAuthenticatorAssuranceLevel).not.toHaveBeenCalled();
   });
 
   it("requires a Super Admin to name the target in the header", async () => {
@@ -196,16 +111,16 @@ describe("platform bank Next boundary", () => {
     return { route, invoke, update };
   }
 
-  it("denies AAL1 before platform bank or logo effects", async () => {
-    const { route, invoke, update } = platformHandler({ ok: false, status: 403, code: "MFA_REQUIRED", message: "Authenticator required" });
+  it("denies an invalid session before platform bank or logo effects", async () => {
+    const { route, invoke, update } = platformHandler({ ok: false, status: 401, code: "INVALID_SESSION", message: "Sign in again" });
     const response = await route(new Request("https://fixture.invalid", { method: "POST", body: JSON.stringify({ logo_url: "fixture", bank: { account_number: "123" } }) }));
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(401);
     expect(invoke).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
   });
 
   it("keeps an ordinary logo-only save available at AAL1", async () => {
-    const { route, invoke, update } = platformHandler({ ok: false, status: 403, code: "MFA_REQUIRED", message: "Authenticator required" });
+    const { route, invoke, update } = platformHandler({ ok: false, status: 401, code: "INVALID_SESSION", message: "Sign in again" });
     const response = await route(new Request("https://fixture.invalid", { method: "POST", body: JSON.stringify({ logo_url: "fixture" }) }));
     expect(response.status).toBe(200);
     expect(update).toHaveBeenCalledOnce();
@@ -252,10 +167,10 @@ describe("credential-bearing Super Admin onboarding", () => {
     expect(rpc).toHaveBeenCalledWith("platform_onboard_business_audited", expect.anything());
   });
 
-  it("denies first credential linking at AAL1 before tenant creation", async () => {
+  it("allows first credential linking with normal Super Admin sign-in", async () => {
     const { route, request, rpc } = onboardingHandler("aal1");
-    expect((await route(request(true))).status).toBe(403);
-    expect(rpc).not.toHaveBeenCalled();
+    expect((await route(request(true))).status).toBe(200);
+    expect(rpc).toHaveBeenCalledWith("platform_onboard_business_audited", expect.objectContaining({ p_actor_id: ACTOR }));
   });
 
   it("uses the audited onboarding wrapper after verified AAL2", async () => {

@@ -10,7 +10,7 @@
 //  - X / Esc snoozes for this session only (accidental-close protection).
 //  - It can always be replayed: window event "ck-welcome-tour-open"
 //    (dispatched by the help assistant's "Show me around" chip).
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   CalendarCheck,
@@ -47,11 +47,11 @@ function buildSteps(isPrivileged: boolean): TourStep[] {
       icon: <CalendarCheck size={22} weight="duotone" />,
       kicker: "Operations",
       title: "Run every departure from one place",
-      blurb: "Your day-to-day home: who's booked, who's paid, who's checked in.",
+      blurb: "Today's bookings, payments and check-ins.",
       features: [
-        { title: "Bookings", detail: "Every booking grouped by day. Check in, reschedule, refund or message a guest.", href: "/bookings" },
-        { title: "New booking", detail: "Take phone and walk-in bookings. Send a payment link or mark paid on the spot.", href: "/new-booking" },
-        { title: "Slots", detail: "Open departures with dates, times and capacity. Close or weather-cancel a day in two clicks.", href: "/slots" },
+        { title: "Bookings", detail: "Bookings by day. Check in, reschedule, refund or message guests.", href: "/bookings" },
+        { title: "New booking", detail: "Add phone or walk-in bookings. Send a payment link or record payment.", href: "/new-booking" },
+        { title: "Slots", detail: "Set departures and capacity. Close or cancel days for weather.", href: "/slots" },
       ],
     },
     {
@@ -59,14 +59,14 @@ function buildSteps(isPrivileged: boolean): TourStep[] {
       icon: <ChatsCircle size={22} weight="duotone" />,
       kicker: "Customers",
       title: "Every conversation, one inbox",
-      blurb: "WhatsApp and website chat land in the same place. The bot answers routine questions and hands over to you when a guest asks for a human.",
+      blurb: "WhatsApp and website chat in one inbox. The bot handles FAQs; guests can ask for staff.",
       features: [
         { title: "Inbox", detail: "Live two-way chat. Conversations needing a human float to the top.", href: "/inbox" },
         // Operator roles can have these sections hidden per-user, so only
         // privileged roles get toured through them.
         ...(isPrivileged
           ? [
-              { title: "Refunds", detail: "Requests arrive in a queue with the policy-correct amount already worked out.", href: "/refunds" },
+              { title: "Refunds", detail: "Refund requests with amounts calculated from your policy.", href: "/refunds" },
               { title: "Vouchers", detail: "Sell gift vouchers and redeem them at checkout or in person.", href: "/vouchers" },
               { title: "Reviews", detail: "Google reviews in one feed, plus automatic post-trip review requests.", href: "/reviews" },
             ]
@@ -82,7 +82,7 @@ function buildSteps(isPrivileged: boolean): TourStep[] {
         icon: <ChartLineUp size={22} weight="duotone" />,
         kicker: "Revenue",
         title: "Know exactly how the business is doing",
-        blurb: "Money in, money owed, and how full your boats really are.",
+        blurb: "Revenue, balances due and capacity used.",
         features: [
           { title: "Invoices", detail: "Issued automatically on payment; resend or download any time.", href: "/invoices" },
           { title: "Pricing", detail: "Seasonal and per-slot price overrides without touching your base rates.", href: "/pricing" },
@@ -94,7 +94,7 @@ function buildSteps(isPrivileged: boolean): TourStep[] {
         icon: <Megaphone size={22} weight="duotone" />,
         kicker: "Growth",
         title: "Bring guests back without the busywork",
-        blurb: "Campaigns and automations that run themselves once set up.",
+        blurb: "Set up email campaigns and automations.",
         features: [
           { title: "Marketing", detail: "Email campaigns, designed templates and date-triggered automations with promo codes.", href: "/marketing" },
           { title: "Broadcasts", detail: "WhatsApp announcements to affected guests: weather, delays, gathering points.", href: "/broadcasts" },
@@ -108,9 +108,9 @@ function buildSteps(isPrivileged: boolean): TourStep[] {
     icon: <Lifebuoy size={22} weight="duotone" />,
     kicker: "Always at hand",
     title: "Help is one click away, always",
-    blurb: "Anything this tour didn't cover, the help assistant can explain in context.",
+    blurb: "Ask the help assistant about other tasks.",
     features: [
-      { title: "Help assistant", detail: "The chat bubble in the corner answers “how do I…” questions and links you straight to the right page.", href: "/" },
+      { title: "Help assistant", detail: "Use the help chat for answers and page links.", href: "/" },
       ...(isPrivileged
         ? [{ title: "Settings", detail: "Tours, booking-site branding, payment and WhatsApp credentials, auto-messages and payment reminders all live here.", href: "/settings" }]
         : []),
@@ -126,6 +126,7 @@ export default function WelcomeChecklist() {
   const [replay, setReplay] = useState(false);
   const [step, setStep] = useState(0);
   const [items, setItems] = useState<ChecklistItem[]>([]);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   const isPrivileged = role === "MAIN_ADMIN" || role === "SUPER_ADMIN";
   const tourSteps = buildSteps(isPrivileged);
@@ -183,19 +184,25 @@ export default function WelcomeChecklist() {
     return () => window.removeEventListener(WELCOME_TOUR_EVENT, onOpen);
   }, [loadChecklist]);
 
-  // Keyboard: arrows page, Escape snoozes.
+  // Native modal semantics keep focus inside and restore it when the tour closes.
   useEffect(() => {
     if (!show) return;
+    const dialog = dialogRef.current;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialog?.showModal();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        sessionStorage.setItem(SESSION_SNOOZE_KEY, "1");
-        setShow(false);
-      }
       if (e.key === "ArrowRight") setStep((s) => Math.min(s + 1, lastPage));
       if (e.key === "ArrowLeft") setStep((s) => Math.max(s - 1, 0));
     }
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      dialog?.close();
+      document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus();
+    };
   }, [show, lastPage]);
 
   if (!show) return null;
@@ -220,22 +227,21 @@ export default function WelcomeChecklist() {
   const section = !isWelcome && !isChecklist ? tourSteps[step - 1] : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" role="dialog" aria-modal="true" aria-label="Welcome tour">
-      <div className="ui-card flex max-h-[88dvh] w-full max-w-xl flex-col overflow-hidden" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
-        <style>{`@keyframes ck-tour-in{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}`}</style>
+    <dialog ref={dialogRef} onCancel={snooze} aria-label="Welcome tour" className="m-auto max-h-[92dvh] w-[calc(100%-2rem)] max-w-xl overflow-visible border-0 bg-transparent p-0 backdrop:bg-black/40">
+      <div className="ui-card flex max-h-[88dvh] w-full flex-col overflow-hidden" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
 
         {/* Header */}
-        <div className="flex items-start justify-between px-6 pt-5">
+        <div className="flex shrink-0 items-center justify-between gap-3 px-5 pt-4 sm:px-6">
           <div className="ui-mono-label" style={{ color: "var(--ck-accent)" }}>
             {isWelcome ? "Welcome to BookingTours" : isChecklist ? "Getting set up" : `Tour · ${section!.kicker}`}
           </div>
-          <button type="button" onClick={snooze} aria-label="Close for now" className="-mr-2 -mt-1 rounded p-1.5 transition-colors hover:bg-black/5" style={{ color: "var(--ck-text-muted)" }}>
+          <button type="button" onClick={snooze} aria-label="Close for now" className="-mr-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ color: "var(--ck-text-muted)" }}>
             <X size={18} />
           </button>
         </div>
 
         {/* Body */}
-        <div key={step} className="flex-1 overflow-y-auto px-6 pb-2" style={{ animation: "ck-tour-in .22s ease-out" }}>
+        <div key={step} className="min-h-0 flex-1 overflow-y-auto px-5 pb-2 sm:px-6" aria-live="polite">
           {isWelcome && (
             <div className="pb-4 pt-2">
               <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: "var(--ck-success-soft, rgba(18,94,64,0.08))", color: "var(--ck-accent)" }}>
@@ -246,11 +252,11 @@ export default function WelcomeChecklist() {
               </h2>
               <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--ck-text-muted)" }}>
                 {isPrivileged
-                  ? "This dashboard runs your whole operation: bookings, guest chat, payments and marketing. The two-minute tour shows you where everything lives, then a short checklist gets you to your first paid booking."
-                  : "This dashboard is where the day-to-day work happens: bookings, guest chat and departures. The one-minute tour shows you where everything lives."}
+                  ? "Take a tour of bookings, chat, payments and marketing. Then follow the setup checklist."
+                  : "Take a tour of bookings, guest chat and departures."}
               </p>
               <p className="mt-3 text-[13px]" style={{ color: "var(--ck-text-muted)" }}>
-                You can replay this any time from the help assistant in the corner.
+                Replay the tour from the help chat.
               </p>
             </div>
           )}
@@ -285,7 +291,7 @@ export default function WelcomeChecklist() {
                 Five steps to your first paid booking
               </h2>
               <p className="mt-1.5 text-sm" style={{ color: "var(--ck-text-muted)" }}>
-                Your progress is picked up automatically as you go.
+                Progress updates automatically.
               </p>
               <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--ck-border-subtle)" }}>
                 <div className="h-full rounded-full transition-all" style={{ width: `${(doneCount / Math.max(items.length, 1)) * 100}%`, background: "var(--ck-accent)" }} />
@@ -316,20 +322,22 @@ export default function WelcomeChecklist() {
         </div>
 
         {/* Footer: progress dots + actions */}
-        <div className="flex items-center justify-between gap-3 px-6 py-4" style={{ borderTop: "1px solid var(--ck-border-subtle)" }}>
-          <div className="flex items-center gap-1.5" aria-label={`Step ${step + 1} of ${totalPages}`}>
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-3 sm:px-6" style={{ borderTop: "1px solid var(--ck-border-subtle)" }}>
+          <div className="flex flex-wrap items-center" aria-label={`Step ${step + 1} of ${totalPages}`}>
             {Array.from({ length: totalPages }).map((_, i) => (
               <button
                 key={i}
                 type="button"
                 aria-label={`Go to step ${i + 1}`}
+                aria-current={i === step ? "step" : undefined}
                 onClick={() => setStep(i)}
-                className="h-1.5 rounded-full transition-all"
-                style={{ width: i === step ? 18 : 6, background: i === step ? "var(--ck-accent)" : "var(--ck-border-strong)" }}
-              />
+                className="flex h-11 w-8 items-center justify-center rounded-lg"
+              >
+                <span className="h-1.5 rounded-full" style={{ width: i === step ? 18 : 6, background: i === step ? "var(--ck-accent)" : "var(--ck-border-strong)" }} />
+              </button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             {!replay && (
               <button type="button" className="ui-btn ui-btn-ghost" onClick={complete}>
                 Don&apos;t show this again
@@ -352,6 +360,6 @@ export default function WelcomeChecklist() {
           </div>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

@@ -5,7 +5,7 @@ import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { DatePicker } from "../../components/DatePicker";
-import { Warning, CaretRight } from "@phosphor-icons/react";
+import { Warning, CaretRight, SortAscending } from "@phosphor-icons/react";
 
 type AnyRecord = Record<string, unknown>;
 
@@ -539,9 +539,9 @@ export default function Invoices() {
   return (
     <div className="space-y-4">
       <div className="anim-fade-up">
-        <p className="ui-mono-label mb-2">Billing</p>
-        <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Pro Forma Invoices</h2>
-        <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>Download or print the pro forma version sent after successful bookings.</p>
+        <h2 className="font-display text-[24px] font-semibold leading-none md:text-[28px]" style={{ color: "var(--ck-text-strong)" }}>Billing</h2>
+        <p className="mt-2 hidden text-sm font-medium md:block" style={{ color: "var(--ck-text-strong)" }}>Pro forma invoices</p>
+        <p className="mt-1 hidden text-sm md:block" style={{ color: "var(--ck-text-muted)" }}>Download or print booking pro forma invoices.</p>
       </div>
 
       {!loading && !companyInfo.name && (
@@ -551,36 +551,31 @@ export default function Invoices() {
         </div>
       )}
 
-      <div className="anim-fade-up anim-d1 ui-card ui-card-hover flex items-center gap-3 p-4">
-        <div>
-          <p className="ui-mono-label !text-[10px]">Outstanding total</p>
-          <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{money(totalOutstanding)}</p>
+      <div className="ui-card flex flex-wrap items-center justify-between gap-x-6 gap-y-4 p-4">
+        <div className="min-w-0">
+          <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>Outstanding total</p>
+          <p className="mt-1 text-2xl font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{money(totalOutstanding)}</p>
         </div>
-      </div>
-
-      <div className="anim-fade-up anim-d2 ui-card flex flex-col gap-3 p-3 text-sm sm:flex-row sm:flex-wrap sm:items-center">
-        <span className="font-medium" style={{ color: "var(--ck-text)" }}>Sort by:</span>
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value as "booking_desc" | "booking_asc" | "created_desc" | "created_asc")}
-          className="ui-control w-full sm:w-auto"
-        >
-          <option value="booking_desc">Booking date (newest first)</option>
-          <option value="booking_asc">Booking date (oldest first)</option>
-          <option value="created_desc">Invoice created (newest first)</option>
-          <option value="created_asc">Invoice created (oldest first)</option>
-        </select>
-        <span className="font-medium sm:ml-3" style={{ color: "var(--ck-text)" }}>Exact date:</span>
-        <DatePicker value={exactDate} onChange={setExactDate} />
-        {exactDate && (
-          <button
-            type="button"
-            onClick={() => setExactDate("")}
-            className="ui-btn ui-btn-ghost !h-8 !px-3 text-xs"
-          >
-            Clear Date
-          </button>
-        )}
+        <div className="flex w-full min-w-0 items-start gap-2 sm:w-auto">
+          <div className="min-w-0 flex-1 sm:w-52">
+            <DatePicker editable placeholder="Date" value={exactDate} onChange={setExactDate} alignRight />
+          </div>
+          <div className="ui-btn ui-btn-ghost relative min-h-11 min-w-11 shrink-0 !px-2 focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--ck-accent)]">
+            <SortAscending size={22} aria-hidden="true" />
+            <select
+              aria-label="Sort invoices"
+              title="Sort invoices"
+              value={sortBy}
+              onChange={event => setSortBy(event.target.value as typeof sortBy)}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            >
+              <option value="booking_desc">Booking date: newest</option>
+              <option value="booking_asc">Booking date: oldest</option>
+              <option value="created_desc">Invoice date: newest</option>
+              <option value="created_asc">Invoice date: oldest</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       {loading ? (

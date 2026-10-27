@@ -1,0 +1,6 @@
+{
+  "booking_arrival_approvals": ["id","business_id","booking_id","slot_id","approval_version","decision","account_reference","reason","actor_admin_id","created_at"],
+  "operator_booking_requests": ["id","business_id","actor_admin_id","payload_hash","receipt","created_at"],
+  "bookings": ["party_composition","arrival_approval_version"],
+  "payment_recovery_bookings": ["id","business_id","customer_name","email","phone","status","total_amount","total_captured","payment_url","payment_status","created_at","payment_failed_at","payment_failure_reason","payment_recovery_emailed_at","recovery_at","amount_due","slot_id","departure_at","tour_name","departure_passed"]
+}

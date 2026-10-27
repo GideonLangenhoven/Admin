@@ -2,7 +2,7 @@ video/
 video1/
 my-video/
 auto-research/
-booking/
+/booking/
 .next/
 node_modules/
 coverage/
@@ -31,3 +31,9 @@ data/
 next-env.d.ts
 tsconfig.tsbuildinfo
 .activityhub-onboarding-staging/
+
+.mcp.json
+.codex/
+*.log
+*.sql
+playwright.simple-nav.config.ts

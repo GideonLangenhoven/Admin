@@ -1,0 +1,61 @@
+{
+  "theme": {
+    "business_name": "Kayak",
+    "business_tagline": "Kayak on the Ocean",
+    "logo_url": "/__catalogue_photos/logo.jpg",
+    "color_main": "#1f7a8c",
+    "color_secondary": "#022b3a",
+    "color_cta": "#1f7a8c",
+    "color_bg": "#e1e5f2",
+    "color_nav": "#ffffff",
+    "color_hover": "#bfdbf7",
+    "hero_eyebrow": null,
+    "hero_title": null,
+    "hero_subtitle": null,
+    "hero_image": null,
+    "footer_line_one": null,
+    "footer_line_two": null,
+    "nav_gift_voucher_label": "Gift Voucher",
+    "nav_my_bookings_label": "My Bookings",
+    "card_cta_label": "Book Now",
+    "chat_widget_label": "Book here"
+  },
+  "tours": [
+    {
+      "id": "96e07644-315b-4e96-8f36-bb070b665cf8",
+      "name": "Morning Kayak",
+      "base_price_per_person": 600,
+      "image_url": "/__catalogue_photos/1790663949767.jpeg",
+      "description": "Start the day on the water. A two-hour morning paddle with coastal views and time to enjoy Cape Town from a different perspective. Choose a departure below and make the morning yours."
+    },
+    {
+      "id": "33910bd3-6826-4ee4-9dcc-4fcfcaf9097b",
+      "name": "Sunset Paddle",
+      "base_price_per_person": 500,
+      "image_url": "/__catalogue_photos/1790664015501.jpg",
+      "description": "Trade the afternoon rush for an evening on the water. This two-hour paddle follows the coast as the light softens, with the city and mountains as your backdrop. Sunset timing and routes depend on conditions."
+    },
+    {
+      "id": "8dbdf290-7a45-4bd9-a07e-77f0176b41ed",
+      "name": "Midday Hike",
+      "base_price_per_person": 700,
+      "image_url": "/__catalogue_photos/1790664062648.jpeg",
+      "description": "Take the adventure onto land with a two-hour Table Mountain hike. Enjoy the mountain scenery and a fresh perspective on Cape Town. Bring comfortable walking shoes, water and a sun hat."
+    }
+  ],
+  "businessId": "10000000-0000-4000-8000-000000000001",
+  "fixtureNow": "2026-10-01T08:00:00Z",
+  "slots": [
+    {
+      "id": "30000000-0000-4000-8000-000000000001",
+      "business_id": "10000000-0000-4000-8000-000000000001",
+      "tour_id": "96e07644-315b-4e96-8f36-bb070b665cf8",
+      "start_time": "2026-10-03T14:00:00Z",
+      "price_per_person_override": 625,
+      "status": "OPEN",
+      "capacity_total": 10,
+      "booked": 2,
+      "held": 1
+    }
+  ]
+}

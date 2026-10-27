@@ -125,6 +125,9 @@ const context = {
   })),
   has_chat: !!data.chat_embed,
   chat_embed: data.chat_embed || "",
+  my_bookings_url: data.my_bookings_url || data.manage_bookings_url || (data.subdomain ? `https://${data.subdomain}.booking.bookingtours.co.za` : "#"),
+  has_widget: !!data.widget_embed,
+  widget_embed: data.widget_embed || "",
 };
 
 // Render

@@ -1,5 +1,7 @@
 "use client";
 
+import { authStorage } from "./browser-session";
+
 import { createClient } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
@@ -30,7 +32,7 @@ export async function reauthenticateAdminPassword(email: string, password: strin
 export async function getAuthHeaders(businessId?: string): Promise<Record<string, string>> {
   // Capture the target before awaiting the session: switching operator while
   // auth refreshes must not redirect an in-flight action to the new operator.
-  const target = businessId ?? (typeof window === "undefined" ? "" : localStorage.getItem("ck_admin_business_id") || "");
+  const target = businessId ?? (typeof window === "undefined" ? "" : authStorage.getItem("ck_admin_business_id") || "");
   const { data: { session } } = await supabase.auth.getSession();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (session?.access_token) headers["Authorization"] = "Bearer " + session.access_token;

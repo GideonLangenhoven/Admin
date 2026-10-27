@@ -142,7 +142,7 @@ export default function BulkSlotWizard({ tours, onClose }: { tours: Tour[]; onCl
                 ))}
                 <button onClick={() => setRanges(prev => [...prev, { start: "", end: "" }])}
                   className="text-xs text-[color:var(--ck-accent)]">
-                  + Add another date range
+                  Add date range
                 </button>
               </div>
               <div>

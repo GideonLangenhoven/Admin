@@ -54,10 +54,10 @@ export function stepSentence(
     case "condition": {
       const conditionType = config.condition_type || "has_tag";
       if (conditionType === "opened_email") {
-        return "If they opened the previous email: continue, otherwise: stop";
+        return "If any recorded email open exists for this contact: continue, otherwise: stop";
       }
       if (conditionType === "clicked_link") {
-        return "If they clicked a link in the previous email: continue, otherwise: stop";
+        return "If any recorded email click exists for this contact: continue, otherwise: stop";
       }
       const tag = String(config.value || "").trim();
       return tag
@@ -102,6 +102,8 @@ export function triggerSentence(a: AutomationLike): string {
     }
     case "post_booking":
       return "Runs right after a booking is made.";
+    case "booking_inactive":
+      return `Runs ${pluralize(Number(config.days_since_last_booking) || 90, "day")} after the last paid booking. Stops if the customer books again.`;
     case "date_field": {
       const fieldLabel = DATE_FIELD_LABELS[config.field] || "date";
       const daysBefore = Number(config.days_before) || 0;
@@ -171,6 +173,10 @@ export function validateAutomation(automation: AutomationLike, steps: Automation
       if (!String(s.config?.code_prefix || "").trim()) issues.push(label + ": Promo code prefix is required");
     }
   });
+  if (automation.trigger_type === "booking_inactive") {
+    const days = Number(automation.trigger_config?.days_since_last_booking);
+    if (!Number.isSafeInteger(days) || days < 1 || days > 3650) issues.push("Trigger: days since last booking must be a whole number from 1 to 3,650.");
+  }
   if (automation.trigger_type === "tag_added" && !String(automation.trigger_config?.tag || "").trim()) {
     issues.push("Trigger: tag_added requires a tag value in trigger_config");
   }

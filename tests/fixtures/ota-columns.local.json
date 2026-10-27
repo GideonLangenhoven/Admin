@@ -1,0 +1,56 @@
+{
+  "ota_product_mappings": [
+    "business_id",
+    "channel",
+    "created_at",
+    "default_markup_pct",
+    "enabled",
+    "external_option_code",
+    "external_product_code",
+    "id",
+    "notes",
+    "tour_id",
+    "updated_at",
+    "supplier_option_id",
+    "category_prices",
+    "catalog"
+  ],
+  "bookings": [
+    "id",
+    "business_id",
+    "ota_channel",
+    "ota_environment",
+    "ota_supplier_reference",
+    "status"
+  ],
+  "ota_runtime_boundary": [
+    "singleton",
+    "environment"
+  ],
+  "ota_availability_snapshots": [
+    "business_id",
+    "channel",
+    "snapshot"
+  ],
+  "ota_events": [
+    "business_id",
+    "channel",
+    "environment",
+    "event_id",
+    "payload",
+    "result",
+    "completed_at"
+  ],
+  "ota_reservations": [
+    "id",
+    "business_id",
+    "channel",
+    "environment",
+    "slot_id",
+    "qty",
+    "expires_at",
+    "status",
+    "details",
+    "booking_id"
+  ]
+}

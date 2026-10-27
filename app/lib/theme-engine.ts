@@ -2,12 +2,12 @@
 // The admin app cannot import across the nested booking/ git repo boundary
 // (Vercel doesn't upload it). tests/unit/theme-engine.test.ts asserts this
 // copy is byte-identical to the canonical one — update BOTH together.
-// Legibility engine for the glassmorphic booking site.
+// Legibility tokens for booking work surfaces and operator-themed chrome.
 //
 // Operator theme colors are UNTRUSTED input — any six hex values, including
 // all-white or all-black. This module derives every color the UI actually
-// uses (ink, glass alphas, button inks, scrim) so that WCAG 2.1 AA holds for
-// ANY palette. Components never consume raw config colors for text.
+// uses (ink, glass alphas, button inks, scrim). Rendered screens still need
+// contrast and interaction checks; tokens alone do not establish compliance.
 //
 // Pure TS, no DOM: unit-testable, and runs identically on server and client.
 
@@ -98,13 +98,13 @@ export function solveSurface(tint: RGB, floorAlpha: number, worstBackdrops: RGB[
  * button must render under its label: a translucent black/white layer strong
  * enough to get the chosen ink to 4.5:1 — the operator's hue shows through.
  */
-export type ButtonInk = { ink: RGB; overlay: string | null };
+export type ButtonInk = { ink: RGB; overlay: string | null; surface: RGB };
 
 export function solveButtonInk(base: RGB): ButtonInk {
   const dark = contrast(base, INK_DARK);
   const light = contrast(base, INK_LIGHT);
   if (Math.max(dark, light) >= 4.5) {
-    return { ink: dark >= light ? INK_DARK : INK_LIGHT, overlay: null };
+    return { ink: dark >= light ? INK_DARK : INK_LIGHT, overlay: null, surface: base };
   }
   // Mid-tone: darken under light ink (usually cheaper perceptually).
   const white: RGB = [255, 255, 255];
@@ -112,14 +112,21 @@ export function solveButtonInk(base: RGB): ButtonInk {
   for (let a = 0.1; a <= 0.75; a += 0.05) {
     const darkened = over(black, a, base);
     if (contrast(darkened, INK_LIGHT) >= 4.5) {
-      return { ink: INK_LIGHT, overlay: rgba(black, +a.toFixed(2)) };
+      return { ink: INK_LIGHT, overlay: rgba(black, +a.toFixed(2)), surface: darkened };
     }
     const lightened = over(white, a, base);
     if (contrast(lightened, INK_DARK) >= 4.5) {
-      return { ink: INK_DARK, overlay: rgba(white, +a.toFixed(2)) };
+      return { ink: INK_DARK, overlay: rgba(white, +a.toFixed(2)), surface: lightened };
     }
   }
-  return { ink: light >= dark ? INK_LIGHT : INK_DARK, overlay: rgba(black, 0.75) };
+  return { ink: light >= dark ? INK_LIGHT : INK_DARK, overlay: rgba(black, 0.75), surface: over(black, 0.75, base) };
+}
+
+// Supporting catalogue text can be quieter only while it still passes AA.
+function supportingInk({ ink, surface }: ButtonInk): string {
+  let alpha = 0.72;
+  while (alpha < 1 && contrast(over(ink, alpha, surface), surface) < 4.5) alpha += 0.04;
+  return rgba(ink, Math.min(1, alpha));
 }
 
 // ── Theme derivation ──────────────────────────────────────────────────────
@@ -190,6 +197,10 @@ export function computeTheme(colors: Partial<OperatorColors>, heroAverage?: RGB 
 
   const ctaInk = solveButtonInk(cta);
   const mainInk = solveButtonInk(main);
+  // Booking work surfaces stay white even when the operator's backdrop is
+  // dark. Keep the configured palette intact for chrome, accents and buttons.
+  const catalogue = solveButtonInk([255, 255, 255]);
+  const catalogueNav = solveButtonInk(nav);
 
   // Accent as TEXT (links, eyebrows): only when the raw accent passes AA on
   // the card surface over every worst backdrop; otherwise fall back to ink
@@ -214,6 +225,19 @@ export function computeTheme(colors: Partial<OperatorColors>, heroAverage?: RGB 
     "--cfg-bg": rgbToHex(bg),
     "--cfg-nav": rgbToHex(nav),
     "--cfg-hover": rgbToHex(hover),
+
+    "--catalogue-surface": rgbToHex(catalogue.surface),
+    "--catalogue-ink": rgbToHex(catalogue.ink),
+    "--catalogue-muted": supportingInk(catalogue),
+    "--catalogue-nav-surface": rgbToHex(catalogueNav.surface),
+    "--catalogue-nav-ink": rgbToHex(catalogueNav.ink),
+
+    "--booking-surface": rgbToHex(catalogue.surface),
+    "--booking-ink": rgbToHex(catalogue.ink),
+    "--booking-muted": supportingInk(catalogue),
+    "--booking-border": "#dde1e6",
+    "--booking-control-border": "#858d99",
+    "--booking-accent-text": rgbToHex(contrast(main, catalogue.surface) >= 4.5 ? main : catalogue.ink),
 
     "--ink": rgbToHex(ink),
     "--ink-muted": rgba(ink, 0.72),

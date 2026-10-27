@@ -9,6 +9,8 @@ import { fillMarketingTokens } from "../_shared/marketing-tokens.ts";
 import { marketingEmailValidationError, parseResendBatchResponse } from "../_shared/marketing-batch.ts";
 import { replaceLegacyMarketingSocialIcons } from "../_shared/marketing-email-html.ts";
 
+import { confirmMarketingDelivery, reserveMarketingDelivery, finishMarketingDelivery } from "../_shared/marketing-delivery.ts";
+
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 const RAW_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "";
 // Refuse to ever use the Resend dev sandbox as the platform fallback — it
@@ -202,6 +204,12 @@ Deno.serve(withSentry("marketing-dispatch", async (req: Request) => {
         continue;
       }
 
+      const permission = await supabase.rpc("marketing_eligibility", { p_business_id: item.business_id, p_contact_id: item.contact_id });
+      if (permission.error || permission.data !== "eligible") {
+        failedIds.push({ id: item.id, error: permission.error ? "Eligibility unavailable" : permission.data, retryable: false });
+        continue;
+      }
+
       // Skip items for campaigns that are NOT in "sending" status (cancelled, paused, etc.)
       if (camp.status !== "sending") {
         // U9: scheduled/paused campaigns become "sending" later — release the
@@ -321,21 +329,47 @@ Deno.serve(withSentry("marketing-dispatch", async (req: Request) => {
 
       // One request per 100 recipients (Resend's per-request maximum), all in
       // flight together. A run of 500 is 5 requests, not 500.
-      const groups = chunk(emailPayloads, RESEND_BATCH_MAX);
-      const responses = await Promise.all(groups.map((group) =>
-        fetch("https://api.resend.com/emails/batch", {
+      const deliveryByQueue = new Map<string, string>();
+      const reservedPayloads: typeof emailPayloads = [];
+      for (const payload of emailPayloads) {
+        const delivery = await reserveMarketingDelivery(supabase, { businessId: payload.businessId,
+          contactId: payload.contactId, queueId: payload.queueId, key: "campaign/" + payload.queueId,
+          payload: toResendMessage(payload) });
+        if (delivery.reason === "reserved") {
+          deliveryByQueue.set(payload.queueId, delivery.id!);
+          reservedPayloads.push(payload);
+        } else if (["quiet_hours", "frequency_24h", "frequency_policy", "policy_approval_pending", "campaign_paused", "operator_paused"].includes(delivery.reason)) {
+          await supabase.from("marketing_queue").update({ status: "pending", next_retry_at: new Date(Date.now() + 3600000).toISOString(), error_message: delivery.reason })
+            .eq("id", payload.queueId).eq("business_id", payload.businessId);
+        } else {
+          failedIds.push({ id: payload.queueId, error: delivery.reason, retryable: false });
+        }
+      }
+      const groups = chunk(reservedPayloads, RESEND_BATCH_MAX);
+      const responses = await Promise.all(groups.map(async (group) => {
+        const confirmed = await Promise.all(group.map(async payload => {
+          const reason = await confirmMarketingDelivery(supabase, payload.businessId, deliveryByQueue.get(payload.queueId)!);
+          if (reason === "eligible") return payload;
+          failedIds.push({ id: payload.queueId, error: reason, retryable: false });
+          return null;
+        }));
+        group.splice(0, group.length, ...confirmed.filter((p): p is typeof emailPayloads[number] => p !== null));
+        if (group.length === 0) return { ok: true, status: 200, data: { data: [] } };
+        return fetch("https://api.resend.com/emails/batch", {
           method: "POST",
           headers: {
             Authorization: "Bearer " + RESEND_API_KEY,
             "Content-Type": "application/json",
             "x-batch-validation": "permissive",
+            "Idempotency-Key": "marketing-batch/" + deliveryByQueue.get(group[0].queueId),
           },
           body: JSON.stringify(group.map(toResendMessage)),
+          signal: AbortSignal.timeout(15000),
         })
           .then(async (r) => ({ ok: r.ok, status: r.status, data: await r.json().catch(() => ({})) }))
           // A network failure on one chunk must not lose the other four.
           .catch((e) => ({ ok: false, status: 0, data: { message: e instanceof Error ? e.message : String(e) } }))
-      ));
+      }));
 
       // Recorded after the sends land, batched rather than one round trip per
       // email — the other half of what capped the old batch size.
@@ -351,19 +385,23 @@ Deno.serve(withSentry("marketing-dispatch", async (req: Request) => {
           if (result) {
             for (const sent of result.sent) {
               const payload = group[sent.index];
+              await finishMarketingDelivery(supabase, payload.businessId, deliveryByQueue.get(payload.queueId)!, "sent", sent.emailId);
               sentIds.push(payload.queueId);
               businessCounts[payload.businessId] = (businessCounts[payload.businessId] || 0) + 1;
               // Store resend email ID for later bounce matching
               idUpdates.push({ queueId: payload.queueId, emailId: sent.emailId });
             }
             for (const failed of result.failed) {
-              failedIds.push({ id: group[failed.index].queueId, error: failed.error, retryable: false });
+              const payload = group[failed.index];
+              await finishMarketingDelivery(supabase, payload.businessId, deliveryByQueue.get(payload.queueId)!, "failed");
+              failedIds.push({ id: payload.queueId, error: failed.error, retryable: false });
             }
           } else {
             // Unexpected response shape — mark as retryable rather than optimistically marking sent
-            console.warn("RESEND_UNEXPECTED_RESPONSE:", JSON.stringify(resData).substring(0, 500));
+            console.warn("RESEND_UNEXPECTED_RESPONSE: reconciliation required");
             for (const p of group) {
-              failedIds.push({ id: p.queueId, error: "Unexpected Resend response shape", retryable: true });
+              await finishMarketingDelivery(supabase, p.businessId, deliveryByQueue.get(p.queueId)!, "reconcile");
+              failedIds.push({ id: p.queueId, error: "Provider outcome unknown: reconciliation required", retryable: false });
             }
           }
         } else {
@@ -371,7 +409,8 @@ Deno.serve(withSentry("marketing-dispatch", async (req: Request) => {
           // request no longer condemns the other four hundred recipients.
           const errMsg = (res.data as any)?.message || "Batch API error " + res.status;
           for (const p of group) {
-            failedIds.push({ id: p.queueId, error: errMsg, retryable: res.status >= 500 || res.status === 429 || res.status === 0 });
+            await finishMarketingDelivery(supabase, p.businessId, deliveryByQueue.get(p.queueId)!, [400,401,403,404,422,429].includes(res.status) ? "failed" : "reconcile");
+            failedIds.push({ id: p.queueId, error: errMsg + "; explicit recovery/reconciliation required", retryable: false });
           }
         }
       }

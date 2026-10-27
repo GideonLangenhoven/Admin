@@ -32,6 +32,7 @@ function refundActionFixture(initialReplies: Reply[], auth: "ok" | "missing" | "
     return Response.json(reply.body, { status: reply.status || 200 });
   });
   const exports = sourceExports("app/lib/booking-actions.ts", {
+    "./browser-session": { authStorage: { getItem: () => null } },
     "./supabase": {
       supabase: {
         auth: { getSession: async () => {
@@ -82,6 +83,7 @@ function bulkHarness(options: {
     bookingsById,
     bulkProgress: null,
     confirmAction: options.confirmAction || (async () => true),
+    confirmCancellation: async () => ({ offerChoice: true }),
     confirm: () => true,
     prompt: () => "fixture reason",
     setBulkActionInFlight: (value: string | null) => { inFlight = value; },
@@ -124,6 +126,7 @@ function delayedCallerHarness(path: "bookings-bulk" | "executeAutoRefund" | "exe
   const enteredSession = deferred<void>();
   const fetchImpl = vi.fn<typeof fetch>(async () => Response.json({ ok: true, refund_status: "REFUNDED" }));
   const actions = sourceExports("app/lib/booking-actions.ts", {
+    "./browser-session": { authStorage: { getItem: () => null } },
     "./supabase": {
       supabase: {
         auth: { getSession: () => {
@@ -245,7 +248,8 @@ describe("refund action outcome contract", () => {
     let canSubmit = true;
     const fetchImpl = vi.fn<typeof fetch>(() => response.promise);
     const actions = sourceExports("app/lib/booking-actions.ts", {
-      "./supabase": { supabase: { auth: { getSession: async () => ({ data: { session: { access_token: "fixture-user-token" } } }) } } },
+      "./browser-session": { authStorage: { getItem: () => null } },
+    "./supabase": { supabase: { auth: { getSession: async () => ({ data: { session: { access_token: "fixture-user-token" } } }) } } },
     }, { NEXT_PUBLIC_SUPABASE_URL: "https://fixture.invalid" }, fetchImpl) as { processRefundAction: (input: any) => Promise<any> };
     const pending = actions.processRefundAction({ bookingId: "booking-a", canSubmit: () => canSubmit });
     await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledOnce());
@@ -372,7 +376,7 @@ describe("bookings bulk action runtime", () => {
     const cancel = vi.fn(async () => ({ ok: true }));
     const cancelRun = bulkHarness({ cancel });
     await cancelRun.run("cancel");
-    expect(cancel).toHaveBeenCalledWith("booking-a", { reason: "fixture reason", weather: true });
+    expect(cancel).toHaveBeenCalledWith("booking-a", { reason: "fixture reason", weather: true, offerChoice: true });
     expect(cancelRun.progress?.[0].status).toBe("completed");
 
     const markPaid = vi.fn(async () => ({ ok: true }));

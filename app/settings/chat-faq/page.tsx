@@ -53,7 +53,7 @@ export default function ChatFaqPage() {
 
   async function handleSave() {
     if (!form.question_pattern || !form.keywords || !form.answer) {
-      notify({ title: "Missing info", message: "Please fill in all the fields before saving.", tone: "error" });
+      notify({ title: "Missing info", message: "Complete all fields before saving.", tone: "error" });
       return;
     }
     setSaving(true);
@@ -73,7 +73,7 @@ export default function ChatFaqPage() {
         headers: await authHeaders(),
         body: JSON.stringify({ business_id: businessId, intent: form.intent, question_pattern: form.question_pattern, match_keywords: keywords, answer: form.answer }),
       });
-      if (r.ok) { notify({ title: "Done", message: "Quick answer added. Customers will start getting this reply automatically.", tone: "success" }); }
+      if (r.ok) { notify({ title: "Done", message: "Quick answer added. Matching messages now get this reply.", tone: "success" }); }
       else { notify({ title: "Something went wrong", message: (await r.json()).error, tone: "error" }); }
     }
     setSaving(false);
@@ -151,14 +151,14 @@ export default function ChatFaqPage() {
           <p className="ui-mono-label mb-2">AI · Chat FAQ</p>
           <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Quick Answers</h1>
           <p className="text-sm mt-2 max-w-2xl" style={{ color: "var(--ck-text-muted)" }}>
-            Set up automatic replies for questions your customers ask all the time. When someone sends a WhatsApp message that matches one of these, the reply goes out instantly, with no waiting for you to type it.
+            Set automatic WhatsApp replies for common questions.
           </p>
         </div>
         <button
           onClick={() => { setShowAdd(true); setEditId(null); setForm({ intent: "BOOKING_QUESTION", question_pattern: "", keywords: "", answer: "" }); }}
           className="ui-btn ui-btn-primary shrink-0"
         >
-          Add a quick answer
+          Add answer
         </button>
       </div>
 
@@ -175,18 +175,18 @@ export default function ChatFaqPage() {
               </select>
             </label>
             <label className="block">
-              <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>The question (how a customer would ask it)</span>
+              <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Customer&apos;s question</span>
               <input value={form.question_pattern} onChange={e => setForm({ ...form, question_pattern: e.target.value })}
                 placeholder="e.g. What time does the tour start?" className="ui-control mt-1 w-full text-sm" />
             </label>
           </div>
           <label className="block">
-            <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Trigger words (separate with commas). If a message contains these words, this answer is sent.</span>
+            <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Trigger words, separated by commas. Matching messages get this reply.</span>
             <input value={form.keywords} onChange={e => setForm({ ...form, keywords: e.target.value })}
               placeholder="e.g. time, start, when, schedule, what time" className="ui-control w-full text-sm" />
           </label>
           <label className="block">
-            <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Your reply (this is what the customer will receive)</span>
+            <span className="text-xs font-medium" style={{ color: "var(--ck-text-muted)" }}>Your reply</span>
             <textarea value={form.answer} onChange={e => setForm({ ...form, answer: e.target.value.slice(0, 1000) })} rows={3}
               placeholder="e.g. Our tours depart at 06:00 and 08:30 daily. Please arrive 15 minutes early at the shop." className="ui-control w-full text-sm" />
           </label>
@@ -230,7 +230,7 @@ export default function ChatFaqPage() {
         <div className="text-center py-10 space-y-2">
           <p className="text-sm font-medium" style={{ color: "var(--ck-text-strong)" }}>No quick answers yet</p>
           <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
-            Add your first one above. For example: if customers always ask &quot;What should I bring?&quot;, you can set up an automatic reply with your packing list so they get an instant answer.
+            Add an answer above, such as a packing list for &quot;What should I bring?&quot;
           </p>
         </div>
       )}

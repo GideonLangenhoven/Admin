@@ -26,6 +26,11 @@ export async function setAdminAuthPassword(
       if (!userId && list.users.length < 1000) throw error;
     }
   }
+  if (user.role === "GUIDE") {
+    // Old or partially linked Auth records must never let a guide reset an office password.
+    const { data: office, error } = await db.from("admin_users").select("id").eq("user_id", userId).maybeSingle();
+    if (error || office) throw new Error("This identity is linked to an office account");
+  }
   const { error } = await db.auth.admin.updateUserById(userId, { password, email_confirm: true });
   if (error) throw error;
   return userId;

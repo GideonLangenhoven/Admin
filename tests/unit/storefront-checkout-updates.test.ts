@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { sourceFunction } from "../helpers/source-handler";
+import { captureQuestionFields, validateQuestionAnswers } from "../../supabase/functions/_shared/booking-custom-fields";
 
 function fixture({ free = false, soldOut = false, retry = false, email = "guest@example.invalid" } = {}) {
   const booking = { id: "booking-a", business_id: "operator-a", waiver_token: "fixture-proof", waiver_status: "PENDING", status: retry ? "HELD" : "PENDING", qty: 1, slot_id: "slot-a" };
@@ -19,11 +20,12 @@ function fixture({ free = false, soldOut = false, retry = false, email = "guest@
   });
   const submit = sourceFunction("booking/app/book/page.tsx", "submitBooking", {
     crypto: { randomUUID: vi.fn().mockReturnValueOnce(booking.id).mockReturnValueOnce(booking.waiver_token) },
+    questionsReady: true, questionState: { questions: [], answers: {} }, validateQuestionAnswers, captureQuestionFields, setQuestionErrors: vi.fn(),
     name: " Fixture Guest ", email, phone: "820000000", dialCode: "+27", termsAccepted: true, submitting: false,
     normalizePhone: () => "27820000000", appliedPromo: {code:"SAVE",discount_type:"PERCENT",discount_value:20}, computedPromoDiscount:20,
     selectedTour: { id: "tour-a", business_id: "operator-a" }, selectedSlot: { id: "slot-a" }, theme:{id:"operator-a"},
     qty:1, effectiveUnitPrice:100, finalTotal:free?0:100, grandTotal:100, effectiveVoucherCredit:free?100:0,
-    embed:false, marketingOptIn:false, isCompany:false, draftBookingId:retry?booking.id:null, draftWaiverToken:retry?booking.waiver_token:null,
+    embed:false, marketingOptIn:false, whatsappUpdatesOptIn:false, isCompany:false, draftBookingId:retry?booking.id:null, draftWaiverToken:retry?booking.waiver_token:null,
     tenantSupabase:client(false), createBookingSupabase, selectedAddOns:{"extra-a":2}, vouchers:[{id:"voucher-a",code:"FIXTURE1"}],
     supabase:{functions:{invoke:checkout}}, showToast,setStep,setDraftBookingId,
     setSubmitting:vi.fn(),setDraftWaiverToken:vi.fn(),setBookingRef:vi.fn(),clearLocalDraft:vi.fn(),setPaymentUrl:vi.fn(),setCheckoutAmount:vi.fn(),setHoldExpiresAt:vi.fn(),

@@ -16,6 +16,10 @@ If billing or policies are missing, use **Complete missing setup** once. It crea
 
 **Add New Client** creates the business and Main Admin immediately. If that operator should finish the guided wizard, enter the same booking subdomain and Main Admin email under **Onboarding Invites**. The invite attaches to the existing business; it does not create a second one. The booking site pauses until the operator completes the wizard. Businesses with bookings cannot use this handoff; their owners finish setup in the admin dashboard. For a new operator, you can start directly with **Onboarding Invites**, which creates a fenced skeleton business. A retried assisted submission uses the same request ID to avoid duplicates.
 
+In **Business Management**, an operator still marked **ONBOARDING** has an **Activate operator** action. Complete missing setup under **Client readiness & support**, check launch readiness, then activate and record a reason. This changes the operator and its subscription to **ACTIVE**, enables online bookings, and records the change in the audit trail. It does not complete the guided wizard or send the owner a password setup email; use **Send setup link** if needed.
+
+Under a business's **Admin Users**, choose **Edit contact details** to update an administrator's name, email and optional phone number, including the Main Admin. Saving an email changes the existing account's sign-in address immediately and expires old setup links. The account, password and permissions are kept. Use **Send setup link** afterward if password setup is still pending. Main Admins have the same contact editor for their own business in **Settings → Admin Users**.
+
 ## Support and staff access
 
 Select the client before opening their settings, billing, privacy requests or notifications. The server verifies the selected business against your sign-in; ordinary clients cannot switch into another business by editing a request.
@@ -23,6 +27,12 @@ Select the client before opening their settings, billing, privacy requests or no
 In the client's detail panel, **Send setup link** emails a secure password link. Let the owner choose their password. **Suspend** blocks staff access and revokes refresh sessions without deleting records. **Reactivate** requires an available seat. You cannot suspend yourself, another platform account, or the last active Main Admin. Increase seats or promote another active Main Admin first, as appropriate.
 
 Business suspension requires confirmation and an audit reason. It stops trading and is not automatically lifted just because an invoice is paid. Pausing/resuming billing and changing seats update billing records atomically. Seat reductions cannot fall below active staff.
+
+## Operator settings support
+
+Open **Operator settings support** at /super-admin/sensitive-actions. Select the operator first to change its banking, WhatsApp or Yoco settings. Changes use your signed-in Super Admin account and are recorded in the audit trail. Credential status does not expose saved secret values.
+
+MFA has been removed for all accounts, including Super Admins. Banking, integration credentials, platform settings and client onboarding use normal sign-in with the existing role permissions. No authenticator setup, QR code or six-digit authenticator code is required.
 
 ## Monthly invoices
 

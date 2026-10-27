@@ -59,6 +59,10 @@ async function handleCreate(body: any, cors: Record<string, string>) {
   if (offerErr || !offer) {
     return jsonRes({ error: "Combo offer not found or inactive" }, 404, cors);
   }
+  const { error: partnershipErr } = await supabase.rpc("assert_combo_offer_partnerships", { p_offer_id: offer.id });
+  if (partnershipErr) {
+    return jsonRes({ error: "This combo is no longer available. Please book each tour separately." }, partnershipErr.code === "23514" ? 409 : 503, cors);
+  }
 
   // Build the leg list: N-party via combo_offer_items, legacy 2-party via the
   // A/B columns. slot_ids maps item id → chosen slot; legacy slot_a_id/slot_b_id
@@ -226,7 +230,7 @@ async function handleCreate(body: any, cors: Record<string, string>) {
   }).select("id").single();
   if (comboErr || !comboBooking) {
     await rollbackBookings();
-    return jsonRes({ error: "Failed to create combo booking: " + (comboErr?.message || "unknown") }, 500, cors);
+    return jsonRes({ error: "Failed to create combo booking: " + (comboErr?.message || "unknown") }, comboErr?.code === "23514" ? 409 : 500, cors);
   }
 
   // Per-leg items — the authoritative N-party record (confirm RPC, settlement

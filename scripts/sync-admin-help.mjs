@@ -92,4 +92,4 @@ const res = await fetch(SUPABASE_URL.replace(/\/+$/, "") + "/functions/v1/kb-syn
 });
 const data = await res.json().catch(() => ({}));
 console.log("kb-sync " + res.status + ": " + JSON.stringify(data));
-process.exit(res.ok && data?.ok ? 0 : 1);
+process.exit(res.ok && data?.ok && data.failed === 0 ? 0 : 1);

@@ -29,8 +29,8 @@ function pct(num: number, den: number) {
   return (num / den * 100).toFixed(1) + "%";
 }
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
+function fmtDate(iso: string, timeZone: string) {
+  return new Date(iso).toLocaleDateString("en-ZA", { timeZone, day: "numeric", month: "short" });
 }
 
 // Mono axis ticks — the instrument voice on chart axes.
@@ -67,7 +67,8 @@ const CAMPAIGN_PILL: Record<string, string> = {
 };
 
 export default function MarketingOverview() {
-  const { businessId } = useBusinessContext();
+  const { businessId, timezone } = useBusinessContext();
+  const [reportError, setReportError] = useState(false);
   const [contacts, setContacts] = useState(0);
   const [unsubscribed, setUnsubscribed] = useState(0);
   const [bounced, setBounced] = useState(0);
@@ -96,14 +97,15 @@ export default function MarketingOverview() {
         supabase.from("businesses").select("marketing_email_usage, marketing_included_emails, marketing_overage_rate_zar").eq("id", businessId).single(),
         supabase.from("marketing_usage_monthly").select("emails_sent").eq("business_id", businessId).eq("period", currentPeriod).maybeSingle(),
       ]);
+      setReportError([activeRes, unsubRes, bouncedRes, tRes, campRes, bizRes, usageRes].some(result => Boolean(result.error)));
       setContacts(activeRes.count || 0);
       setUnsubscribed(unsubRes.count || 0);
       setBounced(bouncedRes.count || 0);
       setTemplates(tRes.count || 0);
       setCampaigns((campRes.data as CampaignRow[]) || []);
       setEmailsSent(bizRes.data?.marketing_email_usage || 0);
-      setIncludedEmails(bizRes.data?.marketing_included_emails || 500);
-      setOverageRate(bizRes.data?.marketing_overage_rate_zar || 0.15);
+      setIncludedEmails(bizRes.data?.marketing_included_emails ?? 500);
+      setOverageRate(bizRes.data?.marketing_overage_rate_zar ?? 0.15);
       setMonthlyUsage(usageRes.data?.emails_sent || 0);
       setLoading(false);
     }
@@ -186,6 +188,7 @@ export default function MarketingOverview() {
 
   return (
     <div className="space-y-6">
+      {reportError ? <p role="alert" className="ui-card p-5">Reporting or billing unavailable. Refresh before using these figures.</p> : <>
       {/* ── KPI Cards ── */}
       <div className="anim-fade-up grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
@@ -252,7 +255,7 @@ export default function MarketingOverview() {
             </div>
           ) : (
             <div className="ui-empty !py-8">
-              <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Send your first campaign to see engagement data</p>
+              <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Send a campaign to see results.</p>
             </div>
           )}
         </div>
@@ -365,23 +368,23 @@ export default function MarketingOverview() {
           <div className="ui-card">
             <div className="ui-empty">
               <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>No campaigns yet</p>
-              <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Create a template, then send your first campaign</p>
+              <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>Create a template to send a campaign.</p>
             </div>
           </div>
         ) : (
           <div className="ui-card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px] text-sm">
+            <div className="ui-table-container overflow-x-auto">
+              <table role="table" className="ui-responsive-table w-full min-w-[700px] text-sm">
                 <thead>
                   <tr>
-                    <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Campaign</th>
-                    <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Status</th>
-                    <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Sent</th>
-                    <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Opens</th>
-                    <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Clicks</th>
-                    <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Unsub</th>
-                    <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Date</th>
-                    <th className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Actions</th>
+                    <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Campaign</th>
+                    <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Status</th>
+                    <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Sent</th>
+                    <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Opens</th>
+                    <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Clicks</th>
+                    <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Unsub</th>
+                    <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Date</th>
+                    <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>
@@ -389,25 +392,25 @@ export default function MarketingOverview() {
                     const canCancel = c.status === "sending" || c.status === "scheduled";
                     return (
                     <tr key={c.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]">
-                      <td className="px-4 py-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{c.name}</td>
-                      <td className="px-4 py-3"><CampaignStatusBadge status={c.status} /></td>
-                      <td className="px-4 py-3 text-right font-mono text-xs tabular-nums" style={{ color: "var(--ck-text)" }}>
+                      <td data-label="Campaign" className="px-4 py-3 font-medium" style={{ color: "var(--ck-text-strong)" }}>{c.name}</td>
+                      <td data-label="Status" className="px-4 py-3"><CampaignStatusBadge status={c.status} /></td>
+                      <td data-label="Sent" className="px-4 py-3 text-right font-mono text-xs tabular-nums" style={{ color: "var(--ck-text)" }}>
                         {c.total_sent}/{c.total_recipients}
                         {c.total_failed > 0 && <span className="ml-1" style={{ color: "var(--ck-danger)" }}>({c.total_failed})</span>}
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--ck-text)" }}>
+                      <td data-label="Opens" className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--ck-text)" }}>
                         {c.total_opens > 0 ? <>{c.total_opens} <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>({pct(c.total_opens, c.total_sent)})</span></> : "—"}
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--ck-text)" }}>
+                      <td data-label="Clicks" className="px-4 py-3 text-right tabular-nums" style={{ color: "var(--ck-text)" }}>
                         {c.total_clicks > 0 ? <>{c.total_clicks} <span className="text-xs" style={{ color: "var(--ck-text-muted)" }}>({pct(c.total_clicks, c.total_sent)})</span></> : "—"}
                       </td>
-                      <td className="px-4 py-3 text-right tabular-nums" style={{ color: c.total_unsubscribes > 0 ? "var(--ck-amber)" : "var(--ck-text-muted)" }}>
+                      <td data-label="Unsub" className="px-4 py-3 text-right tabular-nums" style={{ color: c.total_unsubscribes > 0 ? "var(--ck-amber)" : "var(--ck-text-muted)" }}>
                         {c.total_unsubscribes || "—"}
                       </td>
-                      <td className="px-4 py-3 text-right text-xs" style={{ color: "var(--ck-text-muted)" }}>
-                        {c.scheduled_at && c.status === "scheduled" ? fmtDate(c.scheduled_at) : fmtDate(c.created_at)}
+                      <td data-label="Date" className="px-4 py-3 text-right text-xs" style={{ color: "var(--ck-text-muted)" }}>
+                        {c.scheduled_at && c.status === "scheduled" ? fmtDate(c.scheduled_at, timezone) : fmtDate(c.created_at, timezone)}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td data-label="Actions" className="px-4 py-3 text-right">
                         {canCancel ? (
                           <button data-demo-action={c.status === "scheduled" ? "campaign.cancel" : "campaign.pause"}
                             type="button"
@@ -430,6 +433,7 @@ export default function MarketingOverview() {
           </div>
         )}
       </div>
+      </>}
     </div>
   );
 }

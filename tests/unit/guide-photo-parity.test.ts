@@ -1,0 +1,141 @@
+import { describe, expect, it, vi } from "vitest";
+import { sourceExports, sourceHandler } from "../helpers/source-handler";
+import { issuePhotoFolder, verifyPhotoFolder } from "../../app/lib/photo-folder-token";
+
+const slotId = "10000000-0000-4000-8000-000000000001", otherSlot = "10000000-0000-4000-8000-000000000002";
+const caller = { id: "guide-a", business_id: "a", role: "GUIDE" };
+const secret = "fixture-".repeat(8);
+const url = "https://drive.google.com/drive/folders/folder-a";
+function database(failedTable?: string) {
+  const writes: { table: string; rows: any[] }[] = [], queries: { table: string; filters: any[] }[] = [];
+  const rows: Record<string, any[]> = {
+    slots: [{ id: slotId, business_id: "a", booked: 3, start_time: new Date(Date.now() - 3600000).toISOString(), tours: { name: "Paddle" }, businesses: { timezone: "Africa/Johannesburg" } }, { id: otherSlot, business_id: "b" }],
+    trip_photos: [{ id: "photo-a", business_id: "a", slot_id: slotId, photo_url: url }, { id: "photo-b", business_id: "b", slot_id: otherSlot, photo_url: "https://other.invalid" }],
+    bookings: [{ id: "booking-a", business_id: "a", slot_id: slotId, status: "PAID", customer_name: "Alex Guest", phone: "27820000000", email: "alex@example.invalid" }, { id: "cancelled", business_id: "a", slot_id: slotId, status: "CANCELLED", email: "cancelled@example.invalid" }, { id: "other", business_id: "b", slot_id: otherSlot, status: "PAID", email: "other@example.invalid" }],
+  };
+  const db = { from(table: string) {
+    const filters: any[] = []; queries.push({ table, filters });
+    let insert: any[] | undefined;
+    const finish = async () => {
+      if (table === failedTable) return { data: null, error: { message: "Private DB failure" } };
+      if (insert) { writes.push({ table, rows: insert }); (rows[table] ||= []).push(...insert); return { data: null, error: null }; }
+      return { data: (rows[table] || []).filter(row => filters.every(([kind, key, value]) => kind === "eq" ? row[key] === value : kind === "in" ? value.includes(row[key]) : kind === "gt" ? row[key] > value : row[key] < value)), error: null };
+    };
+    const q: any = { select: () => q, order: () => q, limit: () => q,
+      eq: (key: string, value: unknown) => { filters.push(["eq", key, value]); return q; },
+      in: (key: string, value: unknown) => { filters.push(["in", key, value]); return q; },
+      gt: (key: string, value: unknown) => { filters.push(["gt", key, value]); return q; },
+      lt: (key: string, value: unknown) => { filters.push(["lt", key, value]); return q; },
+      insert: (value: unknown) => { insert = Array.isArray(value) ? value : [value]; return q; },
+      maybeSingle: async () => { const result = await finish(); return { ...result, data: result.data?.[0] || null }; },
+      then: (resolve: any, reject: any) => finish().then(resolve, reject),
+    }; return q;
+  } };
+  return { db, writes, queries };
+}
+function fixture(path: string, options: { signedIn?: boolean; failedTable?: string; failChannel?: string; badSession?: boolean } = {}) {
+  const data = database(options.failedTable);
+  const provider = vi.fn(async (target: string, init: RequestInit) => {
+    if (target.includes("googleapis.com")) return new Response(null, { headers: { Location: options.badSession ? "https://evil.invalid/upload" : "https://www.googleapis.com/upload/drive/v3/files?upload_id=synthetic" } });
+    const body = JSON.parse(init.body as string);
+    if (target.endsWith("google-drive")) return Response.json(body.action === "create_folder" ? { folder_id: "folder-a" } : body.action === "token" ? { access_token: "private-google-key" } : { connected: true, email: "operator@example.invalid", access_token: "must-not-return" });
+    expect(body.data?.email || body.to).not.toContain("other@example.invalid");
+    expect(body.data?.email || body.to).not.toContain("cancelled@example.invalid");
+    return Response.json(options.failChannel && target.endsWith(options.failChannel) ? { ok: false, error: "Provider rejected" } : { ok: true });
+  });
+  const mocks = {
+    "@/app/lib/api-auth": { getCallerAdmin: async () => null },
+    "@/app/lib/guide-api-auth": { getCallerGuide: async () => options.signedIn === false ? null : caller },
+    "@supabase/supabase-js": { createClient: () => data.db },
+    "@/app/lib/photo-folder-token": { issuePhotoFolder, verifyPhotoFolder },
+  };
+  const post = path.endsWith("photos/route.ts") ? undefined : sourceHandler(path, mocks, {}, provider);
+  const get = path.endsWith("photos/route.ts") ? sourceExports(path, mocks, {}, provider).GET as (req: Request) => Promise<Response> : undefined;
+  return { ...data, provider, post: (body: unknown) => post!(new Request("https://fixture.invalid", { method: "POST", body: JSON.stringify(body) })), get: (query: string) => get!(new Request("https://fixture.invalid?" + query)) };
+}
+
+describe("trip-scoped upload capabilities", () => {
+  const grant = { business_id: "a", slot_id: slotId, folder_id: "folder-a" };
+  it("binds the folder to its operator, trip, signature and one-hour expiry", () => {
+    const token = issuePhotoFolder(grant, secret, 1000);
+    expect(verifyPhotoFolder(token, "a", slotId, secret, 1001)).toMatchObject(grant);
+    for (const [business, slot, key, now] of [["b", slotId, secret, 1001], ["a", otherSlot, secret, 1001], ["a", slotId, "wrong", 1001], ["a", slotId, secret, 3601000]] as const) expect(verifyPhotoFolder(token, business, slot, key, now)).toBeNull();
+    expect(verifyPhotoFolder(token + ".extra", "a", slotId, secret, 1001)).toBeNull();
+    expect(verifyPhotoFolder("forged", "a", slotId, secret, 1001)).toBeNull();
+  });
+  it("returns only a single-file upload URL, with the Google key staying server-side", async () => {
+    const f = fixture("app/api/guide/photo-session/route.ts");
+    const folder = await (await f.post({ action: "folder", slot_id: slotId, business_id: "b" })).json();
+    expect(folder.folder_url).toBe(url); expect(folder.access_token).toBeUndefined();
+    const response = await f.post({ action: "start", slot_id: slotId, folder_token: folder.folder_token, file_name: "trip.mp4", content_type: "video/mp4", size: 20_000_000 });
+    expect(response.status).toBe(200); expect(await response.json()).toEqual({ upload_url: "https://www.googleapis.com/upload/drive/v3/files?upload_id=synthetic" });
+    const google = f.provider.mock.calls.find(([target]) => target.includes("googleapis.com"))!;
+    expect(JSON.parse(google[1].body as string)).toEqual({ name: "trip.mp4", parents: ["folder-a"] });
+    expect(new Headers(google[1].headers).get("Authorization")).toBe("Bearer private-google-key");
+    expect(new Headers(google[1].headers).get("Origin")).toBe("https://fixture.invalid");
+    expect((await f.post({ action: "complete", slot_id: slotId, folder_token: folder.folder_token })).status).toBe(200);
+  });
+  it.each([false, true])("rejects unauthorized/foreign trips before any upload: foreign=%s", async foreign => {
+    const f = fixture("app/api/guide/photo-session/route.ts", { signedIn: foreign });
+    expect((await f.post({ action: "folder", slot_id: foreign ? otherSlot : slotId })).status).toBe(foreign ? 404 : 401);
+    expect(f.provider).not.toHaveBeenCalled(); expect(f.writes).toEqual([]);
+  });
+  it.each(["forged", issuePhotoFolder({ ...grant, business_id: "b" }, secret), issuePhotoFolder({ ...grant, slot_id: otherSlot }, secret)])("rejects a forged or differently scoped folder before refreshing Google credentials", async folder_token => {
+    const f = fixture("app/api/guide/photo-session/route.ts");
+    expect((await f.post({ action: "start", slot_id: slotId, folder_token, file_name: "trip.jpg", content_type: "image/jpeg", size: 10 })).status).toBe(403);
+    expect(f.provider).not.toHaveBeenCalled();
+  });
+  it("refuses invalid media and foreign resumable URLs", async () => {
+    const f = fixture("app/api/guide/photo-session/route.ts", { badSession: true });
+    const token = issuePhotoFolder(grant, secret);
+    expect((await f.post({ action: "start", slot_id: slotId, folder_token: token, file_name: "bad.txt", content_type: "text/plain", size: 10 })).status).toBe(400);
+    expect(f.provider).not.toHaveBeenCalled();
+    expect((await f.post({ action: "start", slot_id: slotId, folder_token: token, file_name: "photo.jpg", content_type: "image/jpeg", size: 10 })).status).toBe(503);
+  });
+});
+
+describe("guide photo reads", () => {
+  const route = "app/api/guide/photos/route.ts";
+  it("returns only the guide's trip choices, selected photo links and history", async () => {
+    const f = fixture(route);
+    const trips = await (await f.get("kind=slots&slot_id=" + slotId)).json();
+    expect(trips.slots.map((s: any) => s.id)).toEqual([slotId]);
+    const photos = await (await f.get("kind=history&slot_id=" + slotId)).json();
+    expect(photos.photos).toHaveLength(1); expect(photos.selected_photos).toHaveLength(1);
+    expect((await f.get("kind=history&slot_id=" + otherSlot)).status).toBe(404);
+    expect(f.writes).toEqual([]);
+  });
+  it("strips secrets from the Drive status response", async () => {
+    const f = fixture(route); expect(await (await f.get("kind=drive")).json()).toEqual({ connected: true, email: "operator@example.invalid" });
+  });
+  it("rejects unauthenticated reads and does not turn database failures into empty galleries", async () => {
+    expect((await fixture(route, { signedIn: false }).get("kind=history")).status).toBe(401);
+    expect((await fixture(route, { failedTable: "trip_photos" }).get("kind=history")).status).toBe(503);
+  });
+});
+
+describe("guide photo and thank-you delivery parity", () => {
+  const route = "app/api/guide/send-thank-you/route.ts";
+  it("saves new links, sends both existing channels, counts each booker once and records the guide actor", async () => {
+    const f = fixture(route);const links = [url, "https://photos.example.invalid/new"];
+    const response = await f.post({ slot_id: slotId, photo_urls: links, business_id: "b", email: "forged@example.invalid" });
+    expect(await response.json()).toMatchObject({ ok: true, sent: 1, failures: [], recipient_count: 1 });
+    expect(f.provider).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(f.provider.mock.calls[0][1].body as string).message).toContain(links[1]);
+    expect(JSON.parse(f.provider.mock.calls[1][1].body as string)).toEqual({ type: "TRIP_PHOTOS", data: { business_id: "a", email: "alex@example.invalid", customer_name: "Alex Guest", tour_name: "Paddle", photo_url: links[0], photo_urls: links } });
+    expect(f.writes.find(w => w.table === "trip_photos")?.rows).toEqual([{ business_id: "a", slot_id: slotId, photo_url: links[1], uploaded_by_guide_id: "guide-a" }]);
+    expect(f.writes.find(w => w.table === "audit_logs")?.rows[0]).toMatchObject({ actor_id: null, business_id: "a", after_state: { actor_guide_id: "guide-a", source: "simple-guide" } });
+  });
+  it("reports an email failure even if WhatsApp succeeds", async () => {
+    const f = fixture(route, { failChannel: "send-email" }); const response = await f.post({ slot_id: slotId, photo_urls: [url] });
+    expect(await response.json()).toMatchObject({ ok: false, sent: 1, failures: ["Alex Guest (email)"] });
+  });
+  it.each(["slots", "bookings", "trip_photos"])("does not send after a %s read failure", async failedTable => {
+    const f = fixture(route, { failedTable }); expect((await f.post({ slot_id: slotId, photo_urls: [url] })).status).toBeGreaterThanOrEqual(400); expect(f.provider).not.toHaveBeenCalled();
+  });
+  it("rejects unauthorized sends, foreign trips and unsafe links without provider calls", async () => {
+    const anon = fixture(route, { signedIn: false });expect((await anon.post({ slot_id: slotId })).status).toBe(401);expect(anon.provider).not.toHaveBeenCalled();
+    const f = fixture(route);expect((await f.post({ slot_id: otherSlot })).status).toBe(403);
+    expect((await f.post({ slot_id: slotId, photo_urls: ["javascript:alert(1)"] })).status).toBe(400);expect(f.provider).not.toHaveBeenCalled();
+  });
+});

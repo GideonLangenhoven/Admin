@@ -21,6 +21,14 @@ describe("marketing template materialization", () => {
     social_google_reviews: "https://g.page/safarico/review",
   };
 
+  it.each(["win-back-2", "win-back-3"])("welcome-back starter %s works without promising an unissued discount", key => {
+    const blocks = materializeStarterTemplate(getStarterTemplateByKey(key)!, biz, []);
+    const content = JSON.stringify(blocks);
+    expect(content).not.toContain("{promo_code}");
+    expect(content).not.toContain("{promo_discount}");
+    expect(content).not.toContain("{voucher_code}");
+  });
+
   it("uses the operator's accent color on CTA buttons instead of the platform default", () => {
     const starter = getStarterTemplateByKey("welcome-series-1")!;
     const blocks = materializeStarterTemplate(starter, biz, []);
@@ -70,15 +78,15 @@ describe("marketing template materialization", () => {
     expect(button.url).toBe("{site_url}");
   });
 
-  it("inserts the operator's real tours as tour cards after the guest-favourites quote", () => {
+  it("inserts verified tours without a fabricated testimonial", () => {
     const starter = getStarterTemplateByKey("welcome-series-2")!;
     const tours = [
       { id: "tour-1", name: "Sunrise Balloon Safari", duration_minutes: 180, image_url: "" },
       { id: "tour-2", name: "Bush Walk", duration_minutes: 90, image_url: "" },
     ];
     const blocks = materializeStarterTemplate(starter, biz, tours);
-    const quoteIdx = blocks.findIndex((b) => b.type === "quote");
-    const cards = blocks.slice(quoteIdx + 1, quoteIdx + 3) as any[];
+    expect(blocks.some(b => b.type === "quote")).toBe(false);
+    const cards = blocks.filter(b => b.type === "tourcard") as any[];
     expect(cards.map((c) => c.type)).toEqual(["tourcard", "tourcard"]);
     expect(cards[0].title).toBe("Sunrise Balloon Safari");
     expect(cards[0].ctaUrl).toBe("{site_url}/book?tour=tour-1");

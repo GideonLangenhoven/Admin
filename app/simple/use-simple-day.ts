@@ -1,15 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { restoreReturnPosition } from "@/app/lib/simple-view";
 import { bookingRealtimeFilter } from "@/app/lib/bookings-realtime";
 import { supabase } from "@/app/lib/supabase";
 import { loadSimpleDay, type SimpleDay } from "./simple-data";
 
-export function useSimpleDay(businessId: string, date: string, timeZone: string) {
+export function useSimpleDay(businessId: string, date: string, timeZone: string, guide = false) {
   const [data, setData] = useState<SimpleDay | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadedScope, setLoadedScope] = useState<typeof scope | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const scope = useMemo(() => ({ businessId, date, timeZone }), [businessId, date, timeZone]);
+  const scope = useMemo(() => ({ businessId, date, timeZone, guide }), [businessId, date, timeZone, guide]);
   const activeRef = useRef<{ scope: typeof scope; request: number } | null>(null);
 
   const reload = useCallback(async (quiet = false) => {
@@ -26,16 +30,21 @@ export function useSimpleDay(businessId: string, date: string, timeZone: string)
       return;
     }
     if (!quiet) setLoading(true);
+    setRefreshing(true);
     setError("");
     try {
       const next = await loadSimpleDay(scope);
-      if (isCurrent()) setData(next);
+      if (isCurrent()) {
+        setLoadedScope(scope);
+        setData(next);
+        setUpdatedAt(new Date().toISOString());
+      }
     } catch (cause) {
       if (!isCurrent()) return;
-      console.error("Simple view day load failed", cause);
-      setError("We couldn’t load this day. Check your connection and try again.");
+      void cause;
+      setError("Day unavailable. Check your connection and retry.");
     } finally {
-      if (isCurrent()) setLoading(false);
+      if (isCurrent()) { setLoading(false); setRefreshing(false); }
     }
   }, [scope]);
 
@@ -49,7 +58,7 @@ export function useSimpleDay(businessId: string, date: string, timeZone: string)
   }, [reload, scope]);
 
   useEffect(() => {
-    if (!businessId || !date) return;
+    if (!businessId || !date || guide) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const refreshSoon = () => {
       if (timer) clearTimeout(timer);
@@ -63,7 +72,29 @@ export function useSimpleDay(businessId: string, date: string, timeZone: string)
       if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
-  }, [businessId, date, reload]);
+  }, [businessId, date, reload, guide]);
 
-  return { data, loading, error, reload };
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const refresh = () => reload(true);
+    const offline = () => setError("Connection lost. Refresh after reconnecting before changing arrivals.");
+    window.addEventListener("online", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("offline", offline);
+    const timer = setInterval(refresh, 60_000);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("online", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("offline", offline);
+    };
+  }, [reload]);
+
+  useEffect(()=>{
+    if(typeof window!=="undefined" && data && loadedScope===scope) restoreReturnPosition(businessId,window.location.pathname+window.location.search);
+  },[data,loadedScope,scope,businessId]);
+
+  const matches = loadedScope === scope;
+  return { data: matches ? data : null, loading: loading || (!matches && !error && !!businessId && !!date), error, reload, updatedAt: matches ? updatedAt : null, refreshing };
+
 }

@@ -32,7 +32,7 @@ it("blocks anonymous onboarding credential linking before provider or database e
   }, { SETTINGS_ENCRYPTION_KEY: "fixture-encryption-key-".repeat(2) });
   const response = await handler(new Request("https://fixture.invalid", { method: "POST", body: JSON.stringify({ action: "save-credentials", token: "11111111-1111-4111-8111-111111111111", yoco_secret_key: "sk_test_fixture" }) }));
   expect(response.status).toBe(403);
-  expect(await response.json()).toMatchObject({ success: false, code: "MFA_REQUIRED" });
+  expect(await response.json()).toMatchObject({ success: false, code: "ADMIN_SIGN_IN_REQUIRED" });
   expect(gateway.validateYocoKey).not.toHaveBeenCalled();
   expect(gateway.registerYocoWebhook).not.toHaveBeenCalled();
   expect(rpc).not.toHaveBeenCalled();

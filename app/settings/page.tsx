@@ -1,4 +1,6 @@
 "use client";
+import { renderGiftVoucherFace } from "../../supabase/functions/_shared/gift-voucher-face";
+import GuideAccessSettings from "@/components/guide/GuideAccessSettings";
 import { useState, useEffect, ReactNode } from "react";
 import Link from "next/link";
 import { confirmAction, notify } from "../lib/app-notify";
@@ -7,17 +9,20 @@ import { OPERATOR_HIDEABLE_SECTIONS } from "../lib/operator-sections";
 import { supabase } from "../lib/supabase";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
 import { SETTINGS_SECTIONS } from "../lib/settings-sections";
-import { getAdminTimezone, setAdminTimezone, zonedToUtc } from "../lib/admin-timezone";
+import { BOOKING_PALETTES } from "../lib/booking-palettes";
+import { getAdminTimezone, setAdminTimezone, normalize24HourTime } from "../lib/admin-timezone";
+import { buildTourSlotStartTimes } from "../lib/tour-slot-generation";
 import { useBusinessContext } from "../../components/BusinessContext";
 import DataRequestBadge from "../../components/DataRequestBadge";
-import { computeTheme as computeGlassTheme } from "../lib/theme-engine";
+import BookingSitePreview from "../../components/booking/BookingSitePreview";
 import dynamic from "next/dynamic";
 import { CaretDown } from "@phosphor-icons/react";
 import { DatePicker } from "../../components/DatePicker";
 import WhatsAppBotSection from "./components/WhatsAppBotSection";
 import { DemoFeatureLink } from "../../components/DemoActionGuide";
 import { isDemoPathVisible } from "../lib/demo-guide";
-import { MfaStatus, useSensitiveActionMfa } from "../../components/MfaSensitiveAction";
+import RemoveIntegrationButton from "../../components/RemoveIntegrationButton";
+import AdminContactEditor from "../../components/AdminContactEditor";
 
 function CollapsibleSection({ id, title, subtitle, children, defaultOpen = false, openSections, toggle }: {
     id: string; title: string; subtitle?: string; children: ReactNode; defaultOpen?: boolean;
@@ -53,73 +58,6 @@ function isPrivileged(r: string | null) {
     return r === "MAIN_ADMIN" || r === "SUPER_ADMIN";
 }
 
-// Live glass preview of the public booking site, driven by the SAME theme
-// engine the customer site runs (booking/lib/theme-engine): the inks and
-// glass alphas shown here are exactly what customers will get — including
-// automatic contrast repair for hard palettes.
-function BookingSitePreview({ siteSettings }: { siteSettings: Record<string, any> }) {
-    const glass = computeGlassTheme({
-        main: siteSettings.color_main,
-        secondary: siteSettings.color_secondary,
-        cta: siteSettings.color_cta,
-        bg: siteSettings.color_bg,
-        nav: siteSettings.color_nav,
-        hover: siteSettings.color_hover,
-    });
-    const v = glass.vars;
-    const glassCard: React.CSSProperties = {
-        background: v["--glass-tint-card"],
-        border: "1px solid " + v["--glass-border"],
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.22), 0 8px 32px rgba(0,0,0,0.22)",
-        backdropFilter: "blur(14px) saturate(160%)",
-        WebkitBackdropFilter: "blur(14px) saturate(160%)",
-    };
-    return (
-        <div>
-            <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1 pb-2 border-b border-[var(--ck-border-subtle)]">Booking Page Preview</h3>
-            <p className="text-xs text-[var(--ck-text-muted)] mb-4">Live glass preview. Text colors are solved automatically so any palette stays readable.</p>
-            <div
-                className="rounded-3xl border border-[var(--ck-border-subtle)] overflow-hidden"
-                style={{
-                    background:
-                        `radial-gradient(90% 70% at 12% 8%, color-mix(in srgb, ${v["--cfg-main"]} 42%, transparent), transparent 60%),` +
-                        `radial-gradient(80% 65% at 88% 18%, color-mix(in srgb, ${v["--cfg-hover"]} 30%, transparent), transparent 62%),` +
-                        `radial-gradient(110% 80% at 50% 105%, color-mix(in srgb, ${v["--cfg-secondary"]} 55%, transparent), transparent 70%),` +
-                        v["--cfg-bg"],
-                }}
-            >
-                <div className="flex items-center justify-between gap-4 px-5 py-3 m-3 rounded-full" style={{ ...glassCard, background: v["--glass-tint-nav"] }}>
-                    <div className="min-w-0">
-                        <div className="text-base font-semibold truncate" style={{ color: v["--ink-nav"] }}>{siteSettings.business_name || "Business Name"}</div>
-                        <div className="text-xs truncate" style={{ color: v["--ink-nav"], opacity: 0.72 }}>{siteSettings.business_tagline || "Business tagline"}</div>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm shrink-0">
-                        <span style={{ color: v["--ink-nav"] }}>{siteSettings.nav_gift_voucher_label || "Gift Voucher"}</span>
-                        <span className="px-4 py-2 rounded-full font-semibold" style={{ backgroundColor: v["--accent"], backgroundImage: `linear-gradient(${v["--main-overlay"]}, ${v["--main-overlay"]})`, color: v["--ink-on-main"] }}>{siteSettings.nav_my_bookings_label || "My Bookings"}</span>
-                    </div>
-                </div>
-                <div className="px-6 py-8 text-center">
-                    <div className="text-xs font-semibold uppercase tracking-[0.3em]" style={{ color: v["--accent-text"] }}>{siteSettings.hero_eyebrow || "Hero Eyebrow"}</div>
-                    <div className="mt-3 text-4xl font-semibold" style={{ color: v["--ink"] }}>{siteSettings.hero_title || "Hero Title"}</div>
-                    <div className="mt-3 text-base max-w-2xl mx-auto" style={{ color: v["--ink-muted"] }}>{siteSettings.hero_subtitle || "Hero subtitle appears here."}</div>
-                    <div className="mt-6 mx-auto max-w-sm rounded-3xl p-4 text-left" style={glassCard}>
-                        <div className="text-sm font-semibold" style={{ color: v["--ink"] }}>Sample Tour Card</div>
-                        <div className="text-xs mt-0.5" style={{ color: v["--ink-muted"] }}>2 hours · R495 per person</div>
-                        <div className="mt-3 inline-flex w-full items-center justify-center px-5 py-2.5 rounded-full font-semibold text-sm" style={{ backgroundColor: v["--cta"], backgroundImage: `linear-gradient(${v["--cta-overlay"]}, ${v["--cta-overlay"]})`, color: v["--ink-on-cta"] }}>{siteSettings.card_cta_label || "Book Now"}</div>
-                    </div>
-                </div>
-                <div className="px-6 pb-6 text-center text-sm">
-                    <div style={{ color: v["--ink"] }}>{siteSettings.footer_line_one || ((siteSettings.business_name || "Business Name") + " · Coastal Activity Centre")}</div>
-                    <div className="mt-1" style={{ color: v["--ink-muted"] }}>{siteSettings.footer_line_two || "Established: 1994 · BookingTours Platform"}</div>
-                    <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold" style={glassCard}>
-                        <span style={{ color: v["--ink"] }}>{siteSettings.chat_widget_label || "Book here"}</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 // Personal (per-admin) preference — stored on the caller's own admin_users row
 // via self-scoped RPCs, so it follows them across devices. Not gated by
 // settings_permissions: every Settings viewer manages only their own bubble.
@@ -144,7 +82,7 @@ function HelpAssistantSection() {
         }
         // HelpChat (mounted in AppShell) listens for this so the bubble reacts instantly.
         window.dispatchEvent(new CustomEvent("ck-help-chat-hidden", { detail: { hidden: next } }));
-        notify({ message: next ? "Help assistant hidden. You can turn it back on here any time." : "Help assistant is back.", tone: "success" });
+        notify({ message: next ? "Help assistant hidden. Turn it on here any time." : "Help assistant is back.", tone: "success" });
     }
 
     return (
@@ -152,7 +90,7 @@ function HelpAssistantSection() {
             <div>
                 <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Help assistant bubble</h3>
                 <p className="mt-1 text-xs text-[var(--ck-text-muted)]">
-                    The floating chat bubble that answers questions about the dashboard. This only affects your own account. Other team members keep their own setting.
+                    Dashboard help chat. This setting applies only to your account.
                 </p>
             </div>
             <label className="flex shrink-0 cursor-pointer items-center gap-2">
@@ -230,6 +168,7 @@ interface Tour {
     active: boolean;
     sort_order: number | null;
     image_url: string | null;
+    voucher_image_url: string | null;
     hidden: boolean;
     confirmation_tagline: string | null;
     last_minute_hours: number | null;
@@ -264,12 +203,19 @@ export default function SettingsPage() {
     useEffect(() => {
         const openLinkedSection = () => {
             const id = window.location.hash.slice(1);
-            if (id) setOpenSections(prev => ({ ...prev, [id]: true }));
+            if (id) setOpenSections(prev => ({ ...prev, [id === "add-admin" ? "admins" : id]: true }));
         };
         openLinkedSection();
         window.addEventListener("hashchange", openLinkedSection);
         return () => window.removeEventListener("hashchange", openLinkedSection);
     }, []);
+    useEffect(() => {
+        if (!loading && openSections.admins && window.location.hash === "#add-admin") {
+            const heading = document.getElementById("add-admin");
+            heading?.focus();
+            heading?.scrollIntoView({ block: "start" });
+        }
+    }, [loading, openSections.admins]);
 
     // New Admin Form
     const [newName, setNewName] = useState("");
@@ -284,7 +230,7 @@ export default function SettingsPage() {
     // Tours state
     const [tours, setTours] = useState<Tour[]>([]);
     const [editingTour, setEditingTour] = useState<Tour | null>(null);
-    const [tourForm, setTourForm] = useState({ name: "", description: "", confirmationTagline: "", price: "", lastMinuteHours: "", lastMinuteEndHours: "", lastMinutePrice: "", duration: "", durationUnit: "min" as "min" | "hours" | "days", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""] as string[], slotDays: [0, 1, 2, 3, 4, 5, 6] as number[] });
+    const [tourForm, setTourForm] = useState({ name: "", description: "", confirmationTagline: "", price: "", lastMinuteHours: "", lastMinuteEndHours: "", lastMinutePrice: "", duration: "", durationMinutes: "0", durationUnit: "min" as "min" | "hours" | "days", sort_order: "0", active: true, image_url: "", voucher_image_url: "", default_capacity: "10", slotDateMode: "range" as "range" | "specific", slotDates: [""] as string[], slotStartDate: "", slotEndDate: "", slotTimes: [""] as string[], slotDays: [0, 1, 2, 3, 4, 5, 6] as number[] });
     const [tourSaving, setTourSaving] = useState(false);
     const [tourError, setTourError] = useState("");
     const [slotMessage, setSlotMessage] = useState("");
@@ -293,11 +239,14 @@ export default function SettingsPage() {
 
     // Site Settings State
     const [siteSettings, setSiteSettings] = useState(DEFAULT_SITE_SETTINGS);
+    const selectedPalette = Object.entries(BOOKING_PALETTES).find(([, colors]) =>
+        Object.entries(colors).every(([key, value]) => siteSettings[key as keyof typeof colors].toLowerCase() === value.toLowerCase())
+    )?.[0] || "";
     const [subdomain, setSubdomain] = useState<string | null>(null);
     // Custom booking questions — edited as a plain form; serialised to the
     // businesses.booking_custom_fields JSON array on save (same structure the
     // admin new-booking form and the chat bots already consume).
-    type BookingQuestion = { key: string; label: string; type: "text" | "textarea" | "number"; required: boolean; placeholder: string };
+    type BookingQuestion = { key: string; label: string; type: string; required: boolean; placeholder: string; [setting: string]: unknown };
     const [bookingQuestions, setBookingQuestions] = useState<BookingQuestion[]>([]);
     const [questionsSaving, setQuestionsSaving] = useState(false);
     const [questionsMessage, setQuestionsMessage] = useState<{ type: string; text: string }>({ type: "", text: "" });
@@ -342,6 +291,7 @@ export default function SettingsPage() {
     const [yocoSaving, setYocoSaving] = useState(false);
     const [yocoTestSaving, setYocoTestSaving] = useState(false);
     const [testModeToggling, setTestModeToggling] = useState(false);
+    const [credentialRemoving, setCredentialRemoving] = useState(false);
     const [gdriveConnected, setGdriveConnected] = useState(false);
     const [gdriveEmail, setGdriveEmail] = useState("");
     const [gdriveLoading, setGdriveLoading] = useState(false);
@@ -363,8 +313,6 @@ export default function SettingsPage() {
     const [bankDirty, setBankDirty] = useState(false);
     const [invoiceSaving, setInvoiceSaving] = useState(false);
     const [invoiceMessage, setInvoiceMessage] = useState({ type: "", text: "" });
-    const bankMfa = useSensitiveActionMfa(readOnly || !isPrivileged(role), `bank:${businessId}`);
-    const credentialMfa = useSensitiveActionMfa(readOnly || !isPrivileged(role), `credentials:${businessId}`);
 
     // Marketing test email recipient
     const [marketingTestEmail, setMarketingTestEmail] = useState("");
@@ -444,7 +392,7 @@ export default function SettingsPage() {
 
     async function fetchAdmins() {
         setLoading(true);
-        const { data, error } = await supabase.from("admin_users").select("id, name, email, role, suspended, created_at, password_set_at, must_set_password, invite_sent_at, settings_permissions").eq("business_id", businessId).order("created_at");
+        const { data, error } = await supabase.from("admin_users").select("id, name, email, phone, role, suspended, created_at, password_set_at, must_set_password, invite_sent_at, settings_permissions").eq("business_id", businessId).order("created_at");
         if (data) setAdmins(data.filter(a => a.role !== "SUPER_ADMIN"));
         const { data: biz } = await supabase.from("businesses").select("billing_admin_user_id").eq("id", businessId).maybeSingle();
         setBillingAdminId(biz?.billing_admin_user_id || "");
@@ -573,7 +521,7 @@ export default function SettingsPage() {
 
     function resetTourForm() {
         setEditingTour(null);
-        setTourForm({ name: "", description: "", confirmationTagline: "", price: "", lastMinuteHours: "", lastMinuteEndHours: "", lastMinutePrice: "", duration: "", durationUnit: "min", sort_order: "0", active: true, image_url: "", default_capacity: "10", slotStartDate: "", slotEndDate: "", slotTimes: [""], slotDays: [0, 1, 2, 3, 4, 5, 6] });
+        setTourForm({ name: "", description: "", confirmationTagline: "", price: "", lastMinuteHours: "", lastMinuteEndHours: "", lastMinutePrice: "", duration: "", durationMinutes: "0", durationUnit: "min", sort_order: "0", active: true, image_url: "", voucher_image_url: "", default_capacity: "10", slotDateMode: "range", slotDates: [""], slotStartDate: "", slotEndDate: "", slotTimes: [""], slotDays: [0, 1, 2, 3, 4, 5, 6] });
         setTourError("");
     }
 
@@ -581,9 +529,9 @@ export default function SettingsPage() {
 
     function minutesToDurationForm(m: number | null) {
         const mins = Number(m || 0);
-        if (mins >= 1440 && mins % 1440 === 0) return { duration: String(mins / 1440), durationUnit: "days" as const };
-        if (mins >= 60 && mins % 60 === 0) return { duration: String(mins / 60), durationUnit: "hours" as const };
-        return { duration: String(mins || ""), durationUnit: "min" as const };
+        if (mins >= 1440 && mins % 1440 === 0) return { duration: String(mins / 1440), durationUnit: "days" as const, durationMinutes: "0" };
+        if (mins >= 60) return { duration: String(Math.floor(mins / 60)), durationUnit: "hours" as const, durationMinutes: String(mins % 60) };
+        return { duration: String(mins || ""), durationUnit: "min" as const, durationMinutes: "0" };
     }
 
     function startEditTour(t: Tour) {
@@ -601,7 +549,10 @@ export default function SettingsPage() {
             sort_order: String(t.sort_order || 0),
             active: t.active,
             image_url: t.image_url || "",
+            voucher_image_url: t.voucher_image_url || "",
             default_capacity: String((t as any).default_capacity || 10),
+            slotDateMode: "range",
+            slotDates: [""],
             slotStartDate: "",
             slotEndDate: "",
             slotTimes: [""],
@@ -609,6 +560,8 @@ export default function SettingsPage() {
         });
         setTourError("");
     }
+
+    const tourTimezone = getAdminTimezone();
 
     const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -619,62 +572,33 @@ export default function SettingsPage() {
         });
     }
 
-    async function generateSlotsForTour(tourId: string): Promise<{ created: number; skipped: number }> {
-        const validTimes = tourForm.slotTimes.filter(t => t.trim() !== "");
-        if (!tourForm.slotStartDate || !tourForm.slotEndDate || validTimes.length === 0) {
-            setTourError("Please fill in start date, end date, and at least one start time.");
-            return { created: 0, skipped: 0 };
+    const hasSlotDates = tourForm.slotDateMode === "specific"
+        ? tourForm.slotDates.some(Boolean)
+        : !!tourForm.slotStartDate && !!tourForm.slotEndDate && tourForm.slotDays.length > 0;
+    const canGenerateSlots = hasSlotDates && tourForm.slotTimes.some(t => t.trim() !== "");
+
+    async function generateSlotsForTour(tourId: string): Promise<{ created: number; skipped: number } | null> {
+        try {
+            const slots = buildTourSlotStartTimes(tourForm, tourTimezone).map(start_time => ({
+                business_id: businessId,
+                tour_id: tourId,
+                start_time,
+                capacity_total: Number(tourForm.default_capacity) || 10,
+                booked: 0,
+                held: 0,
+                status: "OPEN",
+            }));
+            const { data: inserted, error: slotErr } = await supabase
+                .from("slots")
+                .upsert(slots, { onConflict: "business_id,tour_id,start_time", ignoreDuplicates: true })
+                .select("id");
+            if (slotErr) throw new Error("Slots failed: " + slotErr.message);
+            const created = inserted?.length ?? 0;
+            return { created, skipped: slots.length - created };
+        } catch (error) {
+            setTourError(error instanceof Error ? error.message : "Could not generate slots. Please try again.");
+            return null;
         }
-        if (tourForm.slotDays.length === 0) {
-            setTourError("Please select at least one day of the week.");
-            return { created: 0, skipped: 0 };
-        }
-
-        const slots: any[] = [];
-        const tz = getAdminTimezone();
-        const [startYear, startMonth, startDay] = tourForm.slotStartDate.split("-").map(Number);
-        const [endYear, endMonth, endDay] = tourForm.slotEndDate.split("-").map(Number);
-        const capacity = Number(tourForm.default_capacity) || 10;
-
-        const cursor = new Date(startYear, startMonth - 1, startDay);
-        const stop = new Date(endYear, endMonth - 1, endDay);
-
-        for (let d = new Date(cursor); d <= stop; d.setDate(d.getDate() + 1)) {
-            if (!tourForm.slotDays.includes(d.getDay())) continue;
-
-            const localDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-            for (let ti = 0; ti < validTimes.length; ti++) {
-                const localIso = `${localDateStr}T${validTimes[ti]}:00`;
-                const utcStart = new Date(zonedToUtc(localIso, tz)).toISOString();
-
-                slots.push({
-                    business_id: businessId,
-                    tour_id: tourId,
-                    start_time: utcStart,
-                    capacity_total: capacity,
-                    booked: 0,
-                    held: 0,
-                    status: "OPEN",
-                });
-            }
-        }
-
-        if (slots.length === 0) {
-            setTourError("No slots to create: there are no matching days in the selected date range.");
-            return { created: 0, skipped: 0 };
-        }
-
-        const { data: inserted, error: slotErr } = await supabase
-            .from("slots")
-            .upsert(slots, { onConflict: "business_id,tour_id,start_time", ignoreDuplicates: true })
-            .select("id");
-        if (slotErr) {
-            setTourError("Slots failed: " + slotErr.message);
-            return { created: 0, skipped: 0 };
-        }
-        const created = inserted?.length ?? 0;
-        return { created, skipped: slots.length - created };
     }
 
     async function handleGenerateSlots() {
@@ -682,8 +606,9 @@ export default function SettingsPage() {
         setSlotGenerating(true);
         setTourError("");
         setSlotMessage("");
-        const { created, skipped } = await generateSlotsForTour(editingTour.id);
-        if (created > 0 || skipped > 0) {
+        const result = await generateSlotsForTour(editingTour.id);
+        if (result) {
+            const { created, skipped } = result;
             const parts: string[] = [];
             if (created > 0) parts.push(`${created} slot${created !== 1 ? "s" : ""} generated`);
             if (skipped > 0) parts.push(`${skipped} already existed and were skipped`);
@@ -698,12 +623,23 @@ export default function SettingsPage() {
         e.preventDefault();
         if (!tourForm.name.trim()) return setTourError("Name is required");
         if (!tourForm.price || Number(tourForm.price) <= 0) return setTourError("Price must be greater than 0");
-        if (!tourForm.duration || Number(tourForm.duration) <= 0) return setTourError("Duration is required");
+        const duration = Number(tourForm.duration);
+        const extraMinutes = tourForm.durationUnit === "hours" ? Number(tourForm.durationMinutes || 0) : 0;
+        const durationMinutes = duration * DURATION_UNIT_MINUTES[tourForm.durationUnit] + extraMinutes;
+        if (tourForm.duration === "" || !Number.isInteger(duration) || duration < 0 || !Number.isInteger(extraMinutes) || extraMinutes < 0 || extraMinutes > 59 || !Number.isSafeInteger(durationMinutes) || durationMinutes <= 0) return setTourError("Enter a duration above zero: whole hours plus 0 to 59 minutes.");
+        const autoGenerateSlots = !editingTour && (tourForm.slotTimes.some(t => t.trim() !== "") || (tourForm.slotDateMode === "specific" ? tourForm.slotDates.some(Boolean) : !!tourForm.slotStartDate || !!tourForm.slotEndDate));
+        if (autoGenerateSlots) {
+            try {
+                buildTourSlotStartTimes(tourForm, tourTimezone);
+            } catch (error) {
+                return setTourError(error instanceof Error ? error.message : "Please check the departure dates and times.");
+            }
+        }
         const lmHours = tourForm.lastMinuteHours.trim() === "" ? null : Number(tourForm.lastMinuteHours);
         const lmEndHours = tourForm.lastMinuteEndHours.trim() === "" ? null : Number(tourForm.lastMinuteEndHours);
         const lmPrice = tourForm.lastMinutePrice.trim() === "" ? null : Number(tourForm.lastMinutePrice);
         const lmSet = [lmHours, lmEndHours, lmPrice].filter(v => v !== null).length;
-        if (lmSet > 0 && lmSet < 3) return setTourError("Last-minute deals need a start, a cut-off and a price. Clear all three to switch the deal off.");
+        if (lmSet > 0 && lmSet < 3) return setTourError("Enter a start, cut-off and price. Clear all three to turn off the deal.");
         // Capped at 30 days: a mistyped 480 instead of 48 would otherwise discount
         // a month of departures before anyone noticed.
         if (lmHours !== null && (lmHours <= 0 || lmHours > 720)) return setTourError("Last-minute start must be between 1 and 720 hours (30 days) before departure");
@@ -721,10 +657,11 @@ export default function SettingsPage() {
             last_minute_hours: lmHours,
             last_minute_end_hours: lmEndHours,
             last_minute_price: lmPrice,
-            duration_minutes: Number(tourForm.duration) * DURATION_UNIT_MINUTES[tourForm.durationUnit],
+            duration_minutes: durationMinutes,
             sort_order: Number(tourForm.sort_order) || 0,
             active: tourForm.active,
             image_url: tourForm.image_url.trim() || null,
+            voucher_image_url: tourForm.voucher_image_url.trim() || null,
             default_capacity: Number(tourForm.default_capacity) || 10,
         };
 
@@ -735,9 +672,17 @@ export default function SettingsPage() {
             const { data: newTour, error: inErr } = await supabase.from("tours").insert({ ...payload, business_id: businessId }).select().single();
             if (inErr) { setTourError("Failed: " + inErr.message); setTourSaving(false); return; }
 
-            // Auto-generate slots if date range and time are provided
-            if (newTour && tourForm.slotStartDate && tourForm.slotEndDate && tourForm.slotTimes.some(t => t.trim() !== "")) {
-                const { created, skipped } = await generateSlotsForTour(newTour.id);
+            if (newTour && autoGenerateSlots) {
+                const result = await generateSlotsForTour(newTour.id);
+                if (!result) {
+                    // Keep the chosen schedule available to retry without creating another tour.
+                    setEditingTour(newTour as Tour);
+                    setTourError(message => "Tour created. " + message + " Choose Generate Slots to retry.");
+                    setTourSaving(false);
+                    fetchTours();
+                    return;
+                }
+                const { created, skipped } = result;
                 if (created > 0 || skipped > 0) {
                     const parts: string[] = [];
                     if (created > 0) parts.push(`${created} slot${created !== 1 ? "s" : ""} generated`);
@@ -902,7 +847,7 @@ export default function SettingsPage() {
         }
         if (!await confirmAction({
             title: "Remove admin",
-            message: "Are you sure you want to remove this admin?",
+            message: "Remove this admin?",
             tone: "warning",
             confirmLabel: "Remove admin",
         })) return;
@@ -964,11 +909,12 @@ export default function SettingsPage() {
             });
             setSubdomain(data.subdomain || null);
             setBookingQuestions((Array.isArray(data.booking_custom_fields) ? data.booking_custom_fields : [])
-                .filter((f: any) => f && (f.key || f.label))
+                .filter((f: any) => f && (f.key || f.id || f.label))
                 .map((f: any) => ({
-                    key: String(f.key || ""),
+                    ...f,
+                    key: String(f.key || f.id || ""),
                     label: String(f.label || ""),
-                    type: (f.type === "textarea" || f.type === "number") ? f.type : "text",
+                    type: typeof f.type === "string" ? f.type : "text",
                     required: !!f.required,
                     placeholder: String(f.placeholder || ""),
                 })));
@@ -1058,8 +1004,8 @@ export default function SettingsPage() {
         if (!await confirmAction({
             title: next === "SUSPENDED" ? "Suspend subscription" : "Reactivate subscription",
             message: next === "SUSPENDED"
-                ? "This will block all admins from accessing the dashboard. Are you sure?"
-                : "This will restore dashboard access for all admins.",
+                ? "Block dashboard access for all admins?"
+                : "Restore dashboard access for all admins?",
             tone: next === "SUSPENDED" ? "warning" : "info",
             confirmLabel: next === "SUSPENDED" ? "Suspend" : "Reactivate",
         })) return;
@@ -1083,6 +1029,7 @@ export default function SettingsPage() {
         const cleaned = bookingQuestions
             .filter(q => q.label.trim())
             .map((q, i) => ({
+                ...q,
                 key: q.key || (q.label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 24) || "question") + "_" + Date.now().toString().slice(-4) + i,
                 label: q.label.trim(),
                 type: q.type,
@@ -1093,7 +1040,7 @@ export default function SettingsPage() {
         if (error) {
             setQuestionsMessage({ type: "error", text: "Failed to save questions: " + error.message });
         } else {
-            setBookingQuestions(cleaned.map(f => ({ key: f.key, label: f.label, type: f.type, required: f.required, placeholder: (f as any).placeholder || "" })));
+            setBookingQuestions(cleaned.map(f => ({ ...f, placeholder: f.placeholder || "" })));
             setQuestionsMessage({ type: "success", text: "Booking questions saved." });
             setTimeout(() => setQuestionsMessage({ type: "", text: "" }), 3000);
         }
@@ -1210,7 +1157,6 @@ export default function SettingsPage() {
     async function handleSaveInvoice(e: React.FormEvent) {
         e.preventDefault();
         if (readOnly) return;
-        if (isPrivileged(role) && bankDirty && !await bankMfa.requireMfa("Save banking details")) return;
         setInvoiceSaving(true);
         setInvoiceMessage({ type: "", text: "" });
 
@@ -1267,9 +1213,14 @@ export default function SettingsPage() {
         }
     }
 
+    function handleCredentialsRemoved(section: "wa" | "yoco" | "yoco_test") {
+        setCredStatus(current => current && { ...current, [section]: false });
+        setCredMessage({ type: "", text: "" });
+    }
+
     async function handleSaveWa(e: React.FormEvent) {
         e.preventDefault();
-        if (readOnly || !await credentialMfa.requireMfa("Save WhatsApp credentials")) return;
+        if (readOnly) return;
         setWaSaving(true);
         setCredMessage({ type: "", text: "" });
         try {
@@ -1291,7 +1242,7 @@ export default function SettingsPage() {
 
     async function handleSaveYoco(e: React.FormEvent) {
         e.preventDefault();
-        if (readOnly || !await credentialMfa.requireMfa("Save Yoco credentials")) return;
+        if (readOnly) return;
         setYocoSaving(true);
         setCredMessage({ type: "", text: "" });
         try {
@@ -1312,7 +1263,7 @@ export default function SettingsPage() {
     }
 
     async function handleToggleTestMode() {
-        if (readOnly || !await credentialMfa.requireMfa("Change Yoco test mode")) return;
+        if (readOnly) return;
         setTestModeToggling(true);
         setCredMessage({ type: "", text: "" });
         const newMode = !(credStatus?.yoco_test_mode);
@@ -1324,7 +1275,7 @@ export default function SettingsPage() {
             });
             const d = await res.json();
             if (!res.ok || d.error) throw new Error(d.error || "Toggle failed");
-            setCredMessage({ type: "success", text: newMode ? "Yoco TEST MODE enabled. Sandbox keys will be used for payments." : "Yoco TEST MODE disabled. Live keys are active." });
+            setCredMessage({ type: "success", text: newMode ? "Yoco test mode on. Payments use test keys." : "Yoco test mode off. Live payments active." });
             fetchCredStatus();
         } catch (err: any) {
             setCredMessage({ type: "error", text: String(err?.message || "Failed to toggle test mode.") });
@@ -1334,7 +1285,7 @@ export default function SettingsPage() {
 
     async function handleSaveYocoTest(e: React.FormEvent) {
         e.preventDefault();
-        if (readOnly || !await credentialMfa.requireMfa("Save Yoco test credentials")) return;
+        if (readOnly) return;
         setYocoTestSaving(true);
         setCredMessage({ type: "", text: "" });
         try {
@@ -1547,12 +1498,12 @@ export default function SettingsPage() {
         setEmailImgUploading(key);
         try {
             const ext = file.name.split(".").pop() || "jpg";
-            const path = `${businessId}/${key}.${ext}`;
+            const path = key === "gift" ? `${businessId}/gift-${Date.now()}.${ext}` : `${businessId}/${key}.${ext}`;
             const { error } = await supabase.storage.from("email-images").upload(path, file, { upsert: true });
             if (error) { notify("Upload failed: " + error.message); return; }
             const { data: urlData } = supabase.storage.from("email-images").getPublicUrl(path);
             setEmailImgs(prev => ({ ...prev, [key]: urlData.publicUrl }));
-            notify("Image uploaded. Click Save Email Images to persist.");
+            notify("Image uploaded. Save email settings to keep it.");
         } catch (err: any) {
             notify("Upload failed: " + (err?.message || "Unknown error"));
         } finally {
@@ -1629,26 +1580,18 @@ export default function SettingsPage() {
 
     return (
         <div className="max-w-4xl">
-            <div className="anim-fade-up mb-6">
+            <div className="anim-fade-up mb-6 flex flex-wrap items-end justify-between gap-3">
+                <div>
                 <p className="ui-mono-label mb-2">Admin Console</p>
                 <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Settings</h1>
+                </div>
+                {isPrivileged(role) && <a href="#add-admin" onClick={() => setOpenSections(prev => ({ ...prev, admins: true }))} className="ui-btn ui-btn-primary">Add admin</a>}
             </div>
 
             <div className="space-y-4">
 
-            {isPrivileged(role) && <nav aria-label="Settings tools" className="ui-card divide-y divide-[var(--ck-border-subtle)] px-5">
-                <Link href="/privacy/data-requests" className="flex items-center gap-3 py-4 text-sm hover:text-[var(--ck-accent)]">
-                    <span className="font-semibold">Data Requests</span>
-                    <span className="text-xs text-[var(--ck-text-muted)]">Review customer privacy requests</span>
-                    <DataRequestBadge />
-                </Link>
-                <div className="py-4">
-                    <p className="text-sm font-semibold text-[var(--ck-text-strong)]">OTA Channels</p>
-                    <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Direct Viator and GetYourGuide connections are not available yet.</p>
-                </div>
-            </nav>}
-
             {isPrivileged(role) && <CollapsibleSection id="admins" title="Admin Users" openSections={openSections} toggle={toggleSection}>
+                <GuideAccessSettings />
                 {/* Business logo — shown in the dashboard sidebar, the booking
                     site header, every customer email, and on invoices. Saves
                     immediately on upload/remove. */}
@@ -1689,7 +1632,7 @@ export default function SettingsPage() {
                             <span className="font-display text-[15px] font-semibold tabular-nums text-[var(--ck-text-strong)] leading-none">{usedAdminSeats}</span>
                             <span className="ui-mono-label !text-[9.5px]">/ {usageSnapshot?.seat_limit || 10} seats</span>
                         </span>
-                        <label className="flex items-center gap-2 text-xs text-[var(--ck-text-muted)]" title="Who receives BookingTours subscription invoices. Defaults to the first admin created on this account.">
+                        <label className="flex items-center gap-2 text-xs text-[var(--ck-text-muted)]" title="Receives subscription invoices. Defaults to the first admin.">
                             Billing contact
                             <select data-demo-action="admin.billing" value={billingAdminId} onChange={e => saveBillingContact(e.target.value)} className="ui-control px-2 py-1.5 text-xs rounded-lg outline-none max-w-[180px]">
                                 <option value="">First admin (default)</option>
@@ -1711,6 +1654,7 @@ export default function SettingsPage() {
                                             <div className="min-w-0">
                                                 <div className="font-medium text-[var(--ck-text-strong)] text-sm">{a.name || a.email}</div>
                                                 <div className="text-xs text-[var(--ck-text-muted)] mt-0.5">{a.email}</div>
+                                                {a.phone && <div className="text-xs text-[var(--ck-text-muted)] mt-0.5">{a.phone}</div>}
                                                 <div className="text-xs text-[var(--ck-text-muted)] mt-0.5">
                                                     {a.role === "MAIN_ADMIN" ? "Main Admin" : "Admin"} • Added {new Date(a.created_at).toLocaleDateString()}
                                                 </div>
@@ -1742,13 +1686,13 @@ export default function SettingsPage() {
                                                         {isExpanded ? "Close" : "Permissions"}
                                                     </button>
                                                 )}
-                                                {a.role !== "MAIN_ADMIN" && (
+                                                {a.role !== "SUPER_ADMIN" && (
                                                     <button data-demo-action={(a.must_set_password || !a.password_set_at) ? "admin.setup" : "admin.reset"}
                                                         onClick={() => handleResendSetup(a)}
                                                         disabled={resendingAdminId === a.id}
                                                         className="text-[var(--ck-accent)] text-sm font-medium hover:underline disabled:opacity-50 whitespace-nowrap"
                                                     >
-                                                        {resendingAdminId === a.id ? "Sending..." : ((a.must_set_password || !a.password_set_at) ? "Resend setup link" : "Email reset link")}
+                                                        {resendingAdminId === a.id ? "Sending..." : ((a.must_set_password || !a.password_set_at) ? "Send setup link" : "Email reset link")}
                                                     </button>
                                                 )}
                                                 {a.role !== "MAIN_ADMIN" && (
@@ -1757,6 +1701,12 @@ export default function SettingsPage() {
                                                     </button>
                                                 )}
                                             </div>
+                                        </div>
+                                        <div className="px-4 pb-4">
+                                            <AdminContactEditor key={`${businessId}:${a.id}`} admin={a} businessId={businessId} disabled={readOnly} onSaved={updated => {
+                                                setAdmins(rows => rows.map(row => row.id === updated.id ? { ...row, ...updated } : row));
+                                                setMyEmail(localStorage.getItem("ck_admin_email"));
+                                            }} />
                                         </div>
                                         {/* Expandable permissions panel */}
                                         {isExpanded && a.role !== "MAIN_ADMIN" && a.role !== "SUPER_ADMIN" && (
@@ -1782,7 +1732,7 @@ export default function SettingsPage() {
                                                     ))}
                                                 </div>
                                                 <p className="text-xs font-semibold text-[var(--ck-text-strong)] mt-5 mb-1">Dashboard sections visible to {a.name || a.email}</p>
-                                                <p className="text-[10px] text-[var(--ck-text-muted)] mb-3 leading-relaxed">Uncheck to hide a section from this admin. Billing, Chat FAQ and Data Requests are always Main-Admin only.</p>
+                                                <p className="text-[10px] text-[var(--ck-text-muted)] mb-3 leading-relaxed">Uncheck to hide sections. Billing, Chat FAQ and Data Requests require Main Admin access.</p>
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                     {OPERATOR_HIDEABLE_SECTIONS.filter(section => !readOnly || !section.key.startsWith("/") || isDemoPathVisible(section.key)).map(section => {
                                                         const hideKey = `hide:${section.key}`;
@@ -1806,7 +1756,7 @@ export default function SettingsPage() {
                                                     })}
                                                 </div>
                                                 <p className="text-[10px] text-[var(--ck-text-muted)] mt-3 leading-relaxed">
-                                                    Banking details and Admin Users management are always restricted to the Main Admin only.
+                                                    Only the Main Admin can manage banking details and admins.
                                                 </p>
                                             </div>
                                         )}
@@ -1821,7 +1771,7 @@ export default function SettingsPage() {
                 {/* Add Admin Form + Subscription */}
                 <div className="space-y-6">
                     <div className="flex items-center justify-between gap-4">
-                        <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-[var(--ck-text-strong)]">Add New Admin</h2>
+                        <h2 id="add-admin" tabIndex={-1} className="scroll-mt-6 text-[15px] font-semibold tracking-[-0.01em] text-[var(--ck-text-strong)]">Add New Admin</h2>
                         <button data-demo-action={subscriptionStatus === "SUSPENDED" ? "admin.reactivate" : "admin.suspend"}
                             onClick={toggleSubscription}
                             disabled={togglingSubscription}
@@ -1852,13 +1802,13 @@ export default function SettingsPage() {
                                 </div>
                                 <div>
                                     <div className="rounded-xl border border-[var(--ck-border-subtle)] bg-[var(--ck-bg)] p-3 text-xs text-[var(--ck-text-muted)]">
-                                        The new admin will receive a confirmation email with a secure link to create their password.
+                                        The new admin gets an email to set their password.
                                     </div>
                                 </div>
                                 {error && <div className="text-xs text-[var(--ck-danger)] font-medium">{error}</div>}
                                 {adminMessage && <div className="text-xs text-[var(--ck-success)] font-medium">{adminMessage}</div>}
                                 <button type="submit" disabled={adding} className="ui-btn ui-btn-primary w-full disabled:opacity-50">
-                                    {adding ? "Adding..." : "Add Admin and Send Setup Link"}
+                                    {adding ? "Adding..." : "Add admin"}
                                 </button>
                             </>
                         )}
@@ -1869,7 +1819,7 @@ export default function SettingsPage() {
                 {/* Marketing test email recipient */}
                 <div className="mt-6 pt-5 border-t border-[var(--ck-border-subtle)]">
                     <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1">Marketing Test Email Recipient</h3>
-                    <p className="text-xs text-[var(--ck-text-muted)] mb-3">Choose which admin receives test marketing emails when previewing templates.</p>
+                    <p className="text-xs text-[var(--ck-text-muted)] mb-3">Choose who receives test marketing emails.</p>
                     <div className="flex items-end gap-3">
                         <select data-demo-action="admin.test-email"
                             value={marketingTestEmail}
@@ -1919,7 +1869,7 @@ export default function SettingsPage() {
                                                 <img src={t.image_url} alt={t.name} className="w-14 h-14 rounded-lg object-cover shrink-0" />
                                             )}
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex items-center justify-between mb-1">
+                                                <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
                                                     <span className="font-medium text-sm text-[var(--ck-text-strong)]">{t.name}</span>
                                                     <div className="flex items-center gap-1.5">
                                                         {t.hidden && (
@@ -1931,8 +1881,9 @@ export default function SettingsPage() {
                                                     </div>
                                                 </div>
                                                 <div className="text-xs text-[var(--ck-text-muted)]">
-                                                    R{t.base_price_per_person || 0}/person · {t.duration_minutes ? formatDuration(t.duration_minutes) : "—"} · <span className={tourSlotCounts[t.id] ? "text-emerald-600" : "text-orange-500"}>{tourSlotCounts[t.id] ?? "…"} upcoming slot{tourSlotCounts[t.id] !== 1 ? "s" : ""}</span>
+                                                    R{t.base_price_per_person || 0}/person · <span className={tourSlotCounts[t.id] ? "text-emerald-600" : "text-orange-500"}>{tourSlotCounts[t.id] ?? "…"} upcoming slot{tourSlotCounts[t.id] !== 1 ? "s" : ""}</span>
                                                 </div>
+                                                <p className="mt-2 text-sm font-semibold text-[var(--ck-text-strong)]">Duration: {t.duration_minutes ? formatDuration(t.duration_minutes) : "Not set"}</p>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-3 mt-2">
@@ -1962,7 +1913,7 @@ export default function SettingsPage() {
                         <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-3">
                             {editingTour ? "Edit Tour" : "Add New Tour"}
                         </h3>
-                        <form data-demo-submit="tour.save" onSubmit={handleSaveTour} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
+                        <form aria-label="Tour details" data-demo-submit="tour.save" onSubmit={handleSaveTour} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Tour Name</label>
                                 <input type="text" required value={tourForm.name} onChange={e => setTourForm({ ...tourForm, name: e.target.value })}
@@ -1979,7 +1930,7 @@ export default function SettingsPage() {
                                 <input type="text" value={tourForm.confirmationTagline} onChange={e => setTourForm({ ...tourForm, confirmationTagline: e.target.value })}
                                     maxLength={200} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
                                     placeholder="e.g. Lace up your boots for an unforgettable day on the trail." />
-                                <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">The excitement line in this tour&apos;s confirmation email, after &quot;Your spots are officially locked in.&quot; Overrides your account tagline. Leave blank to fall back to the account default.</p>
+                                <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">Custom line for this tour&apos;s confirmation email. Blank uses your account default.</p>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-strong)] mb-1">Tour Image</label>
@@ -2005,6 +1956,36 @@ export default function SettingsPage() {
                                     </div>
                                 </div>
                             </div>
+                            <div className="rounded-xl border border-[var(--ck-border-subtle)] p-4 space-y-3">
+                                <div>
+                                    <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Gift voucher photo</h3>
+                                    <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Gift voucher photo, with the recipient&apos;s name, voucher details and message. Blank uses the tour image.</p>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <label className="ui-btn ui-btn-secondary relative cursor-pointer focus-within:ring-2 focus-within:ring-[var(--ck-accent)]">
+                                        {uploadingField === "voucherImage" ? "Uploading…" : "Upload voucher photo"}
+                                        <input type="file" aria-label="Upload gift voucher photo" accept="image/jpeg,image/png,image/webp" disabled={uploadingField === "voucherImage"}
+                                            className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                                            onChange={async e => {
+                                                const file = e.target.files?.[0];
+                                                e.target.value = "";
+                                                if (!file) return;
+                                                if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { notify({ message: "Choose a JPG, PNG or WebP photo.", tone: "warning" }); return; }
+                                                setUploadingField("voucherImage");
+                                                try { await handleImageUpload(file, "email-images", businessId + "/voucher-photos", url => setTourForm(prev => ({ ...prev, voucher_image_url: url }))); }
+                                                catch { notify({ message: "Photo upload failed. Please try again.", tone: "error" }); }
+                                                finally { setUploadingField(null); }
+                                            }} />
+                                    </label>
+                                    {tourForm.voucher_image_url && <button type="button" className="ui-btn ui-btn-ghost" onClick={() => setTourForm(prev => ({ ...prev, voucher_image_url: "" }))}>Use tour image</button>}
+                                    <span className="text-xs text-[var(--ck-text-muted)]">JPG, PNG or WebP · Up to 5 MB</span>
+                                </div>
+                                <details>
+                                    <summary className="cursor-pointer text-sm font-medium py-2">Preview gift voucher</summary>
+                                    <div className="max-w-lg mt-2" dangerouslySetInnerHTML={{ __html: renderGiftVoucherFace({ imageUrl: tourForm.voucher_image_url || tourForm.image_url || emailImgs.gift, businessName: siteSettings.business_name, logoUrl: siteSettings.logo_url, experienceName: tourForm.name, recipientName: "Alex", buyerName: "Sam", message: "Happy birthday! Here’s to your next adventure together.", value: tourForm.price || "500", expiresLabel: "Valid for 3 years" }) }} />
+                                    <p className="mt-2 text-xs text-[var(--ck-text-muted)]">Sample voucher. Save the tour to use this photo.</p>
+                                </details>
+                            </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Price per Person (R)</label>
@@ -2012,21 +1993,35 @@ export default function SettingsPage() {
                                         onChange={e => setTourForm({ ...tourForm, price: e.target.value })}
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="600" />
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Duration</label>
-                                    <div className="flex gap-2">
-                                        <input type="number" required min="1" step="1" value={tourForm.duration}
+                                <fieldset className="min-w-0 sm:col-span-2">
+                                    <legend className="mb-2 text-sm font-semibold text-[var(--ck-text-strong)]">Tour duration</legend>
+                                    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,7rem),1fr))] gap-3">
+                                        <label className="block text-sm text-[var(--ck-text-strong)]">
+                                            {tourForm.durationUnit === "hours" ? "Hours" : tourForm.durationUnit === "days" ? "Days" : "Minutes"}
+                                        <input type="number" required min={tourForm.durationUnit === "hours" ? "0" : "1"} step="1" value={tourForm.duration}
+                                            aria-label={tourForm.durationUnit === "hours" ? "Duration hours" : "Duration"}
                                             onChange={e => setTourForm({ ...tourForm, duration: e.target.value })}
-                                            className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="90" />
+                                            className="ui-control mt-1 w-full tabular-nums" placeholder={tourForm.durationUnit === "hours" ? "1" : "90"} />
+                                        </label>
+                                        <label className="block text-sm text-[var(--ck-text-strong)]">
+                                            Unit
                                         <select value={tourForm.durationUnit}
-                                            onChange={e => setTourForm({ ...tourForm, durationUnit: e.target.value as "min" | "hours" | "days" })}
-                                            className="ui-control px-2 py-2 text-sm rounded-lg outline-none" aria-label="Duration unit">
-                                            <option value="min">min</option>
-                                            <option value="hours">hours</option>
-                                            <option value="days">days</option>
+                                            onChange={e => setTourForm({ ...tourForm, durationUnit: e.target.value as "min" | "hours" | "days", durationMinutes: "0" })}
+                                            className="ui-control mt-1 w-full" aria-label="Duration unit">
+                                            <option value="min">Minutes</option>
+                                            <option value="hours">Hours</option>
+                                            <option value="days">Days</option>
                                         </select>
+                                        </label>
+                                        {tourForm.durationUnit === "hours" && <label className="block text-sm text-[var(--ck-text-strong)]">
+                                            Minutes
+                                            <input type="number" min="0" max="59" step="1" value={tourForm.durationMinutes}
+                                                onChange={e => setTourForm({ ...tourForm, durationMinutes: e.target.value })}
+                                                aria-label="Duration minutes"
+                                                className="ui-control mt-1 w-full tabular-nums" placeholder="0" />
+                                        </label>}
                                     </div>
-                                </div>
+                                </fieldset>
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
@@ -2049,7 +2044,7 @@ export default function SettingsPage() {
                             <div className="border-t border-[var(--ck-border-subtle)] pt-4">
                                 <DemoFeatureLink feature="tour.last-minute" />
                                 <label className="block text-xs font-semibold text-[var(--ck-text-strong)] mb-1">Last-minute deal (optional)</label>
-                                <p className="text-xs text-[var(--ck-text-muted)] mb-3">Unsold seats drop to the deal price between the start and the cut-off, then go back to the normal price. Leave blank to switch it off.</p>
+                                <p className="text-xs text-[var(--ck-text-muted)] mb-3">Unsold seats use the deal price until the cut-off, then return to normal. Blank turns it off.</p>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div>
                                         <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Starts (hours before departure)</label>
@@ -2077,37 +2072,79 @@ export default function SettingsPage() {
                                 <label className="block text-xs font-semibold text-[var(--ck-text-strong)] mb-1">
                                     {editingTour ? "Generate Slots" : "Auto-generate Slots (optional)"}
                                 </label>
-                                <p className="text-xs text-[var(--ck-text-muted)] mb-3">Creates one slot per selected day in the date range.</p>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Start Date</label>
-                                        <DatePicker
-                                            value={tourForm.slotStartDate}
-                                            onChange={(v) => setTourForm({ ...tourForm, slotStartDate: v })}
-                                            placeholder="Select start"
-                                            disabled={{ before: new Date() }}
-                                            compact
-                                        />
+                                <p className="text-xs text-[var(--ck-text-muted)] mb-3">{tourForm.slotDateMode === "specific" ? "Creates departures on these dates at each time below." : "Creates departures on these weekdays and dates at each time below."}</p>
+                                {editingTour && <p className="mb-3 text-sm text-[var(--ck-text-strong)]">Existing slots keep their current availability. To stop weekday bookings, use <Link className="font-medium underline underline-offset-2" href={`/slots?panel=bulk-edit&tour=${editingTour.id}`}>Slots → Bulk Edit → Close weekday slots</Link>.</p>}
+                                <fieldset className="mb-3">
+                                    <legend className="text-xs font-medium text-[var(--ck-text-muted)] mb-1">Schedule dates</legend>
+                                    <div className="flex flex-wrap gap-x-5">
+                                        {([["range", "Date range"], ["specific", "Specific dates"]] as const).map(([value, label]) => (
+                                            <label key={value} className="flex min-h-11 items-center gap-2 cursor-pointer text-sm text-[var(--ck-text-strong)]">
+                                                <input type="radio" name="tourSlotDateMode" value={value} checked={tourForm.slotDateMode === value}
+                                                    onChange={() => { setTourForm(prev => ({ ...prev, slotDateMode: value })); setTourError(""); setSlotMessage(""); }}
+                                                    className="h-4 w-4 accent-[var(--ck-accent)]" />
+                                                {label}
+                                            </label>
+                                        ))}
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">End Date</label>
-                                        <DatePicker
-                                            value={tourForm.slotEndDate}
-                                            onChange={(v) => setTourForm({ ...tourForm, slotEndDate: v })}
-                                            placeholder="Select end"
-                                            disabled={tourForm.slotStartDate ? { before: new Date(tourForm.slotStartDate + "T00:00:00") } : { before: new Date() }}
-                                            compact
-                                            alignRight
-                                        />
+                                </fieldset>
+                                {tourForm.slotDateMode === "specific" ? (
+                                    <fieldset>
+                                        <legend className="text-xs font-medium text-[var(--ck-text-muted)] mb-1">Tour dates</legend>
+                                        <div className="space-y-2">
+                                            {tourForm.slotDates.map((date, idx) => (
+                                                <div key={idx} className="flex items-center gap-2">
+                                                    <div className="min-w-0 flex-1">
+                                                        <DatePicker value={date} placeholder={`Select date ${idx + 1}`} className="min-h-11 focus-visible:ring-2 focus-visible:ring-[var(--ck-accent)]"
+                                                            onChange={value => setTourForm(prev => ({ ...prev, slotDates: prev.slotDates.map((d, i) => i === idx ? value : d) }))}
+                                                            disabled={{ before: new Date() }} />
+                                                    </div>
+                                                    <button type="button" aria-label={`Remove date ${idx + 1}`}
+                                                        onClick={() => setTourForm(prev => ({ ...prev, slotDates: prev.slotDates.length > 1 ? prev.slotDates.filter((_, i) => i !== idx) : [""] }))}
+                                                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-[var(--ck-danger)] hover:bg-[var(--ck-surface-sunken)]">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <button type="button" onClick={() => setTourForm(prev => ({ ...prev, slotDates: [...prev.slotDates, ""] }))}
+                                            className="mt-1.5 inline-flex min-h-11 items-center text-xs font-medium text-[var(--ck-accent)] hover:underline">Add date</button>
+                                    </fieldset>
+                                ) : (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Start Date</label>
+                                            <DatePicker
+                                                value={tourForm.slotStartDate}
+                                                onChange={(v) => setTourForm({ ...tourForm, slotStartDate: v })}
+                                                placeholder="Select start"
+                                                disabled={{ before: new Date() }}
+                                                compact
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">End Date</label>
+                                            <DatePicker
+                                                value={tourForm.slotEndDate}
+                                                onChange={(v) => setTourForm({ ...tourForm, slotEndDate: v })}
+                                                placeholder="Select end"
+                                                disabled={tourForm.slotStartDate ? { before: new Date(tourForm.slotStartDate + "T00:00:00") } : { before: new Date() }}
+                                                compact
+                                                alignRight
+                                            />
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                                 <div className="mt-3">
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Start Time{tourForm.slotTimes.length > 1 ? "s" : ""} (SAST)</label>
+                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Start Time{tourForm.slotTimes.length > 1 ? "s" : ""} (24-hour · {tourTimezone === "Africa/Johannesburg" ? "SAST" : tourTimezone})</label>
                                     <div className="space-y-2">
                                         {tourForm.slotTimes.map((t, idx) => (
                                             <div key={idx} className="flex gap-2 items-center">
-                                                <input type="time" value={t} onChange={e => { const times = [...tourForm.slotTimes]; times[idx] = e.target.value; setTourForm({ ...tourForm, slotTimes: times }); }}
-                                                    className="ui-control flex-1 px-3 py-2 text-sm rounded-lg outline-none" />
+                                                <input type="text" inputMode="numeric" autoComplete="off" maxLength={5} placeholder="18:00" value={t}
+                                                    aria-label={`Start time ${idx + 1} (24-hour)`} aria-describedby="tour-time-hint"
+                                                    onFocus={e => e.currentTarget.select()}
+                                                    onChange={e => { const value = e.target.value; const times = [...tourForm.slotTimes]; times[idx] = /^\d{4}$/.test(value) ? normalize24HourTime(value) || value : value; setTourForm({ ...tourForm, slotTimes: times }); }}
+                                                    onBlur={() => { const normalized = normalize24HourTime(t); if (normalized) setTourForm(prev => ({ ...prev, slotTimes: prev.slotTimes.map((time, i) => i === idx ? normalized : time) })); }}
+                                                    className="ui-control min-w-0 flex-1 px-3 py-2 text-sm rounded-lg outline-none tabular-nums" />
                                                 {tourForm.slotTimes.length > 1 && (
                                                     <button type="button" onClick={() => { const times = tourForm.slotTimes.filter((_, i) => i !== idx); setTourForm({ ...tourForm, slotTimes: times }); }}
                                                         className="text-[var(--ck-danger)] hover:bg-red-50 rounded-lg p-1.5" title="Remove time">
@@ -2117,10 +2154,11 @@ export default function SettingsPage() {
                                             </div>
                                         ))}
                                     </div>
+                                    <p id="tour-time-hint" className="mt-1.5 text-xs text-[var(--ck-text-muted)]">24-hour time: 1800 becomes 18:00; 0930 becomes 09:30.</p>
                                     <button type="button" onClick={() => setTourForm({ ...tourForm, slotTimes: [...tourForm.slotTimes, ""] })}
-                                        className="mt-1.5 text-xs font-medium text-[var(--ck-accent)] hover:underline">+ Add another time slot</button>
+                                        className="mt-1.5 text-xs font-medium text-[var(--ck-accent)] hover:underline">Add time</button>
                                 </div>
-                                <div className="mt-3">
+                                {tourForm.slotDateMode === "range" && <div className="mt-3">
                                     <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Days of the Week</label>
                                     <div className="flex flex-wrap gap-1.5 mt-1">
                                         {DAY_LABELS.map((label, idx) => (
@@ -2136,9 +2174,9 @@ export default function SettingsPage() {
                                         <button type="button" onClick={() => setTourForm(prev => ({ ...prev, slotDays: [0, 6] }))} className="inline-flex min-h-11 items-center px-2 text-sm text-[var(--ck-accent)] hover:underline">Weekends</button>
                                         <button type="button" onClick={() => setTourForm(prev => ({ ...prev, slotDays: [] }))} className="inline-flex min-h-11 items-center px-2 text-sm text-[var(--ck-text-muted)] hover:underline">None</button>
                                     </div>
-                                </div>
+                                </div>}
                                 {editingTour && (
-                                    <button data-demo-action="slot.generate" type="button" onClick={handleGenerateSlots} disabled={slotGenerating || !tourForm.slotStartDate || !tourForm.slotEndDate || !tourForm.slotTimes.some(t => t.trim() !== "") || tourForm.slotDays.length === 0}
+                                    <button data-demo-action="slot.generate" type="button" onClick={handleGenerateSlots} disabled={slotGenerating || tourSaving || !canGenerateSlots}
                                         className="mt-3 w-full rounded-xl bg-emerald-600 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50">
                                         {slotGenerating ? "Generating..." : "Generate Slots for " + editingTour.name}
                                     </button>
@@ -2149,7 +2187,7 @@ export default function SettingsPage() {
                             {slotMessage && <div className="text-xs text-[var(--ck-success)] font-medium">{slotMessage}</div>}
 
                             <div className="flex gap-3">
-                                <button type="submit" disabled={tourSaving}
+                                <button type="submit" disabled={tourSaving || slotGenerating || uploadingField === "voucherImage"}
                                     className="flex-1 rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
                                     {tourSaving ? "Saving..." : editingTour ? "Update Tour" : "Add Tour"}
                                 </button>
@@ -2163,7 +2201,7 @@ export default function SettingsPage() {
                         </form>
                         
                         {editingTour && (
-                            <InlineSlotManager tourId={editingTour.id} businessId={businessId} />
+                            <InlineSlotManager tourId={editingTour.id} businessId={businessId} timezone={tourTimezone} />
                         )}
                     </div>
 
@@ -2175,8 +2213,7 @@ export default function SettingsPage() {
                     <div className="pb-2 border-b border-[var(--ck-border-subtle)]">
                         <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1">Custom Booking Questions</h3>
                         <p className="text-xs text-[var(--ck-text-muted)]">
-                            Extra questions asked when a booking is taken (e.g. allergies, hotel pickup, experience level).
-                            Add your own or start from a template below. No code needed.
+                            Booking questions, such as allergies or pickup location. Add your own or use a template.
                         </p>
                     </div>
 
@@ -2201,7 +2238,7 @@ export default function SettingsPage() {
                     </div>
 
                     {bookingQuestions.length === 0 ? (
-                        <p className="text-xs text-[var(--ck-text-muted)]">No custom questions yet. Add one above, or click &quot;Add question&quot;.</p>
+                        <p className="text-xs text-[var(--ck-text-muted)]">No questions yet. Choose &quot;Add question&quot; or a template above.</p>
                     ) : (
                         <div className="space-y-3">
                             {bookingQuestions.map((q, i) => (
@@ -2215,6 +2252,7 @@ export default function SettingsPage() {
                                         <option value="text">Short answer</option>
                                         <option value="textarea">Long answer</option>
                                         <option value="number">Number</option>
+                                        {!["text", "textarea", "number"].includes(q.type) && <option value={q.type}>{({ select: "Dropdown", radio: "Single choice", multiselect: "Multiple choices", checkbox: "Checkbox", date: "Date" } as Record<string, string>)[q.type] || q.type}</option>}
                                     </select>
                                     <input type="text" value={q.placeholder}
                                         onChange={e => setBookingQuestions(prev => prev.map((p, j) => j === i ? { ...p, placeholder: e.target.value } : p))}
@@ -2249,7 +2287,7 @@ export default function SettingsPage() {
                 </div>
             </CollapsibleSection>}
 
-            {canAccess("addons") && <CollapsibleSection id="addons" title="Booking Add-Ons" subtitle="Optional extras customers can add when booking (e.g. photos, equipment rental)" openSections={openSections} toggle={toggleSection}>
+            {canAccess("addons") && <CollapsibleSection id="addons" title="Booking Add-Ons" subtitle="Booking extras, such as photos or equipment hire." openSections={openSections} toggle={toggleSection}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
                     {/* Add-On List */}
@@ -2298,7 +2336,7 @@ export default function SettingsPage() {
                                         </div>
                                     </div>
                                 ))}
-                                {addOns.length === 0 && <div className="p-4 text-center text-sm ui-text-muted">No add-ons yet. Create your first optional extra.</div>}
+                                {addOns.length === 0 && <div className="p-4 text-center text-sm ui-text-muted">No extras yet. Add one above.</div>}
                             </div>
                         </div>
                     </div>
@@ -2385,7 +2423,7 @@ export default function SettingsPage() {
                 </CollapsibleSection>
             )}
 
-            {canAccess("site") && <CollapsibleSection id="site" title="Booking Site Configuration" subtitle="These settings directly affect the public booking page" openSections={openSections} toggle={toggleSection}>
+            {canAccess("site") && <CollapsibleSection id="site" title="Booking Site Configuration" subtitle="Settings for your public booking page." openSections={openSections} toggle={toggleSection}>
                 <form data-demo-submit="site.save" onSubmit={handleSaveSiteSettings} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6 space-y-8">
 
                     {/* Legal & Text Policies */}
@@ -2399,7 +2437,7 @@ export default function SettingsPage() {
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Terms &amp; Conditions</label>
                                 <RichTextEditor value={siteSettings.terms_conditions} onChange={v => setSiteSettings({ ...siteSettings, terms_conditions: v })} rows={10} placeholder="Enter T&C's..." />
-                                <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Shown on your booking site&apos;s Terms &amp; Conditions page. If this is empty or under 100 characters, the site shows platform-default terms (marked as such) instead.</p>
+                                <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Booking site terms. Blank or under 100 characters uses labelled platform-default terms.</p>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Privacy Policy</label>
@@ -2443,11 +2481,11 @@ export default function SettingsPage() {
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Explore the Atlantic coastline by kayak with Cape Town's original guided team." />
                             </div>
                             {/* Site background image — saves immediately on upload/remove
-                                (same pattern as the logo). Falls back to the first active
-                                tour's photo, then a palette gradient, when empty. */}
+                                (same pattern as the logo). Uses a palette background
+                                when empty. */}
                             <div className="md:col-span-2 rounded-2xl border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] p-4">
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Site Background Image <span className="text-[var(--ck-accent)]">(the photo behind the glass panels on your booking site)</span></label>
-                                <p className="mb-3 text-[11px] text-[var(--ck-text-muted)]">Upload any landscape photo up to 20MB. It&apos;s automatically resized to 2560px wide and optimised for fast loading. Best shape: 16:9 landscape (e.g. 2560×1440). It renders softly blurred behind frosted panels, so good colour and light matter more than sharpness. If empty, your first tour&apos;s photo is used.</p>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Site Background Image <span className="text-[var(--ck-accent)]">(the photo behind your booking catalogue)</span></label>
+                                <p className="mb-3 text-[11px] text-[var(--ck-text-muted)]">Landscape photo, up to 20MB. Best at 16:9, e.g. 2560×1440. Resized to 2560px wide and blurred behind cards. Blank uses your palette.</p>
                                 <div className="flex items-center gap-3">
                                     {siteSettings.hero_image && (
                                         /* eslint-disable-next-line @next/next/no-img-element */
@@ -2478,7 +2516,7 @@ export default function SettingsPage() {
                                         <button data-demo-action="site.hero-remove" type="button" onClick={async () => {
                                             setSiteSettings(prev => ({ ...prev, hero_image: "" }));
                                             const { error } = await supabase.from("businesses").update({ hero_image: null }).eq("id", businessId);
-                                            notify(error ? { message: "Failed to remove background: " + error.message, tone: "error" } : { message: "Background removed. The site falls back to your first tour photo.", tone: "success" });
+                                            notify(error ? { message: "Failed to remove background: " + error.message, tone: "error" } : { message: "Background removed. Your palette provides the background.", tone: "success" });
                                         }} className="text-xs text-[var(--ck-danger)] hover:underline">Remove</button>
                                     )}
                                 </div>
@@ -2523,19 +2561,19 @@ export default function SettingsPage() {
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Public Contact Email</label>
                                 <input type="email" value={siteSettings.public_email} onChange={e => setSiteSettings({ ...siteSettings, public_email: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="hello@yourbusiness.co.za" />
-                                <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">Shown to customers on the Contact Us panel. Leave blank to hide.</p>
+                                <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">Shown in Contact Us. Blank hides it.</p>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Public Contact Phone</label>
                                 <input type="tel" value={siteSettings.public_phone} onChange={e => setSiteSettings({ ...siteSettings, public_phone: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="+27821234567" />
-                                <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">Include the country code. Leave blank to hide.</p>
+                                <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">Include country code. Blank hides it.</p>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Public WhatsApp Number</label>
                                 <input type="tel" value={siteSettings.public_whatsapp} onChange={e => setSiteSettings({ ...siteSettings, public_whatsapp: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="+27821234567" />
-                                <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">Include the country code. Leave blank to hide.</p>
+                                <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">Include country code. Blank hides it.</p>
                             </div>
                         </div>
                     </div>
@@ -2577,51 +2615,42 @@ export default function SettingsPage() {
                                 <div className="md:col-span-2">
                                     <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Waiver URL</label>
                                     <input type="url" value={siteSettings.waiver_url} onChange={e => setSiteSettings({ ...siteSettings, waiver_url: e.target.value })}
-                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Leave blank to use the built-in waiver form" />
-                                    <p className="mt-1 text-xs text-[var(--ck-text-muted)]">If left blank, the platform will generate a booking-specific waiver form automatically. If you use a custom URL, booking and token query params are appended.</p>
+                                        className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Blank uses the built-in waiver." />
+                                    <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Blank creates a waiver per booking. Custom URLs receive booking and token parameters.</p>
                                 </div>
                             </div>
-                            <p className="mt-3 text-xs text-[var(--ck-text-muted)]">Use full URLs here. Payment links, admin weather broadcasts, and related booking actions can reuse these values instead of hardcoded paths.</p>
+                            <p className="mt-3 text-xs text-[var(--ck-text-muted)]">Use full URLs. Payment links, weather notices and booking actions use these addresses.</p>
                         </div>
                     )}
 
-                    <BookingSitePreview siteSettings={siteSettings} />
+                    <BookingSitePreview siteSettings={siteSettings} tours={tours} />
 
                     {/* Branding Colors */}
                     <div>
-                        <div className="flex items-center justify-between mb-4 pb-2 border-b border-[var(--ck-border-subtle)]">
+                        <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-2 border-b border-[var(--ck-border-subtle)]">
                             <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Theme Colors</h3>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-medium text-[var(--ck-text-muted)]">Choose Template -</span>
+                            <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
+                                <label htmlFor="booking-palette" className="text-xs font-medium text-[var(--ck-text-muted)]">Choose Palette</label>
                                 <select
-                                    className="ui-control px-3 py-1 text-xs rounded-lg outline-none cursor-pointer bg-[var(--ck-surface)] border border-[var(--ck-border-subtle)]"
+                                    id="booking-palette"
+                                    value={selectedPalette}
+                                    className="ui-control min-h-11 max-w-full px-3 py-2 text-xs rounded-lg outline-none cursor-pointer bg-[var(--ck-surface)] border border-[var(--ck-border-subtle)]"
                                     onChange={(e) => {
-                                        const val = e.target.value;
-                                        if (!val) return;
-                                        const palettes: Record<string, any> = {
-                                            "Gentle Sea Breeze": { color_main: "#1F7A8C", color_secondary: "#022B3A", color_cta: "#1F7A8C", color_bg: "#E1E5F2", color_nav: "#FFFFFF", color_hover: "#BFDBF7" },
-                                            "Earthy Green": { color_main: "#52796F", color_secondary: "#2F3E46", color_cta: "#52796F", color_bg: "#CAD2C5", color_nav: "#F2F4F0", color_hover: "#84A98C" },
-                                            "Cherry Blossom": { color_main: "#BD632F", color_secondary: "#273E47", color_cta: "#A4243B", color_bg: "#D8C99B", color_nav: "#F8F5EE", color_hover: "#D8973C" },
-                                            "Soft Sand": { color_main: "#D5BDAF", color_secondary: "#4A4036", color_cta: "#D5BDAF", color_bg: "#F5EBE0", color_nav: "#FFFFFF", color_hover: "#D6CCC2" },
-                                            "Golden Summer Fields": { color_main: "#D4A373", color_secondary: "#3D4A27", color_cta: "#D4A373", color_bg: "#FEFAE0", color_nav: "#FFFFFF", color_hover: "#E9EDC9" },
-                                            "Pastel Dreams": { color_main: "#FF99C8", color_secondary: "#2D3748", color_cta: "#FF99C8", color_bg: "#FCF6BD", color_nav: "#FFFFFF", color_hover: "#D0F4DE" },
-                                            "Purple Haze": { color_main: "#A167A5", color_secondary: "#0E273C", color_cta: "#A167A5", color_bg: "#E8D7F1", color_nav: "#F8F4FA", color_hover: "#D3BCCC" }
-                                        };
-                                        if (palettes[val]) setSiteSettings(prev => ({ ...prev, ...palettes[val] }));
-                                        e.target.value = "";
+                                        const colors = BOOKING_PALETTES[e.target.value];
+                                        if (colors) setSiteSettings(prev => ({ ...prev, ...colors }));
                                     }}
                                 >
-                                    <option value="">Select a Palette...</option>
-                                    <option value="Gentle Sea Breeze">Gentle Sea Breeze</option>
-                                    <option value="Earthy Green">Earthy Green</option>
-                                    <option value="Cherry Blossom">Cherry Blossom</option>
-                                    <option value="Soft Sand">Soft Sand</option>
-                                    <option value="Golden Summer Fields">Golden Summer Fields</option>
-                                    <option value="Pastel Dreams">Pastel Dreams</option>
-                                    <option value="Purple Haze">Purple Haze</option>
+                                    <option value="">Custom colours</option>
+                                    {Object.keys(BOOKING_PALETTES).map(name => <option key={name} value={name}>{name}</option>)}
                                 </select>
+                                <div className="flex overflow-hidden rounded border border-[var(--ck-border-subtle)]" role="img" aria-label="Current palette: main, secondary, button, background, navigation and hover colours">
+                                    {(["color_main", "color_secondary", "color_cta", "color_bg", "color_nav", "color_hover"] as const).map(key => (
+                                        <span key={key} className="h-6 w-5" style={{ backgroundColor: siteSettings[key] }} title={`${key.replace("color_", "")}: ${siteSettings[key]}`} />
+                                    ))}
+                                </div>
                             </div>
                         </div>
+                        <p className="text-xs text-[var(--ck-text-muted)] mb-4">Preview a palette, then save to publish. 27 available.</p>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div>
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Main Color</label>
@@ -2686,7 +2715,7 @@ export default function SettingsPage() {
                         <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-4 pb-2 border-b border-[var(--ck-border-subtle)]">Chatbot Avatar</h3>
                         <div className="flex flex-wrap gap-4">
                             {chatbotAvatars.length === 0 && (
-                                <p className="text-xs text-[var(--ck-text-muted)]">No avatars available. Ask a super admin to add some.</p>
+                                <p className="text-xs text-[var(--ck-text-muted)]">No avatars. Ask a super admin to add one.</p>
                             )}
                             {chatbotAvatars.map(({ id, lottie_url, label }) => {
                                 const isSelected = siteSettings.chatbot_avatar === lottie_url;
@@ -2770,12 +2799,12 @@ export default function SettingsPage() {
                 </div>
             </CollapsibleSection>}
 
-            {canAccess("site") && <CollapsibleSection id="embed-widget" title="Embed Widget Snippet" subtitle="Paste this into your existing website to embed the booking flow" openSections={openSections} toggle={toggleSection}>
+            {canAccess("site") && <CollapsibleSection id="embed-widget" title="Embed Widget Snippet" subtitle="Paste this code into your website." openSections={openSections} toggle={toggleSection}>
                 <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-6 space-y-4">
                     {subdomain ? (
                         <>
                             <p className="text-sm text-[var(--ck-text)]">
-                                Drop this snippet into any HTML page on your site. The widget loads in an iframe and auto-resizes to its content.
+                                Embed on any HTML page. The iframe resizes automatically.
                             </p>
                             <div className="relative">
                                 <pre className="bg-[var(--ck-surface-sunken)] border border-[var(--ck-border-subtle)] rounded-lg px-4 py-3 pr-20 text-xs font-mono overflow-x-auto whitespace-pre-wrap">{`<div id="bookingtours-widget" data-tenant="${subdomain}"></div>\n<script src="https://booking.bookingtours.co.za/widget.js" async></script>`}</pre>
@@ -2801,7 +2830,7 @@ export default function SettingsPage() {
                         </>
                     ) : (
                         <p className="text-sm text-[var(--ck-text-muted)]">
-                            Your booking subdomain is not provisioned yet. Contact support to set one up before embedding the widget.
+                            Contact support to set up your booking subdomain before embedding.
                         </p>
                     )}
                 </div>
@@ -2841,7 +2870,7 @@ export default function SettingsPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <label className="block">
                                 <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Activity verb</span>
-                                <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">Past-tense word used in post-trip emails: &quot;Thank you for … with us.&quot; Leave blank for the neutral &quot;adventuring&quot;.</p>
+                                <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">Post-trip wording: &quot;Thank you for … with us.&quot; Blank uses &quot;adventuring&quot;.</p>
                                 <input type="text" value={activityVerbPast} onChange={e => setActivityVerbPast(e.target.value)}
                                     maxLength={40}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
@@ -2849,7 +2878,7 @@ export default function SettingsPage() {
                             </label>
                             <label className="block">
                                 <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Location phrase</span>
-                                <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">Appended to &quot;We hope you had an incredible time …&quot; in the trip-photos email. Leave blank for no suffix.</p>
+                                <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">Ends &quot;We hope you had an incredible time …&quot; in photo emails. Optional.</p>
                                 <input type="text" value={locationPhrase} onChange={e => setLocationPhrase(e.target.value)}
                                     maxLength={60}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
@@ -2858,7 +2887,7 @@ export default function SettingsPage() {
                         </div>
                         <label className="block">
                             <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Confirmation tagline</span>
-                            <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">The excitement line in the booking-confirmation email, after &quot;Your spots are officially locked in.&quot; Leave blank to let the platform pick one based on the tour name (e.g. &quot;…an unforgettable experience on the water&quot; for kayak tours). Set your own if the guess doesn&apos;t fit your activity.</p>
+                            <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">Custom line in confirmation emails. Blank uses wording based on the tour name.</p>
                             <input type="text" value={emailTagline} onChange={e => setEmailTagline(e.target.value)}
                                 maxLength={200}
                                 className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
@@ -2870,7 +2899,7 @@ export default function SettingsPage() {
                         { key: "payment", label: "Payment Link", desc: "Sent when admin creates a booking requiring payment" },
                         { key: "confirm", label: "Booking Confirmation", desc: "Sent after payment is completed" },
                         { key: "invoice", label: "Invoice", desc: "Sent with the tax invoice attachment" },
-                        { key: "gift", label: "Gift Voucher", desc: "Sent to the gift voucher buyer after purchase" },
+                        { key: "gift", label: "Gift Voucher Default Photo", desc: "Fallback voucher background. Set a photo per experience in Tours above." },
                         { key: "cancel", label: "Cancellation – General", desc: "Sent when a booking is cancelled for any reason" },
                         { key: "cancel_weather", label: "Cancellation – Weather", desc: "Sent when a booking is cancelled due to weather" },
                         { key: "indemnity", label: "Trip Reminder / Waiver", desc: "Used by the pre-trip reminder email (sent if WhatsApp fails) and waiver requests" },
@@ -2998,14 +3027,14 @@ export default function SettingsPage() {
 
                     <label className="block">
                         <span className="text-xs font-medium text-[var(--ck-text-muted)]">Arrival instructions</span>
-                        <p className="text-[11px] text-[var(--ck-text-muted)] mb-1">Shown beneath the meeting point in confirmation emails and in the day-before waiver reminder, together with &quot;What to bring&quot; above. Defaults to &quot;Please arrive 15 minutes before launch.&quot; if left blank.</p>
+                        <p className="text-[11px] text-[var(--ck-text-muted)] mb-1">Shown below the meeting point in confirmations and day-before waiver reminders. Blank uses &quot;Please arrive 15 minutes before launch.&quot;</p>
                         <textarea value={opsConfig.arrival_instructions} onChange={e => setOpsConfig({ ...opsConfig, arrival_instructions: e.target.value })}
                             rows={2} placeholder="e.g. Please arrive 20 minutes before departure and check in at the kiosk." className="ui-control mt-1 w-full" />
                     </label>
 
                     <label className="block">
                         <span className="text-xs font-medium text-[var(--ck-text-muted)]">AI chatbot personality &amp; knowledge</span>
-                        <p className="text-[11px] text-[var(--ck-text-muted)] mb-1">This is the system prompt for your AI chatbot on your booking site and WhatsApp. It tells the AI who it is, your business rules, and how to handle questions.</p>
+                        <p className="text-[11px] text-[var(--ck-text-muted)] mb-1">Instructions for your website and WhatsApp chatbot: role, business rules and answers.</p>
                         <textarea value={opsConfig.ai_system_prompt} onChange={e => setOpsConfig({ ...opsConfig, ai_system_prompt: e.target.value })}
                             rows={8} placeholder="You are a friendly booking assistant for [business]. You help customers book tours, answer FAQs..." className="ui-control mt-1 w-full font-mono text-xs" />
                     </label>
@@ -3021,7 +3050,7 @@ export default function SettingsPage() {
                             </button>
                         </div>
                         {faqEntries.length === 0 && (
-                            <p className="text-xs text-[var(--ck-text-muted)] italic">No FAQs yet. Add questions your customers commonly ask. These power the AI chatbot.</p>
+                            <p className="text-xs text-[var(--ck-text-muted)] italic">Add common questions and answers for the chatbot.</p>
                         )}
                         <div className="space-y-3">
                             {faqEntries.map((faq, i) => (
@@ -3043,14 +3072,14 @@ export default function SettingsPage() {
                     <div>
                         <button type="submit" disabled={opsSaving}
                             className="rounded-xl px-8 bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-50">
-                            {opsSaving ? "Saving..." : "Save Operations & AI"}
+                            {opsSaving ? "Saving..." : "Save"}
                         </button>
                     </div>
                 </form>
             </CollapsibleSection>}
 
             {isPrivileged(role) && (
-              <CollapsibleSection id="whatsapp-bot" title="WhatsApp Bot Mode" subtitle="Control when the AI assistant auto-replies to WhatsApp messages" openSections={openSections} toggle={toggleSection}>
+              <CollapsibleSection id="whatsapp-bot" title="WhatsApp Bot Mode" subtitle="Choose when WhatsApp auto-replies run." openSections={openSections} toggle={toggleSection}>
                 <WhatsAppBotSection />
               </CollapsibleSection>
             )}
@@ -3059,7 +3088,7 @@ export default function SettingsPage() {
                 <HelpAssistantSection />
             </CollapsibleSection>
 
-            {isPrivileged(role) && <CollapsibleSection id="autotags" title="Automation Tag Rules" subtitle="Control how tags are automatically assigned to marketing contacts based on booking behaviour" openSections={openSections} toggle={toggleSection}>
+            {isPrivileged(role) && <CollapsibleSection id="autotags" title="Automation Tag Rules" subtitle="Tag marketing contacts by booking history." openSections={openSections} toggle={toggleSection}>
                 <form data-demo-submit="tags.save" onSubmit={async (e) => {
                     e.preventDefault();
                     setAutoTagSaving(true);
@@ -3069,13 +3098,13 @@ export default function SettingsPage() {
                     notify({ message: "Automation tag rules saved.", tone: "success" });
                 }} className="space-y-6">
                     <p className="text-xs text-[var(--ck-text-muted)]">
-                        Tags are automatically applied to your marketing contacts daily based on their booking history. These tags power your automations. For example, when a contact gets tagged <strong>vip</strong>, any automation triggered by that tag fires instantly.
+                        Tags update daily from booking history and can start automations. For example, <strong>vip</strong>starts any automation using that tag.
                     </p>
 
                     {/* VIP Rules */}
                     <div className="rounded-lg border border-[var(--ck-border-subtle)] p-4 space-y-3">
                         <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">VIP Tag</h3>
-                        <p className="text-xs text-[var(--ck-text-muted)]">Assigned when a customer makes a certain number of paid bookings within a time window. Expires after a set period unless they rebook.</p>
+                        <p className="text-xs text-[var(--ck-text-muted)]">Based on paid bookings within a set period. Expires unless they rebook.</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Bookings required</span>
@@ -3106,7 +3135,7 @@ export default function SettingsPage() {
                     {/* Lapsed Rules */}
                     <div className="rounded-lg border border-[var(--ck-border-subtle)] p-4 space-y-3">
                         <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Lapsed Customer Tag</h3>
-                        <p className="text-xs text-[var(--ck-text-muted)]">Assigned when a customer hasn't booked in a while. Removed automatically when they book again.</p>
+                        <p className="text-xs text-[var(--ck-text-muted)]">Applied after a gap in bookings. Removed when they book again.</p>
                         <label className="block max-w-xs">
                             <span className="text-xs font-medium text-[var(--ck-text-muted)]">Days since last booking</span>
                             <input type="number" min={14} max={365} value={autoTagConfig.lapsed_days} onChange={e => setAutoTagConfig({ ...autoTagConfig, lapsed_days: parseInt(e.target.value) || 90 })}
@@ -3224,8 +3253,6 @@ export default function SettingsPage() {
                             </label>
                         </div>
 
-                        {!readOnly && <MfaStatus status={bankMfa.status} />}
-                        {!readOnly && bankMfa.panel}
 
                     </div>
                     </>}
@@ -3242,7 +3269,7 @@ export default function SettingsPage() {
                         </div>
                     )}
 
-                    <button type="submit" disabled={readOnly || invoiceSaving || bankMfa.busy}
+                    <button type="submit" disabled={readOnly || invoiceSaving}
                         className="rounded-lg bg-[var(--ck-accent)] px-6 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
                         {invoiceSaving ? "Saving..." : "Save invoice details"}
                     </button>
@@ -3252,18 +3279,16 @@ export default function SettingsPage() {
             {/* Privileged-only: credential saves are hard-gated to MAIN_ADMIN/SUPER_ADMIN
                 server-side, so never show this section to a delegated admin. */}
             {isPrivileged(role) && <CollapsibleSection id="credentials" title="Integration Credentials" subtitle="AES-256 encrypted at rest. Update each integration independently." openSections={openSections} toggle={toggleSection}>
-                <div className="mb-5 space-y-3">
-                    {!readOnly && <MfaStatus status={credentialMfa.status} />}
-                    {!readOnly && credentialMfa.panel}
-                </div>
+                <p className="mb-4 text-sm text-[var(--ck-text-muted)]">Enter both values to replace an integration, or remove it to start again.</p>
+                {role === "MAIN_ADMIN" && !readOnly && <p className="mb-4 text-sm"><Link href="/settings/agent-connections" className="underline">AI connections</Link></p>}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
                     {/* WhatsApp */}
                     <form data-demo-submit="credentials.whatsapp" onSubmit={handleSaveWa} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
                         <div className="flex items-center justify-between pb-3 border-b border-[var(--ck-border-subtle)]">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2" title="WhatsApp (Meta API)">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="text-[#25D366]"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
-                                <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">WhatsApp (Meta API)</h3>
+                                <h3 className="sr-only">WhatsApp (Meta API)</h3>
                             </div>
                             {credStatus !== null && (
                                 <span className={"ui-status " + (credStatus.wa ? "ui-pill-success" : "ui-pill-amber")}>
@@ -3271,7 +3296,7 @@ export default function SettingsPage() {
                                 </span>
                             )}
                         </div>
-                        <p className="text-xs text-[var(--ck-text-muted)]">Ask BookingTours to connect your WhatsApp Business Account to our Meta app before entering credentials here. A token from a separate Meta app will not work with this bot.</p>
+                        <p className="text-xs text-[var(--ck-text-muted)]">Ask BookingTours to connect your WhatsApp account first. Tokens must come from the BookingTours Meta app.</p>
                         <div>
                             <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Access Token</label>
                             <input
@@ -3298,11 +3323,12 @@ export default function SettingsPage() {
                         </div>
                         <button
                             type="submit"
-                            disabled={readOnly || credentialMfa.busy || waSaving || !waForm.token.trim() || !waForm.phoneId.trim()}
+                            disabled={readOnly || credentialRemoving || waSaving || !waForm.token.trim() || !waForm.phoneId.trim()}
                             className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity"
                         >
                             {waSaving ? "Encrypting & saving..." : "Save WhatsApp Credentials"}
                         </button>
+                        {credStatus?.wa && <RemoveIntegrationButton businessId={businessId} section="wa" disabled={readOnly || credentialRemoving || waSaving || yocoSaving || yocoTestSaving || testModeToggling} onBusyChange={setCredentialRemoving} onRemoved={() => handleCredentialsRemoved("wa")} />}
                     </form>
 
                     {/* Yoco */}
@@ -3343,11 +3369,12 @@ export default function SettingsPage() {
                         </div>
                         <button
                             type="submit"
-                            disabled={readOnly || credentialMfa.busy || yocoSaving || !yocoForm.secretKey.trim() || !yocoForm.webhookSecret.trim()}
+                            disabled={readOnly || credentialRemoving || yocoSaving || !yocoForm.secretKey.trim() || !yocoForm.webhookSecret.trim()}
                             className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity"
                         >
                             {yocoSaving ? "Encrypting & saving..." : "Save Yoco Credentials"}
                         </button>
+                        {credStatus?.yoco && <RemoveIntegrationButton businessId={businessId} section="yoco" disabled={readOnly || credentialRemoving || waSaving || yocoSaving || yocoTestSaving || testModeToggling} onBusyChange={setCredentialRemoving} onRemoved={() => handleCredentialsRemoved("yoco")} />}
                     </form>
 
                     {/* Yoco Test Mode */}
@@ -3364,15 +3391,15 @@ export default function SettingsPage() {
                             )}
                         </div>
                         <p className="text-xs text-[var(--ck-text-muted)] leading-relaxed">
-                            When enabled, all Yoco payments will use sandbox (test) keys. No real charges will be processed. Use this to test the payment flow with Yoco test cards.
+                            Uses Yoco test keys and cards. No real charges.
                         </p>
                         {credStatus?.yoco_test && !credStatus.yoco_test_mode && (
-                            <p className="text-xs text-amber-600">Test credentials are saved, but checkout still uses live mode. Enable Test Mode to create test payment links.</p>
+                            <p className="text-xs text-amber-600">Test keys saved. Checkout is still live; turn on Test Mode for test links.</p>
                         )}
                         <button data-demo-action={credStatus?.yoco_test_mode ? "credentials.test-off" : "credentials.test-on"}
                             type="button"
                             onClick={handleToggleTestMode}
-                            disabled={readOnly || credentialMfa.busy || testModeToggling || (!credStatus?.yoco_test && !credStatus?.yoco_test_mode)}
+                            disabled={readOnly || credentialRemoving || testModeToggling || (!credStatus?.yoco_test && !credStatus?.yoco_test_mode)}
                             className={"w-full rounded-xl py-2.5 text-sm font-semibold transition-opacity disabled:opacity-40 " + (credStatus?.yoco_test_mode
                                 ? "border border-[color-mix(in_srgb,var(--ck-amber-bright)_35%,transparent)] bg-[var(--ck-amber-soft)] text-[var(--ck-amber)] hover:bg-[color-mix(in_srgb,var(--ck-amber-bright)_18%,transparent)]"
                                 : "bg-orange-500 text-white hover:bg-orange-600")}
@@ -3422,11 +3449,12 @@ export default function SettingsPage() {
                         </div>
                         <button
                             type="submit"
-                            disabled={readOnly || credentialMfa.busy || yocoTestSaving || !yocoTestForm.secretKey.trim() || !yocoTestForm.webhookSecret.trim()}
+                            disabled={readOnly || credentialRemoving || yocoTestSaving || !yocoTestForm.secretKey.trim() || !yocoTestForm.webhookSecret.trim()}
                             className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity"
                         >
-                            {yocoTestSaving ? "Encrypting & saving..." : "Save Yoco Test Credentials"}
+                            {yocoTestSaving ? "Encrypting & saving..." : "Save test credentials"}
                         </button>
+                        {credStatus?.yoco_test && <RemoveIntegrationButton businessId={businessId} section="yoco_test" disabled={readOnly || credentialRemoving || waSaving || yocoSaving || yocoTestSaving || testModeToggling} onBusyChange={setCredentialRemoving} onRemoved={() => handleCredentialsRemoved("yoco_test")} />}
                     </form>
 
                     {/* Google Drive */}
@@ -3457,7 +3485,7 @@ export default function SettingsPage() {
                             </>
                         ) : (
                             <>
-                                <p className="text-sm text-[var(--ck-text-muted)]">Connect Google Drive to upload trip photos directly from the Photos page.</p>
+                                <p className="text-sm text-[var(--ck-text-muted)]">Connect Google Drive for uploads from Photos.</p>
                                 <button data-demo-action="credentials.drive"
                                     type="button"
                                     onClick={handleConnectGdrive}
@@ -3507,7 +3535,7 @@ export default function SettingsPage() {
                             }}
                             className="w-full rounded-xl bg-[var(--ck-text-strong)] py-2.5 text-sm font-semibold text-[var(--ck-btn-primary-text)] hover:opacity-90 disabled:opacity-40 transition-opacity"
                         >
-                            {googlePlaceSaving ? "Saving..." : "Save Google Place ID"}
+                            {googlePlaceSaving ? "Saving..." : "Save Place ID"}
                         </button>
                     </div>}
 
@@ -3519,6 +3547,18 @@ export default function SettingsPage() {
                     </div>
                 )}
             </CollapsibleSection>}
+
+            {isPrivileged(role) && <nav aria-label="Settings tools" className="ui-card divide-y divide-[var(--ck-border-subtle)] px-5">
+                <Link href="/privacy/data-requests" className="flex items-center gap-3 py-4 text-sm hover:text-[var(--ck-accent)]">
+                    <span className="font-semibold">Data Requests</span>
+                    <span className="text-xs text-[var(--ck-text-muted)]">Data requests</span>
+                    <DataRequestBadge />
+                </Link>
+                <div className="py-4">
+                    <p className="text-sm font-semibold text-[var(--ck-text-strong)]">OTA Channels</p>
+                    <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Direct Viator and GetYourGuide connections are not available yet.</p>
+                </div>
+            </nav>}
 
             </div>
         </div >
