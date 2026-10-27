@@ -4,7 +4,7 @@
  * H2b: report or repair slot counter drift, where slots.booked / slots.held
  * differ from the bookings and holds they count:
  *   booked = sum(qty) of bookings in PAID, CONFIRMED, COMPLETED
- *   held   = sum(qty) of ACTIVE holds
+ *   held   = sum(qty) of ACTIVE holds and ACTIVE OTA reservations
  *
  * Usage:
  *   DATABASE_URL=postgresql://... node scripts/reconcile-slot-counters.mjs          # dry run (default)
@@ -28,8 +28,10 @@ const DRIFT_SQL = `
   left join public.tours t on t.id = s.tour_id
   cross join lateral (select coalesce(sum(x.qty), 0)::integer as qty from public.bookings x
     where x.slot_id = s.id and x.status in ('PAID', 'CONFIRMED', 'COMPLETED')) bk
-  cross join lateral (select coalesce(sum(x.qty), 0)::integer as qty from public.holds x
-    where x.slot_id = s.id and x.status = 'ACTIVE') h
+  cross join lateral (select ((select coalesce(sum(x.qty), 0) from public.holds x
+      where x.slot_id = s.id and x.status = 'ACTIVE')
+    + (select coalesce(sum(o.qty), 0) from public.ota_reservations o
+      where o.slot_id = s.id and o.status = 'ACTIVE'))::integer as qty) h
   where coalesce(s.booked, 0) <> bk.qty or coalesce(s.held, 0) <> h.qty
   order by s.start_time;
 `;

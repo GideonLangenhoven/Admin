@@ -36,6 +36,7 @@ try {
     CREATE TABLE bookings(id uuid PRIMARY KEY, business_id uuid, slot_id uuid, status text, qty integer);
     CREATE TABLE holds(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), booking_id uuid REFERENCES bookings ON DELETE CASCADE,
       slot_id uuid, status text, qty integer);
+    CREATE TABLE ota_reservations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slot_id uuid, status text, qty integer);
     CREATE FUNCTION increment_held(sid uuid, amount integer) RETURNS void LANGUAGE sql AS $$ UPDATE slots SET held = held + amount WHERE id = sid $$;
     GRANT SELECT, INSERT, UPDATE, DELETE ON slots, bookings, holds TO authenticated;`);
   await db.query(`INSERT INTO slots(id,business_id,start_time,capacity_total) VALUES ($1,$3,now()+interval '2 days',10),($2,$3,now()+interval '3 days',10)`, [S1, S2, BUSINESS]);
@@ -90,6 +91,17 @@ try {
   await hold(4, S1, 2);
   await db.query('DELETE FROM bookings WHERE id=$1', [id(4)]);
   assert.deepEqual(await counters(S1), { booked: 0, held: 0 }, 'a cascade-deleted hold releases held');
+
+  // OTA reservations hold seats in their own table, and the OTA RPCs add and subtract held themselves.
+  // A recount on the same slot keeps those seats; expiry flips the row, then subtracts them.
+  await db.query(`INSERT INTO ota_reservations(slot_id, status, qty) VALUES ($1, 'ACTIVE', 2)`, [S1]);
+  await db.query('UPDATE slots SET held = held + 2 WHERE id=$1', [S1]);
+  await booking(7, S1, 'PENDING', 1);
+  assert.deepEqual(await counters(S1), { booked: 0, held: 2 }, 'a recount keeps an ACTIVE OTA reservation');
+  assert.deepEqual((await db.query('SELECT * FROM slot_counter_drift()')).rows, []);
+  await db.query(`UPDATE ota_reservations SET status='EXPIRED' WHERE slot_id=$1`, [S1]);
+  await db.query('UPDATE slots SET held = held - 2 WHERE id=$1 AND held >= 2', [S1]);
+  assert.deepEqual(await counters(S1), { booked: 0, held: 0 });
 
   // Two transactions on the same slot: the one that commits second waits for the slot lock and counts both.
   await booking(5, S1, 'PENDING', 2);

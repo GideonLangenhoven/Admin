@@ -6,7 +6,9 @@ begin;
 -- booking API), so live slots drifted. They are now recounted from the source
 -- rows whenever a transaction that changed those rows commits:
 --   booked = sum(qty) of bookings in PAID, CONFIRMED, COMPLETED
---   held   = sum(qty) of ACTIVE holds
+--   held   = sum(qty) of ACTIVE holds and ACTIVE OTA reservations
+-- (ota_reservations has no trigger: the OTA RPCs add and subtract held
+-- themselves when a reservation starts or ends, so it only has to be counted.)
 -- The triggers are deferred, so functions that do their own arithmetic and
 -- capacity checks behave exactly as before inside their transaction, and the
 -- stored values are corrected at commit.
@@ -30,8 +32,9 @@ begin
   end if;
   select coalesce(sum(qty), 0) into v_booked from public.bookings
   where slot_id = p_slot_id and status in ('PAID', 'CONFIRMED', 'COMPLETED');
-  select coalesce(sum(qty), 0) into v_held from public.holds
-  where slot_id = p_slot_id and status = 'ACTIVE';
+  select (select coalesce(sum(qty), 0) from public.holds where slot_id = p_slot_id and status = 'ACTIVE')
+       + (select coalesce(sum(qty), 0) from public.ota_reservations where slot_id = p_slot_id and status = 'ACTIVE')
+  into v_held;
   update public.slots set booked = v_booked, held = v_held
   where id = p_slot_id and (booked, held) is distinct from (v_booked, v_held);
 end $$;
@@ -119,8 +122,10 @@ as $$
   from public.slots s
   cross join lateral (select coalesce(sum(x.qty), 0)::integer as qty from public.bookings x
     where x.slot_id = s.id and x.status in ('PAID', 'CONFIRMED', 'COMPLETED')) b
-  cross join lateral (select coalesce(sum(x.qty), 0)::integer as qty from public.holds x
-    where x.slot_id = s.id and x.status = 'ACTIVE') h
+  cross join lateral (select ((select coalesce(sum(x.qty), 0) from public.holds x
+      where x.slot_id = s.id and x.status = 'ACTIVE')
+    + (select coalesce(sum(o.qty), 0) from public.ota_reservations o
+      where o.slot_id = s.id and o.status = 'ACTIVE'))::integer as qty) h
   where (p_from is null or s.start_time >= p_from)
     and (coalesce(s.booked, 0) <> b.qty or coalesce(s.held, 0) <> h.qty)
   order by s.start_time
