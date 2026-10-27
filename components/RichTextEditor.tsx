@@ -8,6 +8,7 @@ interface Props {
   onChange: (html: string) => void;
   rows?: number;
   placeholder?: string;
+  labelledBy?: string; // id of the visible label
 }
 
 const TOOLBAR: { cmd: string; arg?: string; label: string; title: string }[] = [
@@ -32,7 +33,7 @@ const FONT_SIZES = [
   { value: "7", label: "Extra Large" },
 ];
 
-export default function RichTextEditor({ value, onChange, rows = 10, placeholder }: Props) {
+export default function RichTextEditor({ value, onChange, rows = 10, placeholder, labelledBy }: Props) {
   const editorRef = useRef<HTMLDivElement>(null);
   const internalUpdate = useRef(false);
 
@@ -123,6 +124,9 @@ export default function RichTextEditor({ value, onChange, rows = 10, placeholder
         ref={editorRef}
         contentEditable
         suppressContentEditableWarning
+        role="textbox"
+        aria-multiline="true"
+        aria-labelledby={labelledBy}
         onInput={handleInput}
         data-placeholder={placeholder}
         className="rich-editor-content px-3 py-2 text-sm text-[var(--ck-text)] outline-none overflow-y-auto"

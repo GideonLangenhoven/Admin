@@ -1820,13 +1820,13 @@ export default function SettingsPage() {
                         ) : (
                             <>
                                 <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Admin Name</label>
-                                    <input type="text" required value={newName} onChange={e => setNewName(e.target.value)}
+                                    <label htmlFor="settings-admin-name" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Admin Name</label>
+                                    <input id="settings-admin-name" type="text" required value={newName} onChange={e => setNewName(e.target.value)}
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="e.g. Sarah Jacobs" />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Email Address</label>
-                                    <input type="email" required value={newEmail} onChange={e => setNewEmail(e.target.value)}
+                                    <label htmlFor="settings-admin-email" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Email Address</label>
+                                    <input id="settings-admin-email" type="email" required value={newEmail} onChange={e => setNewEmail(e.target.value)}
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="admin@example.com" />
                                 </div>
                                 <div>
@@ -1850,7 +1850,7 @@ export default function SettingsPage() {
                     <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-1">Marketing Test Email Recipient</h3>
                     <p className="text-xs text-[var(--ck-text-muted)] mb-3">Choose who receives test marketing emails.</p>
                     <div className="flex items-end gap-3">
-                        <select data-demo-action="admin.test-email"
+                        <select data-demo-action="admin.test-email" aria-label="Marketing test email recipient"
                             value={marketingTestEmail}
                             onChange={(e) => handleSaveMarketingTestEmail(e.target.value)}
                             disabled={savingTestEmail}
@@ -1944,19 +1944,19 @@ export default function SettingsPage() {
                         </h3>
                         <form aria-label="Tour details" data-demo-submit="tour.save" onSubmit={handleSaveTour} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Tour Name</label>
-                                <input type="text" required value={tourForm.name} onChange={e => setTourForm({ ...tourForm, name: e.target.value })}
+                                <label htmlFor="settings-tour-name" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Tour Name</label>
+                                <input id="settings-tour-name" type="text" required value={tourForm.name} onChange={e => setTourForm({ ...tourForm, name: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="e.g. Sunset Paddle" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Description</label>
-                                <textarea required value={tourForm.description} onChange={e => setTourForm({ ...tourForm, description: e.target.value })}
+                                <label htmlFor="settings-tour-description" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Description</label>
+                                <textarea id="settings-tour-description" required value={tourForm.description} onChange={e => setTourForm({ ...tourForm, description: e.target.value })}
                                     rows={3} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none resize-none"
                                     placeholder="Describe this activity..." />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Confirmation email tagline</label>
-                                <input type="text" value={tourForm.confirmationTagline} onChange={e => setTourForm({ ...tourForm, confirmationTagline: e.target.value })}
+                                <label htmlFor="settings-tour-tagline" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Confirmation email tagline</label>
+                                <input id="settings-tour-tagline" type="text" value={tourForm.confirmationTagline} onChange={e => setTourForm({ ...tourForm, confirmationTagline: e.target.value })}
                                     maxLength={200} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
                                     placeholder="e.g. Lace up your boots for an unforgettable day on the trail." />
                                 <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">Custom line for this tour&apos;s confirmation email. Blank uses your account default.</p>
@@ -2017,8 +2017,8 @@ export default function SettingsPage() {
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Price per Person (R)</label>
-                                    <input type="number" required min="1" step="1" value={tourForm.price}
+                                    <label htmlFor="settings-tour-price" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Price per Person (R)</label>
+                                    <input id="settings-tour-price" type="number" required min="1" step="1" value={tourForm.price}
                                         onChange={e => setTourForm({ ...tourForm, price: e.target.value })}
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="600" />
                                 </div>
@@ -2054,8 +2054,8 @@ export default function SettingsPage() {
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Default Capacity</label>
-                                    <input type="number" min="1" step="1" value={tourForm.default_capacity}
+                                    <label htmlFor="settings-tour-capacity" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Default Capacity</label>
+                                    <input id="settings-tour-capacity" type="number" min="1" step="1" value={tourForm.default_capacity}
                                         onChange={e => setTourForm({ ...tourForm, default_capacity: e.target.value })}
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="10" />
                                     <p className="text-xs text-[var(--ck-text-muted)] mt-1">Max people per slot</p>
@@ -2076,20 +2076,20 @@ export default function SettingsPage() {
                                 <p className="text-xs text-[var(--ck-text-muted)] mb-3">Unsold seats use the deal price until the cut-off, then return to normal. Blank turns it off.</p>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                     <div>
-                                        <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Starts (hours before departure)</label>
-                                        <input type="number" min="1" max="720" step="1" value={tourForm.lastMinuteHours}
+                                        <label htmlFor="settings-deal-starts" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Starts (hours before departure)</label>
+                                        <input id="settings-deal-starts" type="number" min="1" max="720" step="1" value={tourForm.lastMinuteHours}
                                             onChange={e => setTourForm({ ...tourForm, lastMinuteHours: e.target.value })}
                                             className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="48" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Cut-off (hours before departure)</label>
-                                        <input type="number" min="0" step="1" value={tourForm.lastMinuteEndHours}
+                                        <label htmlFor="settings-deal-cutoff" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Cut-off (hours before departure)</label>
+                                        <input id="settings-deal-cutoff" type="number" min="0" step="1" value={tourForm.lastMinuteEndHours}
                                             onChange={e => setTourForm({ ...tourForm, lastMinuteEndHours: e.target.value })}
                                             className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="4" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Deal price per person (R)</label>
-                                        <input type="number" min="1" step="1" value={tourForm.lastMinutePrice}
+                                        <label htmlFor="settings-deal-price" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Deal price per person (R)</label>
+                                        <input id="settings-deal-price" type="number" min="1" step="1" value={tourForm.lastMinutePrice}
                                             onChange={e => setTourForm({ ...tourForm, lastMinutePrice: e.target.value })}
                                             className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="450" />
                                     </div>
@@ -2272,10 +2272,10 @@ export default function SettingsPage() {
                         <div className="space-y-3">
                             {bookingQuestions.map((q, i) => (
                                 <div key={q.key || "new-" + i} className="rounded-xl border border-[var(--ck-border-subtle)] bg-[var(--ck-surface)] p-3 grid grid-cols-1 md:grid-cols-[1fr_150px_1fr_auto_auto] gap-2 items-center">
-                                    <input type="text" value={q.label}
+                                    <input type="text" value={q.label} aria-label={"Question " + (i + 1)}
                                         onChange={e => setBookingQuestions(prev => prev.map((p, j) => j === i ? { ...p, label: e.target.value } : p))}
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="The question, e.g. Any allergies?" />
-                                    <select value={q.type}
+                                    <select value={q.type} aria-label={"Question " + (i + 1) + " answer type"}
                                         onChange={e => setBookingQuestions(prev => prev.map((p, j) => j === i ? { ...p, type: e.target.value as any } : p))}
                                         className="ui-control px-2 py-2 text-sm rounded-lg outline-none">
                                         <option value="text">Short answer</option>
@@ -2283,7 +2283,7 @@ export default function SettingsPage() {
                                         <option value="number">Number</option>
                                         {!["text", "textarea", "number"].includes(q.type) && <option value={q.type}>{({ select: "Dropdown", radio: "Single choice", multiselect: "Multiple choices", checkbox: "Checkbox", date: "Date" } as Record<string, string>)[q.type] || q.type}</option>}
                                     </select>
-                                    <input type="text" value={q.placeholder}
+                                    <input type="text" value={q.placeholder} aria-label={"Question " + (i + 1) + " hint"}
                                         onChange={e => setBookingQuestions(prev => prev.map((p, j) => j === i ? { ...p, placeholder: e.target.value } : p))}
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Hint text (optional)" />
                                     <label className="flex items-center gap-1.5 text-xs font-medium text-[var(--ck-text-muted)] cursor-pointer select-none whitespace-nowrap">
@@ -2377,13 +2377,13 @@ export default function SettingsPage() {
                         </h3>
                         <form data-demo-submit="addon.save" onSubmit={handleSaveAddOn} className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5 space-y-4">
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Name</label>
-                                <input type="text" required value={addOnForm.name} onChange={e => setAddOnForm({ ...addOnForm, name: e.target.value })}
+                                <label htmlFor="settings-addon-name" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Name</label>
+                                <input id="settings-addon-name" type="text" required value={addOnForm.name} onChange={e => setAddOnForm({ ...addOnForm, name: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="e.g. GoPro Photos" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Description (optional)</label>
-                                <input type="text" value={addOnForm.description} onChange={e => setAddOnForm({ ...addOnForm, description: e.target.value })}
+                                <label htmlFor="settings-addon-description" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Description (optional)</label>
+                                <input id="settings-addon-description" type="text" value={addOnForm.description} onChange={e => setAddOnForm({ ...addOnForm, description: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Short description shown to customer" />
                             </div>
                             <div>
@@ -2412,8 +2412,8 @@ export default function SettingsPage() {
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Price (R)</label>
-                                    <input type="number" required min="0" step="0.01" value={addOnForm.price}
+                                    <label htmlFor="settings-addon-price" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Price (R)</label>
+                                    <input id="settings-addon-price" type="number" required min="0" step="0.01" value={addOnForm.price}
                                         onChange={e => setAddOnForm({ ...addOnForm, price: e.target.value })}
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="150" />
                                 </div>
@@ -2460,21 +2460,21 @@ export default function SettingsPage() {
                         <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-4 pb-2 border-b border-[var(--ck-border-subtle)]">Policies &amp; Information</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Directions &amp; Meeting Info</label>
-                                <RichTextEditor value={siteSettings.directions} onChange={v => setSiteSettings({ ...siteSettings, directions: v })} rows={10} placeholder="Enter how to find the location..." />
+                                <label id="settings-directions-label" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Directions &amp; Meeting Info</label>
+                                <RichTextEditor labelledBy="settings-directions-label" value={siteSettings.directions} onChange={v => setSiteSettings({ ...siteSettings, directions: v })} rows={10} placeholder="Enter how to find the location..." />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Terms &amp; Conditions</label>
-                                <RichTextEditor value={siteSettings.terms_conditions} onChange={v => setSiteSettings({ ...siteSettings, terms_conditions: v })} rows={10} placeholder="Enter T&C's..." />
+                                <label id="settings-terms-label" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Terms &amp; Conditions</label>
+                                <RichTextEditor labelledBy="settings-terms-label" value={siteSettings.terms_conditions} onChange={v => setSiteSettings({ ...siteSettings, terms_conditions: v })} rows={10} placeholder="Enter T&C's..." />
                                 <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Booking site terms. Blank or under 100 characters uses labelled platform-default terms.</p>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Privacy Policy</label>
-                                <RichTextEditor value={siteSettings.privacy_policy} onChange={v => setSiteSettings({ ...siteSettings, privacy_policy: v })} rows={10} />
+                                <label id="settings-privacy-label" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Privacy Policy</label>
+                                <RichTextEditor labelledBy="settings-privacy-label" value={siteSettings.privacy_policy} onChange={v => setSiteSettings({ ...siteSettings, privacy_policy: v })} rows={10} />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Cookies Policy</label>
-                                <RichTextEditor value={siteSettings.cookies_policy} onChange={v => setSiteSettings({ ...siteSettings, cookies_policy: v })} rows={10} />
+                                <label id="settings-cookies-label" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Cookies Policy</label>
+                                <RichTextEditor labelledBy="settings-cookies-label" value={siteSettings.cookies_policy} onChange={v => setSiteSettings({ ...siteSettings, cookies_policy: v })} rows={10} />
                             </div>
                         </div>
                     </div>
@@ -2485,28 +2485,28 @@ export default function SettingsPage() {
                         <p className="text-xs text-[var(--ck-text-muted)] mb-4">The <strong>Business Name</strong> and <strong>Logo</strong> below control: the admin dashboard sidebar, the browser tab title, all outgoing emails, and the public booking site header.</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Name <span className="text-[var(--ck-accent)]">(appears in the dashboard header &amp; all emails)</span></label>
-                                <input type="text" value={siteSettings.business_name} onChange={e => setSiteSettings({ ...siteSettings, business_name: e.target.value })}
+                                <label htmlFor="settings-business-name" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Name <span className="text-[var(--ck-accent)]">(appears in the dashboard header &amp; all emails)</span></label>
+                                <input id="settings-business-name" type="text" value={siteSettings.business_name} onChange={e => setSiteSettings({ ...siteSettings, business_name: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="e.g. Cape Kayak Adventures" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Tagline</label>
-                                <input type="text" value={siteSettings.business_tagline} onChange={e => setSiteSettings({ ...siteSettings, business_tagline: e.target.value })}
+                                <label htmlFor="settings-business-tagline" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Tagline</label>
+                                <input id="settings-business-tagline" type="text" value={siteSettings.business_tagline} onChange={e => setSiteSettings({ ...siteSettings, business_tagline: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Cape Town's Original Since 1994" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Hero Eyebrow</label>
-                                <input type="text" value={siteSettings.hero_eyebrow} onChange={e => setSiteSettings({ ...siteSettings, hero_eyebrow: e.target.value })}
+                                <label htmlFor="settings-hero-eyebrow" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Hero Eyebrow</label>
+                                <input id="settings-hero-eyebrow" type="text" value={siteSettings.hero_eyebrow} onChange={e => setSiteSettings({ ...siteSettings, hero_eyebrow: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Cape Town Sea Kayaking" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Hero Title</label>
-                                <input type="text" value={siteSettings.hero_title} onChange={e => setSiteSettings({ ...siteSettings, hero_title: e.target.value })}
+                                <label htmlFor="settings-hero-title" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Hero Title</label>
+                                <input id="settings-hero-title" type="text" value={siteSettings.hero_title} onChange={e => setSiteSettings({ ...siteSettings, hero_title: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Find Your Perfect Paddle" />
                             </div>
                             <div className="md:col-span-2">
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Hero Subtitle</label>
-                                <input type="text" value={siteSettings.hero_subtitle} onChange={e => setSiteSettings({ ...siteSettings, hero_subtitle: e.target.value })}
+                                <label htmlFor="settings-hero-subtitle" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Hero Subtitle</label>
+                                <input id="settings-hero-subtitle" type="text" value={siteSettings.hero_subtitle} onChange={e => setSiteSettings({ ...siteSettings, hero_subtitle: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Explore the Atlantic coastline by kayak with Cape Town's original guided team." />
                                 {/* The booking site shows the hero only when it has a title. */}
                                 {!siteSettings.hero_title.trim() && (siteSettings.hero_eyebrow.trim() || siteSettings.hero_subtitle.trim()) && (
@@ -2561,50 +2561,50 @@ export default function SettingsPage() {
                         <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-4 pb-2 border-b border-[var(--ck-border-subtle)]">Navigation, Buttons &amp; Footer Copy</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Gift Voucher Nav Label</label>
-                                <input type="text" value={siteSettings.nav_gift_voucher_label} onChange={e => setSiteSettings({ ...siteSettings, nav_gift_voucher_label: e.target.value })}
+                                <label htmlFor="settings-nav-gift-voucher" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Gift Voucher Nav Label</label>
+                                <input id="settings-nav-gift-voucher" type="text" value={siteSettings.nav_gift_voucher_label} onChange={e => setSiteSettings({ ...siteSettings, nav_gift_voucher_label: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Gift Voucher" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">My Bookings Nav Label</label>
-                                <input type="text" value={siteSettings.nav_my_bookings_label} onChange={e => setSiteSettings({ ...siteSettings, nav_my_bookings_label: e.target.value })}
+                                <label htmlFor="settings-nav-my-bookings" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">My Bookings Nav Label</label>
+                                <input id="settings-nav-my-bookings" type="text" value={siteSettings.nav_my_bookings_label} onChange={e => setSiteSettings({ ...siteSettings, nav_my_bookings_label: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="My Bookings" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Primary Tour CTA Label</label>
-                                <input type="text" value={siteSettings.card_cta_label} onChange={e => setSiteSettings({ ...siteSettings, card_cta_label: e.target.value })}
+                                <label htmlFor="settings-nav-tour-cta" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Primary Tour CTA Label</label>
+                                <input id="settings-nav-tour-cta" type="text" value={siteSettings.card_cta_label} onChange={e => setSiteSettings({ ...siteSettings, card_cta_label: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Book Now" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Chat Widget Label</label>
-                                <input type="text" value={siteSettings.chat_widget_label} onChange={e => setSiteSettings({ ...siteSettings, chat_widget_label: e.target.value })}
+                                <label htmlFor="settings-chat-label" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Chat Widget Label</label>
+                                <input id="settings-chat-label" type="text" value={siteSettings.chat_widget_label} onChange={e => setSiteSettings({ ...siteSettings, chat_widget_label: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Book here" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Footer Line One</label>
-                                <input type="text" value={siteSettings.footer_line_one} onChange={e => setSiteSettings({ ...siteSettings, footer_line_one: e.target.value })}
+                                <label htmlFor="settings-footer-one" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Footer Line One</label>
+                                <input id="settings-footer-one" type="text" value={siteSettings.footer_line_one} onChange={e => setSiteSettings({ ...siteSettings, footer_line_one: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Kayaks Adventures · Coastal Activity Centre" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Footer Line Two</label>
-                                <input type="text" value={siteSettings.footer_line_two} onChange={e => setSiteSettings({ ...siteSettings, footer_line_two: e.target.value })}
+                                <label htmlFor="settings-footer-two" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Footer Line Two</label>
+                                <input id="settings-footer-two" type="text" value={siteSettings.footer_line_two} onChange={e => setSiteSettings({ ...siteSettings, footer_line_two: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Established: 1994 · BookingTours Platform" />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Public Contact Email</label>
-                                <input type="email" value={siteSettings.public_email} onChange={e => setSiteSettings({ ...siteSettings, public_email: e.target.value })}
+                                <label htmlFor="settings-contact-email" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Public Contact Email</label>
+                                <input id="settings-contact-email" type="email" value={siteSettings.public_email} onChange={e => setSiteSettings({ ...siteSettings, public_email: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="hello@yourbusiness.co.za" />
                                 <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">Shown in Contact Us. Blank hides it.</p>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Public Contact Phone</label>
-                                <input type="tel" value={siteSettings.public_phone} onChange={e => setSiteSettings({ ...siteSettings, public_phone: e.target.value })}
+                                <label htmlFor="settings-contact-phone" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Public Contact Phone</label>
+                                <input id="settings-contact-phone" type="tel" value={siteSettings.public_phone} onChange={e => setSiteSettings({ ...siteSettings, public_phone: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="+27821234567" />
                                 <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">Include country code. Blank hides it.</p>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Public WhatsApp Number</label>
-                                <input type="tel" value={siteSettings.public_whatsapp} onChange={e => setSiteSettings({ ...siteSettings, public_whatsapp: e.target.value })}
+                                <label htmlFor="settings-contact-whatsapp" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Public WhatsApp Number</label>
+                                <input id="settings-contact-whatsapp" type="tel" value={siteSettings.public_whatsapp} onChange={e => setSiteSettings({ ...siteSettings, public_whatsapp: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="+27821234567" />
                                 <p className="text-[11px] text-[var(--ck-text-muted)] mt-1">Include country code. Blank hides it.</p>
                             </div>
@@ -2616,38 +2616,38 @@ export default function SettingsPage() {
                             <h3 className="text-sm font-semibold text-[var(--ck-text-strong)] mb-4 pb-2 border-b border-[var(--ck-border-subtle)]">Booking Site Links &amp; Redirects</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Booking Site URL</label>
-                                    <input type="url" value={siteSettings.booking_site_url} onChange={e => setSiteSettings({ ...siteSettings, booking_site_url: e.target.value })}
+                                    <label htmlFor="settings-url-booking-site" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Booking Site URL</label>
+                                    <input id="settings-url-booking-site" type="url" value={siteSettings.booking_site_url} onChange={e => setSiteSettings({ ...siteSettings, booking_site_url: e.target.value })}
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_BOOKING_URL} />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Manage Bookings URL</label>
-                                    <input type="url" value={siteSettings.manage_bookings_url} onChange={e => setSiteSettings({ ...siteSettings, manage_bookings_url: e.target.value })}
+                                    <label htmlFor="settings-url-manage-bookings" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Manage Bookings URL</label>
+                                    <input id="settings-url-manage-bookings" type="url" value={siteSettings.manage_bookings_url} onChange={e => setSiteSettings({ ...siteSettings, manage_bookings_url: e.target.value })}
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_MANAGE_BOOKINGS_URL} />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Gift Voucher Page URL</label>
-                                    <input type="url" value={siteSettings.gift_voucher_url} onChange={e => setSiteSettings({ ...siteSettings, gift_voucher_url: e.target.value })}
+                                    <label htmlFor="settings-url-gift-voucher" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Gift Voucher Page URL</label>
+                                    <input id="settings-url-gift-voucher" type="url" value={siteSettings.gift_voucher_url} onChange={e => setSiteSettings({ ...siteSettings, gift_voucher_url: e.target.value })}
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_GIFT_VOUCHER_URL} />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Payment Success URL</label>
-                                    <input type="url" value={siteSettings.booking_success_url} onChange={e => setSiteSettings({ ...siteSettings, booking_success_url: e.target.value })}
+                                    <label htmlFor="settings-url-payment-success" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Payment Success URL</label>
+                                    <input id="settings-url-payment-success" type="url" value={siteSettings.booking_success_url} onChange={e => setSiteSettings({ ...siteSettings, booking_success_url: e.target.value })}
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_BOOKING_SUCCESS_URL} />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Payment Cancel URL</label>
-                                    <input type="url" value={siteSettings.booking_cancel_url} onChange={e => setSiteSettings({ ...siteSettings, booking_cancel_url: e.target.value })}
+                                    <label htmlFor="settings-url-payment-cancel" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Payment Cancel URL</label>
+                                    <input id="settings-url-payment-cancel" type="url" value={siteSettings.booking_cancel_url} onChange={e => setSiteSettings({ ...siteSettings, booking_cancel_url: e.target.value })}
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_BOOKING_CANCEL_URL} />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Voucher Success URL</label>
-                                    <input type="url" value={siteSettings.voucher_success_url} onChange={e => setSiteSettings({ ...siteSettings, voucher_success_url: e.target.value })}
+                                    <label htmlFor="settings-url-voucher-success" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Voucher Success URL</label>
+                                    <input id="settings-url-voucher-success" type="url" value={siteSettings.voucher_success_url} onChange={e => setSiteSettings({ ...siteSettings, voucher_success_url: e.target.value })}
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder={DEFAULT_VOUCHER_SUCCESS_URL} />
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Waiver URL</label>
-                                    <input type="url" value={siteSettings.waiver_url} onChange={e => setSiteSettings({ ...siteSettings, waiver_url: e.target.value })}
+                                    <label htmlFor="settings-url-waiver" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Waiver URL</label>
+                                    <input id="settings-url-waiver" type="url" value={siteSettings.waiver_url} onChange={e => setSiteSettings({ ...siteSettings, waiver_url: e.target.value })}
                                         className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Blank uses the built-in waiver." />
                                     <p className="mt-1 text-xs text-[var(--ck-text-muted)]">Blank creates a waiver per booking. Custom URLs receive booking and token parameters.</p>
                                 </div>
@@ -2686,56 +2686,56 @@ export default function SettingsPage() {
                         <p className="text-xs text-[var(--ck-text-muted)] mb-4">Preview a palette, then save to publish. 27 available.</p>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Main Color</label>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1" htmlFor="settings-color-main">Main Color</label>
                                 <div className="flex bg-[var(--ck-surface)] rounded-lg border border-[var(--ck-border-subtle)] overflow-hidden focus-within:ring-2 focus-within:ring-[var(--ck-accent)]">
-                                    <input type="color" value={siteSettings.color_main} onChange={e => setSiteSettings({ ...siteSettings, color_main: e.target.value })}
+                                    <input type="color" id="settings-color-main" value={siteSettings.color_main} onChange={e => setSiteSettings({ ...siteSettings, color_main: e.target.value })}
                                         className="h-10 w-12 p-1 bg-transparent cursor-pointer border-r border-[var(--ck-border-subtle)]" />
-                                    <input type="text" value={siteSettings.color_main} onChange={e => setSiteSettings({ ...siteSettings, color_main: e.target.value })}
+                                    <input type="text" aria-label="Main Color hex value" value={siteSettings.color_main} onChange={e => setSiteSettings({ ...siteSettings, color_main: e.target.value })}
                                         className="flex-1 w-full px-3 py-2 text-sm outline-none uppercase" />
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Secondary Color</label>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1" htmlFor="settings-color-secondary">Secondary Color</label>
                                 <div className="flex bg-[var(--ck-surface)] rounded-lg border border-[var(--ck-border-subtle)] overflow-hidden focus-within:ring-2 focus-within:ring-[var(--ck-accent)]">
-                                    <input type="color" value={siteSettings.color_secondary} onChange={e => setSiteSettings({ ...siteSettings, color_secondary: e.target.value })}
+                                    <input type="color" id="settings-color-secondary" value={siteSettings.color_secondary} onChange={e => setSiteSettings({ ...siteSettings, color_secondary: e.target.value })}
                                         className="h-10 w-12 p-1 bg-transparent cursor-pointer border-r border-[var(--ck-border-subtle)]" />
-                                    <input type="text" value={siteSettings.color_secondary} onChange={e => setSiteSettings({ ...siteSettings, color_secondary: e.target.value })}
+                                    <input type="text" aria-label="Secondary Color hex value" value={siteSettings.color_secondary} onChange={e => setSiteSettings({ ...siteSettings, color_secondary: e.target.value })}
                                         className="flex-1 w-full px-3 py-2 text-sm outline-none uppercase" />
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Call To Action</label>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1" htmlFor="settings-color-cta">Call To Action</label>
                                 <div className="flex bg-[var(--ck-surface)] rounded-lg border border-[var(--ck-border-subtle)] overflow-hidden focus-within:ring-2 focus-within:ring-[var(--ck-accent)]">
-                                    <input type="color" value={siteSettings.color_cta} onChange={e => setSiteSettings({ ...siteSettings, color_cta: e.target.value })}
+                                    <input type="color" id="settings-color-cta" value={siteSettings.color_cta} onChange={e => setSiteSettings({ ...siteSettings, color_cta: e.target.value })}
                                         className="h-10 w-12 p-1 bg-transparent cursor-pointer border-r border-[var(--ck-border-subtle)]" />
-                                    <input type="text" value={siteSettings.color_cta} onChange={e => setSiteSettings({ ...siteSettings, color_cta: e.target.value })}
+                                    <input type="text" aria-label="Call To Action hex value" value={siteSettings.color_cta} onChange={e => setSiteSettings({ ...siteSettings, color_cta: e.target.value })}
                                         className="flex-1 w-full px-3 py-2 text-sm outline-none uppercase" />
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Page Background</label>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1" htmlFor="settings-color-bg">Page Background</label>
                                 <div className="flex bg-[var(--ck-surface)] rounded-lg border border-[var(--ck-border-subtle)] overflow-hidden focus-within:ring-2 focus-within:ring-[var(--ck-accent)]">
-                                    <input type="color" value={siteSettings.color_bg} onChange={e => setSiteSettings({ ...siteSettings, color_bg: e.target.value })}
+                                    <input type="color" id="settings-color-bg" value={siteSettings.color_bg} onChange={e => setSiteSettings({ ...siteSettings, color_bg: e.target.value })}
                                         className="h-10 w-12 p-1 bg-transparent cursor-pointer border-r border-[var(--ck-border-subtle)]" />
-                                    <input type="text" value={siteSettings.color_bg} onChange={e => setSiteSettings({ ...siteSettings, color_bg: e.target.value })}
+                                    <input type="text" aria-label="Page Background hex value" value={siteSettings.color_bg} onChange={e => setSiteSettings({ ...siteSettings, color_bg: e.target.value })}
                                         className="flex-1 w-full px-3 py-2 text-sm outline-none uppercase" />
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Navigation Bar</label>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1" htmlFor="settings-color-nav">Navigation Bar</label>
                                 <div className="flex bg-[var(--ck-surface)] rounded-lg border border-[var(--ck-border-subtle)] overflow-hidden focus-within:ring-2 focus-within:ring-[var(--ck-accent)]">
-                                    <input type="color" value={siteSettings.color_nav} onChange={e => setSiteSettings({ ...siteSettings, color_nav: e.target.value })}
+                                    <input type="color" id="settings-color-nav" value={siteSettings.color_nav} onChange={e => setSiteSettings({ ...siteSettings, color_nav: e.target.value })}
                                         className="h-10 w-12 p-1 bg-transparent cursor-pointer border-r border-[var(--ck-border-subtle)]" />
-                                    <input type="text" value={siteSettings.color_nav} onChange={e => setSiteSettings({ ...siteSettings, color_nav: e.target.value })}
+                                    <input type="text" aria-label="Navigation Bar hex value" value={siteSettings.color_nav} onChange={e => setSiteSettings({ ...siteSettings, color_nav: e.target.value })}
                                         className="flex-1 w-full px-3 py-2 text-sm outline-none uppercase" />
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Card Hover Overlay</label>
+                                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1" htmlFor="settings-color-hover">Card Hover Overlay</label>
                                 <div className="flex bg-[var(--ck-surface)] rounded-lg border border-[var(--ck-border-subtle)] overflow-hidden focus-within:ring-2 focus-within:ring-[var(--ck-accent)]">
-                                    <input type="color" value={siteSettings.color_hover} onChange={e => setSiteSettings({ ...siteSettings, color_hover: e.target.value })}
+                                    <input type="color" id="settings-color-hover" value={siteSettings.color_hover} onChange={e => setSiteSettings({ ...siteSettings, color_hover: e.target.value })}
                                         className="h-10 w-12 p-1 bg-transparent cursor-pointer border-r border-[var(--ck-border-subtle)]" />
-                                    <input type="text" value={siteSettings.color_hover} onChange={e => setSiteSettings({ ...siteSettings, color_hover: e.target.value })}
+                                    <input type="text" aria-label="Card Hover Overlay hex value" value={siteSettings.color_hover} onChange={e => setSiteSettings({ ...siteSettings, color_hover: e.target.value })}
                                         className="flex-1 w-full px-3 py-2 text-sm outline-none uppercase" />
                                 </div>
                             </div>
@@ -2813,8 +2813,8 @@ export default function SettingsPage() {
                     </div>
 
                     <div>
-                        <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Plain-language summary (shown to customers)</label>
-                        <textarea value={refundPolicyText} onChange={e => setRefundPolicyText(e.target.value)} rows={3}
+                        <label htmlFor="settings-refund-summary" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Plain-language summary (shown to customers)</label>
+                        <textarea id="settings-refund-summary" value={refundPolicyText} onChange={e => setRefundPolicyText(e.target.value)} rows={3}
                             className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none resize-y" />
                     </div>
 
@@ -2957,6 +2957,7 @@ export default function SettingsPage() {
                                     <div className="flex gap-2">
                                         <input
                                             type="url"
+                                            aria-label={label + " image URL"}
                                             value={emailImgs[key]}
                                             onChange={e => setEmailImgs({ ...emailImgs, [key]: e.target.value })}
                                             className="ui-control flex-1 px-3 py-2 text-sm rounded-lg outline-none"
@@ -2999,8 +3000,9 @@ export default function SettingsPage() {
                                 { key: "google_reviews", label: "Google Reviews", placeholder: "https://g.page/r/..." },
                             ] as { key: keyof typeof socialLinks; label: string; placeholder: string }[]).map(({ key, label, placeholder }) => (
                                 <div key={key}>
-                                    <label className="text-xs font-medium text-[var(--ck-text-muted)] mb-1 block">{label}</label>
+                                    <label htmlFor={"settings-social-" + key} className="text-xs font-medium text-[var(--ck-text-muted)] mb-1 block">{label}</label>
                                     <input
+                                        id={"settings-social-" + key}
                                         type="url"
                                         value={socialLinks[key]}
                                         onChange={e => setSocialLinks({ ...socialLinks, [key]: e.target.value })}
@@ -3338,8 +3340,8 @@ export default function SettingsPage() {
                         </div>
                         <p className="text-xs text-[var(--ck-text-muted)]">Ask BookingTours to connect your WhatsApp account first. Tokens must come from the BookingTours Meta app.</p>
                         <div>
-                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Access Token</label>
-                            <input
+                            <label htmlFor="settings-wa-token" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Access Token</label>
+                            <input id="settings-wa-token"
                                 type="password"
                                 value={waForm.token}
                                 onChange={e => setWaForm({ ...waForm, token: e.target.value })}
@@ -3350,8 +3352,8 @@ export default function SettingsPage() {
                             <p className="mt-1 text-xs text-[var(--ck-text-muted)]">BookingTours setup: Meta Business Suite → Settings → Users → System users → Generate token for the BookingTours app. Grant WhatsApp messaging and management access to this business account. The token shown in the app&apos;s WhatsApp API Setup is temporary.</p>
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Phone Number ID</label>
-                            <input
+                            <label htmlFor="settings-wa-phone-id" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Phone Number ID</label>
+                            <input id="settings-wa-phone-id"
                                 type="text"
                                 value={waForm.phoneId}
                                 onChange={e => setWaForm({ ...waForm, phoneId: e.target.value })}
@@ -3385,8 +3387,8 @@ export default function SettingsPage() {
                             )}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Secret Key</label>
-                            <input
+                            <label htmlFor="settings-yoco-secret" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Secret Key</label>
+                            <input id="settings-yoco-secret"
                                 type="password"
                                 value={yocoForm.secretKey}
                                 onChange={e => setYocoForm({ ...yocoForm, secretKey: e.target.value })}
@@ -3396,8 +3398,8 @@ export default function SettingsPage() {
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Webhook Signing Secret</label>
-                            <input
+                            <label htmlFor="settings-yoco-webhook-secret" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Webhook Signing Secret</label>
+                            <input id="settings-yoco-webhook-secret"
                                 type="password"
                                 value={yocoForm.webhookSecret}
                                 onChange={e => setYocoForm({ ...yocoForm, webhookSecret: e.target.value })}
@@ -3465,8 +3467,8 @@ export default function SettingsPage() {
                             )}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Test Secret Key</label>
-                            <input
+                            <label htmlFor="settings-yoco-test-secret" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Test Secret Key</label>
+                            <input id="settings-yoco-test-secret"
                                 type="password"
                                 value={yocoTestForm.secretKey}
                                 onChange={e => setYocoTestForm({ ...yocoTestForm, secretKey: e.target.value })}
@@ -3476,8 +3478,8 @@ export default function SettingsPage() {
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Test Webhook Signing Secret</label>
-                            <input
+                            <label htmlFor="settings-yoco-test-webhook-secret" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Test Webhook Signing Secret</label>
+                            <input id="settings-yoco-test-webhook-secret"
                                 type="password"
                                 value={yocoTestForm.webhookSecret}
                                 onChange={e => setYocoTestForm({ ...yocoTestForm, webhookSecret: e.target.value })}
@@ -3550,8 +3552,8 @@ export default function SettingsPage() {
                             )}
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Google Place ID</label>
-                            <input
+                            <label htmlFor="settings-google-place-id" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Google Place ID</label>
+                            <input id="settings-google-place-id"
                                 type="text"
                                 value={googlePlaceId}
                                 onChange={e => setGooglePlaceId(e.target.value)}

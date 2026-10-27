@@ -450,8 +450,8 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Source</label>
-                <input
+                <label htmlFor="external-credential-source" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Source</label>
+                <input id="external-credential-source"
                   type="text"
                   value={credentialForm.source}
                   onChange={(e) => setCredentialForm((prev) => ({ ...prev, source: e.target.value.toUpperCase() }))}
@@ -578,30 +578,30 @@ export default function ExternalBookingSettings({ tours }: { tours: TourOption[]
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Source</label>
-                <input type="text" value={mappingForm.source} onChange={(e) => setMappingForm((prev) => ({ ...prev, source: e.target.value.toUpperCase() }))} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="PARTNER" />
+                <label htmlFor="external-mapping-source" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Source</label>
+                <input id="external-mapping-source" type="text" value={mappingForm.source} onChange={(e) => setMappingForm((prev) => ({ ...prev, source: e.target.value.toUpperCase() }))} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="PARTNER" />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Tour</label>
-                <select value={selectedTourId} onChange={(e) => setMappingForm((prev) => ({ ...prev, tour_id: e.target.value }))} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none">
+                <label htmlFor="external-mapping-tour" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Tour</label>
+                <select id="external-mapping-tour" value={selectedTourId} onChange={(e) => setMappingForm((prev) => ({ ...prev, tour_id: e.target.value }))} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none">
                   {orderedTours.map((tour) => <option key={tour.id} value={tour.id}>{tour.name}</option>)}
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">External Product ID</label>
-                <input type="text" value={mappingForm.external_product_id} onChange={(e) => setMappingForm((prev) => ({ ...prev, external_product_id: e.target.value }))} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="12345678" />
+                <label htmlFor="external-product-id" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">External Product ID</label>
+                <input id="external-product-id" type="text" value={mappingForm.external_product_id} onChange={(e) => setMappingForm((prev) => ({ ...prev, external_product_id: e.target.value }))} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="12345678" />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">External Product Code</label>
-                <input type="text" value={mappingForm.external_product_code} onChange={(e) => setMappingForm((prev) => ({ ...prev, external_product_code: e.target.value }))} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="SEA-KAYAK-AM" />
+                <label htmlFor="external-product-code" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">External Product Code</label>
+                <input id="external-product-code" type="text" value={mappingForm.external_product_code} onChange={(e) => setMappingForm((prev) => ({ ...prev, external_product_code: e.target.value }))} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="SEA-KAYAK-AM" />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">External Product Name</label>
-                <input type="text" value={mappingForm.external_product_name} onChange={(e) => setMappingForm((prev) => ({ ...prev, external_product_name: e.target.value }))} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Sea Kayak Tour" />
+                <label htmlFor="external-product-name" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">External Product Name</label>
+                <input id="external-product-name" type="text" value={mappingForm.external_product_name} onChange={(e) => setMappingForm((prev) => ({ ...prev, external_product_name: e.target.value }))} className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Sea Kayak Tour" />
               </div>
 
               <label className="flex items-center gap-2 cursor-pointer">
