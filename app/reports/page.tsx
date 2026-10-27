@@ -1,4 +1,5 @@
 "use client";
+import { pluralize } from "../lib/automation-copy";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "../lib/supabase";
@@ -1065,7 +1066,7 @@ function ReportsContent() {
               <ReportPeriodPicker value={bookingPeriod} onChange={setBookingPeriod} label="Group attendance by" />
               {groupReportRows(activeBookings, bookingPeriod, activeTimezone, b => b.slots?.start_time).map(group => {
                 const { pax: totalPax, arrived: checkedInPax, upcoming } = attendanceTotals(group.rows);
-                return <ReportPeriodGroup key={`${bookingPeriod}:${group.key}`} label={group.label} summary={`${group.rows.length} bookings · ${checkedInPax} of ${totalPax} arrived${upcoming > 0 ? ` · ${upcoming} upcoming` : ""}`}>
+                return <ReportPeriodGroup key={`${bookingPeriod}:${group.key}`} label={group.label} summary={`${pluralize(group.rows.length, "booking")} · ${checkedInPax} of ${totalPax} arrived${upcoming > 0 ? ` · ${upcoming} upcoming` : ""}`}>
               <div className="space-y-3 md:hidden">
                 {group.rows.map(b => (
                   <div key={b.id} className="border-t p-4" style={b.checked_in ? { borderColor: "var(--ck-success)", background: "var(--ck-success-soft)" } : arrivedGuests(b) > 0 ? { borderColor: "var(--ck-amber)", background: "var(--ck-amber-soft)" } : undefined}>
@@ -1122,7 +1123,7 @@ function ReportsContent() {
                   </tbody>
                   <tfoot>
                     <tr className="border-t-2 text-sm font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-warm)" }}>
-                      <td colSpan={5} className="p-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>Totals ({group.rows.length} bookings)</td>
+                      <td colSpan={5} className="p-3 text-xs" style={{ color: "var(--ck-text-muted)" }}>Totals ({pluralize(group.rows.length, "booking")})</td>
                       <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{totalPax}</td>
                       <td className="p-3 text-center" style={{ color: "var(--ck-success)" }}>{checkedInPax} present</td>
                       <td className="hidden p-3 lg:table-cell"></td>

@@ -375,7 +375,7 @@ export default function TemplatesPage() {
     <div className="space-y-4">
       <div className="anim-fade-up flex items-center justify-between">
         <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
-          <span className="font-display tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{templates.length}</span> templates
+          <span className="font-display tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{templates.length}</span> template{templates.length === 1 ? "" : "s"}
         </p>
         <button onClick={() => setShowGallery(true)} className="ui-btn ui-btn-primary">
           New Template

@@ -1,5 +1,6 @@
 "use client";
 
+import { pluralize } from "../../app/lib/automation-copy";
 import Link from "next/link";
 import { useState } from "react";
 import { CaretDown, Check, CheckCircle, Minus, UsersThree } from "@phosphor-icons/react";
@@ -54,7 +55,7 @@ function BookingRow({ booking, reload, returnTo, refreshing, date }: { booking: 
       notes: fullyArrived ? "Arrival count corrected by operator" : undefined,
     });
     setMessage(result.ok
-      ? { tone: "success", text: `${arrivedCount} of ${booking.qty} guests recorded as arrived.` }
+      ? { tone: "success", text: `${arrivedCount} of ${pluralize(booking.qty, "guest")} recorded as arrived.` }
       : { tone: "error", text: result.error || "Arrival count was not saved." });
     await reload(true);
     setBusy(false);

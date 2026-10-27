@@ -1,4 +1,5 @@
 "use client";
+import { pluralize } from "../../app/lib/automation-copy";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -46,7 +47,7 @@ export default function GuideDay({ photos = false }: { photos?: boolean }) {
       <div className="space-y-4">{rows.map(row => <section key={row.id} className="ui-card p-5" aria-label={row.tour_name}>
         <p className="text-sm font-semibold">{new Intl.DateTimeFormat("en-ZA", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: timezone }).format(new Date(row.start_time))}</p>
         <h2 className="mt-1 text-lg font-semibold">{row.tour_name}</h2>
-        <p className="mt-3"><strong>{row.pax_expected}</strong> passengers expected · {row.booking_count} bookings</p>
+        <p className="mt-3"><strong>{row.pax_expected}</strong> {row.pax_expected === 1 ? "passenger" : "passengers"} expected · {pluralize(row.booking_count, "booking")}</p>
         <Link className="ui-btn ui-btn-soft mt-4 min-h-11" href={`/simpleguide/photos/${row.id}?date=${date}`}>Trip photos{row.photo_count ? ` (${row.photo_count})` : ""}</Link>
       </section>)}</div>}
   </div>;

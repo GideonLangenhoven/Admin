@@ -1,4 +1,5 @@
 "use client";
+import { pluralize } from "../../app/lib/automation-copy";
 import { useEffect, useState, useRef } from "react";
 import { confirmAction, notify } from "@/app/lib/app-notify";
 import { getAdminTimezone } from "@/app/lib/admin-timezone";
@@ -403,7 +404,7 @@ export default function TripPhotosWorkspace({ initialSlotId }: { initialSlotId?:
                         </span>
                         <div>
                           <p className="text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{(s as any).tours?.name}</p>
-                          <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{fmtTime(s.start_time)} · {s.booked} guests</p>
+                          <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{fmtTime(s.start_time)} · {pluralize(s.booked, "guest")}</p>
                         </div>
                       </button>
                     );

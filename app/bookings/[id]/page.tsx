@@ -1,4 +1,5 @@
 "use client";
+import { pluralize } from "../../lib/automation-copy";
 import { useEffect, useState } from "react";
 import { resolveWaiverLink } from "@/supabase/functions/_shared/waiver";
 import ArrivalApproval from "@/components/booking/ArrivalApproval";
@@ -669,10 +670,10 @@ export default function BookingDetailPage() {
         notify({ title: "Reduce failed", message: res.error?.message || data?.error || "Failed", tone: "error" });
       } else {
         const msg = data.refund_amount
-          ? `Reduced to ${reduceGuestsTarget} guests. ${fmtCurrency(data.refund_amount)} refund initiated.`
+          ? `Reduced to ${pluralize(reduceGuestsTarget, "guest")}. ${fmtCurrency(data.refund_amount)} refund initiated.`
           : data.voucher_code
-            ? `Reduced to ${reduceGuestsTarget} guests. Voucher ${data.voucher_code} issued for ${fmtCurrency(data.voucher_amount)}.`
-            : `Reduced to ${reduceGuestsTarget} guests.`;
+            ? `Reduced to ${pluralize(reduceGuestsTarget, "guest")}. Voucher ${data.voucher_code} issued for ${fmtCurrency(data.voucher_amount)}.`
+            : `Reduced to ${pluralize(reduceGuestsTarget, "guest")}.`;
         notify({ title: "Guest count reduced", message: msg, tone: "success" });
         setBooking({
           ...booking,

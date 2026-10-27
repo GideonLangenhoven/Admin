@@ -7,7 +7,7 @@ export type AutomationStep = { step_type: string; config: any };
 export type AutomationLike = { trigger_type: string; trigger_config: any };
 export type TemplateRef = { name: string } | undefined;
 
-function pluralize(n: number, unit: string): string {
+export function pluralize(n: number, unit: string): string {
   return n + " " + unit + (n === 1 ? "" : "s");
 }
 

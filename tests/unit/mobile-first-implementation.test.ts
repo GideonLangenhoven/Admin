@@ -20,7 +20,7 @@ describe("mobile-first implementation contract", () => {
 
   it("keeps dashboard labels readable in the departure cards", () => {
     const dashboard = source("app/page.tsx");
-    expect(dashboard).toContain("{slot.totalPax} guests");
+    expect(dashboard).toContain('{pluralize(slot.totalPax, "guest")}');
     expect(dashboard).toContain("min-h-[76px]");
     expect(dashboard).toContain("h-11 w-11");
     expect(dashboard).not.toContain('max-w-[120px] truncate" style={{ color: "var(--ck-text-muted)" }} title={slot.tourName}>{slot.tourName}</div>\n                            </span>');

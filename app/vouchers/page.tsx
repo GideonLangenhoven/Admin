@@ -1,4 +1,5 @@
 "use client";
+import { pluralize } from "../lib/automation-copy";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { getAdminTimezone } from "../lib/admin-timezone";
@@ -404,7 +405,7 @@ export default function Vouchers() {
             <div key={g.dayKey}>
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{g.dayLabel}</h3>
-                <span className="ui-mono-label !text-[10px]">{g.items.length} vouchers</span>
+                <span className="ui-mono-label !text-[10px]">{pluralize(g.items.length, "voucher")}</span>
               </div>
               <div className="space-y-3 md:hidden">
                 {g.items.map((v) => (

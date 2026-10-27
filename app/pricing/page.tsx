@@ -1,4 +1,5 @@
 "use client";
+import { pluralize } from "../lib/automation-copy";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { confirmAction, notify } from "../lib/app-notify";
@@ -405,7 +406,7 @@ export default function PeakPricingPage() {
                   <p className="font-semibold text-sm" style={{ color: "var(--ck-text-strong)" }}>
                     {new Date(r.startDate).toLocaleDateString("en-ZA", { day: "numeric", month: "short" })} to {new Date(r.endDate).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
-                  <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{r.count} slots {r.price ? "@ R" + r.price : ""}</p>
+                  <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{pluralize(r.count, "slot")} {r.price ? "@ R" + r.price : ""}</p>
                 </div>
                 <button data-demo-action="pricing.remove" onClick={() => removePeakRange(r.startDate, r.endDate)}
                   className="ui-btn ui-btn-danger !h-8 !px-3 text-xs gap-1.5">

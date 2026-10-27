@@ -1,4 +1,5 @@
 
+import { pluralize } from "../app/lib/automation-copy";
 import React from "react";
 import { getAdminTimezone } from "../app/lib/admin-timezone";
 
@@ -74,7 +75,7 @@ export default function DayView({ slots, currentDate, onSlotClick, selectedCance
                 <h3 className={`font-semibold ${isSelected && !isPast ? "text-red-700" : isPast ? "text-gray-400" : "text-gray-900"}`}>
                     {currentDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
                 </h3>
-                <span className={`text-sm ${isSelected && !isPast ? "text-red-600" : "text-gray-500"}`}>{daySlots.length} slots</span>
+                <span className={`text-sm ${isSelected && !isPast ? "text-red-600" : "text-gray-500"}`}>{pluralize(daySlots.length, "slot")}</span>
             </div>
 
             {isToday && (

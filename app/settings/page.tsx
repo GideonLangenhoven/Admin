@@ -3114,7 +3114,7 @@ export default function SettingsPage() {
                     notify({ message: "Automation tag rules saved.", tone: "success" });
                 }} className="space-y-6">
                     <p className="text-xs text-[var(--ck-text-muted)]">
-                        Tags update daily from booking history and can start automations. For example, <strong>vip</strong>starts any automation using that tag.
+                        Tags update daily from booking history and can start automations. For example, <strong>vip</strong> starts any automation using that tag.
                     </p>
 
                     {/* VIP Rules */}

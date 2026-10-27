@@ -1,5 +1,6 @@
 "use client";
 
+import { pluralize } from "../../lib/automation-copy";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { arrivalReadiness } from "@/app/lib/operator-day";
@@ -90,7 +91,7 @@ function BookingCheckIn({
       notes: draft < booking.arrived_count ? "Arrival count corrected by operator" : undefined,
     });
     if (result.ok) {
-      setMessage({ tone: "success", text: `${draft} of ${booking.qty} guests recorded as arrived.` });
+      setMessage({ tone: "success", text: `${draft} of ${pluralize(booking.qty, "guest")} recorded as arrived.` });
     } else {
       setMessage({ tone: "error", text: result.error || "Arrival count was not saved." });
     }

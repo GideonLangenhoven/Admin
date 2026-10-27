@@ -1,4 +1,5 @@
 "use client";
+import { pluralize } from "../lib/automation-copy";
 import { useEffect, useMemo, useState } from "react";
 import { notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
@@ -627,7 +628,7 @@ export default function Invoices() {
               <div className="mb-2 flex items-center justify-between gap-3">
                 <h3 className="text-[15px] font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>{day.dayLabel}</h3>
                 <span className="font-mono text-[11px] tabular-nums" style={{ color: "var(--ck-text-muted)" }}>
-                  {day.invoices.length} invoices · Total R{money(day.total)} · Due R{money(day.due)}
+                  {pluralize(day.invoices.length, "invoice")} · Total R{money(day.total)} · Due R{money(day.due)}
                 </span>
               </div>
 

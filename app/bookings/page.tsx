@@ -1,4 +1,5 @@
 "use client";
+import { pluralize } from "../lib/automation-copy";
 import { Fragment, useEffect, useId, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -2115,7 +2116,7 @@ export default function Bookings() {
                     const available = Math.max(Number(s.available_capacity || 0), 0);
                     return (
                       <option key={s.id} value={s.id}>
-                        {fmtTime(s.start_time)} · {s.tour_name || "Tour"} · {available} seats
+                        {fmtTime(s.start_time)} · {s.tour_name || "Tour"} · {pluralize(available, "seat")}
                       </option>
                     );
                   })}

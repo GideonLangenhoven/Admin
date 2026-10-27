@@ -1,4 +1,5 @@
 "use client";
+import { pluralize } from "../app/lib/automation-copy";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { DayPicker } from "react-day-picker";
@@ -234,7 +235,7 @@ export default function BookingsMonthCalendar({ businessId, tours, selectedDate,
                     {marked.map((t) => {
                       const c = perTour![t.id];
                       return (
-                        <span key={t.id} className="truncate rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold leading-tight text-white" style={{ background: colorByTour.get(t.id) }} title={`${t.name}: ${c.guests} guests (${c.bookings} bookings)`}>
+                        <span key={t.id} className="truncate rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold leading-tight text-white" style={{ background: colorByTour.get(t.id) }} title={`${t.name}: ${pluralize(c.guests, "guest")} (${pluralize(c.bookings, "booking")})`}>
                           {t.name} · {c.guests}
                         </span>
                       );

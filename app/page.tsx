@@ -1,4 +1,5 @@
 "use client";
+import { pluralize } from "./lib/automation-copy";
 import { useEffect, useState, useRef, useMemo } from "react";
 import { supabase } from "./lib/supabase";
 import { confirmAction, notify } from "./lib/app-notify";
@@ -634,7 +635,7 @@ export default function Dashboard() {
                                             type="button"
                                             onClick={() => { setSelectedSlotId(slot.id); }}
                                             className="flex min-h-[76px] w-full flex-wrap items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--ck-surface-sunken)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--ck-accent)]"
-                                            aria-label={`${slot.time}, ${slot.tourName}, ${slot.totalPax} guests, ${slot.checkedIn} checked in`}
+                                            aria-label={`${slot.time}, ${slot.tourName}, ${pluralize(slot.totalPax, "guest")}, ${slot.checkedIn} checked in`}
                                         >
                                             <span className="min-w-0 flex-1 basis-36 [overflow-wrap:anywhere]">
                                                 <span className="block text-base font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{slot.time}</span>
@@ -642,7 +643,7 @@ export default function Dashboard() {
                                                 <span className="mt-1 block text-sm" style={{ color: "var(--ck-text-muted)" }}>{slot.bookingCount} {slot.bookingCount === 1 ? "booking" : "bookings"}</span>
                                             </span>
                                             <span className="shrink-0 text-right">
-                                                <span className="block text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{slot.totalPax} guests</span>
+                                                <span className="block text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{pluralize(slot.totalPax, "guest")}</span>
                                                 <span className={`ui-status mt-1 ${complete ? "ui-pill-success" : "ui-pill-amber"}`}>
                                                     {slot.checkedIn}/{slot.totalPax} present
                                                 </span>
@@ -850,7 +851,7 @@ export default function Dashboard() {
                                 <div className="px-5 py-3.5 border-t" style={{ borderColor: "var(--ck-border-subtle)" }}>
                                     <div className="flex flex-wrap items-center justify-between gap-3">
                                         <span className="text-sm font-medium" style={{ color: "var(--ck-text-muted)" }}>
-                                            {activeSlot.checkedIn} of {activeSlot.totalPax} guests arrived
+                                            {activeSlot.checkedIn} of {pluralize(activeSlot.totalPax, "guest")} arrived
                                         </span>
                                         {activeSlot.checkedIn === activeSlot.totalPax && activeSlot.totalPax > 0 ? (
                                             <span className="flex items-center gap-1.5 text-[12px] font-bold shrink-0" style={{ color: "var(--ck-success)" }}>
