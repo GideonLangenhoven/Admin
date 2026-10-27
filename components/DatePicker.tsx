@@ -16,9 +16,10 @@ interface DatePickerProps {
     disabled?: any; // DayPicker disabled prop
     compact?: boolean; // smaller calendar
     editable?: boolean;
+    min?: string; // YYYY-MM-DD: earlier days are disabled, and an empty picker opens on this month
 }
 
-export function DatePicker({ value, onChange, className = "", placeholder = "Pick a date", alignRight = false, position = "bottom", disabled, compact = false, editable = false }: DatePickerProps) {
+export function DatePicker({ value, onChange, className = "", placeholder = "Pick a date", alignRight = false, position = "bottom", disabled, compact = false, editable = false, min }: DatePickerProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [coords, setCoords] = useState({ top: 0, left: 0 });
@@ -29,6 +30,7 @@ export function DatePicker({ value, onChange, className = "", placeholder = "Pic
         return isValid(date) ? format(date!, "dd/MM/yyyy") : "";
     });
     const [inputError, setInputError] = useState(false);
+    const minDate = min ? parse(min, "yyyy-MM-dd", new Date()) : undefined;
     const inputHintId = useId();
 
     useEffect(() => {
@@ -154,8 +156,8 @@ export function DatePicker({ value, onChange, className = "", placeholder = "Pic
                     <DayPicker
                         mode="single"
                         selected={validDate}
-                        defaultMonth={validDate}
-                        disabled={disabled}
+                        defaultMonth={validDate ?? minDate}
+                        disabled={minDate ? [{ before: minDate }].concat(disabled ?? []) : disabled}
                         onSelect={(d) => {
                             if (d) {
                                 onChange(format(d, "yyyy-MM-dd"));

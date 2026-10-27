@@ -117,6 +117,7 @@ function Slots() {
     capacity: "12",
     price: "",
   });
+  const today = businessDateKey(getAdminTimezone()); // earliest date Add slot offers
   const [savingAdd, setSavingAdd] = useState(false);
   // A number input reports "" for text it cannot parse (e.g. "R600"), which
   // used to save the slot with no price override and no warning.
@@ -732,6 +733,7 @@ function Slots() {
         const timeStr = `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}:00`;
         const localIso = `${dateStr}T${timeStr}`;
         const utcMs = zonedToUtc(localIso, tz);
+        if (utcMs <= Date.now()) continue; // never create a departure in the past
 
         rows.push({
           tour_id: addForm.tourId,
@@ -923,6 +925,8 @@ function Slots() {
 
       {selectedSlot && (() => {
         const availability = selectedSlot.capacity_total - selectedSlot.booked - (selectedSlot.held || 0);
+        const departed = Date.parse(selectedSlot.start_time) <= Date.now();
+        const open = selectedSlot.status === "OPEN" && !departed;
         return (
           <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ background: "rgba(10,18,13,0.55)", backdropFilter: "blur(2px)" }}>
             <div className="ui-card w-full max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-6 sm:max-w-md !rounded-t-2xl sm:!rounded-2xl">
@@ -939,8 +943,8 @@ function Slots() {
             </div>
 
             <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium"
-              style={{ background: selectedSlot.status === "OPEN" ? "var(--ck-success-soft, #e7f5ec)" : "var(--ck-surface-sunken)", color: selectedSlot.status === "OPEN" ? "var(--ck-success)" : "var(--ck-text-muted)" }}>
-              {selectedSlot.status === "OPEN" ? "● Open: accepting bookings" : "○ Closed: not accepting new bookings"}
+              style={{ background: open ? "var(--ck-success-soft, #e7f5ec)" : "var(--ck-surface-sunken)", color: open ? "var(--ck-success)" : "var(--ck-text-muted)" }}>
+              {departed ? "○ Departed: no longer taking bookings" : open ? "● Open: accepting bookings" : "○ Closed: not accepting new bookings"}
             </div>
 
             <div className="space-y-4">
@@ -988,7 +992,7 @@ function Slots() {
             <div className="mt-5 border-t pt-4" style={{ borderColor: "var(--ck-border-subtle)" }}>
               <p className="ui-mono-label !text-[10px] mb-2">Manage this slot</p>
               <div className="space-y-2">
-                {selectedSlot.status === "OPEN" ? (
+                {departed ? null : selectedSlot.status === "OPEN" ? (
                   <button data-demo-action="slot.close"
                     onClick={() => closeSlot(selectedSlot)}
                     disabled={slotStatusSaving || cancellingSlot}
@@ -1170,13 +1174,13 @@ function Slots() {
                     <label className="block text-sm text-gray-600">
                       {idx === 0 ? "Start Date" : `Range ${idx + 1} start`}
                       <div className="mt-1">
-                        <DatePicker position="top" value={range.start} onChange={(val) => setAddForm({ ...addForm, ranges: addForm.ranges.map((r, i) => i === idx ? { ...r, start: val } : r) })} className="py-2.5 w-full border-gray-300" />
+                        <DatePicker position="top" min={today} value={range.start} onChange={(val) => setAddForm({ ...addForm, ranges: addForm.ranges.map((r, i) => i === idx ? { ...r, start: val } : r) })} className="py-2.5 w-full border-gray-300" />
                       </div>
                     </label>
                     <label className="block text-sm text-gray-600">
                       {idx === 0 ? "End Date" : `Range ${idx + 1} end`}
                       <div className="mt-1">
-                        <DatePicker position="top" value={range.end} onChange={(val) => setAddForm({ ...addForm, ranges: addForm.ranges.map((r, i) => i === idx ? { ...r, end: val } : r) })} className="py-2.5 w-full border-gray-300" />
+                        <DatePicker position="top" min={range.start || today} value={range.end} onChange={(val) => setAddForm({ ...addForm, ranges: addForm.ranges.map((r, i) => i === idx ? { ...r, end: val } : r) })} className="py-2.5 w-full border-gray-300" />
                       </div>
                     </label>
                     {idx > 0 ? (
