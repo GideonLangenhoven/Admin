@@ -1,0 +1,17 @@
+P2 Directions: empty rich-text repair, production dry run, 2026-10-27 (read-only).
+Query: FIND_SQL in scripts/repair-empty-rich-text.mjs, run read-only against
+project ukdsrndqhsatjkmxijuj. Nothing was changed.
+
+2 business(es) hold empty markup:
+  Aonyx: directions "<br>" -> NULL  [280d9c97-c09d-4ca2-8ffc-37f0b6e31ba7]
+  Kayak: directions "<br>" -> NULL  [44ff11ab-c697-47de-9227-0ffa51db127c]
+
+Until this is applied, both operators' emails, WhatsApp messages and bots show
+"<br>" as the meeting point. NULL is what the other three businesses hold today
+(3 of 5 have directions NULL, none ""), so it is the state every reader already
+sees in production.
+
+Apply only after approval, in this order:
+  1. Deploy the admin app (the editor then saves a cleared field as "").
+  2. DATABASE_URL=... node scripts/repair-empty-rich-text.mjs          (dry run again)
+  3. DATABASE_URL=... node scripts/repair-empty-rich-text.mjs --apply  (expect "No empty rich text")
