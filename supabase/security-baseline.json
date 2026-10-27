@@ -1,6 +1,6 @@
 {
   "generated_at": "2026-09-12T17:02:37.430Z",
-  "note": "Pre-launch security audit fixes (2026-07-13): admin_users UPDATE fully revoked from authenticated (was: any admin could self-promote to SUPER_ADMIN via business_id-only RLS check with no role restriction); combo_bookings anon/public INSERT policies dropped (was: anon could insert payment_status=PAID directly, bypassing Paysafe); combo_booking_items_anon_insert dropped (settlement forgery); promotion_uses_anon_insert dropped (promo abuse); holds_authenticated_all split into select/update/delete (tenant-scoped, matching prior qual) with INSERT now default-deny (was: with_check=true let any authenticated session write holds against any tenant); zero-policy tables (processed_wa_messages, wa_messages, business_partnerships, combo_settlements, invite_tokens, ngt_intake_submissions, ngt_payments, tenant_invoice_sequences) had broad anon/authenticated grants revoked (RLS already default-denied these, but grants were unnecessarily broad). Migrations: 20260713144334_security_audit_fixes, 20260713144422_security_audit_fixes_c1_correction, plus an admin_setup_token_used_hash column addition. | 2026-08-15 (20260815120000_close_anon_cross_tenant_booking_reads): bookings_read POST/PATCH read-back clause scoped to the writing tenant + DRAFT/PENDING (was: ANY POST or PATCH — including every /rpc/* call — disabled the policy entirely, exposing all tenants' bookings to anon; proven live via check_loyalty); search_bookings_by_ref dropped (SECURITY DEFINER + PUBLIC EXECUTE + caller-supplied business_id, no caller in repo); calculate_booking_refund and check_loyalty EXECUTE revoked from PUBLIC and anon. | 2026-08-15 (20260815140000_onboarding_wizard): new anonymous write path for client onboarding. Edge fn onboarding-wizard is verify_jwt=false and reachable by anyone; its gate is a single-use, unexpired invite_tokens row that resolves to exactly one business_id, plus per-IP check_rate_limit. No request may supply a business_id and writable columns are whitelisted per step, so the encrypted credential columns, subdomain and subscription_status are unreachable from the wizard. Skeleton tenants are created with subscription_status='ONBOARDING' (outside the TRADING set) so a half-finished onboarding cannot take money. New storage bucket onboarding-assets grants anon INSERT, bounded by a 5MB cap and an image-only mime allowlist; the bucket is public-read by design. No public-schema grants, policies or RLS state changed, which is why this snapshot's arrays are unchanged. | 2026-09-12: reviewed deployed first-five release: independent booking proof, tenant-scoped insert/read policy, service-only durable refund operations.",
+  "note": "Pre-launch security audit fixes (2026-07-13): admin_users UPDATE fully revoked from authenticated (was: any admin could self-promote to SUPER_ADMIN via business_id-only RLS check with no role restriction); combo_bookings anon/public INSERT policies dropped (was: anon could insert payment_status=PAID directly, bypassing Paysafe); combo_booking_items_anon_insert dropped (settlement forgery); promotion_uses_anon_insert dropped (promo abuse); holds_authenticated_all split into select/update/delete (tenant-scoped, matching prior qual) with INSERT now default-deny (was: with_check=true let any authenticated session write holds against any tenant); zero-policy tables (processed_wa_messages, wa_messages, business_partnerships, combo_settlements, invite_tokens, ngt_intake_submissions, ngt_payments, tenant_invoice_sequences) had broad anon/authenticated grants revoked (RLS already default-denied these, but grants were unnecessarily broad). Migrations: 20260713144334_security_audit_fixes, 20260713144422_security_audit_fixes_c1_correction, plus an admin_setup_token_used_hash column addition. | 2026-08-15 (20260815120000_close_anon_cross_tenant_booking_reads): bookings_read POST/PATCH read-back clause scoped to the writing tenant + DRAFT/PENDING (was: ANY POST or PATCH — including every /rpc/* call — disabled the policy entirely, exposing all tenants' bookings to anon; proven live via check_loyalty); search_bookings_by_ref dropped (SECURITY DEFINER + PUBLIC EXECUTE + caller-supplied business_id, no caller in repo); calculate_booking_refund and check_loyalty EXECUTE revoked from PUBLIC and anon. | 2026-08-15 (20260815140000_onboarding_wizard): new anonymous write path for client onboarding. Edge fn onboarding-wizard is verify_jwt=false and reachable by anyone; its gate is a single-use, unexpired invite_tokens row that resolves to exactly one business_id, plus per-IP check_rate_limit. No request may supply a business_id and writable columns are whitelisted per step, so the encrypted credential columns, subdomain and subscription_status are unreachable from the wizard. Skeleton tenants are created with subscription_status='ONBOARDING' (outside the TRADING set) so a half-finished onboarding cannot take money. New storage bucket onboarding-assets grants anon INSERT, bounded by a 5MB cap and an image-only mime allowlist; the bucket is public-read by design. No public-schema grants, policies or RLS state changed, which is why this snapshot's arrays are unchanged. | 2026-09-12: reviewed deployed first-five release: independent booking proof, tenant-scoped insert/read policy, service-only durable refund operations. | 2026-10-27 (20261027120000_operator_directory_security_invoker): operator_directory was an owner-rights, auto-updatable view with Supabase's default ALL grant, so anon could PATCH/DELETE businesses rows through it past RLS (proven live via PostgREST, nil-id no-op). It is now security_invoker over SECURITY DEFINER app_private.operator_directory_rows() (not updatable) and anon/authenticated hold SELECT only; clears lint 0010.",
   "grants": [
     {
       "grantee": "anon",
@@ -270,37 +270,7 @@
     {
       "grantee": "anon",
       "table_name": "operator_directory",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "operator_directory",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "operator_directory",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "operator_directory",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "operator_directory",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "operator_directory",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "operator_directory",
-      "privilege_type": "UPDATE"
     },
     {
       "grantee": "anon",
@@ -1970,37 +1940,7 @@
     {
       "grantee": "authenticated",
       "table_name": "operator_directory",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "operator_directory",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "operator_directory",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "operator_directory",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "operator_directory",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "operator_directory",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "operator_directory",
-      "privilege_type": "UPDATE"
     },
     {
       "grantee": "authenticated",

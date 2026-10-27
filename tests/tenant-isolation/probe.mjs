@@ -184,6 +184,26 @@ async function main() {
     leaked ? `amount=${refundBody.amount}, tour_start=${refundBody.tour_start}` : "rejected",
   );
 
+  // ---- 8. the public operator directory must be read-only ---------------
+  // operator_directory reads past businesses RLS by design. If anon can write
+  // through it, any visitor can rewrite a listed tenant's subdomain,
+  // booking_site_url or logo. The nil id matches no row, so an open hole is
+  // reported without changing anything.
+  const dirWrites = [];
+  for (const method of ["PATCH", "DELETE"]) {
+    const res = await fetch(URL_BASE + "/rest/v1/operator_directory?id=eq.00000000-0000-0000-0000-000000000000", {
+      method,
+      headers: { apikey: ANON, Authorization: "Bearer " + ANON, "Content-Type": "application/json" },
+      body: method === "PATCH" ? JSON.stringify({ location_phrase: "probe" }) : undefined,
+    });
+    dirWrites.push({ method, ok: res.ok, status: res.status });
+  }
+  record(
+    "anon cannot write through operator_directory",
+    dirWrites.every((w) => !w.ok),
+    dirWrites.map((w) => `${w.method} ${w.status}`).join(", "),
+  );
+
   const failed = results.filter((r) => !r.pass);
   console.log(`\n${results.length - failed.length}/${results.length} probes passed`);
   if (failed.length) {
