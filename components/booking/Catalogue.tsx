@@ -3,10 +3,12 @@ import "./catalogue.css";
 
 // The original storefront card, shared with the settings preview. Keep the
 // components/booking copy identical across the two separate app builds.
-export function CatalogueCard({ name, duration, price, description, image, reviews, urgency, actionLabel, onSelect }: {
+export function CatalogueCard({ name, duration, price, dealPrice, description, image, reviews, urgency, actionLabel, onSelect }: {
   name: string;
   duration: string;
   price: number | null | undefined;
+  // Lowest last-minute price, shown as "from" beside the struck-through price.
+  dealPrice?: number;
   description?: string | null;
   image?: ReactNode;
   reviews?: string;
@@ -22,7 +24,10 @@ export function CatalogueCard({ name, duration, price, description, image, revie
         {image && <>{image}<div className="glass-photo-scrim" /></>}
         {typeof price === "number" && Number.isFinite(price) && (
           <span className="glass-chip absolute bottom-3 left-3 px-3.5 py-1.5 font-display text-[15px] font-bold">
-            R{price}<span className="ml-1 text-[11px] font-normal" style={{ color: "var(--ink-muted)" }}>pp</span>
+            {typeof dealPrice === "number" && dealPrice < price
+              ? <><span className="mr-1.5 text-[12px] font-normal line-through" style={{ color: "var(--ink-faint)" }}>R{price}</span><span className="mr-1 text-[11px] font-normal">from</span>R{dealPrice}</>
+              : <>R{price}</>}
+            <span className="ml-1 text-[11px] font-normal" style={{ color: "var(--ink-muted)" }}>pp</span>
           </span>
         )}
         <span className="glass-chip absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true">
