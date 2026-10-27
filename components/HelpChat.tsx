@@ -299,7 +299,7 @@ export default function HelpChat({ inline = false }: { inline?: boolean }) {
           className={inline
             ? "flex h-11 shrink-0 items-center justify-center gap-2 rounded-full px-3 transition-colors"
             : "fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full transition-transform hover:scale-105 lg:bottom-6 lg:right-6 lg:h-12 lg:w-auto lg:gap-2 lg:px-4"}
-          style={{ background: "var(--ck-accent)", color: "#fff", boxShadow: "var(--ck-shadow-lg)" }}
+          style={{ background: "var(--ck-accent)", color: "#fff", boxShadow: inline ? undefined : "var(--ck-shadow-lg)" }}
         >
           <ChatCircleDots size={22} weight="fill" />
           <span className="hidden lg:inline text-sm font-semibold">{readOnly ? "AI bot" : "AI help"}</span>
