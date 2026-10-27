@@ -226,10 +226,7 @@ interface EditForm {
   email: string;
   qty: string;
   total_amount: string;
-  status: string;
 }
-
-const STATUS_OPTIONS = ["PENDING", "PENDING PAYMENT", "HELD", "CONFIRMED", "PAID", "COMPLETED", "CANCELLED"];
 
 export default function Bookings() {
   const { businessId, timezone } = useBusinessContext();
@@ -271,7 +268,6 @@ export default function Bookings() {
     email: "",
     qty: "1",
     total_amount: "0.00",
-    status: "PENDING",
   });
   const [rebookBooking, setRebookBooking] = useState<Booking | null>(null);
   const rebookSubmittingRef = useRef(false);
@@ -879,7 +875,6 @@ export default function Bookings() {
       email: b.email || "",
       qty: String(b.qty || 1),
       total_amount: String(Number(b.total_amount || 0).toFixed(2)),
-      status: b.status || "PENDING",
     });
   }
 
@@ -901,7 +896,6 @@ export default function Bookings() {
     }
     setActionBookingId(editBooking.id);
 
-    const isChangingToPaid = editForm.status === "PAID" && editBooking.status !== "PAID";
     const isPending = ["PENDING", "PENDING PAYMENT", "HELD"].includes(editBooking.status);
     const qtyChanged = qty !== editBooking.qty;
 
@@ -928,7 +922,6 @@ export default function Bookings() {
       customer_name: editForm.customer_name.trim(),
       phone: normalizePhone(editForm.phone),
       email: editForm.email.trim().toLowerCase(),
-      status: isChangingToPaid ? editBooking.status : editForm.status,
     };
     // After a guest-count change the server has already set the new total.
     if (!qtyChanged) updateData.total_amount = total;
@@ -956,7 +949,6 @@ export default function Bookings() {
     }
 
     // Notify the customer their details changed (spec: BOOKING_UPDATED email).
-    // Skipped on a PAID transition — manual-mark-paid already sends a confirmation.
     // Removing guests already emailed the customer from rebook-booking.
     const guestsAdded = qty > editBooking.qty;
     const detailsChanged =
@@ -964,7 +956,7 @@ export default function Bookings() {
       updateData.phone !== (editBooking.phone || "") ||
       updateData.email !== (editBooking.email || "").toLowerCase() ||
       guestsAdded;
-    if (detailsChanged && !isChangingToPaid && editForm.email.trim()) {
+    if (detailsChanged && editForm.email.trim()) {
       const changed: string[] = [];
       if (updateData.customer_name !== (editBooking.customer_name || "")) changed.push("name");
       if (updateData.email !== (editBooking.email || "").toLowerCase()) changed.push("email");
@@ -1006,7 +998,7 @@ export default function Bookings() {
     const contactChanged =
       updateData.email !== (editBooking.email || "").toLowerCase() ||
       updateData.phone !== (editBooking.phone || "");
-    if (isPending && !isChangingToPaid && contactChanged && editBooking.yoco_checkout_id && editForm.email.trim()) {
+    if (isPending && contactChanged && editBooking.yoco_checkout_id && editForm.email.trim()) {
       try {
         const linkRes = await supabase.functions.invoke("create-checkout", {
           body: {
@@ -1041,22 +1033,7 @@ export default function Bookings() {
       });
     }
 
-    if (isChangingToPaid) {
-      try {
-        const res = await supabase.functions.invoke("manual-mark-paid", {
-          body: { action: "mark_paid", booking_id: editBooking.id },
-        });
-        if (res.error) {
-          notify({ title: "Marked update partially failed", message: "Booking updated, but mark paid failed: " + res.error.message, tone: "warning" });
-        } else if (res.data?.error) {
-          notify({ title: "Marked update partially failed", message: "Booking updated, but mark paid failed: " + res.data.error, tone: "warning" });
-        } else {
-          notify({ title: "Booking updated", message: "Booking and payment status saved.", tone: "success" });
-        }
-      } catch (err: unknown) {
-        notify({ title: "Mark paid failed", message: err instanceof Error ? err.message : String(err), tone: "error" });
-      }
-    } else if (!shouldInvalidatePaymentLink) {
+    if (!shouldInvalidatePaymentLink) {
       notify({ title: "Booking updated", message: "Booking details were saved successfully.", tone: "success" });
     }
 
@@ -2053,20 +2030,9 @@ export default function Bookings() {
                   <span id="edit-total-hint" className="mt-1 block text-xs">Recalculated for the new guest count when you save. Change the price separately.</span>
                 )}
               </label>
-              <label className="text-sm text-gray-600 md:col-span-2">
-                Status
-                <select
-                  value={editForm.status}
-                  onChange={(e) => setEditForm((p) => ({ ...p, status: e.target.value }))}
-                  className="ui-control mt-1 w-full"
-                >
-                  {STATUS_OPTIONS.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <p className="text-sm text-gray-600 md:col-span-2">
+                Status: <strong>{editBooking.status}</strong>. Change it with Guest actions (Mark Paid, Refund, Cancel) so seats, refunds and emails stay correct.
+              </p>
             </div>
             <div className="mt-4 grid grid-cols-1 gap-2 sm:flex sm:justify-end">
               <button onClick={() => setEditBooking(null)} className="ui-btn ui-btn-ghost">

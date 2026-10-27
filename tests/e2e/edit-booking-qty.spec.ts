@@ -91,6 +91,22 @@ test("a guest-count change refused for capacity shows the reason and saves nothi
   expect(calls.filter(c => c.url.includes("/rest/v1/bookings") && c.method === "PATCH")).toEqual([]);
 });
 
+// M4: status changes go through Guest actions (pay, cancel, refund), never the edit form.
+test("the edit form has no status control and never writes status", async ({ page }) => {
+  const calls = await record(page, {});
+  const seen = notices(page);
+  await openGuestAction(page, /^Edit booking/);
+  const dialog = page.getByRole("heading", { name: "Edit Booking" }).locator("..");
+  await expect(dialog.getByRole("combobox")).toHaveCount(0);
+  await dialog.getByLabel("Name").fill("Renamed guest");
+  await dialog.getByRole("button", { name: "Save", exact: true }).click();
+  await expect.poll(() => seen.find(n => n.title === "Booking updated")).toMatchObject({ tone: "success" });
+  const writes = calls.filter(c => c.url.includes("/rest/v1/bookings") && c.method === "PATCH");
+  expect(writes).toHaveLength(1);
+  expect(writes[0].body).toMatchObject({ customer_name: "Renamed guest" });
+  expect(writes[0].body).not.toHaveProperty("status");
+});
+
 test("a failed payment link shows the server's reason, not a generic error", async ({ page }) => {
   await record(page, {
     "create-checkout": { status: 409, json: { error: "CHECKOUT_UNAVAILABLE", reason: "Reservation expired. Please choose a time again." } },
