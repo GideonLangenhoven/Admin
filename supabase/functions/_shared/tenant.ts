@@ -484,6 +484,15 @@ export async function recordWaMessage(
       provider_message_id: entry.providerMessageId || null,
       error: entry.error || null,
     });
+    // Activity Timeline: one row per WhatsApp message sent for a booking.
+    if (entry.bookingId && entry.status === "SENT") {
+      await sb.from("logs").insert({
+        business_id: businessId,
+        booking_id: entry.bookingId,
+        event: "whatsapp_sent",
+        payload: { type: entry.templateName || entry.kind, to: normalizedTo, provider_id: entry.providerMessageId || null },
+      });
+    }
   } catch (e) {
     console.error("WA_AUDIT_ERR", e);
   }
@@ -497,6 +506,7 @@ export async function sendWhatsappTemplate(
   templateName: string,
   bodyParams: string[],
   languageCode = "en",
+  bookingId?: string | null,
 ) {
   if (!tenant.credentials.waToken || !tenant.credentials.waPhoneId) {
     throw new Error("WhatsApp is not configured for " + getBusinessDisplayName(tenant.business));
@@ -521,10 +531,10 @@ export async function sendWhatsappTemplate(
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const errMsg = String(data?.error?.message || "WhatsApp template send failed: " + templateName);
-    await recordWaMessage(tenant.business.id, { to, kind: "template", templateName, status: "FAILED", error: errMsg });
+    await recordWaMessage(tenant.business.id, { to, kind: "template", templateName, status: "FAILED", error: errMsg, bookingId });
     throw new Error(errMsg);
   }
-  await recordWaMessage(tenant.business.id, { to, kind: "template", templateName, status: "SENT", providerMessageId: data?.messages?.[0]?.id || null });
+  await recordWaMessage(tenant.business.id, { to, kind: "template", templateName, status: "SENT", providerMessageId: data?.messages?.[0]?.id || null, bookingId });
   return data;
 }
 
@@ -542,6 +552,7 @@ export async function sendWhatsappFreeformOrSignal(
   tenant: TenantContext | { business: TenantBusiness; credentials: TenantCredentials },
   to: string,
   message: string,
+  bookingId?: string | null,
 ): Promise<{ ok: boolean; windowClosed: boolean; error: string; messageId?: string }> {
   if (!tenant.credentials.waToken || !tenant.credentials.waPhoneId) {
     return { ok: false, windowClosed: false, error: "WhatsApp not configured for this business" };
@@ -559,11 +570,11 @@ export async function sendWhatsappFreeformOrSignal(
       const errCode = data?.error?.code;
       const windowClosed = errCode === 131047 || errCode === 131026;
       const errMsg = String(data?.error?.message || data?.message || "send failed");
-      await recordWaMessage(tenant.business.id, { to, kind: "text", body: message, status: "FAILED", error: errMsg });
+      await recordWaMessage(tenant.business.id, { to, kind: "text", body: message, status: "FAILED", error: errMsg, bookingId });
       return { ok: false, windowClosed: windowClosed, error: errMsg };
     }
     const messageId = data?.messages?.[0]?.id || undefined;
-    await recordWaMessage(tenant.business.id, { to, kind: "text", body: message, status: "SENT", providerMessageId: messageId || null });
+    await recordWaMessage(tenant.business.id, { to, kind: "text", body: message, status: "SENT", providerMessageId: messageId || null, bookingId });
     return { ok: true, windowClosed: false, error: "", messageId };
   } catch (e: any) {
     return { ok: false, windowClosed: false, error: String(e?.message || e) };
@@ -595,7 +606,7 @@ export async function sendWhatsappWithWindowReopen(
     customer_first_name: string;
   },
 ): Promise<{ sent: "direct" | "template"; queued: boolean }> {
-  const res = await sendWhatsappFreeformOrSignal(tenant, params.to, params.full_message);
+  const res = await sendWhatsappFreeformOrSignal(tenant, params.to, params.full_message, params.booking_id);
   if (res.ok) {
     return { sent: "direct", queued: false };
   }
@@ -609,7 +620,7 @@ export async function sendWhatsappWithWindowReopen(
   const brandName = getBusinessDisplayName(tenant.business);
   const firstName = params.customer_first_name || "there";
   try {
-    await sendWhatsappTemplate(tenant, params.to, reopenerTemplateName, [firstName, brandName]);
+    await sendWhatsappTemplate(tenant, params.to, reopenerTemplateName, [firstName, brandName], "en", params.booking_id);
   } catch (templateErr: any) {
     // Template not approved / rejected / missing variables — fall back to the original
     // sendWhatsappTextForTenant path so caller still attempts something. Rethrow so caller
@@ -636,6 +647,7 @@ export async function sendWhatsappTextForTenant(
   to: string,
   message: string,
   templateFallback?: { name: string; params: string[]; language?: string },
+  bookingId?: string | null,
 ) {
   // Guard: fail fast with a clear message instead of a malformed API call
   if (!tenant.credentials.waToken || !tenant.credentials.waPhoneId) {
@@ -669,16 +681,16 @@ export async function sendWhatsappTextForTenant(
     if ((errCode === 131047 || errCode === 131026) && templateFallback) {
       console.log("WA 24h window closed — sending template fallback: " + templateFallback.name + " to " + normalizedTo);
       // The template send records its own audit row and throws on failure.
-      const templateData = await sendWhatsappTemplate(tenant, to, templateFallback.name, templateFallback.params, templateFallback.language);
+      const templateData = await sendWhatsappTemplate(tenant, to, templateFallback.name, templateFallback.params, templateFallback.language, bookingId);
       // Return shape enriched with the channel actually used so callers (e.g.
       // broadcast) can log per-recipient routing. No existing caller reads the
       // return value, so this is safe; failures still throw as before.
       return { channel: "template" as const, data: templateData };
     }
     const errMsg = String(data?.error?.message || data?.message || "WhatsApp send failed");
-    await recordWaMessage(tenant.business.id, { to, kind: "text", body: message, status: "FAILED", error: errMsg });
+    await recordWaMessage(tenant.business.id, { to, kind: "text", body: message, status: "FAILED", error: errMsg, bookingId });
     throw new Error(errMsg);
   }
-  await recordWaMessage(tenant.business.id, { to, kind: "text", body: message, status: "SENT", providerMessageId: data?.messages?.[0]?.id || null });
+  await recordWaMessage(tenant.business.id, { to, kind: "text", body: message, status: "SENT", providerMessageId: data?.messages?.[0]?.id || null, bookingId });
   return { channel: "text" as const, data };
 }

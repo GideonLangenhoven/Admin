@@ -212,6 +212,19 @@ async function enrichWaiverEmailData(d: Record<string, unknown>) {
   }
 }
 
+// Activity Timeline: the booking an email is about. Most callers send only the
+// 8-character ref, so match it within the tenant; an ambiguous ref logs nothing.
+async function timelineBookingId(d: Record<string, unknown>, businessId: string) {
+  if (!supabase || !businessId) return null;
+  const ref = String(d.ref || "").toLowerCase();
+  let query = supabase.from("bookings").select("id").eq("business_id", businessId);
+  if (d.booking_id) query = query.eq("id", String(d.booking_id));
+  else if (/^[0-9a-f]{8}$/.test(ref)) query = query.gte("id", ref + "-0000-0000-0000-000000000000").lte("id", ref + "-ffff-ffff-ffff-ffffffffffff");
+  else return null;
+  const { data } = await query.limit(2);
+  return data?.length === 1 ? String(data[0].id) : null;
+}
+
 async function resolveBrandingBusinessId(d: Record<string, unknown>) {
   const directBusinessId = String(d.business_id || "").trim();
   if (directBusinessId) return directBusinessId;
@@ -3134,6 +3147,13 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       // are not Resend send failures.)
       return new Response(JSON.stringify({ ok: false, error: result.error || "send_failed", message: result.message, status: result.status }), { status: 502, headers: getCors(req) });
     }
+    try {
+      const timelineBooking = await timelineBookingId(d, branding.businessId);
+      if (timelineBooking) {
+        const logged = await supabase!.from("logs").insert({ business_id: branding.businessId, booking_id: timelineBooking, event: "email_sent", payload: { type, to: d.email, provider_id: result.id || null } });
+        if (logged.error) console.error("EMAIL_TIMELINE_LOG_ERR:", logged.error.message);
+      }
+    } catch (logErr) { console.error("EMAIL_TIMELINE_LOG_ERR:", logErr); }
     return new Response(JSON.stringify({ ok: true, id: result.id }), { status: 200, headers: getCors(req) });
   } catch (err: unknown) {
     console.error("SEND_EMAIL_ERR:", err);

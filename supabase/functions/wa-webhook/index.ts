@@ -1023,7 +1023,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           .select("id, business_id, status").eq("id", (qm as any).booking_id).eq("business_id", tenant.business.id).maybeSingle();
         if (followupError || !operationalCancellationFollowup(tenant.business.id, qm as any, followupBooking)) continue;
         try {
-          const drainRes = await sendWhatsappFreeformOrSignal(tenant, phone, (qm as any).message_body);
+          const drainRes = await sendWhatsappFreeformOrSignal(tenant, phone, (qm as any).message_body, (qm as any).booking_id);
           if (drainRes.ok) {
             await supabase.from("outbox").update({
               status: "SENT",
@@ -3325,7 +3325,7 @@ async function processWhatsappValue(tenant: TenantContext, value: any, message: 
                 .eq("phone", failedPhone)
                 .maybeSingle();
               if (convo?.customer_name) firstName = String(convo.customer_name).split(" ")[0];
-              await sendWhatsappTemplate(tenant, failedPhone, reopenerName, [firstName, getBusinessDisplayName(tenant.business)]);
+              await sendWhatsappTemplate(tenant, failedPhone, reopenerName, [firstName, getBusinessDisplayName(tenant.business)], "en", original.booking_id);
             }
             console.log("WA_STATUS_RECOVERY: msg " + providerId + " failed (" + errCode + ") — queued + reopener for " + failedPhone);
           } catch (stErr) {

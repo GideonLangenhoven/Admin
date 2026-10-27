@@ -182,7 +182,7 @@ Deno.serve(async (req: any) => {
           {
             name: "booking_confirmed1",
             params: [ref, tourName, slotTime, String(booking.qty), currency + " " + booking.total_amount, myBookingsUrl],
-          },
+          }, booking.id,
         );
         waSent = true;
       } catch (e) {

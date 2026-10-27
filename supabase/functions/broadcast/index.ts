@@ -144,7 +144,7 @@ Deno.serve(async (req: Request) => {
           name: reopenerName,
           params: [firstName(b), getBusinessDisplayName(tenant.business) || "our team"],
           language: "en",
-        });
+        }, b.id);
         if (res?.channel === "template") {
           // Outside the 24-hour window the guest got the approved "please
           // reply" template; wa-webhook delivers the message when they do.

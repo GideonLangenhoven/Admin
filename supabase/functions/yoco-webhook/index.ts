@@ -353,7 +353,7 @@ async function sendBookingConfirmation(booking: any, yocoPaymentId: string, chec
         (waiver.waiverStatus !== "SIGNED" && waiver.waiverLink
           ? (isLastMinute ? "IMPORTANT - Please sign your waiver before the trip:\n" : "Waiver: ") + waiver.waiverLink + "\n\n"
           : "") +
-        "Thanks for booking with " + brandName + ".",
+        "Thanks for booking with " + brandName + ".", booking.id,
       );
       waSent = waRes.ok;
     } catch (e) {
@@ -894,7 +894,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
               ", your booking has been moved to a new date/time.\n\n" +
               "Ref: " + rRef + "\n" +
               rTourName + (rSlotTime ? "\n" + rSlotTime : "") + "\n\n" +
-              "Thanks, " + rBrandName + "."
+              "Thanks, " + rBrandName + ".", undefined, rBk.id
             );
           } catch (e) { console.error("RESCHEDULE_CONFIRM_WA_ERR:", e); }
         }
@@ -1026,7 +1026,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
                   agDelta + " guest" + (agDelta === 1 ? "" : "s") + " added to your booking.\n\n" +
                   "Ref: " + agRef + "\n" +
                   agTourName + "\n\n" +
-                  "Thanks, " + agBrandName + "."
+                  "Thanks, " + agBrandName + ".", undefined, agBk.id
                 );
               } catch (e) { console.error("ADD_GUESTS_WA_ERR:", e); }
             }

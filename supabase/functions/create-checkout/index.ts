@@ -451,6 +451,7 @@ Deno.serve(withSentry("create-checkout", async (req: any) => {
                   body: JSON.stringify({
                     to: notifPhone,
                     business_id: bk.business_id,
+                    booking_id: bk.id,
                     message:
                       "Hi " + notifFirst + "!\n\n" +
                       "Here\u2019s your payment link to confirm your booking:\n\n" +
@@ -560,6 +561,7 @@ Deno.serve(withSentry("create-checkout", async (req: any) => {
                   body: JSON.stringify({
                     to: notifPhone,
                     business_id: bk.business_id,
+                    booking_id: bk.id,
                     message:
                       "Hi " + notifFirst + "!\n\n" +
                       "Your booking has been moved to a new slot, but it costs a little more:\n\n" +

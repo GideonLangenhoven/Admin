@@ -831,6 +831,7 @@ Deno.serve(async (req: Request) => {
                 body: JSON.stringify({
                   to: customerPhone,
                   business_id: businessId,
+                  booking_id: result.booking_id,
                   message:
                     "\uD83C\uDF89 *Booking Confirmed!*\n\n" +
                     "\uD83D\uDCCB Ref: " + bookingRef + "\n" +

@@ -733,6 +733,7 @@ export default function NewBookingPage() {
                   body: {
                     to: normalizePhone(mobile),
                     business_id: businessId,
+                    booking_id: bookingId,
                     message:
                       "Hi " + firstName + "!\n\n" +
                       "Here\u2019s your payment link to confirm your booking:\n\n" +
@@ -840,6 +841,7 @@ export default function NewBookingPage() {
               body: {
                 to: normalizePhone(mobile),
                 business_id: businessId,
+                booking_id: bookingId,
                 message: "\u{1F389} *Booking Confirmed!*\n\n" +
                   "\u{1F4CB} Ref: " + ref + "\n" +
                   "\u{1F6F6} " + (tourObj?.name || "Tour") + "\n" +

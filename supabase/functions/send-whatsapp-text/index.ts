@@ -47,7 +47,7 @@ Deno.serve(withSentry("send-whatsapp-text", async (req: any) => {
     const templateFallback = body.template_fallback
       ? { name: body.template_fallback.name, params: body.template_fallback.params || [], language: body.template_fallback.language }
       : undefined;
-    const result = await sendWhatsappTextForTenant(tenant, to, message, templateFallback);
+    const result = await sendWhatsappTextForTenant(tenant, to, message, templateFallback, bookingId || null);
     // Surface which channel actually delivered (free-form text vs the approved
     // template used when the 24h window was closed) so callers can log routing.
     const channel = (result && typeof result === "object" && "channel" in result) ? (result as { channel: string }).channel : "text";

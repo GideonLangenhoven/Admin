@@ -345,7 +345,7 @@ export default function TripPhotosWorkspace({ initialSlotId }: { initialSlotId?:
           const waMsg = "Hi " + (b.customer_name?.split(" ")[0] || "there") +
             "! 📸 Your trip photos from the " + tourName +
             " are ready!\n\n" + validUrls.join("\n") + "\n\nShare with your group and enjoy the memories!";
-          delivered = await sendMessage("send-whatsapp-text", { business_id: businessId, to: b.phone, message: waMsg }, name + " (WhatsApp)");
+          delivered = await sendMessage("send-whatsapp-text", { business_id: businessId, booking_id: b.id, to: b.phone, message: waMsg }, name + " (WhatsApp)");
         }
 
         // Send thank-you email with photo link

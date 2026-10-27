@@ -659,7 +659,7 @@ async function handleCancelRefund(req: any, booking: any) {
         tourName + " (Ref: " + ref + ") has been cancelled.\n\n" +
         "A refund of " + currency + " " + refundAmount.toFixed(2) + " has been requested.\n" +
         "Please allow 5 to 10 business days for it to reflect.\n\n" +
-        "Thanks for choosing " + brandName + "."
+        "Thanks for choosing " + brandName + ".", undefined, booking.id
       );
     } catch (e) { console.error("REBOOK_CANCEL_WA_ERR:", e); }
   }
@@ -753,7 +753,7 @@ async function handleCancelRefundVoucher(req: any, booking: any, totalAmount: nu
         "Since you paid with a voucher, a new voucher has been issued:\n" +
         "Voucher code: " + vcode + "\n" +
         "Value: " + currency + " " + totalAmount.toFixed(2) + "\n\n" +
-        "Use this code when making your next booking with " + brandName + "."
+        "Use this code when making your next booking with " + brandName + ".", undefined, booking.id
       );
     } catch (e) { console.error("REBOOK_CANCEL_VOUCHER_WA_ERR:", e); }
   }
@@ -871,7 +871,7 @@ async function handleCancelRefundSplitTender(req: any, booking: any, totalAmount
         tourName + " (Ref: " + ref + ") has been cancelled.\n\n" +
         "Voucher restored: " + vcode + " (" + currency + " " + split.voucherPortion.toFixed(2) + ")\n" +
         (yocoRefundAmount > 0 ? "Card refund: " + currency + " " + yocoRefundAmount.toFixed(2) + " (after 5% cancellation fee)\nPlease allow 5 to 10 business days for the card refund to reflect.\n\n" : "\n") +
-        "Thanks for choosing " + brandName + "."
+        "Thanks for choosing " + brandName + ".", undefined, booking.id
       );
     } catch (e) { console.error("REBOOK_CANCEL_SPLIT_WA_ERR:", e); }
   }
@@ -975,7 +975,7 @@ async function handleCancelVoucher(req: any, booking: any) {
         tourName + " (Ref: " + ref + ") has been converted to a voucher.\n\n" +
         "Voucher code: " + vcode + "\n" +
         "Value: " + currency + " " + totalAmount.toFixed(2) + "\n\n" +
-        "Use this code when making your next booking with " + brandName + "."
+        "Use this code when making your next booking with " + brandName + ".", undefined, booking.id
       );
     } catch (e) { console.error("REBOOK_VOUCHER_WA_ERR:", e); }
   }
@@ -1028,7 +1028,7 @@ async function sendRebookNotification(booking: any, event: string, message: stri
           message + "\n\n" +
           "Ref: " + ref + "\n" +
           tourName + (slotTime ? "\n" + slotTime : "") + "\n\n" +
-          "Thanks, " + brandName + "."
+          "Thanks, " + brandName + ".", undefined, booking.id
         );
       } catch (e) { console.error("REBOOK_WA_ERR_" + event + ":", e); }
     }
@@ -1112,7 +1112,7 @@ async function handleClaimCredit(req: any, booking: any, body: any) {
           tourName + " (Ref: " + ref + ") has been converted to a voucher:\n" +
           "Voucher code: " + vcode + "\n" +
           "Value: " + currency + " " + creditAmount.toFixed(2) + "\n\n" +
-          "Use this code when making your next booking with " + brandName + "."
+          "Use this code when making your next booking with " + brandName + ".", undefined, booking.id
         );
       } catch (e) { console.error("CLAIM_CREDIT_VOUCHER_WA_ERR:", e); }
     }
@@ -1218,7 +1218,7 @@ async function handleClaimCredit(req: any, booking: any, body: any) {
             "Voucher code: " + splitVoucherCode + "\n" +
             "Use it on your next booking with " + brandName + ".\n\n"
           : "") +
-        "Thanks for choosing " + brandName + "."
+        "Thanks for choosing " + brandName + ".", undefined, booking.id
       );
     } catch (e) { console.error("CLAIM_CREDIT_REFUND_WA_ERR:", e); }
   }

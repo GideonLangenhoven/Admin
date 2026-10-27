@@ -164,7 +164,7 @@ Deno.serve(async (req: Request) => {
               tourName + "\n" +
               money(received) + " received (" + paymentMethod + ")\n" +
               (paidInFull ? "Your booking is paid in full." : "Still due: " + money(balanceDue)) + "\n\n" +
-              "Thanks, " + brandName + ".");
+              "Thanks, " + brandName + ".", undefined, booking.id);
           notified = "whatsapp";
         } catch (e) {
           console.error("WA payment notice err:", e);

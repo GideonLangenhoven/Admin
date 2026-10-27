@@ -222,6 +222,16 @@ function buildTimeline(
           detail: manualPaymentDetail(p),
         });
         break;
+      case "email_sent":
+      case "whatsapp_sent": {
+        const type = String(p.type || "").replace(/_/g, " ").toLowerCase();
+        events.push({
+          time: log.created_at,
+          label: (log.event === "email_sent" ? "Email sent" : "WhatsApp sent") + (type && type !== "text" ? ": " + type.charAt(0).toUpperCase() + type.slice(1) : ""),
+          detail: [p.to && "To: " + p.to, p.provider_id && "Provider ID: " + p.provider_id].filter(Boolean).join(" | ") || undefined,
+        });
+        break;
+      }
       case "payment_confirmed_but_status_update_failed":
         events.push({
           time: log.created_at,

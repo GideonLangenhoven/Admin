@@ -71,7 +71,7 @@ async function recordOnce(key: string, booking: any, event: string, payload: Rec
       if (!email.ok) throw new Error("Refund email failed");
     } else if (notice && booking.phone) {
       const tenant = await getTenantByBusinessId(supabase, booking.business_id);
-      await sendWhatsappTextForTenant(tenant, booking.phone, notice.text);
+      await sendWhatsappTextForTenant(tenant, booking.phone, notice.text, undefined, booking.id);
     }
     await supabase.rpc("finish_yoco_payment", { p_key: key, p_ok: true });
   } catch (error) { await supabase.rpc("finish_yoco_payment", { p_key: key, p_ok: false, p_error: String(error) }); }

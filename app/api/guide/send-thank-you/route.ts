@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     }
     if (b.phone) {
       const message = "Hi " + (b.customer_name?.split(" ")[0] || "there") + "! 📸 Your trip photos from the " + tourName + " are ready!\n\n" + photoUrls.join("\n") + "\n\nShare with your group and enjoy the memories!";
-      delivered = await sendMessage("send-whatsapp-text", { business_id: caller.business_id, to: b.phone, message }, "WhatsApp");
+      delivered = await sendMessage("send-whatsapp-text", { business_id: caller.business_id, booking_id: b.id, to: b.phone, message }, "WhatsApp");
     }
     if (b.email) {
       const emailed = await sendMessage("send-email", {

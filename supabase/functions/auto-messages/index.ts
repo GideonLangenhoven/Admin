@@ -100,7 +100,7 @@ async function sendFirstBookingWhatsappsForBusiness(businessId: string) {
       await sendWhatsappTextForTenant(tenant, booking.phone, message, {
         name: "first_booking_my_bookings_v1",
         params: [firstName, brandName, ref, myBookingsUrl],
-      });
+      }, booking.id);
       sent++;
     } catch (error) {
       console.error("FIRST_BOOKING_WA_ERR", businessId, booking.id, error);
@@ -229,7 +229,7 @@ async function orchestrateTripRemindersForBusiness(businessId: string) {
             qtyStr,
             meetingPoint,
           ],
-        });
+        }, booking.id);
         waChannel = (waResult as any)?.channel || "text";
       } catch (error) {
         console.error("REMINDER_WA_ERR", businessId, booking.id, error);
@@ -341,7 +341,7 @@ async function sendReviewRequestsForBusiness(businessId: string) {
       await sendWhatsappTextForTenant(tenant, booking.phone, message, {
         name: "review_request",
         params: [firstName],
-      });
+      }, booking.id);
       await logSent(businessId, booking.id, booking.phone, "REVIEW_REQUEST");
       sent++;
     } catch (error) {
@@ -394,7 +394,7 @@ async function sendReviewRemindersForBusiness(businessId: string) {
       await sendWhatsappTextForTenant(tenant, phone, message, {
         name: "review_reminder",
         params: [firstName],
-      });
+      }, review.booking_id);
       sent++;
     } catch (error) {
       console.error("REVIEW_REMINDER_ERR", businessId, review.id, error);
@@ -621,7 +621,7 @@ async function sendPaymentRemindersForBusiness(businessId: string): Promise<numb
           await sendWhatsappTextForTenant(tenant, b.phone,
             "Hi " + firstName + ", unfortunately your booking for " + tourName + " on " + timeStr +
             " has been cancelled because payment wasn't received in time, and the spot has been released.\n\n" +
-            "Would still love to have you. You can rebook anytime here: " + myBookingsUrl);
+            "Would still love to have you. You can rebook anytime here: " + myBookingsUrl, undefined, b.id);
         } catch (_e) { /* best effort */ }
       }
       await logSent(businessId, b.id, b.phone || "", "PAYMENT_CANCEL");
@@ -643,7 +643,7 @@ async function sendPaymentRemindersForBusiness(businessId: string): Promise<numb
       "Having any trouble paying? Reply here and we'll sort it out. \u{1F60A}";
 
     if (b.phone) {
-      try { await sendWhatsappTextForTenant(tenant, b.phone, message); } catch (_e) { /* best effort */ }
+      try { await sendWhatsappTextForTenant(tenant, b.phone, message, undefined, b.id); } catch (_e) { /* best effort */ }
     }
     if (b.email) {
       try {
@@ -693,7 +693,7 @@ async function sendOnePaymentReminder(bookingId: string, businessId: string | nu
     (bk.payment_deadline
       ? "Payment is due by " + formatTenantDateTime(tenant.business, bk.payment_deadline) + ". Your payment link will expire at the deadline. Reply here if you need help."
       : "Just so you know: if payment isn't made, the booking will be automatically cancelled about " + cancelPhrase + " before the trip so the spot can be freed up. Having any trouble paying? Reply here and we'll sort it out.");
-  if (bk.phone) { try { await sendWhatsappTextForTenant(tenant, bk.phone, message); } catch (_e) { /* best effort */ } }
+  if (bk.phone) { try { await sendWhatsappTextForTenant(tenant, bk.phone, message, undefined, bk.id); } catch (_e) { /* best effort */ } }
   if (bk.email) {
     try {
       await fetch(SUPABASE_URL + "/functions/v1/send-email", {
