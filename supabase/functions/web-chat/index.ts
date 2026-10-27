@@ -79,6 +79,19 @@ function gCors(r) { const o = typeof r === "string" ? r : (r?.headers?.get("orig
 // Pluralisation helper used throughout user-facing strings ("1 person" not "1 people").
 function pl(n: number, singular: string, plural: string) { return n === 1 ? singular : plural; }
 
+const HANDOFF_REPLY = "I've sent this conversation to the team. You can leave more details here; they will reply when available.";
+
+// Urgent help points at the operator's saved public contact details (the
+// booking-site footer shows the same ones). Nothing saved, nothing promised.
+function urgentContact(business: { public_email?: string | null; public_phone?: string | null; public_whatsapp?: string | null }): string {
+  const ways = [
+    business.public_phone && "call " + business.public_phone,
+    business.public_whatsapp && "WhatsApp " + business.public_whatsapp,
+    business.public_email && "email " + business.public_email,
+  ].filter((way): way is string => Boolean(way));
+  return ways.length ? " For urgent help, " + new Intl.ListFormat("en-GB", { type: "disjunction" }).format(ways) + "." : "";
+}
+
 // Escalation pre-check. Runs before any flow logic to catch safety / legal /
 // data / human-handoff signals that must never be swallowed by the booking
 // flow's fallback responses. Each match returns a fixed reply + intent label
@@ -131,7 +144,7 @@ function detectEscalation(lo: string): { intent: string; reply: string } | null 
   )) {
     return {
       intent: "ESCALATE_HUMAN",
-      reply: "I've sent this conversation to the team. You can leave more details here; they will reply when available. For urgent help, use the contact details on the booking site.",
+      reply: HANDOFF_REPLY,
     };
   }
   // Accessibility / service animal / medical condition questions
@@ -862,6 +875,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
     if (!isBtnClick) {
       const esc = detectEscalation(lo);
       if (esc) {
+        if (esc.intent === "ESCALATE_HUMAN") esc.reply += urgentContact(requestTenant.business);
         await flagHumanHandoff(esc.intent, msg, esc.reply);
         return new Response(JSON.stringify({
           reply: esc.reply,
@@ -889,7 +903,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
     }
     // Handle persistent "Talk to a human" button anywhere in the flow.
     if (isBtnClick && (btnVal === "human" || btnVal === "btn:human")) {
-      const humanReply = "I've sent this conversation to the team. You can leave more details here; they will reply when available. For urgent help, use the contact details on the booking site.";
+      const humanReply = HANDOFF_REPLY + urgentContact(requestTenant.business);
       await flagHumanHandoff("ESCALATE_HUMAN", "[Requested a human]", humanReply);
       return new Response(JSON.stringify({
         reply: humanReply,

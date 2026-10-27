@@ -31,6 +31,9 @@ export type TenantBusiness = {
   what_to_bring?: string | null;
   activity_verb_past?: string | null;
   location_phrase?: string | null;
+  public_email?: string | null;
+  public_phone?: string | null;
+  public_whatsapp?: string | null;
 };
 
 export type TenantCredentials = {
@@ -170,6 +173,9 @@ export async function getBusinessConfig(supabase: any, businessId: string): Prom
       "what_to_bring",
       "activity_verb_past",
       "location_phrase",
+      "public_email",
+      "public_phone",
+      "public_whatsapp",
     ].join(","))
     .eq("id", businessId)
     .maybeSingle();

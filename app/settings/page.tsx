@@ -2479,6 +2479,10 @@ export default function SettingsPage() {
                                 <label className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Hero Subtitle</label>
                                 <input type="text" value={siteSettings.hero_subtitle} onChange={e => setSiteSettings({ ...siteSettings, hero_subtitle: e.target.value })}
                                     className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="Explore the Atlantic coastline by kayak with Cape Town's original guided team." />
+                                {/* The booking site shows the hero only when it has a title. */}
+                                {!siteSettings.hero_title.trim() && (siteSettings.hero_eyebrow.trim() || siteSettings.hero_subtitle.trim()) && (
+                                    <p className="text-[11px] text-[var(--ck-warning)] mt-1">Add a Hero Title to show the eyebrow and subtitle on your booking site.</p>
+                                )}
                             </div>
                             {/* Site background image — saves immediately on upload/remove
                                 (same pattern as the logo). Uses a palette background
