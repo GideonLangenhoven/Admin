@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { notify } from "../lib/app-notify";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { supabase } from "../lib/supabase";
+import { functionError } from "../lib/function-error";
+import { invoiceState, type InvoiceStatus, type MoneyBooking } from "../lib/report-accounting";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { DatePicker } from "../../components/DatePicker";
 import { Warning, CaretRight, SortAscending } from "@phosphor-icons/react";
@@ -31,9 +33,10 @@ interface InvoiceRecord extends AnyRecord {
   notes?: string | null;
   created_at?: string | null;
   booking_created_at?: string | null;
+  booking?: MoneyBooking | null;
 }
 
-interface BookingDateRow {
+interface BookingRow extends MoneyBooking {
   id: string;
   created_at: string | null;
 }
@@ -125,14 +128,33 @@ function counts(inv: InvoiceRecord) {
 
 function payment(inv: InvoiceRecord) {
   const total = asNumber(inv.total_amount, 0);
-  // No amount_paid column exists — same rule as send-email's invoice render:
+  const subtotal = total / (1 + VAT_RATE);
+  const vat = total - subtotal;
+  // The booking is the money truth: a cancelled booking's invoice still says "Pending".
+  if (inv.booking) {
+    const state = invoiceState(inv.booking);
+    return { total, amountPaid: state.paid, balanceDue: state.due, status: state.status, subtotal, vat };
+  }
+  // No booking to check — same rule as send-email's invoice render:
   // an invoice is fully paid unless its payment method is still "Pending".
   const paidUnlessPending = String(inv.payment_method || "").trim().toLowerCase() === "pending" ? 0 : total;
   const amountPaid = asNumber(inv.amount_paid, asNumber(inv.paid_amount, paidUnlessPending));
   const balanceDue = Math.max(total - amountPaid, 0);
-  const subtotal = total / (1 + VAT_RATE);
-  const vat = total - subtotal;
-  return { total, amountPaid, balanceDue, subtotal, vat };
+  const status: InvoiceStatus = balanceDue <= 0 ? "PAID" : amountPaid > 0 ? "PARTIALLY PAID" : "UNPAID";
+  return { total, amountPaid, balanceDue, status, subtotal, vat };
+}
+
+const STATUS_PILL: Record<InvoiceStatus, string> = {
+  "PAID": "ui-pill-success",
+  "PARTIALLY PAID": "ui-pill-amber",
+  "UNPAID": "ui-pill-warning",
+  "CANCELLED": "ui-pill-neutral",
+  "REFUNDED": "ui-pill-ocean",
+  "PARTIALLY REFUNDED": "ui-pill-ocean",
+};
+
+function StatusBadge({ status }: { status: InvoiceStatus }) {
+  return <span className={"ui-status " + STATUS_PILL[status]}>{status.toLowerCase()}</span>;
 }
 
 function serviceDescription(inv: InvoiceRecord) {
@@ -394,22 +416,21 @@ export default function Invoices() {
 
     const baseInvoices = (invoiceRes.data || []) as InvoiceRecord[];
     const bookingIds = [...new Set(baseInvoices.map((inv) => inv.booking_id).filter(Boolean))] as string[];
-    let bookingDateMap = new Map<string, string | null>();
+    let bookingMap = new Map<string, BookingRow>();
 
     if (bookingIds.length > 0) {
       const { data: bookingRows } = await supabase
         .from("bookings")
-        .select("id, created_at")
+        .select("id, created_at, status, total_amount, total_captured, total_refunded, refund_amount, refund_processed_at")
+        .eq("business_id", businessId)
         .in("id", bookingIds);
-      bookingDateMap = new Map(
-        ((bookingRows || []) as BookingDateRow[]).map((b) => [b.id, b.created_at])
-      );
+      bookingMap = new Map(((bookingRows || []) as BookingRow[]).map((b) => [b.id, b]));
     }
 
-    const enriched = baseInvoices.map((inv) => ({
-      ...inv,
-      booking_created_at: inv.booking_id ? bookingDateMap.get(inv.booking_id) || inv.booking_created_at || null : inv.booking_created_at || null,
-    }));
+    const enriched = baseInvoices.map((inv) => {
+      const booking = inv.booking_id ? bookingMap.get(inv.booking_id) : undefined;
+      return { ...inv, booking: booking || null, booking_created_at: booking?.created_at || inv.booking_created_at || null };
+    });
 
     setInvoices(enriched);
     setLoading(false);
@@ -500,12 +521,19 @@ export default function Invoices() {
       const invNo = invoiceNumber(inv);
       const { adults } = counts(inv);
       const pay = payment(inv);
+      if (pay.status === "CANCELLED" && pay.amountPaid <= 0) {
+        notify({ title: "Nothing to invoice", message: "This booking was cancelled before any payment, so the invoice was not resent.", tone: "warning" });
+        setResendingId(null);
+        return;
+      }
 
       const res = await supabase.functions.invoke("send-email", {
         body: {
           type: "INVOICE",
           data: {
             business_id: businessId,
+            // send-email takes paid and due from this booking, not the invoice's payment method.
+            booking_id: inv.booking_id || undefined,
             email,
             customer_name: asText(inv.customer_name, "Customer"),
             customer_email: email,
@@ -522,8 +550,9 @@ export default function Invoices() {
           },
         },
       });
-      if (res.error) {
-        notify({ title: "Invoice resend failed", message: res.error.message, tone: "error", duration: 6000 });
+      const problem = await functionError(res, "The invoice could not be sent. Please try again.");
+      if (problem) {
+        notify({ title: "Invoice resend failed", message: problem, tone: "error", duration: 6000 });
       } else {
         notify({ title: "Invoice resent", message: "Tax invoice " + invNo + " sent to " + email, tone: "success", duration: 5000 });
         setRecentlySentId(inv.id);
@@ -539,7 +568,7 @@ export default function Invoices() {
   return (
     <div className="space-y-4">
       <div className="anim-fade-up">
-        <h2 className="font-display text-[24px] font-semibold leading-none md:text-[28px]" style={{ color: "var(--ck-text-strong)" }}>Billing</h2>
+        <h2 className="font-display text-[24px] font-semibold leading-none md:text-[28px]" style={{ color: "var(--ck-text-strong)" }}>Invoices</h2>
         <p className="mt-2 hidden text-sm font-medium md:block" style={{ color: "var(--ck-text-strong)" }}>Pro forma invoices</p>
         <p className="mt-1 hidden text-sm md:block" style={{ color: "var(--ck-text-muted)" }}>Download or print booking pro forma invoices.</p>
       </div>
@@ -610,7 +639,7 @@ export default function Invoices() {
                     <div key={inv.id} className="ui-card p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
-                          <p className="font-mono text-sm font-bold" style={{ color: "var(--ck-accent)" }}>{invoiceNumber(inv)}</p>
+                          <p className="flex flex-wrap items-center gap-2 font-mono text-sm font-bold" style={{ color: "var(--ck-accent)" }}>{invoiceNumber(inv)} <StatusBadge status={pay.status} /></p>
                           <p className="mt-1 text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{asText(inv.customer_name, "-")}</p>
                           <p className="text-xs break-all" style={{ color: "var(--ck-text-muted)" }}>{asText(inv.customer_email, "")}</p>
                           <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{asText(inv.tour_name, "-")}</p>
@@ -673,6 +702,7 @@ export default function Invoices() {
                               <span className="inline-block transition-transform lg:hidden" style={{ transform: openActions === inv.id ? "rotate(90deg)" : "none", color: "var(--ck-text-muted)" }}><CaretRight size={12} weight="bold" /></span>
                               <span>{invoiceNumber(inv)}</span>
                             </button>
+                            <StatusBadge status={pay.status} />
                             {openActions === inv.id && (
                               <div className="mt-2 flex flex-wrap gap-2 lg:hidden">
                                 <button data-demo-action="invoice.download" onClick={() => handleDownload(inv)} disabled={isBusy} className="ui-btn ui-btn-ghost !h-8 !px-2.5 text-xs gap-1.5 disabled:opacity-50">Download</button>

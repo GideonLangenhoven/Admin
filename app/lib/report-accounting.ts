@@ -57,6 +57,23 @@ export function amountOutstanding(b: MoneyBooking): number {
   return Math.max(0, due - amountReceived(b));
 }
 
+export type InvoiceStatus = "PAID" | "PARTIALLY PAID" | "UNPAID" | "CANCELLED" | "REFUNDED" | "PARTIALLY REFUNDED";
+
+/**
+ * An invoice's real state, from its booking. The invoice row itself keeps the
+ * payment method it was issued with ("Pending"), even after a cancellation.
+ */
+export function invoiceState(b: MoneyBooking): { status: InvoiceStatus; paid: number; refunded: number; due: number } {
+  const paid = amountReceived(b);
+  const refunded = amountRefunded(b);
+  const due = amountOutstanding(b);
+  const status: InvoiceStatus = refunded > 0 ? (refunded >= paid ? "REFUNDED" : "PARTIALLY REFUNDED")
+    : ["CANCELLED", "EXPIRED"].includes(String(b.status || "")) ? "CANCELLED"
+    : due <= 0 ? "PAID"
+    : paid > 0 ? "PARTIALLY PAID" : "UNPAID";
+  return { status, paid, refunded, due };
+}
+
 /**
  * Human payment-method label derived from gateway/voucher/OTA fields.
  * bookings.payment_method is only set on a few manual paths, so the gateway

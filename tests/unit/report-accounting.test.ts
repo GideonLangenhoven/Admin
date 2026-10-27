@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { amountReceived, amountRefunded, netReceived, amountOutstanding, derivePaymentMethod, financialTotals } from "../../app/lib/report-accounting";
+import { amountReceived, amountRefunded, netReceived, amountOutstanding, derivePaymentMethod, financialTotals, invoiceState } from "../../app/lib/report-accounting";
 
 describe("amountReceived", () => {
   it("prefers total_captured when set", () => {
@@ -84,5 +84,31 @@ describe("financialTotals", () => {
   });
   it("counts received-money rows with no payment reference", () => {
     expect(t.missingGatewayRef).toBe(1);
+  });
+});
+
+// H4: an invoice's badge, paid and due come from its booking, not from the
+// invoice's own payment method (which stays "Pending" after a cancellation).
+describe("invoiceState", () => {
+  it.each([
+    ["unpaid booking", { status: "PENDING", total_amount: 730 }, { status: "UNPAID", paid: 0, refunded: 0, due: 730 }],
+    ["held booking", { status: "HELD", total_amount: 730, total_captured: 0 }, { status: "UNPAID", paid: 0, refunded: 0, due: 730 }],
+    ["deposit paid", { status: "CONFIRMED", total_amount: 730, total_captured: 200 }, { status: "PARTIALLY PAID", paid: 200, refunded: 0, due: 530 }],
+    ["paid in full", { status: "PAID", total_amount: 730, total_captured: 730 }, { status: "PAID", paid: 730, refunded: 0, due: 0 }],
+    ["legacy completed, no captured figure", { status: "COMPLETED", total_amount: 730 }, { status: "PAID", paid: 730, refunded: 0, due: 0 }],
+    ["fully covered by a voucher", { status: "PAID", total_amount: 0, voucher_amount_paid: 730 }, { status: "PAID", paid: 0, refunded: 0, due: 0 }],
+    ["cancelled before paying (INV-00007)", { status: "CANCELLED", total_amount: 730, total_captured: 0 }, { status: "CANCELLED", paid: 0, refunded: 0, due: 0 }],
+    ["expired hold", { status: "EXPIRED", total_amount: 610 }, { status: "CANCELLED", paid: 0, refunded: 0, due: 0 }],
+    ["cancelled after paying, refund not yet made", { status: "CANCELLED", total_amount: 3600, total_captured: 3600, refund_amount: 3600 }, { status: "CANCELLED", paid: 3600, refunded: 0, due: 0 }],
+    ["cancelled and refunded in full", { status: "CANCELLED", total_amount: 500, total_captured: 500, total_refunded: 500 }, { status: "REFUNDED", paid: 500, refunded: 500, due: 0 }],
+    ["cancelled with a policy part-refund", { status: "CANCELLED", total_amount: 500, total_captured: 500, total_refunded: 250 }, { status: "PARTIALLY REFUNDED", paid: 500, refunded: 250, due: 0 }],
+    ["guests reduced on a live booking", { status: "PAID", total_amount: 400, total_captured: 500, total_refunded: 100 }, { status: "PARTIALLY REFUNDED", paid: 500, refunded: 100, due: 0 }],
+  ])("%s", (_label, booking, expected) => {
+    expect(invoiceState(booking)).toEqual(expected);
+  });
+  it("only live, unpaid invoices count towards Outstanding", () => {
+    const due = [{ status: "PENDING", total_amount: 730 }, { status: "CANCELLED", total_amount: 730 }, { status: "CANCELLED", total_amount: 610 }, { status: "CONFIRMED", total_amount: 730, total_captured: 200 }]
+      .reduce((sum, b) => sum + invoiceState(b).due, 0);
+    expect(due).toBe(730 + 530);
   });
 });
