@@ -72,8 +72,12 @@ describe("financialTotals", () => {
     { status: "PAID", total_amount: 200, total_captured: 200 },
   ];
   const t = financialTotals(rows);
-  it("computes gross for live bookings only", () => {
-    expect(t.grossBooked).toBe(500 + 400 + 200);
+  // M9: Received keeps money taken on bookings later cancelled, so a gross of
+  // live bookings only fell below it. Gross is the Total Due column's sum.
+  it("computes gross for every booking, cancelled and expired included", () => {
+    expect(t.grossBooked).toBe(500 + 400 + 500 + 250 + 200);
+    expect(t.cancelled).toBe(500 + 250);
+    expect(t.received).toBeLessThanOrEqual(t.grossBooked);
   });
   it("computes discounts, received, refunded, net, outstanding", () => {
     expect(t.discounts).toBe(100);

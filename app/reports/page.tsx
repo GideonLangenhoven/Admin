@@ -78,12 +78,30 @@ function arrivedGuests(booking: { qty?: number | null; arrived_count?: number | 
   return Math.min(qty, Math.max(0, Number(booking.arrived_count ?? (booking.checked_in ? qty : 0))));
 }
 
-function attendanceLabel(booking: { qty?: number | null; arrived_count?: number | null; checked_in?: boolean | null }) {
+type AttendanceBooking = { qty?: number | null; arrived_count?: number | null; checked_in?: boolean | null; slots?: { start_time?: string | null } | null };
+
+// A departure that hasn't started yet can't have no-shows.
+function departsLater(booking: AttendanceBooking) {
+  return Date.parse(booking.slots?.start_time || "") > Date.now();
+}
+
+function attendanceLabel(booking: AttendanceBooking) {
   const qty = Math.max(0, Number(booking.qty || 0));
   const arrived = arrivedGuests(booking);
   if (qty > 0 && arrived === qty) return "Present";
   if (arrived > 0) return `${arrived}/${qty} arrived`;
-  return "Not arrived";
+  return departsLater(booking) ? "Upcoming" : "Not arrived";
+}
+
+// Guests split into arrived, missed (departure started) and still upcoming.
+function attendanceTotals(rows: AttendanceBooking[]) {
+  let pax = 0, arrived = 0, missed = 0;
+  for (const b of rows) {
+    pax += Number(b.qty || 0);
+    arrived += arrivedGuests(b);
+    if (!departsLater(b)) missed += Number(b.qty || 0) - arrivedGuests(b);
+  }
+  return { pax, arrived, missed, upcoming: pax - arrived - missed };
 }
 
 // Standardized select chevron (muted ink) — matches the Dashboard's controls.
@@ -268,6 +286,7 @@ function ReportsContent() {
   // Accounting truth for the Financials tab: cash actually received/refunded
   // per the captured/refund columns, not booked totals by status.
   const fin = useMemo(() => financialTotals(filtered), [filtered]);
+  const basis = filterBy === "slot" ? "tour date" : "booking date";
 
   // Receipts follow the same date filter and accounting rules as Financials.
   const revenueSeries = useMemo(() => {
@@ -411,7 +430,8 @@ function ReportsContent() {
       const totals = [
         [],
         ["TOTALS"],
-        ["Gross booked (live bookings)", fin.grossBooked.toFixed(2)],
+        ["Gross booked (all bookings, incl. cancelled)", fin.grossBooked.toFixed(2)],
+        ["of which cancelled or expired", fin.cancelled.toFixed(2)],
         ["Discounts given", fin.discounts.toFixed(2)],
         ["Amount received", fin.received.toFixed(2)],
         ["of which voucher redemptions", fin.voucherApplied.toFixed(2)],
@@ -840,11 +860,11 @@ function ReportsContent() {
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             {[
-              { label: "Gross Booked", value: fmtCurrency(fin.grossBooked), color: "var(--ck-text-strong)", hint: "total due on live bookings (excl. cancelled/expired)" },
-              { label: "Received", value: fmtCurrency(fin.received), color: "var(--ck-success)", hint: "cash + voucher value actually captured" },
-              { label: "Refunded", value: fmtCurrency(fin.refunded), color: fin.refunded > 0 ? "var(--ck-danger)" : "var(--ck-text-strong)", hint: "processed refunds" },
-              { label: "Net Received", value: fmtCurrency(fin.net), color: "var(--ck-success)", hint: "received minus refunded" },
-              { label: "Outstanding", value: fmtCurrency(fin.outstanding), color: fin.outstanding > 0 ? "var(--ck-warning)" : "var(--ck-text-strong)", hint: "due but not yet received on live bookings" },
+              { label: "Gross Booked", value: fmtCurrency(fin.grossBooked), color: "var(--ck-text-strong)", hint: `Total of every booking in this period (by ${basis}), cancelled ones included` },
+              { label: "Received", value: fmtCurrency(fin.received), color: "var(--ck-success)", hint: "Cash and voucher value received on these bookings, including money taken on bookings later cancelled" },
+              { label: "Refunded", value: fmtCurrency(fin.refunded), color: fin.refunded > 0 ? "var(--ck-danger)" : "var(--ck-text-strong)", hint: "Refunds processed on these bookings" },
+              { label: "Net Received", value: fmtCurrency(fin.net), color: "var(--ck-success)", hint: "Received minus refunded" },
+              { label: "Outstanding", value: fmtCurrency(fin.outstanding), color: fin.outstanding > 0 ? "var(--ck-warning)" : "var(--ck-text-strong)", hint: "Still due on these bookings, cancelled ones excluded" },
             ].map(c => (
               <div key={c.label} className="ui-card p-4" title={c.hint}>
                 <p className="ui-mono-label !text-[10px]">{c.label}</p>
@@ -852,12 +872,12 @@ function ReportsContent() {
               </div>
             ))}
           </div>
-          {(fin.voucherApplied > 0 || fin.missingGatewayRef > 0) && (
-            <p className="px-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>
-              {fin.voucherApplied > 0 && <>Includes {fmtCurrency(fin.voucherApplied)} paid by voucher redemption. </>}
-              {fin.missingGatewayRef > 0 && <span style={{ color: "var(--ck-warning)" }}>{fin.missingGatewayRef} paid booking{fin.missingGatewayRef === 1 ? " has" : "s have"} no payment reference recorded (audit flag).</span>}
-            </p>
-          )}
+          <p className="px-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>
+            All figures cover bookings in this period by {basis}.{" "}
+            {fin.cancelled > 0 && <>Gross includes {fmtCurrency(fin.cancelled)} on cancelled bookings. </>}
+            {fin.voucherApplied > 0 && <>Received includes {fmtCurrency(fin.voucherApplied)} paid by voucher redemption. </>}
+            {fin.missingGatewayRef > 0 && <span style={{ color: "var(--ck-warning)" }}>{fin.missingGatewayRef} paid booking{fin.missingGatewayRef === 1 ? " has" : "s have"} no payment reference recorded (audit flag).</span>}
+          </p>
           <div className="ui-card flex flex-wrap items-center gap-2 p-3">
             <span className="ui-mono-label !text-[10px] mr-1">Accounting registers</span>
             <button data-demo-action="report.refunds" onClick={downloadRefundRegister} disabled={registerBusy !== null} className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-40">
@@ -1025,17 +1045,16 @@ function ReportsContent() {
       ) : activeTab === "attendance" ? (
         (() => {
           const activeBookings = filtered.filter(b => b.status !== "CANCELLED");
-          const totalPax = activeBookings.reduce((s, b) => s + Number(b.qty || 0), 0);
-          const checkedInPax = activeBookings.reduce((s, b) => s + arrivedGuests(b), 0);
-          const noShowPax = totalPax - checkedInPax;
+          const { pax: totalPax, arrived: checkedInPax, missed: noShowPax, upcoming: upcomingPax } = attendanceTotals(activeBookings);
           return (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                 {[
                   { label: "Total Pax", value: totalPax, color: "var(--ck-text-strong)" },
                   { label: "Checked In", value: checkedInPax, color: "var(--ck-success)" },
                   { label: "Not Arrived", value: noShowPax, color: "var(--ck-danger)" },
-                  { label: "Attendance Rate", value: `${totalPax > 0 ? Math.round((checkedInPax / totalPax) * 100) : 0}%`, color: "var(--ck-text-strong)" },
+                  { label: "Upcoming", value: upcomingPax, color: "var(--ck-text-strong)" },
+                  { label: "Attendance Rate", value: `${checkedInPax + noShowPax > 0 ? Math.round((checkedInPax / (checkedInPax + noShowPax)) * 100) : 0}%`, color: "var(--ck-text-strong)" },
                 ].map(c => (
                   <div key={c.label} className="ui-card p-4">
                     <p className="ui-mono-label !text-[10px]">{c.label}</p>
@@ -1045,9 +1064,8 @@ function ReportsContent() {
               </div>
               <ReportPeriodPicker value={bookingPeriod} onChange={setBookingPeriod} label="Group attendance by" />
               {groupReportRows(activeBookings, bookingPeriod, activeTimezone, b => b.slots?.start_time).map(group => {
-                const totalPax = group.rows.reduce((sum, b) => sum + Number(b.qty || 0), 0);
-                const checkedInPax = group.rows.reduce((sum, b) => sum + arrivedGuests(b), 0);
-                return <ReportPeriodGroup key={`${bookingPeriod}:${group.key}`} label={group.label} summary={`${group.rows.length} bookings · ${checkedInPax} of ${totalPax} arrived`}>
+                const { pax: totalPax, arrived: checkedInPax, upcoming } = attendanceTotals(group.rows);
+                return <ReportPeriodGroup key={`${bookingPeriod}:${group.key}`} label={group.label} summary={`${group.rows.length} bookings · ${checkedInPax} of ${totalPax} arrived${upcoming > 0 ? ` · ${upcoming} upcoming` : ""}`}>
               <div className="space-y-3 md:hidden">
                 {group.rows.map(b => (
                   <div key={b.id} className="border-t p-4" style={b.checked_in ? { borderColor: "var(--ck-success)", background: "var(--ck-success-soft)" } : arrivedGuests(b) > 0 ? { borderColor: "var(--ck-amber)", background: "var(--ck-amber-soft)" } : undefined}>
@@ -1057,7 +1075,7 @@ function ReportsContent() {
                         <p className="text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.tours?.name || "—"} · {b.slots?.start_time ? `${fmtDate(b.slots.start_time, activeTimezone)} ${fmtTime(b.slots.start_time, activeTimezone)}` : "—"}</p>
                         <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "No phone"}</p>
                       </div>
-                      <span className={`ui-status ${b.checked_in ? "ui-pill-success" : arrivedGuests(b) > 0 ? "ui-pill-amber" : "ui-pill-danger"}`}>
+                      <span className={`ui-status ${b.checked_in ? "ui-pill-success" : arrivedGuests(b) > 0 ? "ui-pill-amber" : departsLater(b) ? "ui-pill-neutral" : "ui-pill-danger"}`}>
                         {attendanceLabel(b)}
                       </span>
                     </div>
@@ -1092,7 +1110,7 @@ function ReportsContent() {
                         <td className="hidden p-3 text-xs md:table-cell" style={{ color: "var(--ck-text-muted)" }}>{b.phone || "—"}</td>
                         <td className="p-3 text-right font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{b.qty}</td>
                         <td className="p-3 text-center">
-                          <span className={`ui-status ${b.checked_in ? "ui-pill-success" : arrivedGuests(b) > 0 ? "ui-pill-amber" : "ui-pill-danger"}`}>
+                          <span className={`ui-status ${b.checked_in ? "ui-pill-success" : arrivedGuests(b) > 0 ? "ui-pill-amber" : departsLater(b) ? "ui-pill-neutral" : "ui-pill-danger"}`}>
                             {attendanceLabel(b)}
                           </span>
                         </td>

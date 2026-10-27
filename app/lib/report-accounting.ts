@@ -96,6 +96,7 @@ export function derivePaymentMethod(b: MoneyBooking): string {
 
 export type FinancialTotals = {
   grossBooked: number;
+  cancelled: number;
   discounts: number;
   received: number;
   refunded: number;
@@ -107,11 +108,16 @@ export type FinancialTotals = {
 
 /** Aggregates for tiles / footers / CSV summary rows. */
 export function financialTotals(rows: MoneyBooking[]): FinancialTotals {
-  const t: FinancialTotals = { grossBooked: 0, discounts: 0, received: 0, refunded: 0, net: 0, outstanding: 0, voucherApplied: 0, missingGatewayRef: 0 };
+  const t: FinancialTotals = { grossBooked: 0, cancelled: 0, discounts: 0, received: 0, refunded: 0, net: 0, outstanding: 0, voucherApplied: 0, missingGatewayRef: 0 };
   for (const b of rows) {
     const status = String(b.status || "");
-    if (!["CANCELLED", "EXPIRED"].includes(status)) {
-      t.grossBooked += Number(b.total_amount || 0);
+    // Gross is every booking in the period (the Total Due column's sum):
+    // Received keeps money taken on bookings later cancelled, so a gross of
+    // live bookings only could fall below it.
+    t.grossBooked += Number(b.total_amount || 0);
+    if (["CANCELLED", "EXPIRED"].includes(status)) {
+      t.cancelled += Number(b.total_amount || 0);
+    } else {
       t.discounts += Math.max(0, Number(b.original_total || b.total_amount || 0) - Number(b.total_amount || 0));
     }
     const received = amountReceived(b);
