@@ -391,7 +391,7 @@ export default function Invoices() {
     const [invoiceRes, bizRes, bankRes] = await Promise.all([
       supabase.from("invoices").select("*").eq("business_id", businessId).order("created_at", { ascending: false }).limit(200),
       supabase.from("businesses").select("business_name, invoice_company_name, invoice_address_line1, invoice_address_line2, invoice_address_line3, invoice_reg_number, invoice_vat_number").eq("id", businessId).maybeSingle(),
-      supabase.functions.invoke("bank-details", { body: { action: "get", business_id: businessId } }),
+      supabase.functions.invoke("bank-details", { body: { action: "get", business_id: businessId }, headers: { "x-admin-business-id": businessId } }),
     ]);
 
     if (bizRes.data) {

@@ -7,6 +7,7 @@ import { confirmAction, notify } from "../lib/app-notify";
 import { formatDuration } from "../lib/duration";
 import { OPERATOR_HIDEABLE_SECTIONS } from "../lib/operator-sections";
 import { supabase } from "../lib/supabase";
+import { functionError } from "../lib/function-error";
 import { sendAdminSetupLink, getAuthHeaders } from "../lib/admin-auth";
 import { SETTINGS_SECTIONS } from "../lib/settings-sections";
 import { BOOKING_PALETTES } from "../lib/booking-palettes";
@@ -311,6 +312,7 @@ export default function SettingsPage() {
     const [invoiceForm, setInvoiceForm] = useState({ company_name: "", address_line1: "", address_line2: "", address_line3: "", reg_number: "", vat_number: "" });
     const [bankForm, setBankForm] = useState({ account_owner: "", account_number: "", account_type: "", bank_name: "", branch_code: "" });
     const [bankDirty, setBankDirty] = useState(false);
+    const [bankLoadError, setBankLoadError] = useState("");
     const [invoiceSaving, setInvoiceSaving] = useState(false);
     const [invoiceMessage, setInvoiceMessage] = useState({ type: "", text: "" });
 
@@ -957,21 +959,25 @@ export default function SettingsPage() {
                 reg_number: data.invoice_reg_number || "",
                 vat_number: data.invoice_vat_number || "",
             });
-            // Bank details fetched separately via encrypted edge function
+            // Bank details fetched separately via encrypted edge function.
+            // Always name the target business: this runs before the role
+            // state is set, and the function only reads it for super-admins.
             supabase.functions.invoke("bank-details", {
                 body: { action: "get", business_id: businessId },
-                headers: role === "SUPER_ADMIN" ? { "x-admin-business-id": businessId } : undefined,
-            }).then(({ data: bankData }) => {
-                if (bankData) {
-                    setBankForm({
-                        account_owner: bankData.account_owner || "",
-                        account_number: bankData.account_number || "",
-                        account_type: bankData.account_type || "",
-                        bank_name: bankData.bank_name || "",
-                        branch_code: bankData.branch_code || "",
-                    });
-                    setBankDirty(false);
-                }
+                headers: { "x-admin-business-id": businessId },
+            }).then(async (bankRes) => {
+                const failure = await functionError(bankRes, "Please refresh the page and try again.");
+                setBankLoadError(failure ? "Banking details could not be loaded: " + failure : "");
+                // On failure clear the form, so it never shows another business's details.
+                const bankData = failure ? null : bankRes.data;
+                setBankForm({
+                    account_owner: bankData?.account_owner || "",
+                    account_number: bankData?.account_number || "",
+                    account_type: bankData?.account_type || "",
+                    bank_name: bankData?.bank_name || "",
+                    branch_code: bankData?.branch_code || "",
+                });
+                setBankDirty(false);
             });
             // Load operations & AI config
             setOpsConfig({
@@ -1177,7 +1183,7 @@ export default function SettingsPage() {
         }
 
         if (isPrivileged(role) && bankDirty) {
-            const { data: bankData, error: bankErr } = await supabase.functions.invoke("bank-details", {
+            const bankRes = await supabase.functions.invoke("bank-details", {
                 body: {
                     action: "set",
                     business_id: businessId,
@@ -1187,10 +1193,11 @@ export default function SettingsPage() {
                     bank_name: bankForm.bank_name || null,
                     branch_code: bankForm.branch_code || null,
                 },
-                headers: role === "SUPER_ADMIN" ? { "x-admin-business-id": businessId } : undefined,
+                headers: { "x-admin-business-id": businessId },
             });
-            if (bankErr || !bankData?.success) {
-                setInvoiceMessage({ type: "error", text: "Bank details failed: " + (bankErr?.message || bankData?.error || "Unknown error") });
+            const bankFailure = await functionError(bankRes, "Please try again.");
+            if (bankFailure || !bankRes.data?.success) {
+                setInvoiceMessage({ type: "error", text: "Bank details failed: " + (bankFailure || "Please try again.") });
                 setInvoiceSaving(false);
                 return;
             }
@@ -3234,7 +3241,9 @@ export default function SettingsPage() {
                             <h3 className="text-sm font-semibold text-[var(--ck-text-strong)]">Banking Details</h3>
                         </div>
                         <p className="text-xs text-[var(--ck-text-muted)] mb-4">Banking details are encrypted at rest.</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {bankLoadError && <p className="mb-4 p-3 rounded-xl text-sm font-medium bg-red-50 border border-red-200 text-[var(--ck-danger)]">{bankLoadError}</p>}
+                        {/* Locked when the load failed, so a save can't blank the stored details. */}
+                        <fieldset disabled={!!bankLoadError} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account owner</span>
                                 <input type="text" value={bankForm.account_owner} onChange={e => { setBankForm({ ...bankForm, account_owner: e.target.value }); setBankDirty(true); }}
@@ -3260,7 +3269,7 @@ export default function SettingsPage() {
                                 <input type="text" value={bankForm.branch_code} onChange={e => { setBankForm({ ...bankForm, branch_code: e.target.value }); setBankDirty(true); }}
                                     placeholder="e.g. 020909" className="ui-control mt-1 w-full" />
                             </label>
-                        </div>
+                        </fieldset>
 
 
                     </div>
