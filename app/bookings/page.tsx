@@ -17,7 +17,7 @@ import { supabase } from "../lib/supabase";
 import { listAvailableSlots } from "../lib/slot-availability";
 import { rescheduleUnitPrice } from "../lib/reschedule-price";
 import { PaperPlaneTilt, SpinnerGap, CheckCircle, XCircle, Spinner, ArrowLeft, ArrowRight } from "@phosphor-icons/react";
-import { cancelBookingAction, refundBookingAction, markPaidAction, checkInAction, type ActionResult } from "../lib/booking-actions";
+import { cancelBookingAction, refundBookingAction, processRefundAction, markPaidAction, checkInAction, type ActionResult } from "../lib/booking-actions";
 import { DatePicker } from "../../components/DatePicker";
 import { MonthPicker } from "../../components/MonthPicker";
 import BookingsMonthCalendar from "../../components/BookingsMonthCalendar";
@@ -1312,44 +1312,26 @@ export default function Bookings() {
     setRefunding(true);
     setActionBookingId(b.id);
     try {
-      if (b.yoco_checkout_id && SU) {
-        // Yoco refund — edge function handles booking update, notifications, and
-        // logging. It authorizes the caller, so send the admin's session JWT.
-        const { data: { session: rSession } } = await supabase.auth.getSession();
-        if (!rSession?.access_token) {
-          notify({ title: "Session expired", message: "Please sign in again and try again.", tone: "error" });
-          return;
-        }
-        const r = await fetch(SU + "/functions/v1/process-refund", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: "Bearer " + rSession.access_token },
-          body: JSON.stringify({ booking_id: b.id, amount }),
-        });
-        const d = await r.json();
-        if (!r.ok || d?.error) {
-          notify({ title: "Yoco refund failed", message: d?.error || r.statusText || "Unknown", tone: "error" });
-          return;
-        }
-      } else {
-        // Manual (non-Yoco) refund — update booking directly
-        const isPartial = amount < Number(b.total_amount || 0);
-        const { error } = await supabase.from("bookings").update({
-          status: "CANCELLED",
-          refund_status: "PROCESSED",
-          refund_amount: amount,
-          refund_notes: `${isPartial ? "Partial" : "Full"} manual refund from bookings page: R${amount.toFixed(2)} of R${Number(b.total_amount || 0).toFixed(2)}`,
-          cancellation_reason: "Auto-cancelled: refund processed by admin",
-          cancelled_at: new Date().toISOString(),
-        }).eq("id", b.id);
-
-        if (error) { notify({ title: "Refund update failed", message: error.message, tone: "error" }); return; }
-      }
-
-      setRefundDialog(null);
-      notify({ title: "Refund processed", message: "The refund was recorded successfully.", tone: "success" });
+      // process-refund cancels the booking, releases its seats, reserves the
+      // refund (Yoco, or a bank-transfer task) and emails the guest server-side.
+      const result = await processRefundAction({ bookingId: b.id, amount });
       loadBookings();
-    } catch (err: unknown) {
-      notify({ title: "Refund failed", message: err instanceof Error ? err.message : String(err), tone: "error" });
+      if (result.outcome === "failed" || result.outcome === "unprocessed") {
+        notify({ title: "Refund failed", message: result.error || result.message || "The refund could not be started. Please try again.", tone: "error" });
+        return;
+      }
+      setRefundDialog(null);
+      if (result.outcome === "completed") {
+        notify({ title: "Refund processed", message: "The booking is cancelled and the refund is confirmed.", tone: "success" });
+      } else if (result.outcome === "manual_action") {
+        notify({ title: "Refund pending", message: "The booking is cancelled. Pay the guest by bank transfer, then mark it paid in Refunds.", tone: "warning" });
+      } else if (result.outcome === "pending") {
+        notify({ title: "Refund pending", message: "The booking is cancelled. The payment provider has not confirmed the refund yet; track it in Refunds.", tone: "warning" });
+      } else {
+        notify({ title: "Refund status unknown", message: result.error || "Refresh and check this booking in Refunds before retrying.", tone: "error" });
+      }
+    } catch {
+      notify({ title: "Refund status unknown", message: "Refresh and check this booking in Refunds before retrying.", tone: "error" });
     } finally {
       setRefunding(false);
       setActionBookingId(null);

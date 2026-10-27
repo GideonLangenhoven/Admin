@@ -613,9 +613,13 @@
     "status"
   ],
   "idempotency_keys": [
+    "attempts",
     "created_at",
     "id",
-    "key"
+    "key",
+    "last_error",
+    "status",
+    "updated_at"
   ],
   "invite_tokens": [
     "business_id",

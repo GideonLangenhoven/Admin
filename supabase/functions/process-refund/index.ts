@@ -50,6 +50,33 @@ async function authorizeRefund(req: any, booking: any): Promise<{ ok: true } | {
   }
 }
 
+// Adds a refund step to the booking's Activity Timeline and tells the guest,
+// once per key, so retries and provider webhooks never repeat either.
+async function recordOnce(key: string, booking: any, event: string, payload: Record<string, unknown>, notice?: { type: string; data: Record<string, unknown>; text: string }) {
+  const claim = await supabase.rpc("claim_yoco_payment", { p_key: key });
+  if (claim.error) console.error("REFUND_NOTICE_CLAIM_ERR", key, claim.error.message);
+  if (claim.data !== "claimed") return;
+  try {
+    const logged = await supabase.from("logs").insert({ business_id: booking.business_id, booking_id: booking.id, event, payload });
+    if (logged.error) throw logged.error;
+    if (notice && booking.email) {
+      const email = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+        method: "POST", headers: { Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({ type: notice.type, data: {
+          booking_id: booking.id, business_id: booking.business_id, email: booking.email, customer_name: booking.customer_name,
+          ref: booking.id.substring(0,8).toUpperCase(), tour_name: booking.tours?.name || "Booking", start_time: booking.slots?.start_time || "",
+          ...notice.data,
+        } }),
+      });
+      if (!email.ok) throw new Error("Refund email failed");
+    } else if (notice && booking.phone) {
+      const tenant = await getTenantByBusinessId(supabase, booking.business_id);
+      await sendWhatsappTextForTenant(tenant, booking.phone, notice.text);
+    }
+    await supabase.rpc("finish_yoco_payment", { p_key: key, p_ok: true });
+  } catch (error) { await supabase.rpc("finish_yoco_payment", { p_key: key, p_ok: false, p_error: String(error) }); }
+}
+
 Deno.serve(withSentry("process-refund", async (req: any) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
   const respond = (data: any, status = 200) => new Response(JSON.stringify(data), { status, headers: getCors(req) });
@@ -72,6 +99,7 @@ Deno.serve(withSentry("process-refund", async (req: any) => {
     }
     const totalRefunded = Number(booking.total_refunded || 0);
     const keepBooking = body.keep_booking === true || (booking.status !== "CANCELLED" && ["REQUESTED", "MANUAL_EFT_REQUIRED", "FAILED"].includes(booking.refund_status));
+    const cancelsNow = !keepBooking && booking.status !== "CANCELLED";
     const pm = String(booking.payment_method || "").toUpperCase();
     let manual = /MANUAL|CASH|EFT|CARD \(TERMINAL\)|OTHER/.test(pm) || (!booking.yoco_checkout_id && cashPaid > 0 && !combo);
     // A late payment that never confirmed the booking did not consume its voucher.
@@ -86,6 +114,10 @@ Deno.serve(withSentry("process-refund", async (req: any) => {
       if (voucherWasSpent && !reissued && !booking.converted_to_voucher_id) return respond({ error: "Voucher reissue could not be confirmed. Please retry." }, 503);
       const saved = await supabase.from("bookings").update({ refund_status: "REFUNDED", refund_processed_at: new Date().toISOString() }).eq("id", booking.id).eq("business_id", booking.business_id);
       if (saved.error) throw saved.error;
+      await recordOnce("refund_notice:voucher:" + booking.id, booking, "refund_voucher_reissued", { voucher_code: reissued?.code, voucher_amount: reissued?.amount }, {
+        type: "CANCELLATION", data: { voucher_code: reissued?.code, voucher_amount: reissued?.amount.toFixed(2) },
+        text: "Your booking has been cancelled." + (reissued ? " Voucher credit: " + reissued.code + " (R" + reissued.amount.toFixed(2) + ")." : ""),
+      });
       return respond({ ok: true, amount: 0, channel: "voucher", voucher_code: reissued?.code, voucher_amount: reissued?.amount });
     }
 
@@ -116,15 +148,22 @@ Deno.serve(withSentry("process-refund", async (req: any) => {
       const reserved = await supabase.rpc("reserve_refund_request", {
         p_booking_id: booking.id, p_business_id: booking.business_id, p_amount: amount, p_sources: sources, p_keep_booking: keepBooking,
       });
-      if (reserved.error || !reserved.data?.ok) return respond({ error: reserved.data?.error || reserved.error?.message || "Could not reserve refund" }, 409);
+      if (reserved.error) console.error("REFUND_RESERVE_ERR", booking.id, reserved.error.message);
+      if (reserved.error || !reserved.data?.ok) return respond({ error: reserved.data?.error || "Could not reserve the refund. Please try again." }, 409);
       operations = reserved.data.operations || []; requestId = reserved.data.request_id;
     }
     if (!operations.length) return respond({ error: "Refund records are missing. Please reconcile this payment." }, 409);
+    // Cancelled now, money not back yet: tell the guest about the cancellation once.
+    const reservedAmount = operations.reduce((sum, op) => sum + Number(op.amount), 0).toFixed(2);
+    const recordReserved = (event: string) => recordOnce("refund_notice:reserved:" + requestId, booking, event, { amount: reservedAmount, request_id: requestId },
+      cancelsNow ? { type: "CANCELLATION", data: { refund_amount: reservedAmount },
+        text: "Your booking has been cancelled. Your refund of R" + reservedAmount + " is being processed. Allow 5 to 10 business days for it to reach your account." } : undefined);
     for (const operation of operations) {
       if (operation.status !== "PENDING") continue;
       if (operation.mode === "manual" && body.action !== "confirm_manual") {
         const saved = await supabase.from("bookings").update({ refund_status: "MANUAL_EFT_REQUIRED", refund_notes: "Refund reserved. Complete the bank transfer, then mark it as paid." }).eq("id", booking.id).eq("business_id", booking.business_id);
         if (saved.error) throw saved.error;
+        await recordReserved("refund_bank_transfer_required");
         return respond({ ok: true, pending: true, refund_status: "MANUAL_EFT_REQUIRED", amount: operation.amount });
       }
       let status = "SUCCEEDED", providerId: string | null = null, error: string | null = null;
@@ -155,8 +194,14 @@ Deno.serve(withSentry("process-refund", async (req: any) => {
     if (current.error) throw current.error;
     operations = current.data || [];
     const amount = operations.filter(op => op.status !== "FAILED").reduce((sum, op) => sum + Number(op.amount), 0);
-    if (operations.some(op => op.status === "PENDING")) return respond({ ok: true, pending: true, refund_status: "REFUND_PENDING", amount, request_id: requestId }, 202);
-    if (operations.some(op => op.status === "FAILED")) return respond({ ok: false, error: "The payment provider declined part or all of this refund. Review the refund queue before retrying.", refund_status: "FAILED", amount }, 502);
+    if (operations.some(op => op.status === "PENDING")) {
+      await recordReserved("refund_pending");
+      return respond({ ok: true, pending: true, refund_status: "REFUND_PENDING", amount, request_id: requestId }, 202);
+    }
+    if (operations.some(op => op.status === "FAILED")) {
+      await recordOnce("refund_notice:failed:" + requestId, booking, "refund_failed", { amount, request_id: requestId });
+      return respond({ ok: false, error: "The payment provider declined part or all of this refund. Review the refund queue before retrying.", refund_status: "FAILED", amount }, 502);
+    }
 
     const reissued = !operations[0].keep_booking && voucherWasSpent ? await reissueVoucherPortion(supabase, booking) : null;
     if (!operations[0].keep_booking && voucherWasSpent && !reissued && !booking.converted_to_voucher_id) {
@@ -165,29 +210,16 @@ Deno.serve(withSentry("process-refund", async (req: any) => {
     }
     const completed = await supabase.from("bookings").update({ refund_status: "REFUNDED", refund_error: null }).eq("id", booking.id).eq("business_id", booking.business_id);
     if (completed.error) throw completed.error;
-    const noticeKey = "refund_notice:" + requestId;
-    const claim = await supabase.rpc("claim_yoco_payment", { p_key: noticeKey });
-    if (claim.error) throw claim.error;
-    if (claim.data === "claimed") {
-      try {
-        if (booking.email) {
-          const email = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
-            method: "POST", headers: { Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
-            body: JSON.stringify({ type: "BOOKING_UPDATED", data: {
-              booking_id: booking.id, business_id: booking.business_id, email: booking.email, customer_name: booking.customer_name,
-              ref: booking.id.substring(0,8).toUpperCase(), tour_name: booking.tours?.name || "Booking", event: "refund_processed",
-              message: "Your refund of R" + amount.toFixed(2) + " has been processed. Allow 5 to 10 business days for it to reach your account."
-                + (reissued ? " Voucher credit: " + reissued.code + " (R" + reissued.amount.toFixed(2) + ")." : ""),
-            } }),
-          });
-          if (!email.ok) throw new Error("Refund email failed");
-        } else if (booking.phone) {
-          const tenant = await getTenantByBusinessId(supabase, booking.business_id);
-          await sendWhatsappTextForTenant(tenant, booking.phone, "Your refund of R" + amount.toFixed(2) + " has been processed. Allow 5 to 10 business days for it to reach your account.");
-        }
-        await supabase.rpc("finish_yoco_payment", { p_key: noticeKey, p_ok: true });
-      } catch (error) { await supabase.rpc("finish_yoco_payment", { p_key: noticeKey, p_ok: false, p_error: String(error) }); }
-    }
+    // One email for a refund that cancels the booking; a guest already told
+    // about the cancellation (pending or bank-transfer refund) gets the refund update.
+    const toldCancelled = (await supabase.from("idempotency_keys").select("status").eq("key", "refund_notice:reserved:" + requestId).maybeSingle()).data?.status === "completed";
+    const cancelled = !operations[0].keep_booking && !toldCancelled;
+    const message = (cancelled ? "Your booking has been cancelled. " : "") + "Your refund of R" + amount.toFixed(2) + " has been processed. Allow 5 to 10 business days for it to reach your account."
+      + (reissued ? " Voucher credit: " + reissued.code + " (R" + reissued.amount.toFixed(2) + ")." : "");
+    await recordOnce("refund_notice:" + requestId, booking, "refund_completed", { amount, request_id: requestId, voucher_code: reissued?.code },
+      cancelled && !reissued
+        ? { type: "CANCELLATION", data: { refund_amount: amount.toFixed(2) }, text: message }
+        : { type: "BOOKING_UPDATED", data: { event: "refund_processed", message }, text: message });
     return respond({ ok: true, amount, refund_status: "REFUNDED", partial: operations[0].keep_booking, voucher_code: reissued?.code, voucher_amount: reissued?.amount });
   } catch (error: any) {
     console.error("PROCESS_REFUND_ERROR:", error);
