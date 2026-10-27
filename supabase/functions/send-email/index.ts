@@ -1103,7 +1103,10 @@ function invoiceHtml(d: Record<string, unknown>, invCtx?: InvoiceContext) {
   const subtotalStr = m2(subtotalNum);
   const vatStr = m2(vatNum);
   const totalStrFmt = m2(totalNum);
-  const fullyPaid = invoiceAmountPaid(d, totalNum) >= totalNum - 0.005;
+  const paidNum = invoiceAmountPaid(d, totalNum);
+  const fullyPaid = paidNum >= totalNum - 0.005;
+  // A deposit or part-payment: show what was received and what is still due.
+  const partlyPaid = !fullyPaid && paidNum > 0.005;
   return `
     <!DOCTYPE html>
     <html>
@@ -1161,6 +1164,14 @@ function invoiceHtml(d: Record<string, unknown>, invCtx?: InvoiceContext) {
                 <td colspan="3" style="padding: 14px 0 0 0; border-bottom: none; font-size: 18px; font-weight: bold; color: #1b3b36;">${fullyPaid ? "Total Paid" : "Total Due"} (incl. VAT)</td>
                 <td style="padding: 14px 0 0 0; border-bottom: none; font-size: 18px; font-weight: bold; color: #1b3b36; text-align: right;">R${totalStrFmt}</td>
               </tr>
+              ${partlyPaid ? `<tr>
+                <td colspan="3" style="padding: 8px 0 0 0; color: #555; text-align: right;">Paid to date</td>
+                <td style="padding: 8px 0 0 0; color: #555; text-align: right;">R${m2(paidNum)}</td>
+              </tr>
+              <tr>
+                <td colspan="3" style="padding: 4px 0 0 0; font-weight: bold; color: #B45309; text-align: right;">Balance due</td>
+                <td style="padding: 4px 0 0 0; font-weight: bold; color: #B45309; text-align: right;">R${m2(totalNum - paidNum)}</td>
+              </tr>` : ""}
             </table>
           </td>
         </tr>
@@ -1168,7 +1179,7 @@ function invoiceHtml(d: Record<string, unknown>, invCtx?: InvoiceContext) {
         <tr>
           <td style="padding: 0 40px 30px; text-align: center;">
             <p style="font-size: 13px; color: #888; margin: 0;">Payment Method: <strong>${d.payment_method}</strong> &nbsp;|&nbsp; Ref: <strong>${String(d.payment_reference || "").substring(0, 8).toUpperCase()}</strong></p>
-            ${fullyPaid ? "" : `<p style="font-size: 13px; color: #B45309; margin: 8px 0 0; font-weight: 600;">Payment outstanding: this invoice has not been paid yet.</p>`}
+            ${fullyPaid ? "" : `<p style="font-size: 13px; color: #B45309; margin: 8px 0 0; font-weight: 600;">${partlyPaid ? "Balance outstanding: R" + m2(totalNum - paidNum) + "." : "Payment outstanding: this invoice has not been paid yet."}</p>`}
           </td>
         </tr>
         <!-- Footer -->
@@ -2648,7 +2659,10 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       : undefined;
     delete d.delivery_idempotency_key;
 
-    if (type === "BOOKING_CONFIRM" && serviceCaller && d.booking_id && !deliveryIdempotencyKey) {
+    // Every "Booking Confirmed!" for a booking goes through the one queued job
+    // keyed on the booking, admin-created bookings included, so a later
+    // payment or retry can never send a second confirmation.
+    if (type === "BOOKING_CONFIRM" && d.booking_id && !deliveryIdempotencyKey) {
       try {
         await queueBookingConfirmation(d);
         return new Response(JSON.stringify({ ok: true, queued: true }), { status: 202, headers: getCors(req) });

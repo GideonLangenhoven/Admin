@@ -456,14 +456,15 @@ describe("R08 message tenant boundaries and legitimate user flows", () => {
     const f = fixture();
     f.customerHistory({ last_booking_at: returning ? "2026-01-01T10:00:00Z" : null });
     f.rows.bookings[0].created_at = "2026-10-15T10:00:00Z";
-    const response = await f.invoke("send-email", { type: "BOOKING_CONFIRM", data: { business_id: "a", booking_id: "booking-a", email: "guest-a@fixture.invalid", customer_name: "Guest", tour_name: "Kayaking", ref: "BOOKING-A", total_amount: "100.00", qty: 1, returning_customer: !returning } });
+    // Confirmations render when the booking's queued job is delivered (M2).
+    const response = await f.invoke("send-email", { type: "BOOKING_CONFIRM", data: { business_id: "a", booking_id: "booking-a", email: "guest-a@fixture.invalid", customer_name: "Guest", tour_name: "Kayaking", ref: "BOOKING-A", total_amount: "100.00", qty: 1, returning_customer: !returning, delivery_idempotency_key: "booking-confirmation/booking-a" } }, serviceKey);
     expect(response.status).toBe(200);
     expect(f.emails[0].html.includes("Welcome back, Guest.")).toBe(returning);
     expect(f.rpcCalls.find(call => call.name === "customer_booking_history")?.args).toMatchObject({ p_business_id: "a", p_exclude_booking_id: "booking-a", p_before: "2026-10-15T10:00:00Z" });
   });
   it.each([[0,100],[25,75],[100,0]])("confirmation uses captured %s and due %s from the stored booking, never the caller's paid claim",async(captured,due)=>{
     const f=fixture();Object.assign(f.rows.bookings[0],{status:"CONFIRMED",total_amount:100,total_captured:captured});
-    const response=await f.invoke("send-email",{type:"BOOKING_CONFIRM",data:{business_id:"a",booking_id:"booking-a",email:"guest-a@fixture.invalid",customer_name:"Guest",tour_name:"Kayaking",ref:"BOOKING-A",total_amount:999,amount_paid:999,qty:1}});
+    const response=await f.invoke("send-email",{type:"BOOKING_CONFIRM",data:{business_id:"a",booking_id:"booking-a",email:"guest-a@fixture.invalid",customer_name:"Guest",tour_name:"Kayaking",ref:"BOOKING-A",total_amount:999,amount_paid:999,qty:1,delivery_idempotency_key:"booking-confirmation/booking-a"}},serviceKey);
     expect(response.status).toBe(200);expect(f.emails).toHaveLength(1);
     expect(f.emails[0].html).toMatch(new RegExp("Payment received:[\\s\\S]*?R"+captured.toFixed(2)));
     expect(f.emails[0].html).toMatch(new RegExp("Balance due:[\\s\\S]*?R"+due.toFixed(2)));
@@ -471,7 +472,7 @@ describe("R08 message tenant boundaries and legitimate user flows", () => {
   });
   it("holds a confirmation when the stored payment state is unavailable",async()=>{
     const f=fixture();delete f.rows.bookings[0].status;
-    const response=await f.invoke("send-email",{type:"BOOKING_CONFIRM",data:{business_id:"a",booking_id:"booking-a",email:"guest-a@fixture.invalid",customer_name:"Guest",tour_name:"Kayaking",ref:"BOOKING-A",total_amount:100,qty:1}});
+    const response=await f.invoke("send-email",{type:"BOOKING_CONFIRM",data:{business_id:"a",booking_id:"booking-a",email:"guest-a@fixture.invalid",customer_name:"Guest",tour_name:"Kayaking",ref:"BOOKING-A",total_amount:100,qty:1,delivery_idempotency_key:"booking-confirmation/booking-a"}},serviceKey);
     expect(response.status).toBe(503);expect(f.emails).toEqual([]);
   });
   it("preserves the operator's chosen location phrase in the delivered photo email", async () => {
@@ -598,5 +599,40 @@ describe("operator waiver and payment deadline emails", () => {
     expect(f.emails[0].html).toContain(deadline);expect(f.emails[0].html).toContain("/functions/v1/booking-payment?");expect(f.emails[0].html).toContain("This payment link will expire");
     Object.assign(f.rows.bookings[0],{status:"PAID",total_captured:100});
     expect((await f.invoke("send-email",body)).status).toBe(409);expect(f.emails).toHaveLength(1);
+  });
+});
+
+describe("M2: one confirmation per booking, and receipts show the balance", () => {
+  it("queues an admin-created confirmation under the booking's one job, so a later payment cannot repeat it", async () => {
+    const f = fixture();
+    const data = { business_id: "a", booking_id: "booking-a", email: "guest-a@fixture.invalid", customer_name: "Guest a", ref: "BOOKINGA", tour_name: "Tour a", qty: 1 };
+    const admin = await f.invoke("send-email", { type: "BOOKING_CONFIRM", data }, "a");
+    expect(admin.status).toBe(202);
+    expect(await admin.json()).toEqual({ ok: true, queued: true });
+    const service = await f.invoke("send-email", { type: "BOOKING_CONFIRM", data }, serviceKey);
+    expect(service.status).toBe(202);
+    // Nothing went out directly; both share the key the unique index dedupes on.
+    expect(f.emails).toHaveLength(0);
+    expect(f.rows.notification_jobs.map((job: any) => job.dedupe_key)).toEqual(["booking-confirmation/booking-a", "booking-confirmation/booking-a"]);
+  });
+
+  it("shows what was received and the balance on a part-paid invoice", async () => {
+    const f = fixture();
+    const invoice = { business_id: "a", booking_id: "booking-a", email: "guest-a@fixture.invalid", customer_name: "Guest a", customer_email: "guest-a@fixture.invalid",
+      invoice_number: "INV-7", invoice_date: "27 Oct 2026", tour_name: "Tour a", tour_date: "Sat 8 Nov, 08:00", qty: 3, unit_price: 500, total_amount: 1500,
+      payment_method: "Cash", payment_reference: "BOOKINGA" };
+    // send-email reads the money from the booking, not the caller.
+    Object.assign(f.rows.bookings[0], { status: "CONFIRMED", total_amount: 1500, total_captured: 500, payment_method: "Cash" });
+    expect((await f.invoke("send-email", { type: "INVOICE", data: invoice }, serviceKey)).status).toBe(200);
+    const part = f.emails[0].html;
+    expect(part).toMatch(/Paid to date<\/td>\s*<td[^>]*>R500[.,]00/);
+    expect(part).toMatch(/Balance due<\/td>\s*<td[^>]*>R1.000[.,]00/);
+    expect(part).toMatch(/Balance outstanding: R1.000[.,]00\./);
+    expect(part).not.toContain("this invoice has not been paid yet");
+
+    Object.assign(f.rows.bookings[0], { status: "PAID", total_captured: 1500 });
+    expect((await f.invoke("send-email", { type: "INVOICE", data: invoice }, serviceKey)).status).toBe(200);
+    expect(f.emails[1].html).toContain("Total Paid");
+    expect(f.emails[1].html).not.toContain("Balance due");
   });
 });

@@ -12,6 +12,7 @@ import { formatDuration } from "../../lib/duration";
 import { useBusinessContext } from "../../../components/BusinessContext";
 import { notify } from "../../lib/app-notify";
 import { functionError } from "../../lib/function-error";
+import MarkPaidDialog from "../../../components/booking/MarkPaidDialog";
 import { bookingCustomFieldEntries } from "../../../supabase/functions/_shared/booking-custom-fields";
 
 /* ── helpers ── */
@@ -26,6 +27,18 @@ function fmtDateTime(iso: string) {
 }
 function fmtCurrency(v: number) {
   return "R" + v.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// What a manual payment recorded: amount, method, reference and any balance
+// left. Entries from before amounts were recorded only had the method.
+function manualPaymentDetail(p: Record<string, unknown>) {
+  const balance = Number(p.balance_due || 0);
+  return [
+    p.amount != null ? fmtCurrency(Number(p.amount)) : null,
+    p.payment_method ? String(p.payment_method) : null,
+    p.payment_reference ? "ref " + String(p.payment_reference) : null,
+    balance > 0 ? fmtCurrency(balance) + " still due" : null,
+  ].filter(Boolean).join(" · ") || "Payment recorded manually by admin";
 }
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -207,8 +220,8 @@ function buildTimeline(
       case "payment_marked_manual":
         events.push({
           time: log.created_at,
-          label: "Marked as paid (Admin)",
-          detail: "Payment recorded manually by admin",
+          label: Number(p.balance_due || 0) > 0 ? "Part-payment recorded (Admin)" : "Payment recorded (Admin)",
+          detail: manualPaymentDetail(p),
         });
         break;
       case "payment_confirmed_but_status_update_failed":
@@ -317,9 +330,7 @@ export default function BookingDetailPage() {
   const [codeResult, setCodeResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [resendingPayment, setResendingPayment] = useState(false);
   const [markPaidOpen, setMarkPaidOpen] = useState(false);
-  const [markPaidMethod, setMarkPaidMethod] = useState<"Cash" | "EFT" | "Card (terminal)" | "Other">("Cash");
-  const [markPaidNote, setMarkPaidNote] = useState("");
-  const [markPaidLoading, setMarkPaidLoading] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [reduceGuestsOpen, setReduceGuestsOpen] = useState(false);
   const [reduceGuestsTarget, setReduceGuestsTarget] = useState(1);
   const [reduceGuestsRefundMode, setReduceGuestsRefundMode] = useState<"REFUND" | "VOUCHER" | "NONE">("REFUND");
@@ -394,7 +405,7 @@ export default function BookingDetailPage() {
       setLoading(false);
     }
     load();
-  }, [bookingId, businessId]);
+  }, [bookingId, businessId, reloadKey]);
 
   useEffect(() => {
     if (loading || !booking) return;
@@ -670,33 +681,6 @@ export default function BookingDetailPage() {
     setReduceGuestsLoading(false);
   }
 
-  async function markBookingPaid() {
-    if (!booking) return;
-    setMarkPaidLoading(true);
-    try {
-      const res = await supabase.functions.invoke("manual-mark-paid", {
-        body: {
-          action: "mark_paid",
-          booking_id: booking.id,
-          payment_method: markPaidMethod,
-          payment_note: markPaidNote.trim() || undefined,
-        },
-      });
-      if (res.error) {
-        notify({ title: "Mark Paid failed", message: res.error.message, tone: "error" });
-      } else if (res.data?.error) {
-        notify({ title: "Mark Paid failed", message: res.data.error, tone: "error" });
-      } else {
-        notify({ title: "Booking marked paid", message: `${markPaidMethod} payment recorded. Customer notified.`, tone: "success" });
-        setBooking({ ...booking, status: "PAID" });
-        setMarkPaidOpen(false);
-        setMarkPaidNote("");
-      }
-    } catch (err: any) {
-      notify({ title: "Mark Paid failed", message: err?.message || String(err), tone: "error" });
-    }
-    setMarkPaidLoading(false);
-  }
 
   async function resendPaymentLink() {
     if (!booking) return;
@@ -752,12 +736,11 @@ export default function BookingDetailPage() {
         </div>
         {isPending && Number(booking.total_amount) > 0 && (
           <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-2 flex-wrap">
-            <button
-              onClick={() => setMarkPaidOpen((v) => !v)}
-              disabled={markPaidLoading}
-              className="ui-btn ui-btn-soft !h-8 !px-3 !text-xs disabled:opacity-50"
+            <button data-demo-action="booking.paid"
+              onClick={() => setMarkPaidOpen(true)}
+              className="ui-btn ui-btn-soft !h-8 !px-3 !text-xs"
             >
-              {markPaidOpen ? "Cancel" : "Mark as Paid"}
+              Mark as Paid
             </button>
             <button data-demo-action="booking.payment"
               onClick={resendPaymentLink}
@@ -770,59 +753,9 @@ export default function BookingDetailPage() {
         )}
       </div>
 
-      {/* Mark-as-Paid inline panel — for cash, EFT, or in-person card payments. */}
-      {isPending && Number(booking.total_amount) > 0 && markPaidOpen && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 space-y-3">
-          <div>
-            <h3 className="text-sm font-semibold text-emerald-900">Record manual payment</h3>
-            <p className="mt-1 text-xs text-emerald-800">
-              Record cash, EFT or card payment already received. Marks the booking paid, sends email and WhatsApp confirmation, and issues an invoice.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="block text-xs font-medium text-emerald-900">
-              Payment method
-              <select
-                value={markPaidMethod}
-                onChange={(e) => setMarkPaidMethod(e.target.value as typeof markPaidMethod)}
-                disabled={markPaidLoading}
-                className="ui-control mt-1 w-full"
-              >
-                <option value="Cash">Cash</option>
-                <option value="EFT">EFT / Bank transfer</option>
-                <option value="Card (terminal)">Card (in-person terminal)</option>
-                <option value="Other">Other</option>
-              </select>
-            </label>
-            <label className="block text-xs font-medium text-emerald-900">
-              Reference / note (optional)
-              <input
-                type="text"
-                value={markPaidNote}
-                onChange={(e) => setMarkPaidNote(e.target.value.slice(0, 280))}
-                disabled={markPaidLoading}
-                placeholder={markPaidMethod === "EFT" ? "Bank reference, e.g. EFT-1234" : markPaidMethod === "Cash" ? "Receipt number, etc." : "Reference"}
-                className="ui-control mt-1 w-full"
-              />
-            </label>
-          </div>
-          <div className="flex items-center justify-end gap-2">
-            <button
-              onClick={() => { setMarkPaidOpen(false); setMarkPaidNote(""); }}
-              disabled={markPaidLoading}
-              className="ui-btn ui-btn-ghost !h-8 !px-3 !text-xs disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button data-demo-action="booking.paid"
-              onClick={markBookingPaid}
-              disabled={markPaidLoading}
-              className="ui-btn ui-btn-primary !h-8 !px-3 !text-xs disabled:opacity-50"
-            >
-              {markPaidLoading ? "Recording…" : `Mark ${fmtCurrency(Number(booking.total_amount))} as paid`}
-            </button>
-          </div>
-        </div>
+      {/* Mark Paid: cash, EFT or card-machine payments, including deposits. */}
+      {markPaidOpen && (
+        <MarkPaidDialog booking={booking} onClose={() => setMarkPaidOpen(false)} onRecorded={() => setReloadKey(k => k + 1)} />
       )}
 
       {/* Booking ID + Created */}
@@ -1242,8 +1175,8 @@ export default function BookingDetailPage() {
           })}
           {logs.filter((l) => l.event === "payment_marked_manual").map((l) => (
             <div key={l.id} className="mt-2 rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs">
-              <p className="font-medium text-blue-800">Manually marked as paid at {fmtDateTime(l.created_at)}</p>
-              <p className="text-blue-700 mt-1">Recorded by admin</p>
+              <p className="font-medium text-blue-800">Payment recorded by admin at {fmtDateTime(l.created_at)}</p>
+              <p className="text-blue-700 mt-1">{manualPaymentDetail((l.payload || {}) as Record<string, unknown>)}</p>
             </div>
           ))}
         </Card>

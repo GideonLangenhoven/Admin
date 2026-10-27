@@ -21,6 +21,7 @@ import { DatePicker } from "../../components/DatePicker";
 import { MonthPicker } from "../../components/MonthPicker";
 import BookingsMonthCalendar from "../../components/BookingsMonthCalendar";
 import CopyEmailButton from "../../components/booking/CopyEmailButton";
+import MarkPaidDialog from "../../components/booking/MarkPaidDialog";
 import { useBusinessContext } from "../../components/BusinessContext";
 import { fetchAllRows } from "../../supabase/functions/_shared/pagination";
 
@@ -261,6 +262,7 @@ export default function Bookings() {
   const [expandedSlots, setExpandedSlots] = useState<Set<string>>(new Set());
   const [expandAllDays, setExpandAllDays] = useState<Set<string>>(new Set());
   const [editBooking, setEditBooking] = useState<Booking | null>(null);
+  const [markPaidBooking, setMarkPaidBooking] = useState<Booking | null>(null);
   const [editForm, setEditForm] = useState<EditForm>({
     customer_name: "",
     phone: "",
@@ -1042,27 +1044,6 @@ export default function Bookings() {
 
     setActionBookingId(null);
     setEditBooking(null);
-    loadBookings();
-  }
-
-  async function markPaid(b: Booking) {
-    console.log("[BOOKINGS] markPaid", { bookingId: b.id, currentStatus: b.status });
-    setActionBookingId(b.id);
-    try {
-      const res = await supabase.functions.invoke("manual-mark-paid", {
-        body: { action: "mark_paid", booking_id: b.id },
-      });
-      if (res.error) {
-        notify({ title: "Mark paid failed", message: res.error.message, tone: "error" });
-      } else if (res.data?.error) {
-        notify({ title: "Mark paid failed", message: res.data.error, tone: "error" });
-      } else {
-        notify({ title: "Booking marked paid", message: "Notifications were sent to the customer.", tone: "success" });
-      }
-    } catch (err: unknown) {
-      notify({ title: "Mark paid failed", message: err instanceof Error ? err.message : String(err), tone: "error" });
-    }
-    setActionBookingId(null);
     loadBookings();
   }
 
@@ -1877,7 +1858,7 @@ export default function Bookings() {
                             resendingInvoiceId={resendingInvoiceId}
                             onEdit={openEditModal}
                             onRebook={openRebookModal}
-                            onMarkPaid={markPaid}
+                            onMarkPaid={setMarkPaidBooking}
                             onRefund={openRefundDialog}
                             onCancel={cancelBooking}
                             onResendInvoice={resendInvoiceForBooking}
@@ -1984,6 +1965,8 @@ export default function Bookings() {
           </div>
         </div>
       )}
+
+      {markPaidBooking && <MarkPaidDialog booking={markPaidBooking} onClose={() => setMarkPaidBooking(null)} onRecorded={loadBookings} />}
 
       {editBooking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
