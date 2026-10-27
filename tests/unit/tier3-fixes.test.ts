@@ -37,14 +37,16 @@ describe("item 19 — broadcast WhatsApp 24h-window routing", () => {
   const broadcast = readFileSync("supabase/functions/broadcast/index.ts", "utf8");
   const waText = readFileSync("supabase/functions/send-whatsapp-text/index.ts", "utf8");
   it("broadcast passes the approved reopener template as out-of-window fallback", () => {
-    expect(broadcast).toContain("template_fallback");
+    expect(broadcast).toContain("sendWhatsappTextForTenant(tenant, phone, personal(b), {");
     expect(broadcast).toContain("name: reopenerName");
     expect(broadcast).toContain('"booking_update_reopener"');
+    expect(broadcast).toContain('status: "WAITING_WINDOW"');
   });
-  it("broadcast logs per-recipient channel routing and falls back to email", () => {
-    expect(broadcast).toContain("channelCounts");
-    expect(broadcast).toContain("wantEmailFallback");
-    expect(broadcast).toContain("BROADCAST_CHANNELS");
+  it("broadcast logs per-channel routing with the reason each guest was skipped", () => {
+    // H5 (go-live 2026-10-27): email is not a fallback; every guest with an
+    // address gets it, and WhatsApp goes only to opted-in guests.
+    expect(broadcast).toContain("whatsapp.skipped.no_opt_in++");
+    expect(broadcast).toContain('" whatsapp=" + JSON.stringify(whatsapp)');
   });
   it("send-whatsapp-text returns ok:false (not a 500) so callers can branch", () => {
     expect(waText).toContain("ok: false");
@@ -53,9 +55,9 @@ describe("item 19 — broadcast WhatsApp 24h-window routing", () => {
   it("broadcast email nests business_id inside data so tenant branding resolves", () => {
     // send-email's branding resolver only reads data.business_id; a top-level
     // business_id makes broadcasts send from the platform instead of the operator.
-    const sendEmailCall = broadcast.slice(broadcast.indexOf('type: "BROADCAST"'));
-    const dataBlock = sendEmailCall.slice(sendEmailCall.indexOf("data: {"), sendEmailCall.indexOf("}"));
-    expect(dataBlock).toContain("business_id");
+    // H5: the email job's payload becomes send-email's data in the cron worker.
+    expect(broadcast).toContain("payload: { business_id, booking_id: b.id");
+    expect(readFileSync("supabase/functions/cron-tasks/index.ts", "utf8")).toContain("data: { ...payload, email: job.recipient");
   });
 });
 
