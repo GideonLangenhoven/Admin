@@ -1617,7 +1617,7 @@ export default function Bookings() {
       {/* WhatsApp compose dialog */}
       {waDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="ui-card w-full max-w-md p-6">
+          <div className="ui-card w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-6">
             <h3 className="ui-title-md mb-1">WhatsApp {waDialog.name}</h3>
             <p className="ui-mono-label mb-4">{waDialog.phone}</p>
             <textarea
@@ -1652,7 +1652,7 @@ export default function Bookings() {
       {/* Refund dialog */}
       {refundDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="ui-card w-full max-w-sm p-6">
+          <div className="ui-card w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-6">
             <h3 className="ui-title-md mb-1">Refund Booking</h3>
             <p className="mb-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{refundDialog.booking.customer_name} · {refundDialog.booking.id.substring(0, 8).toUpperCase()}</p>
             <p className="mb-4 text-xs" style={{ color: "var(--ck-text-muted)" }}>Booking total: {fmtCurrency(Number(refundDialog.booking.total_amount || 0))}</p>
@@ -1927,7 +1927,7 @@ export default function Bookings() {
       {/* Bulk progress dialog */}
       {bulkProgress && (
         <div role="dialog" aria-modal="true" aria-labelledby="bulk-progress-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="ui-card max-w-lg w-full p-6">
+          <div className="ui-card max-w-lg w-full max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-6">
             <h2 id="bulk-progress-title" className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>
               {bulkActionInFlight ? "Submitting " + bulkActionInFlight + " items..." : "Bulk action results"}
             </h2>
@@ -1981,7 +1981,7 @@ export default function Bookings() {
 
       {editBooking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="ui-card w-full max-w-lg p-5">
+          <div className="ui-card w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-5">
             <h3 className="mb-4 text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Edit Booking</h3>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <label className="text-sm text-gray-600 md:col-span-2">
@@ -2070,7 +2070,7 @@ export default function Bookings() {
 
       {rebookBooking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="ui-card w-full max-w-lg p-5">
+          <div className="ui-card w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-5">
             <h3 className="mb-1 text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Rebook Booking</h3>
             <p className="mb-4 text-xs" style={{ color: "var(--ck-text-muted)" }}>
               {rebookBooking.customer_name} · {rebookBooking.tours?.name || "Tour"}
@@ -2220,7 +2220,7 @@ export default function Bookings() {
 
       {paymentLinkUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="ui-card w-full max-w-lg p-5">
+          <div className="ui-card w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-5">
             <h3 className="mb-1 text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Payment Link Sent</h3>
             <p className="mb-4 text-xs" style={{ color: "var(--ck-text-muted)" }}>Booking ref: {paymentLinkRef}</p>
             <div className="mb-3 rounded-lg border px-4 py-3 text-sm" style={{ background: "var(--ck-success-soft)", borderColor: "color-mix(in srgb, var(--ck-success) 28%, transparent)", color: "var(--ck-success)" }}>

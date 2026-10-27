@@ -128,7 +128,7 @@ export default function AppNotifications() {
 
       {confirmState && (
         <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[101] flex justify-center px-4">
-          <div className="ui-card anim-fade-up pointer-events-auto relative w-full max-w-2xl overflow-hidden p-5" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
+          <div className="ui-card anim-fade-up pointer-events-auto relative max-h-[calc(100dvh-3rem)] w-full max-w-2xl overflow-y-auto overscroll-contain p-5" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
             <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: TONE_STYLES[confirmState.tone || "warning"].rail }} aria-hidden="true" />
             <div className="flex items-start gap-3">
               <span className="ui-icon-chip shrink-0" style={{ background: TONE_STYLES[confirmState.tone || "warning"].chipBg, color: TONE_STYLES[confirmState.tone || "warning"].chipFg }}>

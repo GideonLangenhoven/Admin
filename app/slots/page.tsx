@@ -118,6 +118,9 @@ function Slots() {
     price: "",
   });
   const [savingAdd, setSavingAdd] = useState(false);
+  // A number input reports "" for text it cannot parse (e.g. "R600"), which
+  // used to save the slot with no price override and no warning.
+  const [addPriceInvalid, setAddPriceInvalid] = useState(false);
   const [reopeningDay, setReopeningDay] = useState(false);
 
   // Cancel Day State
@@ -705,11 +708,15 @@ function Slots() {
     const normalizedAddTime = normalize24HourTime(addForm.time);
     if (!normalizedAddTime) { notify({ title: "Valid time required", message: "Enter a 24-hour time such as 14:00.", tone: "warning" }); return; }
     if (!addForm.capacity || Number(addForm.capacity) <= 0) { notify({ title: "Invalid capacity", message: "Please enter a valid capacity.", tone: "warning" }); return; }
+    const priceOverride = addForm.price.trim() === "" ? null : Number(addForm.price);
+    if (addPriceInvalid || (priceOverride !== null && (!Number.isFinite(priceOverride) || priceOverride < 0))) {
+      notify({ title: "Invalid price override", message: "Enter a number such as 600, or leave it blank to use the tour's base price.", tone: "error" });
+      return;
+    }
 
     setSavingAdd(true);
 
     const [hours, mins] = normalizedAddTime.split(":").map(Number);
-    const priceOverride = addForm.price.trim() === "" ? null : Number(addForm.price);
     const tz = getAdminTimezone();
 
     const rows: any[] = [];
@@ -758,8 +765,9 @@ function Slots() {
       const skipped = rows.length - insertedCount;
       setShowAddSlot(false);
       setAddForm({ tourId: "", time: "06:00", ranges: [{ start: "", end: "" }], capacity: "12", price: "" });
+      setAddPriceInvalid(false);
       const message = skipped > 0
-        ? `${insertedCount} slot(s) created. ${skipped} already existed and were skipped.`
+        ? `${insertedCount} slot(s) created. ${skipped} already existed and were skipped (their price was not changed).`
         : `${insertedCount} slot(s) created successfully.`;
       notify({
         title: insertedCount > 0 ? "Slots created" : "No new slots",
@@ -917,7 +925,7 @@ function Slots() {
         const availability = selectedSlot.capacity_total - selectedSlot.booked - (selectedSlot.held || 0);
         return (
           <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ background: "rgba(10,18,13,0.55)", backdropFilter: "blur(2px)" }}>
-            <div className="ui-card w-full max-h-[90vh] overflow-auto p-6 sm:max-w-md !rounded-t-2xl sm:!rounded-2xl">
+            <div className="ui-card w-full max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-6 sm:max-w-md !rounded-t-2xl sm:!rounded-2xl">
             <h3 className="mb-1 text-xl font-bold" style={{ color: "var(--ck-text-strong)" }}>Edit Slot</h3>
             <p className="mb-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>
               {new Date(selectedSlot.start_time).toLocaleString("en-ZA", {
@@ -1023,7 +1031,7 @@ function Slots() {
       {/* BULK EDIT MODAL */}
       {showBulkEdit && (
         <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ background: "rgba(10,18,13,0.55)", backdropFilter: "blur(2px)" }}>
-          <div className="ui-card w-full max-h-[90vh] overflow-y-auto p-6 sm:max-w-md !rounded-t-2xl sm:!rounded-2xl" role="dialog" aria-modal="true" aria-label="Bulk Edit Slots">
+          <div className="ui-card w-full max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-6 sm:max-w-md !rounded-t-2xl sm:!rounded-2xl" role="dialog" aria-modal="true" aria-label="Bulk Edit Slots">
             <h3 className="mb-1 text-xl font-bold" style={{ color: "var(--ck-text-strong)" }}>Bulk Edit Slots</h3>
             <p className="mb-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Update departures for this tour and date range.
@@ -1126,7 +1134,7 @@ function Slots() {
       {/* ADD SLOT MODAL */}
       {showAddSlot && (
         <div className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4" style={{ background: "rgba(10,18,13,0.55)", backdropFilter: "blur(2px)" }}>
-          <div className="ui-card w-full max-h-[90vh] overflow-visible p-6 sm:max-w-md !rounded-t-2xl sm:!rounded-2xl">
+          <div className="ui-card w-full max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-6 sm:max-w-md !rounded-t-2xl sm:!rounded-2xl" role="dialog" aria-modal="true" aria-label="Add New Slots">
             <h3 className="mb-1 text-xl font-bold" style={{ color: "var(--ck-text-strong)" }}>Add New Slots</h3>
             <p className="mb-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Create departures across a date range.
@@ -1213,27 +1221,34 @@ function Slots() {
                   min="0"
                   placeholder="e.g. 600"
                   value={addForm.price}
-                  onChange={(e) => setAddForm({ ...addForm, price: e.target.value })}
+                  onChange={(e) => { setAddPriceInvalid(e.currentTarget.validity.badInput); setAddForm({ ...addForm, price: e.target.value }); }}
+                  aria-invalid={addPriceInvalid}
                   className="ui-control mt-1 w-full"
                 />
+                {addPriceInvalid && <span className="mt-1 block text-xs" style={{ color: "var(--ck-danger)" }}>Enter a number such as 600 or 600.50.</span>}
               </label>
             </div>
 
-            <div className="mt-6 grid grid-cols-1 gap-2 sm:flex sm:justify-end">
-              <button
-                onClick={() => setShowAddSlot(false)}
-                className="ui-btn ui-btn-ghost"
-              >
-                Cancel
-              </button>
-              <button data-demo-action="slot.create"
-                onClick={saveAddSlot}
-                data-help-submit=""
-                disabled={savingAdd || !addForm.tourId || addForm.ranges.some((r) => !r.start || !r.end)}
-                className="ui-btn ui-btn-primary disabled:opacity-50"
-              >
-                {savingAdd ? "Creating..." : "Create Slots"}
-              </button>
+            <div className="sticky bottom-0 -mx-6 -mb-6 mt-6 px-6 pb-6 pt-3" style={{ background: "var(--ck-surface-warm)" }}>
+              {(!addForm.tourId || addForm.ranges.some((r) => !r.start || !r.end)) && (
+                <p className="mb-2 text-xs" style={{ color: "var(--ck-text-muted)" }}>Choose a tour and fill in every date range to create slots.</p>
+              )}
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:justify-end">
+                <button
+                  onClick={() => setShowAddSlot(false)}
+                  className="ui-btn ui-btn-ghost"
+                >
+                  Cancel
+                </button>
+                <button data-demo-action="slot.create"
+                  onClick={saveAddSlot}
+                  data-help-submit=""
+                  disabled={savingAdd || !addForm.tourId || addForm.ranges.some((r) => !r.start || !r.end)}
+                  className="ui-btn ui-btn-primary disabled:opacity-50"
+                >
+                  {savingAdd ? "Creating..." : "Create Slots"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1242,7 +1257,7 @@ function Slots() {
       {/* CANCEL DAY MODAL */}
       {showCancelDay && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(10,18,13,0.55)", backdropFilter: "blur(2px)" }}>
-          <div className="ui-card w-full max-w-sm overflow-visible p-6">
+          <div className="ui-card w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-6" role="dialog" aria-modal="true" aria-label="Cancel days">
             <h3 className="mb-1 text-xl font-bold" style={{ color: "var(--ck-danger)" }}>Cancel ({selectedCancelDates.length}) Day(s)</h3>
             <p className="mb-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Close departures and cancel active bookings for bad weather on:
@@ -1281,7 +1296,7 @@ function Slots() {
       {/* REOPEN DAY MODAL */}
       {showReopenDay && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(10,18,13,0.55)", backdropFilter: "blur(2px)" }}>
-          <div className="ui-card w-full max-w-sm overflow-visible p-6">
+          <div className="ui-card w-full max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-6" role="dialog" aria-modal="true" aria-label="Reopen days">
             <h3 className="mb-1 text-xl font-bold" style={{ color: "var(--ck-accent)" }}>Reopen ({selectedCancelDates.length}) Day(s)</h3>
             <p className="mb-4 text-sm" style={{ color: "var(--ck-text-muted)" }}>
               Reopen closed departures for bookings on:

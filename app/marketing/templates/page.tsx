@@ -464,7 +464,7 @@ export default function TemplatesPage() {
       {/* Send campaign modal */}
       {sending && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="ui-card w-full max-w-lg p-6">
+          <div className="ui-card w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Send Campaign</h3>
               <button onClick={() => setSending(null)} className="ui-btn ui-btn-ghost !h-8 !w-8 !px-0" aria-label="Close"><X size={18} /></button>
