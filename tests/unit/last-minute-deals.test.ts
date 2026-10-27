@@ -63,11 +63,12 @@ describe("last-minute deals: server enforcement", () => {
 
   it("clears the deal flag wherever an operator sets a price by hand", () => {
     const slots = readFileSync("app/slots/page.tsx", "utf8");
-    const pricing = readFileSync("app/pricing/page.tsx", "utf8");
+    // H3 (go-live 2026-10-27): peak prices are written server-side by save_peak_period.
+    const pricing = readFileSync("supabase/migrations/20261027130000_peak_pricing_tenant_access.sql", "utf8");
     expect(slots).toContain("last_minute_at: null");
     expect(slots).toContain("baseUpdates.last_minute_at = null");
-    expect(pricing).toContain("is_peak: true, price_per_person_override: winningPrice, last_minute_at: null");
-    expect(pricing).toContain("is_peak: false, price_per_person_override: null, last_minute_at: null");
+    expect(pricing).toContain("set is_peak = true, price_per_person_override = v_price, last_minute_at = null");
+    expect(pricing).toContain("set is_peak = false, price_per_person_override = null, last_minute_at = null");
   });
 
   it("never advertises a deal the booking flow will not sell", () => {
