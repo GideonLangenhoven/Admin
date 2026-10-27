@@ -63,6 +63,8 @@ const PAYMENT_ACTIONS = [
   { id: "CONFIRMED", name: "Confirm booking, money still due" },
   { id: "PAID", name: "Payment received" },
 ];
+// Shown only while a field is still highlighted.
+const CHECK_HIGHLIGHTED = "Check the highlighted field before reviewing this booking.";
 let draftAuthListenerRegistered=false;
 
 function fmtTime(iso: string) {
@@ -238,7 +240,10 @@ export default function NewBookingPage() {
       tourId: /^[0-9a-f-]{36}$/i.test(requestedTour) ? requestedTour : "",
       slotId: /^[0-9a-f-]{36}$/i.test(requestedSlot) ? requestedSlot : "",
     };
-    setReturnTo(safeSimpleReturn(params.get("returnTo"), "/bookings"));
+    const back = safeSimpleReturn(params.get("returnTo"), "/bookings");
+    setReturnTo(back);
+    // A walk-in pays on the spot.
+    if (back !== "/bookings") setStatus("PAID");
     setContextReady(true);
   }, []);
 
@@ -543,7 +548,7 @@ export default function NewBookingPage() {
 
     if (missingFields.length > 0) {
       setMissingField(missingFields[0]);
-      setResult("Check the highlighted field before reviewing this booking.");
+      setResult(CHECK_HIGHLIGHTED);
       // Always surface a toast so admins don't get a silent no-op when fields
       // are missing. Field-level highlighting still happens via missingField.
       const fieldLabels: Record<string, string> = {
@@ -569,6 +574,12 @@ export default function NewBookingPage() {
         notify({
           title: "Invalid mobile format",
           message: "Include the phone's country code, e.g. +27 or +44.",
+          tone: "warning",
+        });
+      } else if (missingFields.length === 1 && missingFields[0] === "email" && email.trim()) {
+        notify({
+          title: "Enter a valid email",
+          message: "Check the email address, for example name@example.com.",
           tone: "warning",
         });
       } else {
@@ -951,7 +962,7 @@ export default function NewBookingPage() {
               />
             </div>
 
-            {!loadingSlots && availableSlots.length===0 && !dataError && <p role="status" className="mb-3 text-sm">Insufficient capacity</p>}
+            {selectedTourId && qty > 0 && slots.length > 0 && !loadingSlots && availableSlots.length===0 && !dataError && <p role="status" className="mb-3 text-sm">Insufficient capacity</p>}
             <div className="mt-4">
               <label className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold" style={{ color: "var(--ck-text)" }}>
                 Departure time <span style={{ color: "var(--ck-danger)" }}>*</span>
@@ -1265,7 +1276,7 @@ export default function NewBookingPage() {
       {priceUnavailable && <p className="ui-card p-4" role="alert">Price unavailable. Ask an admin to check it before booking.</p>}
       {blockingDataError && <div className="ui-card p-4" role="alert">{blockingDataError} <button type="button" className="underline" onClick={() => { setDataError(""); loadTours(); loadBusinessSettings(); loadAddOns(); loadSlots(); loadAvailabilityPreview(); }}>Refresh booking data</button></div>}
       {attemptedBookingId && !bookingCreated && <p className="text-sm">Save reference: <Link className="underline" href={`/bookings/${attemptedBookingId}`}>{attemptedBookingId.slice(0,8).toUpperCase()}</Link>. If saving fails, retry here or check this reference before creating another booking.</p>}
-      {result && <p ref={resultFocusRef} tabIndex={-1} role="alert" className="text-[var(--ck-danger)]">{result}</p>}
+      {result && (missingField || result !== CHECK_HIGHLIGHTED) && <p ref={resultFocusRef} tabIndex={-1} role="alert" className="text-[var(--ck-danger)]">{result}</p>}
       {reviewing && <section ref={reviewFocusRef} tabIndex={-1} className={`${styles.review} ui-card`} aria-label="Review booking">
         <div className={styles.reviewHeader}>
           <h3 className={styles.sectionTitle}>4. Review booking</h3>
