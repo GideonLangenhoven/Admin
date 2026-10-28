@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { sourceFunction } from "../helpers/source-handler";
+import { rands } from "../../supabase/functions/_shared/chat-booking-pricing";
 
 // "Anything tomorrow morning?" on WhatsApp: the real parser and handler, with
 // "now" pinned and the tenant on Africa/Johannesburg (UTC+2).
@@ -11,7 +12,7 @@ const tenant = { business: { id: "tenant-a", timezone: "Africa/Johannesburg" } }
 
 function load(now: string) {
   vi.useFakeTimers({ now: new Date(now), toFake: ["Date"] });
-  const fn = (name: string, bindings: Record<string, unknown> = {}) => sourceFunction(wa, name, { Date, ...bindings });
+  const fn = (name: string, bindings: Record<string, unknown> = {}) => sourceFunction(wa, name, { Date, rands, ...bindings });
   const tenantTimeZone = fn("tenantTimeZone");
   const getTimeZoneOffsetMs = fn("getTimeZoneOffsetMs");
   const tenantTodayKey = fn("tenantTodayKey", { tenantTimeZone });

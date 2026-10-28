@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { applicableBookingQuestions, captureQuestionFields, QUESTION_SCHEMA_KEY, validateQuestionAnswers } from "../../supabase/functions/_shared/booking-custom-fields";
-import { calculateChatBookingPricing, verifyChatBookingPricing } from "../../supabase/functions/_shared/chat-booking-pricing";
+import { calculateChatBookingPricing, rands, verifyChatBookingPricing } from "../../supabase/functions/_shared/chat-booking-pricing";
 import { sourceFunction } from "../helpers/source-handler";
 
 // Drives the real WhatsApp handleMsg with in-memory tables; network stays off.
@@ -46,7 +46,7 @@ function bot(state: string, stateData: any, tables: Record<string, any> = {}, ex
     sendButtons: async (_t: any, _p: any, body: string) => { sent.push(body); },
     setConvo: async (_id: string, data: any) => { changes.push(data); },
     logE: async () => { throw new Error("Unexpected bot error"); }, typingDelay: async () => undefined,
-    isAvailabilityQuery: ordinary, formatDuration: (m: number) => m + " min", calculateChatBookingPricing, ...extra,
+    isAvailabilityQuery: ordinary, formatDuration: (m: number) => m + " min", calculateChatBookingPricing, rands, ...extra,
   });
   return { handle, sent, changes, filters, ordinary };
 }
@@ -145,7 +145,7 @@ describe("WhatsApp booking flow", () => {
       slots: { id: "slot-1", start_time: "2099-01-01T08:00:00Z", status: "OPEN", tour_id: tour.id, price_per_person_override: null, business_id: "tenant-a" },
       tours: tour, bookings: { id: "30000000-0000-4000-8000-000000000001", waiver_token: "token-1" },
     }, {
-      fetch, SUPABASE_URL: "https://test.invalid", SUPABASE_KEY: "service-key", verifyChatBookingPricing,
+      fetch, SUPABASE_URL: "https://test.invalid", SUPABASE_KEY: "service-key", verifyChatBookingPricing, rands,
       calcDiscount: async () => ({ type: "NONE", percent: 0, label: "" }), logE: async () => undefined,
       rpc: async () => ({ data: { success: true } }), requestCheckout: async () => ({ fully_covered: true, redirectUrl: "https://example.invalid/success", amount: 0 }),
     });
@@ -165,7 +165,7 @@ describe("WhatsApp booking flow", () => {
     slots: { id: "slot-1", start_time: "2099-01-01T08:00:00Z", status: "OPEN", tour_id: tour.id, price_per_person_override: null, business_id: "tenant-a" },
     tours: tour, bookings: { id: "30000000-0000-4000-8000-000000000001", waiver_token: "token-1", status: bookingStatus },
   }, {
-    verifyChatBookingPricing, calcDiscount: async () => ({ type: "NONE", percent: 0, label: "" }), logE: async () => undefined,
+    verifyChatBookingPricing, rands, calcDiscount: async () => ({ type: "NONE", percent: 0, label: "" }), logE: async () => undefined,
     rpc: async (name: string) => name === "confirm_voucher_booking" ? confirmation : { data: { success: true } },
     getBookableTours: async () => [], resolveWaiverLink: () => "", fmtTime: () => "Fri 1 Jan, 10:00", businessName: () => "Fixture Kayak", fetch: vi.fn(async () => new Response("{}")),
   });
@@ -223,7 +223,7 @@ describe("WhatsApp booking flow", () => {
     slots: { id: "slot-1", start_time: "2099-01-01T08:00:00Z", status: "OPEN", tour_id: tour.id, price_per_person_override: null, business_id: "tenant-a" },
     tours: tour, bookings: { id: "30000000-0000-4000-8000-000000000001", waiver_token: "token-1" }, businesses: { booking_custom_fields: config },
   }, {
-    verifyChatBookingPricing, calcDiscount: async () => ({ type: "NONE", percent: 0, label: "" }), logE: async () => undefined,
+    verifyChatBookingPricing, rands, calcDiscount: async () => ({ type: "NONE", percent: 0, label: "" }), logE: async () => undefined,
     rpc: async () => ({ data: { success: true } }), requestCheckout: async () => ({ id: "checkout-1", redirectUrl: "https://pay.example.invalid/1" }),
   });
 

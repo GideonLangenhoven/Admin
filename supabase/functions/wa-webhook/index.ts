@@ -22,7 +22,7 @@ import { retrieveKb, retrieveKbContext } from "../_shared/kb.ts";
 import { assembleBotSystem, buildBlockB, buildBlockC, cancellationPolicyPrompt } from "../_shared/bot-prompt.ts";
 import { hashedUserKey } from "../_shared/openrouter-provider.ts";
 import { botReply, type BotOut, type BotUsage } from "../_shared/bot-llm.ts";
-import { calculateChatBookingPricing, verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
+import { calculateChatBookingPricing, rands, verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
 import { applicableBookingQuestions, captureQuestionFields, validateQuestionAnswers } from "../_shared/booking-custom-fields.ts";
 import { getPaidPortions } from "../_shared/vouchers.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
@@ -741,7 +741,7 @@ async function handleSmartAvail(tenant: TenantContext, phone: string, input: str
     const avail = s.capacity_total - s.booked - (s.held || 0);
     msg += "\u{1F6F6} *" + (tour?.name || "Tour") + "*\n";
     const pp = (s as any).price_per_person_override ?? tour?.base_price_per_person;
-    msg += "   " + fmtTime(tenant, s.start_time) + ", " + avail + (avail === 1 ? " spot" : " spots") + (pp != null ? ", R" + pp + "/pp" : "") + "\n\n";
+    msg += "   " + fmtTime(tenant, s.start_time) + ", " + avail + (avail === 1 ? " spot" : " spots") + (pp != null ? ", " + rands(pp) + "/pp" : "") + "\n\n";
   }
 
   if (slots.length > 8) {
@@ -1419,7 +1419,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           const trows: any[] = [];
           for (let ti = 0; ti < tours.length; ti++) {
             const tr = tours[ti];
-            trows.push({ id: "TOUR_" + tr.id, title: tr.name, description: "R" + tr.base_price_per_person + "/pp \u2022 " + formatDuration(tr.duration_minutes) });
+            trows.push({ id: "TOUR_" + tr.id, title: tr.name, description: rands(tr.base_price_per_person) + "/pp \u2022 " + formatDuration(tr.duration_minutes) });
           }
           await sendText(tenant, phone, "Awesome, let\u2019s get you booked!\n\nWhich tour catches your eye?");
           await sendList(tenant, phone, "We have " + tours.length + " incredible options:", "Choose a Tour", [{ title: "Our Tours", rows: trows }]);
@@ -1438,7 +1438,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             let msg = "Here\u2019s what\u2019s coming up:\n\n";
             for (let ai = 0; ai < slots.length; ai++) {
               const as2 = slots[ai]; const aav = as2.capacity_total - as2.booked - (as2.held || 0); const apr = await getSlotPrice(as2);
-              msg += "\u2022 " + fmtTime(tenant, as2.start_time) + ", " + aav + " spots, R" + apr + "/pp\n";
+              msg += "\u2022 " + fmtTime(tenant, as2.start_time) + ", " + aav + " spots, " + rands(apr) + "/pp\n";
             }
             await sendButtons(tenant, phone, msg, [{ id: "BOOK", title: "\u{1F6F6} Book Now" }, { id: "IDLE", title: "\u2B05 Back" }]);
           }
@@ -1447,7 +1447,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           for (let ati = 0; ati < tours2.length; ati++) {
             const at2 = tours2[ati];
             const atSlots = await getAvailSlotsForTour(tenant, at2.id, 3);
-            availMsg += "*" + at2.name + "* (R" + at2.base_price_per_person + "/pp)\n";
+            availMsg += "*" + at2.name + "* (" + rands(at2.base_price_per_person) + "/pp)\n";
             if (atSlots.length === 0) { availMsg += "  Fully booked for now\n\n"; }
             else {
               for (let asi = 0; asi < atSlots.length; asi++) {
@@ -1522,7 +1522,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         const trows = [];
         for (let ti = 0; ti < tours.length; ti++) {
           const tr = tours[ti];
-          trows.push({ id: "GV_" + tr.id, title: tr.name, description: "R" + tr.base_price_per_person + " voucher" });
+          trows.push({ id: "GV_" + tr.id, title: tr.name, description: rands(tr.base_price_per_person) + " voucher" });
         }
         await sendText(tenant, phone, "\u{1F381} *Buy a Gift Voucher*\n\nGreat idea! Pick which tour the voucher is for:");
         await sendList(tenant, phone, "Each voucher has a credit value applied to your booking.", "Choose Tour", [{ title: "Tours", rows: trows }]);
@@ -1627,7 +1627,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const tourInfo = await supabase.from("tours").select("*").eq("id", tourId).eq("business_id", tenant.business.id).eq("active", true).eq("hidden", false).maybeSingle();
       if (!tourInfo.data) { await sendText(tenant, phone, "Hmm, can\u2019t find that tour. Let\u2019s try again."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
       const t = tourInfo.data;
-      await sendText(tenant, phone, "*" + t.name + "* \u{1F6F6}\n\n" + t.description + "\n\n\u23F1 " + formatDuration(t.duration_minutes) + "\n\u{1F4B0} R" + t.base_price_per_person + " per person\n\nHow many people will be joining?");
+      await sendText(tenant, phone, "*" + t.name + "* \u{1F6F6}\n\n" + t.description + "\n\n\u23F1 " + formatDuration(t.duration_minutes) + "\n\u{1F4B0} " + rands(t.base_price_per_person) + " per person\n\nHow many people will be joining?");
       // Keep a redeemed voucher (PICK_TOUR is entered with it when the tenant has several tours).
       await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { ...sd, tour_id: tourId } });
     }
@@ -1858,7 +1858,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         const opri = os.price_per_person_override || osTour?.base_price_per_person || 600;
         const otime = formatTimeOnly(tenant, os.start_time, { hour: "2-digit", minute: "2-digit" });
         const tName = osTour?.name ? osTour.name + " \u2022 " : "";
-        timeTxt += (ti + 1) + ". " + tName + otime + " (" + oavl + " spots, R" + opri + "/pp)\n";
+        timeTxt += (ti + 1) + ". " + tName + otime + " (" + oavl + " spots, " + rands(opri) + "/pp)\n";
         slotMap[ti + 1] = os.id;
       }
       if (openSlots.length > maxDisplay) timeTxt += "\n...and " + (openSlots.length - maxDisplay) + " more times available!";
@@ -1905,7 +1905,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (disc.percent > 0) {
         const priced = calculateChatBookingPricing({ qty: Number(sd.qty), unitPrice: price, groupDiscountPercent: disc.percent, groupDiscountMinQty: 1 });
         const saving = priced.discount; finalTotal = priced.total;
-        discountMsg = "\n*" + disc.percent + "% " + disc.label + " applied!* You save R" + saving;
+        discountMsg = "\n*" + disc.percent + "% " + disc.label + " applied!* You save " + rands(saving);
       }
       // Check if voucher booking — subtract voucher value from total
       // Supports FREE_TRIP pax limit (only covers pax_limit guests) and peak arbitrage
@@ -1929,17 +1929,17 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         if (finalTotal === 0) {
           discountMsg = "\n\u{1F39F} *Voucher applied, this trip is on us!*";
         } else {
-          discountMsg = "\n\u{1F39F} *Voucher applied: R" + voucherDeduction + " off!*";
+          discountMsg = "\n\u{1F39F} *Voucher applied: " + rands(voucherDeduction) + " off!*";
         }
       }
       const tourName2 = await supabase.from("tours").select("name").eq("id", slot.tour_id).single();
-      let summary = "Here\u2019s your booking summary:\n\n\u{1F6F6} *" + (tourName2.data?.name || "Tour") + "*\n\u{1F4C5} " + fmtTime(tenant, slot.start_time) + "\n\u{1F465} " + sd.qty + " " + (sd.qty === 1 ? "person" : "people") + "\n\u{1F4B0} R" + price + " \u00D7 " + sd.qty + " = R" + baseTotal;
+      let summary = "Here\u2019s your booking summary:\n\n\u{1F6F6} *" + (tourName2.data?.name || "Tour") + "*\n\u{1F4C5} " + fmtTime(tenant, slot.start_time) + "\n\u{1F465} " + sd.qty + " " + (sd.qty === 1 ? "person" : "people") + "\n\u{1F4B0} " + rands(price) + " \u00D7 " + sd.qty + " = " + rands(baseTotal);
       if (sd.voucher_id && finalTotal === 0) summary += discountMsg + "\n*Total: FREE*";
-      else if (sd.voucher_id && finalTotal > 0) summary += discountMsg + "\n*Remaining: R" + finalTotal + "*";
-      else if (disc.percent > 0) summary += discountMsg + "\n*Total: R" + finalTotal + "*";
-      else summary += "\n*Total: R" + finalTotal + "*";
+      else if (sd.voucher_id && finalTotal > 0) summary += discountMsg + "\n*Remaining: " + rands(finalTotal) + "*";
+      else if (disc.percent > 0) summary += discountMsg + "\n*Total: " + rands(finalTotal) + "*";
+      else summary += "\n*Total: " + rands(finalTotal) + "*";
       summary += "\n\nLook good?";
-      const confirmBtns = [{ id: "CONFIRM", title: finalTotal > 0 ? "\u2705 Pay R" + finalTotal : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }];
+      const confirmBtns = [{ id: "CONFIRM", title: finalTotal > 0 ? "\u2705 Pay " + rands(finalTotal) : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }];
       if (finalTotal > 0) confirmBtns.splice(1, 0, { id: "ADD_VOUCHER", title: "\u{1F39F} Add Voucher" });
       await sendButtons(tenant, phone, summary, confirmBtns);
       await setConvo(convo.id, { current_state: "CONFIRM_BOOKING", state_data: { ...sd, slot_id: slotId, tour_id: slot.tour_id, unit_price: price, base_total: baseTotal, total: finalTotal, discount_type: disc.type, discount_percent: disc.percent, voucher_deduction: voucherDeduction || 0 } });
@@ -2101,7 +2101,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
       if (!finalPriceCheck.ok && finalPriceCheck.reason === "PRICE_CHANGED" && finalPriceCheck.pricing) {
         const fp = finalPriceCheck.pricing;
-        await sendButtons(tenant, phone, "The price has changed since we started. The correct total is *R" + fp.total + "*.\n\nPlease confirm again.", [{ id: "CONFIRM", title: fp.total > 0 ? "\u2705 Pay R" + fp.total : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }]);
+        await sendButtons(tenant, phone, "The price has changed since we started. The correct total is *" + rands(fp.total) + "*.\n\nPlease confirm again.", [{ id: "CONFIRM", title: fp.total > 0 ? "\u2705 Pay " + rands(fp.total) : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }]);
         await setConvo(convo.id, {
           current_state: "CONFIRM_BOOKING",
           state_data: { ...sd, discount_type: finalDiscount.type, discount_percent: finalDiscount.percent, tour_id: finalSlotCheck.data.tour_id, unit_price: fp.unitPrice, base_total: fp.baseTotal, total: fp.total, voucher_deduction: fp.voucherDeduction },
@@ -2178,7 +2178,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           }
         }
         for (const remainder of voucherConfirmation.data?.remainders || []) {
-          try { await sendText(tenant, phone, "\u{1F39F} Your voucher *" + remainder.code + "* has *R" + remainder.remaining + "* remaining. Use it on your next booking!"); } catch (e) { }
+          try { await sendText(tenant, phone, "\u{1F39F} Your voucher *" + remainder.code + "* has *" + rands(remainder.remaining) + "* remaining. Use it on your next booking!"); } catch (e) { }
         }
         const vref = booking.id.substring(0, 8).toUpperCase();
         const vslot = await supabase.from("slots").select("start_time").eq("id", verifiedSd.slot_id).single();
@@ -2256,7 +2256,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (yocoData && yocoData.id && yocoData.redirectUrl) {
         payUrl = yocoData.redirectUrl;
       } else { payUrl = "Payment link unavailable. Type *speak to us* for help"; }
-      await sendText(tenant, phone, "Almost there, " + sd.customer_name.split(" ")[0] + "! \u{1F389}\n\n\u{1F4CB} Ref: " + ref + "\n\u{1F4B0} Total: R" + verifiedSd.total + "\n\nComplete your payment here:\n" + payUrl + "\n\n\u23F0 Your spots are held for 15 minutes." + termsNotice);
+      await sendText(tenant, phone, "Almost there, " + sd.customer_name.split(" ")[0] + "! \u{1F389}\n\n\u{1F4CB} Ref: " + ref + "\n\u{1F4B0} Total: " + rands(verifiedSd.total) + "\n\nComplete your payment here:\n" + payUrl + "\n\n\u23F0 Your spots are held for 15 minutes." + termsNotice);
       await setConvo(convo.id, { current_state: "AWAITING_PAYMENT", state_data: { booking_id: booking.id }, last_booking_id: booking.id, customer_name: sd.customer_name, email: email });
       await logE(tenant, "payment_link_sent", { booking_id: booking.id }, booking.id);
     }
@@ -2316,7 +2316,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const tourInfo = await supabase.from("tours").select("*").eq("id", tourId).eq("business_id", tenant.business.id).eq("active", true).eq("hidden", false).maybeSingle();
       if (!tourInfo.data) { await sendText(tenant, phone, "Can't find that tour. Let's try again."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
       const t = tourInfo.data;
-      await sendText(tenant, phone, "\u{1F381} *" + t.name + " Gift Voucher*\nValue: R" + t.base_price_per_person + "\n\nWho is this voucher for? Type their name (e.g. Sarah):");
+      await sendText(tenant, phone, "\u{1F381} *" + t.name + " Gift Voucher*\nValue: " + rands(t.base_price_per_person) + "\n\nWho is this voucher for? Type their name (e.g. Sarah):");
       await setConvo(convo.id, { current_state: "GV_RECIPIENT_NAME", state_data: { tour_id: tourId, tour_name: t.name, value: t.base_price_per_person } });
     }
 
@@ -2343,11 +2343,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const buyerEmail = rawText.toLowerCase();
       let summary = "\u{1F381} *Gift Voucher Summary*\n\n" +
         "\u{1F6F6} " + sd.tour_name + "\n" +
-        "\u{1F4B0} R" + sd.value + "\n" +
+        "\u{1F4B0} " + rands(sd.value) + "\n" +
         "\u{1F465} For: " + sd.recipient_name + "\n";
       if (sd.gift_message) summary += "\u{1F4AC} Message: \"" + sd.gift_message + "\"\n";
       summary += "\u{1F4E7} Send to: " + buyerEmail + "\n\nLook good?";
-      await sendButtons(tenant, phone, summary, [{ id: "GV_CONFIRM", title: "\u2705 Pay R" + sd.value }, { id: "IDLE", title: "\u274C Cancel" }]);
+      await sendButtons(tenant, phone, summary, [{ id: "GV_CONFIRM", title: "\u2705 Pay " + rands(sd.value) }, { id: "IDLE", title: "\u274C Cancel" }]);
       await setConvo(convo.id, { current_state: "GV_CONFIRM", state_data: { ...sd, buyer_email: buyerEmail } });
     }
 
@@ -2383,7 +2383,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         if (yocoData && yocoData.id && yocoData.redirectUrl) {
           await sendText(tenant, phone,
             "\u{1F381} Great! Complete your payment to generate the voucher:\n\n" +
-            "\u{1F4B0} Amount: R" + sd.value + "\n" +
+            "\u{1F4B0} Amount: " + rands(sd.value) + "\n" +
             "\u{1F517} " + yocoData.redirectUrl + "\n\n" +
             "Once paid, the voucher will be emailed to " + sd.buyer_email
           );
@@ -2435,15 +2435,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const tours3 = await getBookableTours(tenant);
       if (tours3.length === 0) { await sendText(tenant, phone, "Your voucher is valid, but there are no open dates right now. Check back soon and we’ll get you booked in!"); await setConvo(convo.id, { current_state: "IDLE" }); return; }
       if (tours3.length === 1) {
-        await sendText(tenant, phone, "\u{1F389} Voucher accepted! (R" + vVal + " credit)\n\nHow many people will be joining?");
+        await sendText(tenant, phone, "\u{1F389} Voucher accepted! (" + rands(vVal) + " credit)\n\nHow many people will be joining?");
         await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { voucher_code: code, voucher_id: vr2.data.id, voucher_value: vVal, voucher_type: vType, voucher_pax_limit: vPaxLimit, voucher_purchase_value: vPurchaseValue, tour_id: tours3[0].id } });
       } else {
         const vtrows: any[] = [];
         for (let vti = 0; vti < tours3.length; vti++) {
           const vtr = tours3[vti];
-          vtrows.push({ id: "TOUR_" + vtr.id, title: vtr.name, description: formatDuration(vtr.duration_minutes) + " \u2022 normally R" + vtr.base_price_per_person + "/pp" });
+          vtrows.push({ id: "TOUR_" + vtr.id, title: vtr.name, description: formatDuration(vtr.duration_minutes) + " \u2022 normally " + rands(vtr.base_price_per_person) + "/pp" });
         }
-        await sendText(tenant, phone, "\u{1F389} Voucher accepted! (R" + vVal + " credit)\n\nWhich tour would you like?");
+        await sendText(tenant, phone, "\u{1F389} Voucher accepted! (" + rands(vVal) + " credit)\n\nWhich tour would you like?");
         await sendList(tenant, phone, "Pick your adventure:", "Choose Tour", [{ title: "Tours", rows: vtrows }]);
         await setConvo(convo.id, { current_state: "PICK_TOUR", state_data: { voucher_code: code, voucher_id: vr2.data.id, voucher_value: vVal, voucher_type: vType, voucher_pax_limit: vPaxLimit, voucher_purchase_value: vPurchaseValue } });
       }
@@ -2484,13 +2484,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // Same pricing as the summary and FINALIZE_BOOKING: group discount first, then the vouchers.
       const xPriced = calculateChatBookingPricing({ qty: Number(sd.qty), unitPrice: Number(sd.unit_price), groupDiscountPercent: Number(sd.discount_percent || 0), groupDiscountMinQty: 1, voucherDeduction: Number(sd.voucher_deduction || 0) + xVal });
       const newTotal = xPriced.total;
-      let xMsg = "\u{1F39F} *Voucher applied!* (R" + xVal + " credit)\n\n";
+      let xMsg = "\u{1F39F} *Voucher applied!* (" + rands(xVal) + " credit)\n\n";
       if (newTotal === 0) xMsg += "Your trip is now *completely FREE!*";
-      else xMsg += "Remaining balance: *R" + newTotal + "*";
+      else xMsg += "Remaining balance: *" + rands(newTotal) + "*";
       await sendText(tenant, phone, xMsg);
       // voucher_id/voucher_code mark the booking as voucher-funded for FINALIZE_BOOKING.
       const updatedSd = { ...sd, voucher_id: sd.voucher_id || xvr.data.id, voucher_code: sd.voucher_code || xcode, voucher_value: Number(sd.voucher_value || 0) + xVal, voucher_codes: vCodes, voucher_ids: vIds, voucher_deduction: xPriced.voucherDeduction, total: newTotal };
-      const cBtns = [{ id: "CONFIRM", title: newTotal > 0 ? "\u2705 Pay R" + newTotal : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }];
+      const cBtns = [{ id: "CONFIRM", title: newTotal > 0 ? "\u2705 Pay " + rands(newTotal) : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }];
       if (newTotal > 0) cBtns.splice(1, 0, { id: "ADD_VOUCHER", title: "\u{1F39F} Add Voucher" });
       await sendButtons(tenant, phone, "Ready to proceed?", cBtns);
       await setConvo(convo.id, { current_state: "CONFIRM_BOOKING", state_data: updatedSd });
@@ -2568,7 +2568,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           const rpRef = rpBk.id.substring(0, 8).toUpperCase();
           const rpYocoData = await requestCheckout({ type: "BOOKING", booking_id: rpBk.id, amount: rpBk.total_amount });
           if (rpYocoData?.redirectUrl) {
-            await sendText(tenant, phone, "Here\u2019s a fresh payment link for booking *" + rpRef + "* (R" + rpBk.total_amount + "):\n\n" + rpYocoData.redirectUrl + "\n\n\u23F0 Your spots are held for 15 minutes.");
+            await sendText(tenant, phone, "Here\u2019s a fresh payment link for booking *" + rpRef + "* (" + rands(rpBk.total_amount) + "):\n\n" + rpYocoData.redirectUrl + "\n\n\u23F0 Your spots are held for 15 minutes.");
           } else {
             await sendText(tenant, phone, "Couldn\u2019t generate a new link. Let me connect you to our team.");
             await setConvo(convo.id, { status: "HUMAN" });

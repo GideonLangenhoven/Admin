@@ -22,6 +22,12 @@ function money(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+// "R800" for whole rands, "R1852.50" with cents (never "R1852.5").
+export function rands(value: number | string) {
+  const n = Number(value);
+  return "R" + (Number.isInteger(n) ? String(n) : n.toFixed(2));
+}
+
 export function calculateChatBookingPricing(input: ChatBookingPricingInput): ChatBookingPricing {
   const qty = Number(input.qty);
   const unitPrice = Number(input.unitPrice);

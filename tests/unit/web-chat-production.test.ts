@@ -71,6 +71,12 @@ describe("web chat production conversation checks", () => {
     const result = await f.post(await f.session(), "9", { ...f.bookingState, step: "ASK_QTY", tprice: 399 });
     expect(result.state).toMatchObject({ total: 3411.45, discount: 179.55 });
   });
+
+  it("shows rand amounts with both cent digits", async () => {
+    const f = webChatFixture();
+    const result = await f.post(await f.session(), "6", { ...f.bookingState, step: "ASK_QTY", tprice: 375 });
+    expect(result.reply).toContain("Total: R2137.50 (5% automatic discount, R112.50 saved)");
+  });
 });
 
 describe("web chat payment and failure checks", () => {
