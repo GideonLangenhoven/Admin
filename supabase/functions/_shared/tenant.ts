@@ -242,6 +242,8 @@ export async function resolveTenantByWhatsappPayload(supabase: any, payload: any
     "what_to_bring",
     "activity_verb_past",
     "location_phrase",
+    "refund_policy_tiers",
+    "refund_policy_text",
   ].join(",");
 
   // Fast path: indexed single-row lookup on the plaintext phone-id column.
