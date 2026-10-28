@@ -267,6 +267,7 @@ export default function SettingsPage() {
     const [emailImgs, setEmailImgs] = useState({ payment: "", confirm: "", invoice: "", gift: "", cancel: "", cancel_weather: "", indemnity: "", admin: "", voucher: "", photos: "" });
     const [emailImgsSaving, setEmailImgsSaving] = useState(false);
     const [emailTagline, setEmailTagline] = useState("");
+    const [emailThankYou, setEmailThankYou] = useState("");
     const [activityVerbPast, setActivityVerbPast] = useState("");
     const [locationPhrase, setLocationPhrase] = useState("");
     const [emailImgsMessage, setEmailImgsMessage] = useState({ type: "", text: "" });
@@ -959,6 +960,7 @@ export default function SettingsPage() {
             setGooglePlaceId(data.google_place_id || "");
             setEmailColor(data.email_color || "#1b3b36");
             setEmailTagline(data.email_tagline || "");
+            setEmailThankYou(data.email_thank_you_message || "");
             setActivityVerbPast(data.activity_verb_past || "");
             setLocationPhrase(data.location_phrase || "");
             setSocialLinks({
@@ -1547,6 +1549,7 @@ export default function SettingsPage() {
         const { error } = await supabase.from("businesses").update({
             email_color: emailColor,
             email_tagline: emailTagline.trim() || null,
+            email_thank_you_message: emailThankYou.trim() || null,
             activity_verb_past: activityVerbPast.trim() || null,
             location_phrase: locationPhrase.trim() || null,
             email_img_payment: emailImgs.payment || null,
@@ -2925,6 +2928,14 @@ export default function SettingsPage() {
                                 maxLength={200}
                                 className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
                                 placeholder="e.g. Get ready to meet the lions up close on an unforgettable safari." />
+                        </label>
+                        <label className="block">
+                            <span className="text-sm font-semibold text-[var(--ck-text-strong)]">Thank-you message</span>
+                            <p className="text-xs text-[var(--ck-text-muted)] mt-0.5 mb-2">Main paragraph of the post-trip email, after &quot;Hi [name],&quot;. Blank uses &quot;Thank you for … with us! We loved having you out there…&quot;.</p>
+                            <textarea value={emailThankYou} onChange={e => setEmailThankYou(e.target.value)}
+                                maxLength={1000} rows={4}
+                                className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none"
+                                placeholder="e.g. Thank you for spending the morning with us on the river. It was a pleasure having you along." />
                         </label>
                     </div>
 

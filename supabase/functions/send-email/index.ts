@@ -279,7 +279,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
       emailColor: "#1b3b36",
       imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "",
       socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "",
-      meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", locationPhrase: "", emailTagline: "", logoUrl: "",
+      meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", locationPhrase: "", emailTagline: "", thankYouMessage: "", logoUrl: "",
     };
   }
 
@@ -287,7 +287,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
   try {
     const res = await supabase
       .from("businesses")
-      .select("id, name, business_name, subdomain, timezone, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos, social_facebook, social_instagram, social_tiktok, social_youtube, social_twitter, social_linkedin, social_tripadvisor, social_google_reviews, meeting_point_address, arrival_instructions, business_address, what_to_bring, activity_verb_past, location_phrase, email_tagline, logo_url")
+      .select("id, name, business_name, subdomain, timezone, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos, social_facebook, social_instagram, social_tiktok, social_youtube, social_twitter, social_linkedin, social_tripadvisor, social_google_reviews, meeting_point_address, arrival_instructions, business_address, what_to_bring, activity_verb_past, location_phrase, email_tagline, email_thank_you_message, logo_url")
       .eq("id", businessId)
       .maybeSingle();
     data = res.data;
@@ -356,6 +356,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     activityVerbPast: String(data?.activity_verb_past || ""),
     locationPhrase: String(data?.location_phrase || ""),
     emailTagline: String(data?.email_tagline || ""),
+    thankYouMessage: String(data?.email_thank_you_message || ""),
     logoUrl: String(data?.logo_url || ""),
   };
 }
@@ -1827,7 +1828,10 @@ function voucherBalanceHtml(d: Record<string, unknown>) {
     </html>`;
 }
 
-function tripPhotosHtml(d: Record<string, unknown>, branding?: { activityVerbPast?: string; locationPhrase?: string }) {
+function tripPhotosHtml(d: Record<string, unknown>, branding?: { activityVerbPast?: string; locationPhrase?: string; thankYouMessage?: string }) {
+  // Operator's own thank-you paragraph (Settings → Email Customisation)
+  // replaces the built-in one; plain text, escaped, newlines kept.
+  const thankYou = String(branding?.thankYouMessage || "").trim();
   // Activity wording comes from the tenant's own terminology (Settings →
   // Email Customisation). A tenant with neither set gets the neutral fallback
   // — never another operator's activity. Note: the confirm-email
@@ -1865,7 +1869,7 @@ function tripPhotosHtml(d: Record<string, unknown>, branding?: { activityVerbPas
           <td style="padding: 10px 40px 20px; text-align: center;">
             <p style="font-size: 15px; color: #555; line-height: 1.7; margin: 0;">
               Hi ${d.customer_name},<br><br>
-              Thank you for ${verb} with <strong>Cape Kayak Adventures</strong>${d.tour_name ? " on our <strong>" + d.tour_name + "</strong> trip" : ""}! We loved having you out there and hope you enjoyed every moment.
+              ${thankYou ? escHtml(thankYou).replace(/\n/g, "<br>") : `Thank you for ${verb} with <strong>Cape Kayak Adventures</strong>${d.tour_name ? " on our <strong>" + d.tour_name + "</strong> trip" : ""}! We loved having you out there and hope you enjoyed every moment.`}
             </p>
           </td>
         </tr>
@@ -2738,7 +2742,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     } catch (brandErr) {
       console.error("BRANDING_LOAD_ERR (using fallbacks):", brandErr);
       const fb = String(d.business_name || d.brand_name || "Your Booking");
-      branding = { businessId: "", brandName: fb, timezone: "UTC", shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", locationPhrase: "", emailTagline: "", logoUrl: "", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
+      branding = { businessId: "", brandName: fb, timezone: "UTC", shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", locationPhrase: "", emailTagline: "", thankYouMessage: "", logoUrl: "", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
     }
 
     if (type === "BOOKING_CONFIRM" || type === "INDEMNITY" || type === "REMINDER" || type === "FIRST_BOOKING_TRIP" || type === "WAIVER_REQUEST") {
