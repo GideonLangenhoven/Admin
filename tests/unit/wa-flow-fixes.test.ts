@@ -123,6 +123,29 @@ describe("WhatsApp booking flow", () => {
     expect(b.sent.join("\n")).toContain("this trip is on us!");
   });
 
+  it("a tenant with more than 10 tours pages through them with a More tours row", async () => {
+    const pageTourRows = sourceFunction(wa, "pageTourRows", {});
+    const rows = Array.from({ length: 21 }, (_, i) => ({ id: "TOUR_" + i, title: "Tour " + i }));
+    const first = pageTourRows(rows);
+    expect(first.map((r: any) => r.id)).toEqual([...rows.slice(0, 9).map((r) => r.id), "MORE_TOURS_9"]);
+    expect(pageTourRows(rows, 9).at(-1).id).toBe("MORE_TOURS_18");
+    expect(pageTourRows(rows, 18).map((r: any) => r.id)).toEqual(["TOUR_18", "TOUR_19", "TOUR_20"]);
+    expect(pageTourRows(rows.slice(0, 10))).toHaveLength(10);
+    const tours = rows.map((r, i) => ({ ...tour, id: "tour-" + i, name: r.title }));
+    for (const [state, prefix, loader] of [["PICK_TOUR", "TOUR_", "getBookableTours"], ["GV_PICK_TOUR", "GV_", "getActiveTours"]]) {
+      const lists: any[] = [];
+      const b = bot(state, {}, {}, {
+        [loader]: async () => tours, pageTourRows,
+        bookTourRows: sourceFunction(wa, "bookTourRows", { rands, formatDuration: (m: number) => m + " min" }),
+        giftTourRows: sourceFunction(wa, "giftTourRows", { rands }),
+        sendList: async (_t: any, _p: any, _body: string, _btn: string, secs: any[]) => { lists.push(secs[0].rows); },
+      });
+      await b.handle(tenant, phone, "More tours", "interactive", { list_reply: { id: "MORE_TOURS_9" } });
+      expect(lists[0].map((r: any) => r.id)).toEqual([...tours.slice(9, 18).map((t) => prefix + t.id), "MORE_TOURS_18"]);
+      expect(b.changes).toEqual([]);
+    }
+  });
+
   for (const [state, id] of [["PICK_TOUR", "TOUR_"], ["GV_PICK_TOUR", "GV_"]]) {
     it(`${state} only loads a tour that belongs to this tenant and is on sale`, async () => {
       const b = bot(state, {}, { tours: tour });

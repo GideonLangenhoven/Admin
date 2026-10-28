@@ -388,10 +388,20 @@ async function askBookingWhatsappConsent(tenant: TenantContext, phone: string, r
     : "May " + operator + " send booking-related WhatsApp updates, including how to use My Bookings? No promotions. Reply STOP any time to opt out.";
   return sendButtons(tenant, phone, prompt, [{ id: "WA_UPDATES_YES", title: "Yes, send updates" }, { id: "WA_UPDATES_NO", title: "No thanks" }]);
 }
+// A WhatsApp list holds 10 rows: past that, show 9 and a "More tours" row that pages on.
+function pageTourRows(rows: any[], offset = 0) {
+  if (rows.length - offset <= 10) return rows.slice(offset);
+  return [...rows.slice(offset, offset + 9), { id: "MORE_TOURS_" + (offset + 9), title: "More tours", description: (rows.length - offset - 9) + " more to choose from" }];
+}
+function bookTourRows(tours: any[]) {
+  return tours.map((tr: any) => ({ id: "TOUR_" + tr.id, title: tr.name, description: rands(tr.base_price_per_person) + "/pp \u2022 " + formatDuration(tr.duration_minutes) }));
+}
+function giftTourRows(tours: any[]) {
+  return tours.map((tr: any) => ({ id: "GV_" + tr.id, title: tr.name, description: rands(tr.base_price_per_person) + " voucher" }));
+}
 async function sendList(tenant: TenantContext, to: any, bt: any, btnTxt: any, secs: any) {
   const body = await interactiveBody(tenant, to, bt, "Choose from the list:");
   let room = 10; // rows across all sections
-  // ponytail: a tenant with more than 10 tours loses the rest from the list; typing the name still works.
   const sections = secs.map(function (sec: any) {
     const rows = sec.rows.slice(0, Math.max(room, 0)); room -= rows.length;
     return { ...(sec.title ? { title: clip(sec.title, 24) } : {}), rows: rows.map(function (r: any) { return { id: r.id, title: clip(r.title, 24), ...(r.description ? { description: clip(r.description, 72) } : {}) }; }) };
@@ -1363,13 +1373,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           await sendText(tenant, phone, "How many people will be joining? (1\u201330)");
           await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { tour_id: tours[0].id } });
         } else {
-          const trows: any[] = [];
-          for (let ti = 0; ti < tours.length; ti++) {
-            const tr = tours[ti];
-            trows.push({ id: "TOUR_" + tr.id, title: tr.name, description: rands(tr.base_price_per_person) + "/pp \u2022 " + formatDuration(tr.duration_minutes) });
-          }
           await sendText(tenant, phone, "Awesome, let\u2019s get you booked!\n\nWhich tour catches your eye?");
-          await sendList(tenant, phone, "We have " + tours.length + " incredible options:", "Choose a Tour", [{ title: "Our Tours", rows: trows }]);
+          await sendList(tenant, phone, "We have " + tours.length + " incredible options:", "Choose a Tour", [{ title: "Our Tours", rows: pageTourRows(bookTourRows(tours)) }]);
           await setConvo(convo.id, { current_state: "PICK_TOUR", state_data: {} });
         }
       }
@@ -1466,13 +1471,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // BUY GIFT VOUCHER
       else if (c === "BUY_VOUCHER" || c.includes("buy") && c.includes("voucher")) {
         const tours = await getActiveTours(tenant);
-        const trows = [];
-        for (let ti = 0; ti < tours.length; ti++) {
-          const tr = tours[ti];
-          trows.push({ id: "GV_" + tr.id, title: tr.name, description: rands(tr.base_price_per_person) + " voucher" });
-        }
         await sendText(tenant, phone, "\u{1F381} *Buy a Gift Voucher*\n\nGreat idea! Pick which tour the voucher is for:");
-        await sendList(tenant, phone, "Each voucher has a credit value applied to your booking.", "Choose Tour", [{ title: "Tours", rows: trows }]);
+        await sendList(tenant, phone, "Each voucher has a credit value applied to your booking.", "Choose Tour", [{ title: "Tours", rows: pageTourRows(giftTourRows(tours)) }]);
         await setConvo(convo.id, { current_state: "GV_PICK_TOUR", state_data: {} });
       }
 
@@ -1545,6 +1545,10 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== PICK TOUR =====
     else if (state === "PICK_TOUR") {
+      if (rid.startsWith("MORE_TOURS_")) {
+        await sendList(tenant, phone, "More tours:", "Choose a Tour", [{ title: "Our Tours", rows: pageTourRows(bookTourRows(await getBookableTours(tenant)), Number(rid.slice(11))) }]);
+        return;
+      }
       let tourId = rid ? rid.replace("TOUR_", "") : "";
       // Typed fallback — customers often type the tour name or a number instead
       // of tapping the list (and some WhatsApp clients don't render lists). The
@@ -1563,7 +1567,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           if (matches.length === 1) tourId = matches[0].id;
         }
         if (!tourId) {
-          const tours2 = tours.slice(0, 10);
+          const tours2 = tours;
           let opts = "Which tour would you like? Reply with the name or number:\n\n";
           for (let oi = 0; oi < tours2.length; oi++) opts += (oi + 1) + ". " + tours2[oi].name + "\n";
           await sendText(tenant, phone, opts);
@@ -2218,6 +2222,10 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== GIFT VOUCHER PURCHASE =====
     else if (state === "GV_PICK_TOUR") {
+      if (rid.startsWith("MORE_TOURS_")) {
+        await sendList(tenant, phone, "More tours:", "Choose Tour", [{ title: "Tours", rows: pageTourRows(giftTourRows(await getActiveTours(tenant)), Number(rid.slice(11))) }]);
+        return;
+      }
       let tourId = rid ? rid.replace("GV_", "") : "";
       // Typed fallback — same as PICK_TOUR: accept a typed tour name or number
       if (!tourId && rawText) {
@@ -2234,7 +2242,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           if (gvMatches.length === 1) tourId = gvMatches[0].id;
         }
         if (!tourId) {
-          const gvTours2 = gvTours.slice(0, 10);
+          const gvTours2 = gvTours;
           let gvOpts = "Which tour is the voucher for? Reply with the name or number:\n\n";
           for (let gi = 0; gi < gvTours2.length; gi++) gvOpts += (gi + 1) + ". " + gvTours2[gi].name + "\n";
           await sendText(tenant, phone, gvOpts);
@@ -2364,13 +2372,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await sendText(tenant, phone, "\u{1F389} Voucher accepted! (" + rands(vVal) + " credit)\n\nHow many people will be joining?");
         await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { voucher_code: code, voucher_id: vr2.data.id, voucher_value: vVal, voucher_type: vType, tour_id: tours3[0].id } });
       } else {
-        const vtrows: any[] = [];
-        for (let vti = 0; vti < tours3.length; vti++) {
-          const vtr = tours3[vti];
-          vtrows.push({ id: "TOUR_" + vtr.id, title: vtr.name, description: formatDuration(vtr.duration_minutes) + " \u2022 normally " + rands(vtr.base_price_per_person) + "/pp" });
-        }
         await sendText(tenant, phone, "\u{1F389} Voucher accepted! (" + rands(vVal) + " credit)\n\nWhich tour would you like?");
-        await sendList(tenant, phone, "Pick your adventure:", "Choose Tour", [{ title: "Tours", rows: vtrows }]);
+        await sendList(tenant, phone, "Pick your adventure:", "Choose Tour", [{ title: "Tours", rows: pageTourRows(bookTourRows(tours3)) }]);
         await setConvo(convo.id, { current_state: "PICK_TOUR", state_data: { voucher_code: code, voucher_id: vr2.data.id, voucher_value: vVal, voucher_type: vType } });
       }
     }
