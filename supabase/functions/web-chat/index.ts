@@ -1423,7 +1423,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         // while tour_id/slot_id still reference requestedBusinessId's tour.
         const businessId = requestedBusinessId;
         // L1: Fetch meeting point dynamically from the business record.
-        const { data: _tourData } = await db.from("tours").select("base_price_per_person, business_id").eq("id", ns.tid).eq("business_id", requestedBusinessId).eq("active", true).eq("hidden", false).maybeSingle();
+        const { data: _tourData } = await db.from("tours").select("name, base_price_per_person, business_id").eq("id", ns.tid).eq("business_id", requestedBusinessId).eq("active", true).eq("hidden", false).maybeSingle();
         let meetingPointText = "";
         if (!meetingPointText) {
           const { data: _bizData } = await db.from("businesses").select("meeting_point_address, arrival_instructions").eq("id", businessId).maybeSingle();
@@ -1440,6 +1440,8 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
           buttons = [{ label: "\u{1F6F6} Book a Tour", value: "btn:book" }, { label: "\u2753 Ask a Question", value: "btn:question" }];
           return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
         }
+        // The confirmation email and WhatsApp repeat these; the browser holds the state.
+        ns.tname = _tourData.name; ns.slotTime = _slotData.start_time;
         if (_slotData?.price_per_person_override != null) {
           serverUnitPrice = Number(_slotData.price_per_person_override);
         }

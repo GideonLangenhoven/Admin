@@ -248,6 +248,16 @@ describe("web chat voucher redemption checks", () => {
     expect(f.calls.filter(call => call.name === "confirm_voucher_booking")).toHaveLength(1);
     expect(f.calls.filter(call => call.kind === "fetch")).toHaveLength(1);
   });
+  it("confirms the tour and time from the database, not the browser's state", async () => {
+    const f = webChatFixture();
+    f.rows.vouchers.push({ id: "voucher-a", business_id: "a", code: "CANOE888", status: "ACTIVE", type: "MONETARY", current_balance: 800, value: 800 });
+    const token = await f.session();
+    const summary = await f.post(token, "CANOE888", { ...f.bookingState, step: "ASK_VOUCHER" });
+    await f.post(token, "btn:confirm", { ...summary.state, tname: "Free champagne cruise", slotTime: "2030-01-01T09:00:00Z" });
+    const email = f.calls.find(call => call.name.endsWith("/send-email"))!.data.data;
+    expect(email.tour_name).toBe("Sea Kayak Tour");
+    expect(email.start_time).not.toContain("2030");
+  });
   it("rejects a voucher that expires before confirmation", async () => {
     const f = webChatFixture();
     const voucher = { id: "voucher-a", business_id: "a", code: "CANOE888", status: "ACTIVE", type: "MONETARY", current_balance: 100, value: 100, expires_at: new Date(Date.now() + 100_000).toISOString() };
