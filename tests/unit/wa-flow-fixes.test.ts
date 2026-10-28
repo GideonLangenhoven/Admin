@@ -65,4 +65,35 @@ describe("WhatsApp booking flow", () => {
       expect(b.changes).toEqual([{ status: "HUMAN", current_state: "IDLE", state_data: {} }]);
     });
   }
+
+  it("a typed yes at the booking summary continues to the details step", async () => {
+    const b = bot("CONFIRM_BOOKING", { tour_id: tour.id, qty: 2, total: 1200 });
+    await b.handle(tenant, phone, "Yes please", "text");
+    expect(b.changes).toEqual([{ current_state: "ASK_DETAILS", state_data: { tour_id: tour.id, qty: 2, total: 1200 } }]);
+  });
+
+  it("a typed yes at the gift voucher summary creates the voucher and payment link", async () => {
+    const insertVoucherWithRetry = vi.fn(async () => ({ data: { id: "v-1" }, error: null }));
+    const b = bot("GV_CONFIRM", { tour_id: tour.id, tour_name: tour.name, value: 600, buyer_email: "buyer@example.invalid" }, {}, {
+      genVoucherCode: () => "ABCD2345", insertVoucherWithRetry,
+      requestCheckout: async () => ({ id: "checkout-1", redirectUrl: "https://pay.example.invalid/1" }),
+    });
+    await b.handle(tenant, phone, "ok", "text");
+    expect(insertVoucherWithRetry).toHaveBeenCalledWith(expect.objectContaining({ business_id: "tenant-a", value: 600 }));
+    expect(b.changes.at(-1)).toMatchObject({ current_state: "GV_AWAITING_PAYMENT" });
+  });
+
+  for (const [state, prompt] of [["CONFIRM_BOOKING", "Reply *yes* to continue, or *no* to cancel."], ["GV_CONFIRM", "Reply *yes* to pay, or *no* to cancel."]]) {
+    it(`${state} answers anything else with how to continue, instead of silence`, async () => {
+      const b = bot(state, { tour_id: tour.id, value: 600 });
+      await b.handle(tenant, phone, "can I bring my dog?", "text");
+      expect(b.sent).toEqual([prompt]); expect(b.changes).toEqual([]);
+    });
+
+    it(`${state} cancels on a typed "no thanks"`, async () => {
+      const b = bot(state, { tour_id: tour.id, value: 600 });
+      await b.handle(tenant, phone, "no thanks", "text");
+      expect(b.changes).toEqual([{ current_state: "IDLE", state_data: {} }]);
+    });
+  }
 });

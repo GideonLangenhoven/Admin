@@ -1891,13 +1891,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     // ===== CONFIRM BOOKING =====
     else if (state === "CONFIRM_BOOKING") {
-      if (rid === "IDLE" || input === "no" || input === "cancel") { await sendText(tenant, phone, "No worries, cancelled! Type *menu* whenever you\u2019re ready."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
+      if (rid === "IDLE" || /^(no|nope|cancel)\b/.test(input)) { await sendText(tenant, phone, "No worries, cancelled! Type *menu* whenever you\u2019re ready."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
       if (rid === "ADD_VOUCHER") {
         await sendText(tenant, phone, "Enter your voucher code:");
         await setConvo(convo.id, { current_state: "ADD_EXTRA_VOUCHER" });
         return;
       }
-      if (rid === "CONFIRM" || input === "yes") {
+      if (rid === "CONFIRM" || /^(y|yes|yep|yeah|ok|okay|sure|confirm|pay)\b/.test(input)) {
         // Details already collected (e.g. re-confirm after a price update) —
         // go straight to finalize instead of asking for name/email again.
         if (sd.customer_name && sd.email) {
@@ -1913,7 +1913,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await typingDelay();
         await sendText(tenant, phone, "Brilliant! Just need a couple of details to lock it in.\n\nPlease reply with your:\n- Full Name\n- Email Address\n\n*(You can just send them together in one message!)*");
         await setConvo(convo.id, { current_state: "ASK_DETAILS", state_data: sd });
+        return;
       }
+      await sendText(tenant, phone, "Reply *yes* to continue, or *no* to cancel.");
     }
 
     // ===== ASK DETAILS (also handles ASK_NAME_EMAIL) =====
@@ -2259,12 +2261,12 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     }
 
     else if (state === "GV_CONFIRM") {
-      if (rid === "IDLE" || input === "no" || input === "cancel") {
+      if (rid === "IDLE" || /^(no|nope|cancel)\b/.test(input)) {
         await sendText(tenant, phone, "No worries, cancelled! Type *menu* whenever you're ready.");
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
         return;
       }
-      if (rid === "GV_CONFIRM" || input === "yes") {
+      if (rid === "GV_CONFIRM" || /^(y|yes|yep|yeah|ok|okay|sure|confirm|pay)\b/.test(input)) {
         // Create voucher in PENDING status
         const vcode = genVoucherCode();
         const vr = await insertVoucherWithRetry({
@@ -2298,7 +2300,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           await sendText(tenant, phone, "Payment link unavailable. Type *speak to us* for help.");
         }
         await setConvo(convo.id, { current_state: "GV_AWAITING_PAYMENT", state_data: { voucher_id: vr.data.id, voucher_code: vcode, buyer_email: sd.buyer_email } });
+        return;
       }
+      await sendText(tenant, phone, "Reply *yes* to pay, or *no* to cancel.");
     }
 
     else if (state === "GV_AWAITING_PAYMENT") {
