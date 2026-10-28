@@ -1000,7 +1000,7 @@ async function botAnswerV2(tenant: TenantContext, phone: any, convo: any, userTe
   }
 }
 
-async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: any, interactive?: any) {
+async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: any, interactive?: any, quiet = false) {
   try {
     const convo = await getConvo(tenant, phone);
     if (!convo) return;
@@ -1163,6 +1163,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         return; // Still in human-handled mode, bot stays silent
       }
     }
+    if (quiet) { console.warn("WA_RATE_LIMITED business=" + tenant.business.id); return; }
 
     let state = convo.current_state || "IDLE";
     let sd = convo.state_data || {};
@@ -2831,7 +2832,11 @@ async function processWhatsappValue(tenant: TenantContext, value: any, message: 
       else if (mt === "image") txt = "[Image Sent]";
       else { console.log("SKIP non-text msg type:" + mt + " from:" + ph); return new Response("OK", { status: 200 }); }
       console.log("F:" + ph + " B:" + tenant.business.id + " T:" + txt);
-      await handleMsg(tenant, ph, txt, mt, inter);
+      // One number can't run up the tenant's AI allowance by scripting messages: past
+      // 20 a minute the bot stays quiet. STOP, DELETE and the Inbox still work.
+      const { data: underLimit, error: limitError } = await supabase.rpc("check_rate_limit", { p_ip: tenant.business.id + ":" + ph, p_endpoint: "wa-bot", p_max: 20 });
+      if (limitError) console.error("WA_RATE_LIMIT_ERR", limitError.message);
+      await handleMsg(tenant, ph, txt, mt, inter, underLimit === false);
       return new Response("OK", { status: 200 });
 }
 
