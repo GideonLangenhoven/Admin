@@ -1616,7 +1616,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         }
       }
       if (!tourId) { await sendText(tenant, phone, "Please pick a tour from the list above."); return; }
-      const tourInfo = await supabase.from("tours").select("*").eq("id", tourId).eq("business_id", tenant.business.id).single();
+      const tourInfo = await supabase.from("tours").select("*").eq("id", tourId).eq("business_id", tenant.business.id).eq("active", true).eq("hidden", false).maybeSingle();
       if (!tourInfo.data) { await sendText(tenant, phone, "Hmm, can\u2019t find that tour. Let\u2019s try again."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
       const t = tourInfo.data;
       await sendText(tenant, phone, "*" + t.name + "* \u{1F6F6}\n\n" + t.description + "\n\n\u23F1 " + formatDuration(t.duration_minutes) + "\n\u{1F4B0} R" + t.base_price_per_person + " per person\n\nHow many people will be joining?");
@@ -2298,7 +2298,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         }
       }
       if (!tourId) { await sendText(tenant, phone, "Please pick a tour from the list."); return; }
-      const tourInfo = await supabase.from("tours").select("*").eq("id", tourId).eq("business_id", tenant.business.id).single();
+      const tourInfo = await supabase.from("tours").select("*").eq("id", tourId).eq("business_id", tenant.business.id).eq("active", true).eq("hidden", false).maybeSingle();
       if (!tourInfo.data) { await sendText(tenant, phone, "Can't find that tour. Let's try again."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
       const t = tourInfo.data;
       await sendText(tenant, phone, "\u{1F381} *" + t.name + " Gift Voucher*\nValue: R" + t.base_price_per_person + "\n\nWho is this voucher for? Type their name (e.g. Sarah):");

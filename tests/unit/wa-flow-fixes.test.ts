@@ -53,10 +53,12 @@ function bot(state: string, stateData: any, tables: Record<string, any> = {}, ex
 
 describe("WhatsApp booking flow", () => {
   for (const [state, id] of [["PICK_TOUR", "TOUR_"], ["GV_PICK_TOUR", "GV_"]]) {
-    it(`${state} only loads a tour that belongs to this tenant`, async () => {
+    it(`${state} only loads a tour that belongs to this tenant and is on sale`, async () => {
       const b = bot(state, {}, { tours: tour });
       await b.handle(tenant, phone, "", "interactive", { list_reply: { id: id + tour.id } });
       expect(b.filters.tours).toContainEqual(["eq", "business_id", "tenant-a"]);
+      expect(b.filters.tours).toContainEqual(["eq", "active", true]);
+      expect(b.filters.tours).toContainEqual(["eq", "hidden", false]);
     });
   }
 
