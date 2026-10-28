@@ -380,7 +380,7 @@ Found but not fixed (pre-existing):
 - **Bulk "selected bookings" weather cancel** goes through `cancel-booking` and
   has no option picker; the owner scoped this release to per trip.
 
-## 7. WhatsApp and web chat review, 28 Oct 2026 (not deployed yet)
+## 7. WhatsApp and web chat review, 28 Oct 2026 (tag deploy-2026-10-28-4)
 
 The owner asked for both bots to be production-ready. The work is 42 commits on
 the admin repo's `golive/bot-review-2026-10-28` (6392443..5f270b6) and one on
@@ -469,7 +469,21 @@ security baseline is unchanged.
   - `deno check` passes on all nine functions in scope;
   - the booking app's `tsc` and `eslint` on ChatWidget are clean.
 
-**Deploy scope when approved**
+**Deployed** (owner-approved, 28 Oct 2026 ~19:40 SAST)
+
+- **Edge functions:** the nine below, each on its first attempt. Their live
+  source matches 92012e9 byte for byte (99 files).
+- **Admin app:** `dpl_CCX1f5qE4Z89EqdTzo6GHRYEZaih`. Roll back to
+  `dpl_9dNaigZJJPqeTEuKrJCSCv553p7F`.
+- **Booking app:** `dpl_FL3rkdsZkRGuvmk4a7ZXzMMdz1p5`. Roll back to
+  `dpl_F3BCtroKUMrPewVtkf5iqgQ2Xmd8`.
+- **Smoke tests:** tenant sites and admin return 200; the fulfil route and an
+  unsigned wa-webhook POST return 401.
+- **Logs:** no 5xx since the deploy. Production requests carry
+  `cf-connecting-ip`, which the forged-IP fix relies on.
+- **Function rollback:** redeploy the nine from `deploy-2026-10-28-3`.
+
+**Scope**
 
 - **Edge functions (9):**
   - wa-webhook and web-chat;
