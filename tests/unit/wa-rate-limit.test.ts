@@ -20,6 +20,7 @@ function bot() {
   const chain: any = { then: (resolve: any) => resolve({ data: [] }), maybeSingle: async () => ({ data: null }), single: async () => ({ data: { id: "m" } }) };
   for (const name of ["select", "insert", "update", "eq", "gte", "order", "limit"]) chain[name] = () => chain;
   const handle = sourceFunction(wa, "handleMsg", {
+    startTyping: () => () => undefined,
     getConvo: async () => ({ id: "conversation-a", current_state: "IDLE", state_data: {} }),
     supabase: { from: () => chain, rpc: async (name: string) => { rpcs.push(name); return { data: 1, error: null }; } },
     getSubscriptionState: async () => ({ trading: true }), shouldBotReply: async () => ({ active: true }),

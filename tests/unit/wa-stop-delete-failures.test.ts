@@ -14,6 +14,7 @@ function bot(rpcError: any) {
     return q;
   };
   const handle = sourceFunction("supabase/functions/wa-webhook/index.ts", "handleMsg", {
+    startTyping: () => () => undefined,
     getConvo: async () => ({ id: "conversation-a", current_state: "IDLE", state_data: {} }),
     supabase: { from: chain, rpc: async () => ({ data: null, error: rpcError }) },
     sendText: async (_t: any, _p: any, message: string) => { sent.push(message); },

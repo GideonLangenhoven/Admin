@@ -34,6 +34,7 @@ function bot(tables: Record<string, any[]>, sendResult: any = { ok: true, window
     return q;
   };
   const handle = sourceFunction("supabase/functions/wa-webhook/index.ts", "handleMsg", {
+    startTyping: () => () => undefined,
     getConvo: async () => ({ id: "conversation-a", current_state: "IDLE", state_data: {} }),
     supabase: { from, rpc: async () => ({ data: 1, error: null }) },
     operationalCancellationFollowup,

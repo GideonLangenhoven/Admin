@@ -46,7 +46,7 @@ function bot(state: string, stateData: any, tables: Record<string, any> = {}, ex
     sendText: async (_t: any, _p: any, message: string) => { sent.push(message); },
     sendButtons: async (_t: any, _p: any, body: string) => { sent.push(body); },
     setConvo: async (_id: string, data: any) => { changes.push(data); },
-    logE: async () => { throw new Error("Unexpected bot error"); }, typingDelay: async () => undefined,
+    logE: async () => { throw new Error("Unexpected bot error"); }, startTyping: () => () => undefined,
     isAvailabilityQuery: ordinary, formatDuration: (m: number) => m + " min", calculateChatBookingPricing, rands, waTermsNotice, ...extra,
   });
   return { handle, sent, changes, filters, ordinary };

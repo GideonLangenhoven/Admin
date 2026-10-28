@@ -22,6 +22,7 @@ function bot(status = "BOT") {
   for (const name of ["select", "update", "eq", "gte", "order", "limit"]) chain[name] = () => chain;
   chain.insert = (row: any) => { logged.push(row.body); return chain; };
   const handle = sourceFunction(wa, "handleMsg", {
+    startTyping: () => () => undefined,
     getConvo: async () => ({ id: "conversation-a", status, current_state: "IDLE", state_data: {} }),
     supabase: { from: () => chain, rpc: async () => ({ data: 1, error: null }) },
     getSubscriptionState: async () => ({ trading: true }), shouldBotReply: async () => ({ active: true }),

@@ -138,6 +138,7 @@ describe("customer enforcement", () => {
       const sent: string[] = []; const changes: any[] = []; const filters: any[] = [];
       const db = { from: (table: string) => query({ data: table === "bookings" ? { ...booking, status: "CANCELLED", cancellation_reason: "Weather cancellation" } : table === "outbox" ? [] : null }, filters) };
       const handle = sourceFunction("supabase/functions/wa-webhook/index.ts", "handleMsg", {
+        startTyping: () => () => undefined,
         getConvo: async () => ({ id: "conversation-a", current_state: state, state_data: state === "IDLE" ? {} : { booking_id: booking.id } }),
         supabase: db, getSubscriptionState: async () => ({ trading: true }), shouldBotReply: async () => ({ active: true }),
         sendText: async (_t: any, _p: any, message: string) => { sent.push(message); },
@@ -157,6 +158,7 @@ describe("customer enforcement", () => {
 it("stale WhatsApp actions stay blocked when the stored phone uses a different format", async () => {
   const sent: string[] = [];
   const handle = sourceFunction("supabase/functions/wa-webhook/index.ts", "handleMsg", {
+    startTyping: () => () => undefined,
     getConvo: async () => ({ id: "conversation-a", current_state: "CONFIRM_VOUCHER_CONVERT", state_data: { booking_id: booking.id } }),
     supabase: { from: (table: string) => {
       const result: any = { data: table === "bookings" ? { ...booking, status: "CANCELLED" } : table === "outbox" ? [] : null };
@@ -280,6 +282,7 @@ describe("weather cancellation options", () => {
       const offered = state === "CONFIRM_VOUCHER_CONVERT" ? ["REFUND"] : ["VOUCHER"];
       const db = { from: (table: string) => query({ data: table === "bookings" ? { ...booking, status: "CANCELLED", cancellation_reason: "Weather cancellation", cancellation_self_service: true, cancellation_options: offered } : table === "outbox" ? [] : null }, filters) };
       const handle = sourceFunction("supabase/functions/wa-webhook/index.ts", "handleMsg", {
+        startTyping: () => () => undefined,
         getConvo: async () => ({ id: "conversation-a", current_state: state, state_data: state === "IDLE" ? {} : { booking_id: booking.id } }),
         supabase: db, getSubscriptionState: async () => ({ trading: true }), shouldBotReply: async () => ({ active: true }),
         sendText: async (_t: any, _p: any, message: string) => { sent.push(message); },

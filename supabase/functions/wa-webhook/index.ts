@@ -408,8 +408,19 @@ async function sendList(tenant: TenantContext, to: any, bt: any, btnTxt: any, se
   }).filter(function (sec: any) { return sec.rows.length > 0; });
   return sendWA(tenant, to, { type: "interactive", interactive: { type: "list", body: { text: body }, action: { button: clip(btnTxt, 20), sections: sections } } });
 }
-async function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
-async function typingDelay() { await delay(800 + Math.floor(Math.random() * 1200)); }
+// Blue ticks plus WhatsApp's real "typing…" while the bot works on a reply. Meta drops the
+// indicator after 25 s or at our next message, so it's renewed every 20 s until the turn ends.
+function startTyping(tenant: TenantContext, messageId: string) {
+  if (!messageId) return () => {};
+  const show = () => fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
+    method: "POST",
+    headers: { Authorization: "Bearer " + tenant.credentials.waToken, "Content-Type": "application/json" },
+    body: JSON.stringify({ messaging_product: "whatsapp", status: "read", message_id: messageId, typing_indicator: { type: "text" } }),
+  }).then((res) => { if (!res.ok) console.warn("WA_TYPING_ERR " + res.status); }, (e) => console.warn("WA_TYPING_ERR", e));
+  show();
+  const timer = setInterval(show, 20_000);
+  return () => clearInterval(timer);
+}
 // On the summary, before the guest taps Confirm: a voucher-paid booking completes on that tap.
 function waTermsNotice(tenant: TenantContext) {
   const base = String(tenant.business.booking_site_url || "").replace(/\/+$/, "");
@@ -935,14 +946,12 @@ async function botAnswerV2(tenant: TenantContext, phone: any, convo: any, userTe
         await setConvo(convo.id, { current_state: "MENU" });
         return true;
       case "escalate": {
-        await typingDelay();
         await sendText(tenant, phone, out.message || "Let me get a person on this for you. Our team will reply here shortly.");
         await setConvo(convo.id, { current_state: "IDLE", status: "HUMAN" });
         await logE(tenant, "human_takeover", { phone: phone, reason: out.escalation_reason || "bot_escalate" });
         return true;
       }
       case "flow": {
-        await typingDelay();
         if (out.message) await sendText(tenant, phone, out.message);
         if (out.flow_id === "availability_check") {
           const availHandled = await handleSmartAvail(tenant, phone, userText);
@@ -961,7 +970,6 @@ async function botAnswerV2(tenant: TenantContext, phone: any, convo: any, userTe
       case "reply":
       default: {
         if (!out.message) return false;
-        await typingDelay();
         // One message, no trailing button prompt (v2 one-message rule).
         await sendText(tenant, phone, out.message);
         await setConvo(convo.id, { current_state: "MENU" });
@@ -974,7 +982,8 @@ async function botAnswerV2(tenant: TenantContext, phone: any, convo: any, userTe
   }
 }
 
-async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: any, interactive?: any, quiet = false) {
+async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: any, interactive?: any, quiet = false, waMessageId = "") {
+  let stopTyping = () => {};
   try {
     const convo = await getConvo(tenant, phone);
     if (!convo) return;
@@ -1148,6 +1157,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
     }
     if (quiet) { console.warn("WA_RATE_LIMITED business=" + tenant.business.id); return; }
+    stopTyping = startTyping(tenant, waMessageId);
     // The bot reads text only; the team sees the original in the Inbox.
     if (!["text", "interactive", "button", "image", "document"].includes(msgType)) { await sendText(tenant, phone, MEDIA_FALLBACK_REPLY); return; }
 
@@ -1245,7 +1255,6 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     if (isPaymentIssue) {
       // Only intercept if we aren't already in human mode
       if (convo.status !== "HUMAN") {
-        await typingDelay();
         await sendText(tenant, phone, "I see you're sending a payment update or having trouble paying. I've paused my automated responses and alerted our team to check this for you right away. 🛶\n\nA human will reply to you here shortly!");
         await setConvo(convo.id, { status: "HUMAN", current_state: "IDLE", state_data: {} });
         return;
@@ -1276,7 +1285,6 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           .order("uploaded_at", { ascending: false });
         if (photos.data && photos.data.length > 0) {
           const photoUrls = photos.data.map(function (p: any) { return p.photo_url; });
-          await typingDelay();
           await sendText(tenant, phone, "Here are your trip photos! 📸\n\n" + photoUrls.join("\n") + "\n\nShare this link with your group and enjoy the memories! 🛶");
           return;
         }
@@ -1297,9 +1305,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (faqKey && !rid) {
         const faqAnswer = await getFaqAnswer(tenant, faqKey, input);
         if (faqAnswer) {
-          await typingDelay();
           await sendText(tenant, phone, faqAnswer);
-          await typingDelay();
           await sendText(tenant, phone, "Anything else I can help with?");
           await sendButtons(tenant, phone, "Quick actions:", [
             { id: "BOOK", title: "\u{1F6F6} Book a Tour" },
@@ -1427,7 +1433,6 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       // ASK A QUESTION
       else if (c === "ASK" || c === "ask" || c.includes("question")) {
-        await typingDelay();
         await sendText(tenant, phone, "Go ahead, ask me anything! \u{1F60A}\n\nI can answer things like:\n\u2022 \"What should I bring?\"\n\u2022 \"Where do we meet?\"\n\u2022 \"Is it safe for beginners?\"\n\u2022 \"Can I reschedule my booking?\"\n\u2022 \"What\'s available tomorrow?\"\n\nOr ask about your specific booking, I can look it up!");
         await setConvo(convo.id, { current_state: "ASK_MODE" });
         return;
@@ -1530,7 +1535,6 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // FALLBACK — try to be helpful
       else {
         if (WA_BOT_V2 === "on" && await botAnswerV2(tenant, phone, convo, input || rawText, "send")) return;
-        await typingDelay();
         const gemReply = await gemFallback(tenant, input || rawText, phone);
         if (gemReply) {
           await sendText(tenant, phone, gemReply);
@@ -1633,7 +1637,6 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         return;
       }
 
-      await typingDelay();
       // Show upcoming dates preview so user doesn't have to guess
       let previewMsg = qty + " " + (qty === 1 ? "person" : "people") + ", nice! \u{1F4C5}\n\nHere\u2019s what\u2019s coming up:\n";
       const dateMap: any = {};
@@ -1821,7 +1824,6 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
       if (openSlots.length > maxDisplay) timeTxt += "\n...and " + (openSlots.length - maxDisplay) + " more times available!";
 
-      await typingDelay();
       await sendText(tenant, phone, timeTxt.trim());
 
       // Update state to use the freshly grabbed slots so price checking relies on them.
@@ -1910,7 +1912,6 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           }
           return;
         }
-        await typingDelay();
         await sendText(tenant, phone, "Brilliant! Just need a couple of details to lock it in.\n\nPlease reply with your:\n- Full Name\n- Email Address\n\n*(You can just send them together in one message!)*");
         await setConvo(convo.id, { current_state: "ASK_DETAILS", state_data: sd });
         return;
@@ -1956,12 +1957,10 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (needsQuestionForm(customDefs)) { await sendQuestionFormLink(tenant, phone, convo.id, sd); return; }
       if (customDefs.length > 0) {
         await setConvo(convo.id, { current_state: "ASK_CUSTOM_FIELDS", state_data: { ...sd, customer_name: dName, email: dEmail, custom_field_defs: customDefs, custom_fields: {}, partial_name: undefined, partial_email: undefined } });
-        await typingDelay();
         await sendText(tenant, phone, "Almost done.\n\n" + promptForCustomField(customDefs[0]));
         return;
       }
       await setConvo(convo.id, { current_state: "ASK_WHATSAPP_UPDATES", state_data: { ...sd, customer_name: dName, email: dEmail, partial_name: undefined, partial_email: undefined } });
-      await typingDelay();
       await askBookingWhatsappConsent(tenant, phone);
     }
 
@@ -1971,7 +1970,6 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const currentField = nextCustomField(defs, values);
       if (!currentField) {
         await setConvo(convo.id, { current_state: "ASK_WHATSAPP_UPDATES", state_data: { ...sd, custom_fields: values } });
-        await typingDelay();
         await askBookingWhatsappConsent(tenant, phone);
         return;
       }
@@ -1993,7 +1991,6 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
 
       await setConvo(convo.id, { current_state: "ASK_WHATSAPP_UPDATES", state_data: { ...sd, custom_fields: values } });
-      await typingDelay();
       await askBookingWhatsappConsent(tenant, phone);
       return;
     }
@@ -2154,7 +2151,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await setConvo(convo.id, { current_state: "IDLE", state_data: {}, last_booking_id: booking.id, customer_name: sd.customer_name, email: email });
         // Sent here, after the confirmation: a 5s timer could fire after the function had finished, or first.
         if (upsellTour) {
-          try { await typingDelay(); await sendText(tenant, phone, "\u{1F4A1} Psst! How about adding a *" + upsellTour.name + "* to your trip?\n\nJust type *book* to add another tour."); }
+          try { await sendText(tenant, phone, "\u{1F4A1} Psst! How about adding a *" + upsellTour.name + "* to your trip?\n\nJust type *book* to add another tour."); }
           catch (e) { console.error("UPSELL_SEND_ERR", e); }
         }
         return;
@@ -2436,7 +2433,6 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // ===== ASK MODE =====
     else if (state === "ASK_MODE") {
       // Smart context-aware answering with database lookups
-      await typingDelay();
 
       // PRIORITY 1: Check booking-related intents first (before FAQ!)
       let wantReschedule = input.includes("reschedule") || input.includes("move") && (input.includes("booking") || input.includes("trip")) || (input.includes("change") && (input.includes("date") || input.includes("time") || input.includes("booking") || input.includes("day")));
@@ -2692,6 +2688,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       await logE(tenant, "BOT_CRASH", { error: String(botErr), stack: botErr?.stack, input: text });
       await sendText(tenant, phone, "Oops, something went wrong on our end! \u{1F61E} Please try again or type *menu* to start over.");
     } catch (_) { }
+  } finally {
+    stopTyping();
   }
 }
 
@@ -2806,7 +2804,7 @@ async function processWhatsappValue(tenant: TenantContext, value: any, message: 
       // 20 a minute the bot stays quiet. STOP, DELETE and the Inbox still work.
       const { data: underLimit, error: limitError } = await supabase.rpc("check_rate_limit", { p_ip: tenant.business.id + ":" + ph, p_endpoint: "wa-bot", p_max: 20 });
       if (limitError) console.error("WA_RATE_LIMIT_ERR", limitError.message);
-      await handleMsg(tenant, ph, txt, mt, inter, underLimit === false);
+      await handleMsg(tenant, ph, txt, mt, inter, underLimit === false, msgId);
       return new Response("OK", { status: 200 });
 }
 

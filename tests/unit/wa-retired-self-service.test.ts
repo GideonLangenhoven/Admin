@@ -27,6 +27,7 @@ function bot(state: string, stateData: any, booking: any) {
   // The first step of ordinary message handling; stops the run there.
   const ordinary = vi.fn(() => { throw new Error("reached ordinary handling"); });
   const handle = sourceFunction("supabase/functions/wa-webhook/index.ts", "handleMsg", {
+    startTyping: () => () => undefined,
     getConvo: async () => ({ id: "conversation-a", current_state: state, state_data: stateData }),
     supabase: { from: (table: string) => query({ data: table === "bookings" ? booking : table === "outbox" ? [] : null }, filters), rpc },
     getSubscriptionState: async () => ({ trading: true }), shouldBotReply: async () => ({ active: true }),

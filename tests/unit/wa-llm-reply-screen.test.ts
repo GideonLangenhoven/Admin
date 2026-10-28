@@ -24,7 +24,7 @@ describe("WhatsApp AI reply screen", () => {
     const sent: string[] = [];
     const v2 = sourceFunction(wa, "botAnswerV2", {
       withinAiQuota: async () => true, buildBotSystemForTurn: async () => "prompt", hashedUserKey: async () => "key",
-      logLlmUsage: async () => undefined, typingDelay: async () => undefined, setConvo: async () => undefined, screenReply, injectionRefusal,
+      logLlmUsage: async () => undefined, setConvo: async () => undefined, screenReply, injectionRefusal,
       sendText: async (_t: any, _p: any, message: string) => { sent.push(message); },
       botReply: async ({ user }: any) => ({ usage: {}, out: { action: "reply", message: user } }),
     });
