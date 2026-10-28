@@ -2158,11 +2158,18 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           p_voucher_ids: verifiedSd.voucher_ids || [verifiedSd.voucher_id],
         });
         if (voucherConfirmation.error || !voucherConfirmation.data?.ok) {
-          await sendText(tenant, phone, "We couldn't confirm that booking. The voucher balance or available spots may have changed. Please try again or contact our team.");
-          await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
-          return;
+          // A transport error can arrive after the transaction committed: only an unconfirmed booking is removed.
+          const saved = await supabase.from("bookings").select("status").eq("id", booking.id).eq("business_id", tenant.business.id).maybeSingle();
+          if (saved.error) throw saved.error;
+          if (!["PAID", "CONFIRMED", "COMPLETED"].includes(saved.data?.status)) {
+            const cleanup = await supabase.from("bookings").delete().eq("id", booking.id).eq("business_id", tenant.business.id).eq("status", "PENDING");
+            if (cleanup.error) await logE(tenant, "VOUCHER_BOOKING_CLEANUP_ERR", { booking_id: booking.id, msg: cleanup.error.message }, booking.id);
+            await sendText(tenant, phone, "We couldn't confirm that booking. The voucher balance or available spots may have changed. Please try again or contact our team.");
+            await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+            return;
+          }
         }
-        for (const remainder of voucherConfirmation.data.remainders || []) {
+        for (const remainder of voucherConfirmation.data?.remainders || []) {
           try { await sendText(tenant, phone, "\u{1F39F} Your voucher *" + remainder.code + "* has *R" + remainder.remaining + "* remaining. Use it on your next booking!"); } catch (e) { }
         }
         const vref = booking.id.substring(0, 8).toUpperCase();

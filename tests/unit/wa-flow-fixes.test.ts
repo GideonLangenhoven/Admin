@@ -10,7 +10,7 @@ const tour = { id: "20000000-0000-4000-8000-000000000001", business_id: "tenant-
 
 function query(result: any, filters: any[]) {
   const chain: any = {};
-  for (const name of ["select", "update", "insert", "eq", "in", "not", "gt", "gte", "lt", "lte", "order", "limit"]) {
+  for (const name of ["select", "update", "insert", "delete", "eq", "in", "not", "gt", "gte", "lt", "lte", "order", "limit"]) {
     chain[name] = (...args: any[]) => { filters.push([name, ...args]); return chain; };
   }
   chain.single = chain.maybeSingle = async () => result;
@@ -156,6 +156,33 @@ describe("WhatsApp booking flow", () => {
     expect(b.sent.at(-1)).toContain("You\u2019re all set!");
     expect(b.sent.join("\n")).not.toContain("Payment link unavailable");
     expect(b.changes.at(-1)).toMatchObject({ current_state: "IDLE", state_data: {} });
+  });
+
+  const voucherOnly = (bookingStatus: string, confirmation: any) => bot("FINALIZE_BOOKING", {
+    ...summary, voucher_id: "v-2", voucher_ids: ["v-2"], voucher_codes: ["WXYZ2345"], voucher_deduction: 1200, total: 0,
+    customer_name: "Synthetic Guest", email: "guest@example.invalid", whatsapp_booking_updates_opt_in: false,
+  }, {
+    slots: { id: "slot-1", start_time: "2099-01-01T08:00:00Z", status: "OPEN", tour_id: tour.id, price_per_person_override: null, business_id: "tenant-a" },
+    tours: tour, bookings: { id: "30000000-0000-4000-8000-000000000001", waiver_token: "token-1", status: bookingStatus },
+  }, {
+    verifyChatBookingPricing, calcDiscount: async () => ({ type: "NONE", percent: 0, label: "" }), logE: async () => undefined,
+    rpc: async (name: string) => name === "confirm_voucher_booking" ? confirmation : { data: { success: true } },
+    getBookableTours: async () => [], resolveWaiverLink: () => "", fmtTime: () => "Fri 1 Jan, 10:00", businessName: () => "Fixture Kayak", fetch: vi.fn(async () => new Response("{}")),
+  });
+
+  it("a voucher-only booking that can't be confirmed is removed, not left pending", async () => {
+    const b = voucherOnly("PENDING", { data: { ok: false, error: "VOUCHER_INSUFFICIENT" }, error: null });
+    await b.handle(tenant, phone, "internal_proceed", "text");
+    expect(b.filters.bookings).toContainEqual(["delete"]);
+    expect(b.filters.bookings).toContainEqual(["eq", "status", "PENDING"]);
+    expect(b.sent.at(-1)).toContain("We couldn't confirm that booking");
+  });
+
+  it("a voucher confirmation that committed before a network error is reported as booked", async () => {
+    const b = voucherOnly("PAID", { data: null, error: { message: "upstream connect error" } });
+    await b.handle(tenant, phone, "internal_proceed", "text");
+    expect(b.filters.bookings).not.toContainEqual(["delete"]);
+    expect(b.sent.join("\n")).toContain("You\u2019re all set!");
   });
 
   const ageQuestion = { key: "age", label: "Youngest guest's age", type: "number", required: true };
