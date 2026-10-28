@@ -1671,7 +1671,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
             const bSlot: any = Array.isArray(b.slots) ? b.slots[0] : b.slots;
             const bTour: any = Array.isArray(b.tours) ? b.tours[0] : b.tours;
             const bTime = bSlot?.start_time ? fmtS(bSlot.start_time) : "?";
-            reply += (bTour?.name || "Tour") + ", " + bTime + "\n" + b.qty + " " + pl(b.qty, "person", "people") + ", " + b.status + "\nRef: " + bRef + "\n\n";
+            reply += (bTour?.name || "Tour") + ", " + bTime + "\n" + b.qty + " " + pl(b.qty, "person", "people") + ", " + b.status.charAt(0) + b.status.slice(1).toLowerCase() + "\nRef: " + bRef + "\n\n";
           }
           reply += "What would you like to do with your booking?";
           // M2: Show comprehensive action buttons based on booking timing

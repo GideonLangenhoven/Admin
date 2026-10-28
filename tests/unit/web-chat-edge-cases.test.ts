@@ -141,6 +141,7 @@ describe("web chat changes reflect the actual booking service result", () => {
     const second = choices.buttons.find((button: any) => button.value.includes("booking-second"));
     const selected = await customer.post("btn:" + second.value, "LOOKUP");
     expect(selected.state).toMatchObject({ step: "PICK_ACTION", booking_id: "booking-second" });
+    expect(selected.reply).toContain("2 people, Paid\n");
     expect(selected.state.bookings.map((booking: any) => booking.id)).toEqual(["booking-second"]);
     expect(f.calls.filter(call => call.kind === "invoke")).toEqual([]);
   });
