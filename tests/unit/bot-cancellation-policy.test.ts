@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { sourceExports, sourceFunction } from "../helpers/source-handler";
 import { webChatFixture } from "../helpers/web-chat-fixture";
@@ -24,6 +25,12 @@ describe("the bots know the cancellation policy", () => {
     expect(text).toContain("if we cancel a trip because of the weather");
     expect(cancellationPolicyPrompt({ refund_policy_tiers: [{ hours_before: 48, refund_percent: 100 }] })).toContain("• Less than 48 hours before the start: no refund");
     expect(cancellationPolicyPrompt({})).toBe("");
+  });
+
+  it("promises no particular weather outcome; the operator picks the options per trip", () => {
+    const weatherLine = botPrompt().cancellationPolicyPrompt({ refund_policy_tiers: tiers }).split("\n").pop();
+    expect(weatherLine).not.toMatch(/refund|voucher|new date/i);
+    expect(readFileSync("supabase/functions/wa-webhook/index.ts", "utf8")).not.toContain("full refund or free reschedule");
   });
 
   it("puts the policy in the web chat prompt", async () => {

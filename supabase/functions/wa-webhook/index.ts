@@ -692,7 +692,7 @@ async function checkWeatherConcern(tenant: TenantContext, phone: string, input: 
 
     const weatherDayLabel = weatherDayIndex === 0 ? "today" : weatherDayIndex === 1 ? "tomorrow" : "your trip day";
     if (concerns.length > 0) {
-      weatherMsg = "Looking at " + weatherDayLabel + "\u2019s forecast, conditions may be challenging \u26A0\uFE0F\n\n" + concerns.map(function (c) { return "\u2022 " + c; }).join("\n") + "\n\nWe\u2019ll let you know for sure on the morning of the trip, about an hour before. Please keep your phone nearby \u{1F4F1}\n\nIf we cancel, you get a *full refund or free reschedule*.";
+      weatherMsg = "Looking at " + weatherDayLabel + "\u2019s forecast, conditions may be challenging \u26A0\uFE0F\n\n" + concerns.map(function (c) { return "\u2022 " + c; }).join("\n") + "\n\nWe\u2019ll let you know for sure on the morning of the trip, about an hour before. Please keep your phone nearby \u{1F4F1}\n\nIf we do cancel, we\u2019ll let you know your options.";
     } else {
       weatherMsg = weatherDayLabel.charAt(0).toUpperCase() + weatherDayLabel.slice(1) + "\u2019s looking good! \u2600\uFE0F\n\n\u{1F30A} Swell: " + swell.toFixed(1) + "m\n\u{1F4A8} Wind: " + Math.round(maxWind) + "km/h " + dirName + "\n\nConditions look favourable for your trip. We\u2019ll still confirm on the morning of your trip about an hour before. Keep your phone nearby \u{1F4F1}";
     }
@@ -2175,7 +2175,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           const upsellTour = otherTours2[0];
           setTimeout(async function () {
             try {
-              await sendText(tenant, phone, "\u{1F4A1} Psst! How about adding a *" + upsellTour.name + "* to your trip? Book both and enjoy even more of Cape Town\u2019s coastline!\n\nJust type *book* to add another tour.");
+              await sendText(tenant, phone, "\u{1F4A1} Psst! How about adding a *" + upsellTour.name + "* to your trip?\n\nJust type *book* to add another tour.");
             } catch (e) { }
           }, 5000);
         }

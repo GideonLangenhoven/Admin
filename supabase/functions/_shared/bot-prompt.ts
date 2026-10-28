@@ -222,7 +222,8 @@ export function cancellationPolicyPrompt(business: { refund_policy_tiers?: unkno
     "Cancellation policy (refund of the amount paid, by notice given before the trip starts):",
     ...lines.map((line) => "• " + line),
     summary ? "Operator's summary: " + summary : "",
-    "Weather: if we cancel a trip because of the weather, these tiers don't apply; guests who paid choose a new date, a voucher or a full refund.",
+    // The operator picks the options per cancelled trip, so promise none here.
+    "Weather: if we cancel a trip because of the weather, these tiers don't apply; the cancellation message tells guests which options they have.",
   ].filter(Boolean).join("\n");
 }
 
