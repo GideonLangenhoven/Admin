@@ -23,6 +23,7 @@ import { assembleBotSystem, buildBlockB, buildBlockC, cancellationPolicyPrompt }
 import { hashedUserKey } from "../_shared/openrouter-provider.ts";
 import { botReply, type BotOut, type BotUsage } from "../_shared/bot-llm.ts";
 import { calculateChatBookingPricing, verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
+import { applicableBookingQuestions, captureQuestionFields, validateQuestionAnswers } from "../_shared/booking-custom-fields.ts";
 import { getPaidPortions } from "../_shared/vouchers.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
 import { formatTourMeetingPoints, isAvailabilityQuery } from "../_shared/bot-guards.ts";
@@ -455,21 +456,34 @@ async function getBookableTours(tenant: TenantContext) {
   const withSlots = new Set(slots.map(function (s: any) { return s.tour_id; }));
   return tours.filter(function (t: any) { return withSlots.has(t.id); });
 }
-async function getBookingCustomFields(tenant: TenantContext) {
+// The booking questions for this tour, by the same rules create-checkout validates with.
+async function getBookingCustomFields(tenant: TenantContext, tourId: string) {
   const r = await supabase.from("businesses").select("booking_custom_fields").eq("id", tenant.business.id).maybeSingle();
-  return Array.isArray(r.data?.booking_custom_fields) ? r.data.booking_custom_fields.filter(function (f: any) { return f && f.key && f.label; }) : [];
+  if (r.error) throw r.error;
+  return applicableBookingQuestions(r.data?.booking_custom_fields ?? [], tourId, tenant.business.id);
+}
+// Choice, date and per-guest questions need the booking form (same rule as web chat).
+function needsQuestionForm(questions: any[]) {
+  return questions.some(function (q: any) { return q.scope === "participant" || !["text", "textarea", "number"].includes(q.type); });
+}
+async function sendQuestionFormLink(tenant: TenantContext, phone: any, convoId: string, sd: any) {
+  const base = String(tenant.business.booking_site_url || "").replace(/\/+$/, "");
+  if (base) await sendText(tenant, phone, "This trip needs a few extra details, which are easiest to fill in on our booking page. Your tour and time are already selected:\n\n" + base + "/book?tour=" + encodeURIComponent(sd.tour_id) + "&slot=" + encodeURIComponent(sd.slot_id));
+  else await sendButtons(tenant, phone, "This trip needs a few extra details. Our team can help you finish the booking.", [{ id: "HUMAN", title: "\u{1F4AC} Speak to Our Team" }, { id: "IDLE", title: "\u2B05 Menu" }]);
+  await setConvo(convoId, { current_state: "MENU", state_data: {} });
 }
 function nextCustomField(defs: any[], values: Record<string, unknown>) {
   for (let i = 0; i < (defs || []).length; i++) {
     const field = defs[i];
     if (!field) continue;
-    if (!String(values?.[field.key] || "").trim()) return field;
+    // A skipped optional question is answered; a required one needs a value.
+    if (!Object.prototype.hasOwnProperty.call(values || {}, field.key) || (field.required && !String(values?.[field.key] ?? "").trim())) return field;
   }
   return null;
 }
 function promptForCustomField(field: any) {
   if (!field) return "Please send the next booking detail.";
-  return field.label + (field.required ? " *" : "") + (field.placeholder ? "\n" + field.placeholder : "");
+  return field.label + (field.required ? " *" : " (optional, reply *skip* to leave it out)") + (field.placeholder ? "\n" + field.placeholder : "");
 }
 async function getLoyaltyCount(tenant: TenantContext, phone: any) {
   try { const r = await supabase.rpc("check_loyalty", { p_phone: phone, p_business_id: tenant.business.id }); return r.data || 0; } catch (e) { return 0; }
@@ -1952,7 +1966,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await sendText(tenant, phone, missMsg);
         return;
       }
-      const customDefs = await getBookingCustomFields(tenant);
+      const customDefs = await getBookingCustomFields(tenant, sd.tour_id);
+      if (needsQuestionForm(customDefs)) { await sendQuestionFormLink(tenant, phone, convo.id, sd); return; }
       if (customDefs.length > 0) {
         await setConvo(convo.id, { current_state: "ASK_CUSTOM_FIELDS", state_data: { ...sd, customer_name: dName, email: dEmail, custom_field_defs: customDefs, custom_fields: {}, partial_name: undefined, partial_email: undefined } });
         await typingDelay();
@@ -1975,13 +1990,15 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         return;
       }
 
-      const fieldValue = rawText.trim();
+      const fieldValue = /^(?:skip|prefer not to say)[.!]*$/i.test(rawText.trim()) ? "" : rawText.trim();
       if (!fieldValue && currentField.required) {
         await sendText(tenant, phone, "I still need this before I can lock in the booking:\n\n" + promptForCustomField(currentField));
         return;
       }
+      const checked = validateQuestionAnswers([currentField], { [currentField.key]: fieldValue }, Number(sd.qty));
+      if (checked.errors.length) { await sendText(tenant, phone, checked.errors[0].message + "\n\n" + promptForCustomField(currentField)); return; }
 
-      values[currentField.key] = fieldValue;
+      values[currentField.key] = checked.answers[currentField.key];
       const upcomingField = nextCustomField(defs, values);
       if (upcomingField) {
         await setConvo(convo.id, { state_data: { ...sd, custom_fields: values } });
@@ -2065,6 +2082,17 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         total: verifiedPricing.total,
         voucher_deduction: verifiedPricing.voucherDeduction,
       };
+      // Re-check the answers against the tour's current questions, as create-checkout will.
+      const questions = await getBookingCustomFields(tenant, verifiedSd.tour_id);
+      if (needsQuestionForm(questions)) { await sendQuestionFormLink(tenant, phone, convo.id, verifiedSd); return; }
+      const answers = validateQuestionAnswers(questions, sd.custom_fields || {}, Number(verifiedSd.qty));
+      if (answers.errors.length) {
+        const kept: Record<string, unknown> = { ...answers.answers };
+        for (const qe of answers.errors) delete kept[qe.key];
+        await setConvo(convo.id, { current_state: "ASK_CUSTOM_FIELDS", state_data: { ...verifiedSd, custom_field_defs: questions, custom_fields: kept } });
+        await sendText(tenant, phone, "Please complete the trip details first.\n\n" + promptForCustomField(nextCustomField(questions, kept)));
+        return;
+      }
       const email = sd.email;
       const br2 = await supabase.from("bookings").insert({
         business_id: tenant.business.id, tour_id: verifiedSd.tour_id, slot_id: verifiedSd.slot_id,
@@ -2074,7 +2102,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         discount_amount: verifiedPricing.discount,
         discount_notes: verifiedSd.discount_percent > 0 ? finalDiscount.label : null,
         voucher_amount_paid: Number(verifiedSd.voucher_deduction || 0),
-        status: "PENDING", source: "WHATSAPP", custom_fields: sd.custom_fields || {},
+        status: "PENDING", source: "WHATSAPP", custom_fields: questions.length ? captureQuestionFields(questions, answers.answers, tenant.business.id, verifiedSd.tour_id) : {},
         marketing_opt_in: null, whatsapp_booking_updates_opt_in: sd.whatsapp_booking_updates_opt_in === true,
         total_captured: 0, total_refunded: 0,
         terms_accepted_at: new Date().toISOString(),

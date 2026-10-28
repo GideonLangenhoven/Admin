@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { applicableBookingQuestions, captureQuestionFields, QUESTION_SCHEMA_KEY, validateQuestionAnswers } from "../../supabase/functions/_shared/booking-custom-fields";
 import { calculateChatBookingPricing, verifyChatBookingPricing } from "../../supabase/functions/_shared/chat-booking-pricing";
 import { sourceFunction } from "../helpers/source-handler";
 
@@ -17,13 +18,29 @@ function query(result: any, filters: any[]) {
   return chain;
 }
 
+// The real module helpers handleMsg calls for booking questions.
+const wa = "supabase/functions/wa-webhook/index.ts";
+const questionHelpers = (db: any, sent: string[], changes: any[]) => {
+  const send = async (_t: any, _p: any, message: string) => { sent.push(message); };
+  const setConvo = async (_id: string, data: any) => { changes.push(data); };
+  return {
+    validateQuestionAnswers, captureQuestionFields,
+    getBookingCustomFields: sourceFunction(wa, "getBookingCustomFields", { supabase: db, applicableBookingQuestions }),
+    needsQuestionForm: sourceFunction(wa, "needsQuestionForm", {}),
+    sendQuestionFormLink: sourceFunction(wa, "sendQuestionFormLink", { sendText: send, sendButtons: send, setConvo }),
+    nextCustomField: sourceFunction(wa, "nextCustomField", {}),
+    promptForCustomField: sourceFunction(wa, "promptForCustomField", {}),
+  };
+};
+
 function bot(state: string, stateData: any, tables: Record<string, any> = {}, extra: Record<string, unknown> = {}) {
   const sent: string[] = []; const changes: any[] = []; const filters: Record<string, any[]> = {};
   // The first step of ordinary IDLE/MENU handling; stops the run there.
   const ordinary = vi.fn(() => { throw new Error("reached ordinary handling"); });
-  const handle = sourceFunction("supabase/functions/wa-webhook/index.ts", "handleMsg", {
+  const db = { from: (table: string) => query({ data: tables[table] ?? (table === "outbox" ? [] : null) }, filters[table] ||= []), rpc: extra.rpc || vi.fn() };
+  const handle = sourceFunction(wa, "handleMsg", {
     getConvo: async () => ({ id: "conversation-a", current_state: state, state_data: stateData }),
-    supabase: { from: (table: string) => query({ data: tables[table] ?? (table === "outbox" ? [] : null) }, filters[table] ||= []), rpc: extra.rpc || vi.fn() },
+    supabase: db, ...questionHelpers(db, sent, changes),
     getSubscriptionState: async () => ({ trading: true }), shouldBotReply: async () => ({ active: true }),
     sendText: async (_t: any, _p: any, message: string) => { sent.push(message); },
     sendButtons: async (_t: any, _p: any, body: string) => { sent.push(body); },
@@ -137,5 +154,64 @@ describe("WhatsApp booking flow", () => {
     expect(b.sent.at(-1)).toContain("You\u2019re all set!");
     expect(b.sent.join("\n")).not.toContain("Payment link unavailable");
     expect(b.changes.at(-1)).toMatchObject({ current_state: "IDLE", state_data: {} });
+  });
+
+  const ageQuestion = { key: "age", label: "Youngest guest's age", type: "number", required: true };
+  const notesQuestion = { key: "notes", label: "Anything we should know?", type: "text" };
+
+  it("ASK_DETAILS asks only the questions for this tour", async () => {
+    const b = bot("ASK_DETAILS", { tour_id: tour.id, slot_id: "slot-1", qty: 2 }, { businesses: { booking_custom_fields: [{ ...ageQuestion, tour_ids: ["another-tour"] }, notesQuestion] } });
+    await b.handle(tenant, phone, "Synthetic Guest, guest@example.invalid", "text");
+    expect(b.sent.at(-1)).toBe("Almost done.\n\nAnything we should know? (optional, reply *skip* to leave it out)");
+    expect(b.changes.at(-1).state_data.custom_field_defs.map((q: any) => q.key)).toEqual(["notes"]);
+  });
+
+  it("ASK_DETAILS sends choice and per-guest questions to the booking form", async () => {
+    const b = bot("ASK_DETAILS", { tour_id: tour.id, slot_id: "slot-1", qty: 2 }, { businesses: { booking_custom_fields: [{ key: "size", label: "Wetsuit size", type: "select", options: ["S", "M"], scope: "participant" }] } });
+    await b.handle({ business: { id: "tenant-a", booking_site_url: "https://book.example.invalid/" } }, phone, "Synthetic Guest, guest@example.invalid", "text");
+    expect(b.sent.at(-1)).toContain("https://book.example.invalid/book?tour=" + tour.id + "&slot=slot-1");
+    expect(b.changes.at(-1)).toEqual({ current_state: "MENU", state_data: {} });
+  });
+
+  it("an answer the checkout would reject is asked again", async () => {
+    const defs = applicableBookingQuestions([ageQuestion], tour.id, "tenant-a");
+    const b = bot("ASK_CUSTOM_FIELDS", { tour_id: tour.id, qty: 2, custom_field_defs: defs, custom_fields: {} });
+    await b.handle(tenant, phone, "about ten", "text");
+    expect(b.sent).toEqual(["Enter a valid number.\n\nYoungest guest's age *"]);
+    expect(b.changes).toEqual([]);
+  });
+
+  it("an optional question can be skipped", async () => {
+    const defs = applicableBookingQuestions([notesQuestion], tour.id, "tenant-a");
+    const askBookingWhatsappConsent = vi.fn(async () => undefined);
+    const b = bot("ASK_CUSTOM_FIELDS", { tour_id: tour.id, qty: 2, custom_field_defs: defs, custom_fields: {} }, {}, { askBookingWhatsappConsent });
+    await b.handle(tenant, phone, "skip", "text");
+    expect(b.changes).toEqual([{ current_state: "ASK_WHATSAPP_UPDATES", state_data: expect.objectContaining({ custom_fields: { notes: "" } }) }]);
+    expect(askBookingWhatsappConsent).toHaveBeenCalled();
+  });
+
+  const finalize = (config: unknown[], answers: Record<string, unknown>) => bot("FINALIZE_BOOKING", { ...summary, customer_name: "Synthetic Guest", email: "guest@example.invalid", whatsapp_booking_updates_opt_in: false, custom_fields: answers }, {
+    slots: { id: "slot-1", start_time: "2099-01-01T08:00:00Z", status: "OPEN", tour_id: tour.id, price_per_person_override: null, business_id: "tenant-a" },
+    tours: tour, bookings: { id: "30000000-0000-4000-8000-000000000001", waiver_token: "token-1" }, businesses: { booking_custom_fields: config },
+  }, {
+    verifyChatBookingPricing, calcDiscount: async () => ({ type: "NONE", percent: 0, label: "" }), logE: async () => undefined,
+    rpc: async () => ({ data: { success: true } }), requestCheckout: async () => ({ id: "checkout-1", redirectUrl: "https://pay.example.invalid/1" }),
+  });
+
+  it("FINALIZE_BOOKING asks for a missing answer instead of creating a booking checkout would reject", async () => {
+    const b = finalize([ageQuestion], {});
+    await b.handle(tenant, phone, "internal_proceed", "text");
+    expect(b.sent).toEqual(["Please complete the trip details first.\n\nYoungest guest's age *"]);
+    expect(b.changes.at(-1)).toMatchObject({ current_state: "ASK_CUSTOM_FIELDS", state_data: { custom_fields: {} } });
+    expect((b.filters.bookings || []).some(f => f[0] === "insert")).toBe(false);
+  });
+
+  it("FINALIZE_BOOKING saves the validated answers with the question snapshot", async () => {
+    const b = finalize([ageQuestion], { age: "9" });
+    await b.handle(tenant, phone, "internal_proceed", "text");
+    const inserted = b.filters.bookings.find(f => f[0] === "insert")[1];
+    expect(inserted.custom_fields.age).toBe("9");
+    expect(inserted.custom_fields[QUESTION_SCHEMA_KEY]).toMatchObject({ format: 1, business_id: "tenant-a", tour_id: tour.id });
+    expect(b.changes.at(-1)).toMatchObject({ current_state: "AWAITING_PAYMENT" });
   });
 });
