@@ -48,4 +48,21 @@ describe("WhatsApp booking flow", () => {
     await b.handle(tenant, phone, "", "interactive", { list_reply: { id: "TOUR_" + tour.id } });
     expect(b.changes).toEqual([{ current_state: "ASK_QTY", state_data: { ...voucher, tour_id: tour.id } }]);
   });
+
+  for (const input of ["do you supply waterproof bags?", "which trip is most popular", "can i get a receipt"]) {
+    it(`"${input}" is answered, not handed to a human`, async () => {
+      const b = bot("IDLE", {});
+      await b.handle(tenant, phone, input, "text");
+      expect(b.ordinary).toHaveBeenCalled();
+      expect(b.changes.some(c => c.status === "HUMAN")).toBe(false);
+    });
+  }
+
+  for (const input of ["I just paid, here is my POP", "sent proof of payment", "I paid it already"]) {
+    it(`"${input}" goes to the team`, async () => {
+      const b = bot("IDLE", {});
+      await b.handle(tenant, phone, input, "text");
+      expect(b.changes).toEqual([{ status: "HUMAN", current_state: "IDLE", state_data: {} }]);
+    });
+  }
 });

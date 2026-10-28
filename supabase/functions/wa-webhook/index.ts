@@ -1217,7 +1217,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // POP / Payment Issue Intercept
     let isPaymentIssue = false;
     if (msgType === "document" || msgType === "image") isPaymentIssue = true;
-    if (input.includes("proof") || input.includes("pop") || input.includes("receipt") || input.includes("paid it") || input.includes("just paid")) isPaymentIssue = true;
+    // Whole words only: "waterproof", "popular" and "can I get a receipt?" are not payment problems.
+    if (/\bpop\b|proof of payment|\bpaid it\b|\bjust paid\b/.test(input)) isPaymentIssue = true;
     if (input.includes("payment") && (input.includes("fail") || input.includes("error") || input.includes("won't") || input.includes("issue"))) isPaymentIssue = true;
     if (input.includes("can't pay") || input.includes("cannot pay") || input.includes("error paying") || input.includes("trouble paying")) isPaymentIssue = true;
 
