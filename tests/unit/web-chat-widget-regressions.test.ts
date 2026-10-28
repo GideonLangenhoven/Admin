@@ -121,3 +121,16 @@ describe("widget polling and input", () => {
     expect(input).not.toContain("text-sm");
   });
 });
+
+describe("widget Turnstile", () => {
+  const src = readFileSync(widget, "utf8");
+  it("sends a Turnstile token when starting a chat, once a site key is set", () => {
+    expect(src).toContain("const turnstile_token = TURNSTILE_SITE_KEY && turnstileRef.current ? await turnstileToken(turnstileRef.current) : undefined;");
+    expect(src).toContain('body: { action: "session", business_id: businessId, chat_session: saved, turnstile_token },');
+  });
+  it("the booking site's CSP lets Cloudflare's script and frame load", () => {
+    const csp = readFileSync("booking/next.config.ts", "utf8");
+    expect(csp).toMatch(/"script-src [^"]*https:\/\/challenges\.cloudflare\.com"/);
+    expect(csp).toMatch(/"frame-src [^"]*https:\/\/challenges\.cloudflare\.com"/);
+  });
+});
