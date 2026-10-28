@@ -99,7 +99,7 @@ failed with the reported symptom, then passed with the fix.
 | --- | --- | --- | --- | --- | --- |
 | Paid after cancel | Nothing was broken, but no test covered it. | No change: `confirm_booking_payment` answers `bad_status`, and `yoco-webhook` records an unfulfilled payment and refunds it in full without marking the booking PAID. | Case in `tests/unit/payment-idempotency-hardening.test.ts` | A mutation that drops `bad_status` from the refund list makes it fail. | Verified (2b840f4). |
 
-## 2. Migrations and data repairs (nothing applied)
+## 2. Migrations and data repairs (applied 28 Oct, except Directions)
 
 | Order | File | For | Local test |
 | --- | --- | --- | --- |
@@ -120,14 +120,16 @@ confirmed with `to_regprocedure`), and pg_cron is a stub table.
 
 `supabase/security-baseline.json` on this branch describes the state after
 these migrations, so the drift check fails against production until they are
-applied, and must pass right after.
+applied, and must pass right after. Applied to production on 28 Oct at 05:04
+UTC; the drift check passes there (1429 grants, 108 tables, 244 policies).
 
 Data repairs, both with a dry run that changes nothing:
 
 - H2b slot counters: [h2b-slot-counter-dry-run.txt](h2b-slot-counter-dry-run.txt).
   13 slots, every change lowers a counter, none ends above capacity.
+  Applied 28 Oct: the same 13 slots re-synced, no drift after.
 - Directions "<br>": [directions-empty-rich-text-dry-run.txt](directions-empty-rich-text-dry-run.txt).
-  Kayak and Aonyx, set to NULL.
+  Kayak and Aonyx, set to NULL. Not applied yet (section 5).
 
 ## 3. Section 6 regression checklist
 
@@ -168,6 +170,18 @@ locally as follows.
   (6) passes on the booking preview. The two commits after that run change no UI.
 - 7 local Postgres tests pass. All 8 migrations apply on the replica, and the
   drift check passes there.
+
+### Gates at 7cfbbf9 (deployed)
+
+- `npx tsc --noEmit`, `npm run check:edge`, and the admin and booking
+  production builds: pass.
+- `npx vitest run tests/unit`: 2735 passed, the same 8 failed.
+- `npm run lint`: 6 errors, 253 warnings. All 6 errors are in test helpers that
+  no commit on this branch touched, and `tests/` never deploys: `prefer-const`
+  in `tests/helpers/admin-contact-preview.cjs`, `tests/helpers/marketing-preview.mjs`,
+  `tests/helpers/operator-preview.mjs` (×2) and `tests/marketing-safety-local.mjs`,
+  and `no-assign-module-variable` in `tests/unit/browser-session.test.ts`.
+- The owner signed off on deferring these 14 (8 unit, 6 lint) on 28 Oct.
 
 ## 4. Found but not fixed
 
@@ -286,34 +300,37 @@ locally as follows.
   `combo_bookings`, `combo_booking_items` and `promotion_uses`. They are
   harmless under deny-all RLS today.
 
-## 5. Awaiting approval
+## 5. Deployed 28 Oct 2026 (tag deploy-2026-10-28-1)
 
-In this order, in one sitting:
+Shipped in one sitting on 28 Oct (UTC):
 
-1. **Migrations 130000 to 200000.** Apply only these eight files, never a
-   repo-wide `db push`. Two of them refuse browser calls that the admin app
-   live today still makes: 150000 stops Refund & cancel, the Edit booking
-   Status field and Refunds → Decline, and 180000 stops the booking page's
-   voucher "Apply code" (`deduct_voucher_balance`). Until step 4, those four
-   actions fail with a permission error. Then run
-   `npm run check-security-drift`, which must pass.
-2. **H2b reconcile.** Run the dry run again, then `--apply`. Expect "No drift".
-3. **Edge functions (37).** admin-help-chat, admin-reply, auto-messages,
-   batch-refund, billing-enforcement, booking-payment, booking-success,
-   broadcast, cancel-booking, combo-settlement-link, confirm-booking,
-   create-checkout, create-paysafe-checkout, cron-tasks, external-booking,
-   fetch-google-reviews, manual-mark-paid, marketing-automation-dispatch,
-   marketing-dispatch, marketing-setup-status, marketing-track,
-   marketing-unsubscribe, my-bookings-lookup, onboarding-wizard,
-   paysafe-webhook, process-refund, rebook-booking, resend-webhook, send-email,
-   send-invoice, send-otp, send-whatsapp-text, wa-send, wa-webhook,
-   weather-cancel, web-chat, yoco-webhook.
-4. **Admin app** (`caepweb-admin`) from `capekayak-golive`, and the **booking
-   app** from `booking-golive`.
-5. **Directions repair.** Run the dry run again, then `--apply`.
-6. **Help KB sync.** `scripts/sync-admin-help.mjs`.
-7. **Auth.** Turn on leaked-password protection.
-8. **Live Section 6 run.** In Yoco test mode, as a tenant ADMIN and as a
-   SUPER_ADMIN, including the sandbox card refund (H2).
+1. **Migrations 130000 to 200000** through the controlled package, 05:04. The
+   drift check passes against production.
+2. **Edge functions (37)**, 05:05 to 05:15. Supabase's bundler timed out
+   fetching jsr.io for some of them; retries succeeded. The live source of all
+   37 matches this branch byte for byte.
+3. **Admin app** promoted 05:13 (`dpl_ADmQ2wBe7LehKyBUfTywT3bLM2pj`), **booking
+   app** 05:14 (`dpl_4mZh5NUAWu2C5arr9cxPK9Bmidoo`). Refund & cancel, the Edit
+   booking Status field, Refunds → Decline and voucher "Apply code" were
+   refused for the nine minutes between steps 1 and 3.
+4. **H2b reconcile**: 13 slots, then no drift.
+5. **Help KB sync**: 179 chunks, 16 re-embedded.
 
-Neither branch has been pushed.
+Before deploying, 7cfbbf9 aligned this branch with what production actually
+ran: the live Cancel days dialog and the Lato font files. One 21 Oct change
+that was never deployed shipped with this release: the weather "contact the
+operator" sentence in `send-email`, which `cancellation-notification-only`
+tests.
+
+Still open:
+
+- **Directions repair** (Kayak, Aonyx). The Supabase MCP refuses UPDATE
+  statements from this client. Run `DATABASE_URL=... node
+  scripts/repair-empty-rich-text.mjs --apply`, or that script's REPAIR_SQL in
+  the SQL editor.
+- **Auth.** Turn on leaked-password protection, and verify the SUPER_ADMIN
+  TOTP factor.
+- **Live Section 6 run.** In Yoco test mode, as a tenant ADMIN and as a
+  SUPER_ADMIN, including the sandbox card refund (H2).
+
+The branches are not pushed; the `deploy-2026-10-28-1` tags are.
