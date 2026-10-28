@@ -34,8 +34,10 @@ const VOUCHER_SUCCESS_URL = Deno.env.get("VOUCHER_SUCCESS_URL") || "";
 const ADMIN_PUSH_URL = Deno.env.get("ADMIN_PUSH_URL") || "";
 const ADMIN_PUSH_SECRET = Deno.env.get("ADMIN_PUSH_SECRET") || "";
 
-async function bookingDiscount(businessId: string, qty: number, phone?: string) {
-  const { data, error } = await db.rpc("resolve_booking_discount", { p_business_id: businessId, p_phone: phone || null, p_qty: qty });
+// No phone: a typed number is unverified, so returning-guest offers (and the
+// booking history they reveal) stay on WhatsApp, where Meta verifies the number.
+async function bookingDiscount(businessId: string, qty: number) {
+  const { data, error } = await db.rpc("resolve_booking_discount", { p_business_id: businessId, p_phone: null, p_qty: qty });
   if (error || !data || !Number.isFinite(data.percent) || data.percent < 0 || data.percent > 100) throw new Error("Could not verify booking discounts");
   return data as { type: string; percent: number; label: string };
 }
@@ -1306,7 +1308,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         // re-asked with no explanation, a confusing dead-end for e.g. "500").
         reply = "This slot only has " + mx + " spot" + (mx === 1 ? "" : "s") + " left, so " + n + " won't fit. Could you do " + mx + " or fewer? For a bigger group, ask us about a private tour.";
       } else {
-        const discount = await bookingDiscount(requestedBusinessId, n, ns.phone);
+        const discount = await bookingDiscount(requestedBusinessId, n);
         const pricing = calculateChatBookingPricing({ qty: n, unitPrice: Number(ns.tprice), groupDiscountPercent: discount.percent, groupDiscountMinQty: 1 });
         ns = { ...ns, step: "ASK_DETAILS", qty: n, requestedQty: n, total: pricing.total, baseTotal: pricing.baseTotal, discount: pricing.discount };
         reply = n + " " + pl(n, "person", "people") + ". Total: R" + pricing.total + (pricing.discount > 0 ? " (" + discount.percent + "% automatic discount, R" + pricing.discount + " saved)" : "") + ".\n\nPlease send your full name, email address and phone number with country code (for example +44 7700 900123). Send them all in one message or one at a time.";
@@ -1326,8 +1328,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         reply = Object.values(details.errors).join("\n") || "I still need your " + details.missing.map(field => labels[field]).join(" and ") + ". You can send one detail at a time.";
         return new Response(JSON.stringify({ reply, state: ns, validationErrors: details.errors }), { status: 200, headers: gCors(req) });
       }
-      // Returning-guest rules can be checked once a phone number is supplied.
-      const discount = await bookingDiscount(requestedBusinessId, Number(ns.qty), dPhone);
+      const discount = await bookingDiscount(requestedBusinessId, Number(ns.qty));
       const pricing = calculateChatBookingPricing({ qty: Number(ns.qty), unitPrice: Number(ns.tprice), groupDiscountPercent: discount.percent, groupDiscountMinQty: 1, voucherDeduction: ns.vid ? Number(ns.vded || 0) : 0 });
       const priceChanged = pricing.total !== Number(ns.total);
       ns = { ...ns, total: pricing.total, baseTotal: pricing.baseTotal, discount: pricing.discount, vded: pricing.voucherDeduction };
@@ -1457,7 +1458,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         if (_slotData?.price_per_person_override != null) {
           serverUnitPrice = Number(_slotData.price_per_person_override);
         }
-        const discount = await bookingDiscount(requestedBusinessId, Number(ns.qty || 0), ns.phone);
+        const discount = await bookingDiscount(requestedBusinessId, Number(ns.qty || 0));
         const priceCheck = verifyChatBookingPricing({
           quotedTotal: ft,
           tolerance: 0.005,

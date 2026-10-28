@@ -384,15 +384,17 @@ describe("web chat automatic discount settings", () => {
     expect(result.reply).not.toContain("discount");
   });
 
-  it("checks returning-guest offers after receiving the contact phone", async () => {
+  it("a typed phone number doesn't unlock (or reveal) a returning guest's offer", async () => {
     const f = webChatFixture();
     Object.assign(f.discount, { type: "RETURNING", percent: 15, minQty: 1, phone: "+27110000000", label: "Welcome back" });
     const token = await f.session();
     const quote = await f.post(token, "2", { ...f.bookingState, step: "ASK_QTY", name: "", email: "", phone: "" });
-    expect(quote.state.total).toBe(800);
     const details = await f.post(token, "Fixture Guest, guest@fixture.invalid, +27110000000", quote.state);
-    expect(details.state).toMatchObject({ step: "ASK_VOUCHER", total: 680, discount: 120 });
-    expect(details.reply).toContain("15% automatic discount");
+    expect(details.state).toMatchObject({ step: "ASK_VOUCHER", total: 800, discount: 0 });
+    expect(details.reply).not.toContain("discount");
+    await f.post(token, "btn:confirm", { ...details.state, step: "CONFIRM" });
+    expect(f.rows.bookings[0]).toMatchObject({ total_amount: 800, discount_amount: 0, discount_notes: null });
+    expect(f.calls.filter(call => call.name === "resolve_booking_discount").map(call => call.data.p_phone)).toEqual([null, null, null]);
   });
 
   it("rechecks rules at confirmation and requires acceptance of a changed total", async () => {
