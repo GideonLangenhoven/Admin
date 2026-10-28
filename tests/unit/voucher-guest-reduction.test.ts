@@ -58,8 +58,8 @@ describe("voucher-aware reschedule and WA flows", () => {
     expect(yoco).toContain("p_captured_cents: capturedCents");
   });
 
-  it("WA guest removal routes through rebook-booking", () => {
-    expect(wa).toContain('"/functions/v1/rebook-booking"');
+  it("WA guest removal goes to My Bookings, which routes through rebook-booking", () => {
+    expect(wa).toMatch(/if \(wantReducePeople\) \{\s*await sendManageBookingsRedirect\(/);
     expect(wa).not.toContain("guests_removed_voucher_wa\", { booking_id: sd.booking_id, old_qty: sd.qty, new_qty: sd.new_qty, voucher: gvCode");
   });
 });

@@ -7,11 +7,11 @@ const web = readFileSync("supabase/functions/web-chat/index.ts", "utf8");
 // P0: slot capacity changes must go through the atomic adjust_slot_capacity
 // RPC (read-modify-write races leak or oversell capacity).
 describe("bot slot updates are atomic (P0)", () => {
-  it("both bots define and use the adjustSlotBooked helper", () => {
-    expect(wa).toContain("adjust_slot_capacity");
+  it("web-chat adjusts capacity atomically; WhatsApp no longer changes existing bookings", () => {
     expect(web).toContain("adjust_slot_capacity");
-    expect(wa).toContain("adjustSlotBooked(");
     expect(web).toContain("adjustSlotBooked(");
+    expect(wa).not.toContain("adjust_slot_capacity");
+    expect(wa).not.toMatch(/from\("slots"\)\.update/);
   });
 
   it("no inline read-modify-write slot updates remain", () => {
@@ -44,8 +44,9 @@ describe("WhatsApp reopen template configurable (P0)", () => {
 // P1: the <24h "no refund" hard gate must consult the tenant's policy —
 // tiers legitimately define <24h percents (e.g. 12-24h => 50%).
 describe("cancel gate is policy-aware (P1)", () => {
-  it("wa-webhook offers refund whenever the policy percent > 0", () => {
-    expect(wa).toContain("if (cancelPct > 0)");
+  it("wa-webhook leaves cancellations to My Bookings, which applies the policy", () => {
+    expect(wa).not.toContain("cancelPct");
+    expect(wa).toContain("sendManageBookingsRedirect(");
   });
   it("web-chat offers refund whenever the policy percent > 0", () => {
     expect(web).toContain("if (cnPct !== null && cnPct > 0)");

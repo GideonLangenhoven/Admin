@@ -10,9 +10,9 @@ describe("bot cancellation refunds follow tenant refund policy", () => {
   const wa = readFileSync("supabase/functions/wa-webhook/index.ts", "utf8");
   const web = readFileSync("supabase/functions/web-chat/index.ts", "utf8");
 
-  it("wa-webhook computes the cancel percent from refund policy tiers", () => {
-    expect(wa).toContain("calculate_refund_percent");
+  it("wa-webhook quotes no refund of its own; My Bookings applies the policy tiers", () => {
     expect(wa).not.toContain('"95% refund via WhatsApp"');
+    expect(wa).toContain("sendManageBookingsRedirect(");
   });
 
   it("web-chat computes the cancel percent from refund policy tiers", () => {
