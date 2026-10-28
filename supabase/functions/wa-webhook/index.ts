@@ -2160,11 +2160,25 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         voucher_ids: verifiedSd.voucher_ids || [verifiedSd.voucher_id].filter(Boolean),
         voucher_codes: verifiedSd.voucher_codes || [verifiedSd.voucher_code].filter(Boolean),
       });
+      const ref = booking.id.substring(0, 8).toUpperCase();
+      if (yocoData?.fully_covered) {
+        // The vouchers cover the rest, so create-checkout already confirmed the
+        // booking. confirm-booking sends the confirmation once (idempotent).
+        try {
+          await fetch(SUPABASE_URL + "/functions/v1/confirm-booking", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY, "x-tenant-business-id": tenant.business.id },
+            body: JSON.stringify({ booking_id: booking.id, booking_token: (booking as any).waiver_token }),
+          });
+        } catch (e) { console.error("WA_CONFIRM_BOOKING_ERR booking=" + booking.id, e); }
+        await sendText(tenant, phone, "\u{1F389} *You\u2019re all set!* Your voucher covers this booking.\n\n\u{1F4CB} Ref: " + ref + "\n\nYour confirmation email is on its way." + termsNotice);
+        await setConvo(convo.id, { current_state: "IDLE", state_data: {}, last_booking_id: booking.id, customer_name: sd.customer_name, email: email });
+        return;
+      }
       let payUrl = "";
       if (yocoData && yocoData.id && yocoData.redirectUrl) {
         payUrl = yocoData.redirectUrl;
       } else { payUrl = "Payment link unavailable. Type *speak to us* for help"; }
-      const ref = booking.id.substring(0, 8).toUpperCase();
       await sendText(tenant, phone, "Almost there, " + sd.customer_name.split(" ")[0] + "! \u{1F389}\n\n\u{1F4CB} Ref: " + ref + "\n\u{1F4B0} Total: R" + verifiedSd.total + "\n\nComplete your payment here:\n" + payUrl + "\n\n\u23F0 Your spots are held for 15 minutes." + termsNotice);
       await setConvo(convo.id, { current_state: "AWAITING_PAYMENT", state_data: { booking_id: booking.id }, last_booking_id: booking.id, customer_name: sd.customer_name, email: email });
       await logE(tenant, "payment_link_sent", { booking_id: booking.id }, booking.id);
@@ -2380,28 +2394,25 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         await setConvo(convo.id, { current_state: "CONFIRM_BOOKING" });
         return;
       }
-      // Stack the voucher value
-      const xVal = Number(xvr.data.current_balance || xvr.data.value || xvr.data.purchase_amount || 0);
-      const existingVoucherValue = Number(sd.voucher_value || 0);
-      const newVoucherValue = existingVoucherValue + xVal;
-      // Store multiple voucher codes and IDs
       const vCodes = (sd.voucher_codes || [sd.voucher_code].filter(Boolean));
-      vCodes.push(xcode);
       const vIds = (sd.voucher_ids || [sd.voucher_id].filter(Boolean));
-      vIds.push(xvr.data.id);
-      // Recalculate total
-      const newDeduction = Math.min(newVoucherValue, Number(sd.base_total));
-      let newTotal = Math.max(0, Number(sd.base_total) - newDeduction);
-      // Apply any other discounts too
-      if (sd.discount_percent > 0 && !sd.voucher_id) {
-        const discSaving = Math.round(Number(sd.base_total) * sd.discount_percent / 100);
-        newTotal = Math.max(0, newTotal - discSaving);
+      const xVal = Number(xvr.data.current_balance ?? xvr.data.value ?? xvr.data.purchase_amount ?? 0);
+      if (vIds.includes(xvr.data.id) || !(xVal > 0)) {
+        await sendText(tenant, phone, vIds.includes(xvr.data.id) ? "That voucher is already on this booking." : "That voucher has no balance left.");
+        await setConvo(convo.id, { current_state: "CONFIRM_BOOKING" });
+        return;
       }
-      let xMsg = "\u{1F39F} *Second voucher applied!* (R" + xVal + " credit)\n\n";
+      vCodes.push(xcode);
+      vIds.push(xvr.data.id);
+      // Same pricing as the summary and FINALIZE_BOOKING: group discount first, then the vouchers.
+      const xPriced = calculateChatBookingPricing({ qty: Number(sd.qty), unitPrice: Number(sd.unit_price), groupDiscountPercent: Number(sd.discount_percent || 0), groupDiscountMinQty: 1, voucherDeduction: Number(sd.voucher_deduction || 0) + xVal });
+      const newTotal = xPriced.total;
+      let xMsg = "\u{1F39F} *Voucher applied!* (R" + xVal + " credit)\n\n";
       if (newTotal === 0) xMsg += "Your trip is now *completely FREE!*";
       else xMsg += "Remaining balance: *R" + newTotal + "*";
       await sendText(tenant, phone, xMsg);
-      const updatedSd = { ...sd, voucher_value: newVoucherValue, voucher_codes: vCodes, voucher_ids: vIds, voucher_deduction: newDeduction, total: newTotal };
+      // voucher_id/voucher_code mark the booking as voucher-funded for FINALIZE_BOOKING.
+      const updatedSd = { ...sd, voucher_id: sd.voucher_id || xvr.data.id, voucher_code: sd.voucher_code || xcode, voucher_value: Number(sd.voucher_value || 0) + xVal, voucher_codes: vCodes, voucher_ids: vIds, voucher_deduction: xPriced.voucherDeduction, total: newTotal };
       const cBtns = [{ id: "CONFIRM", title: newTotal > 0 ? "\u2705 Pay R" + newTotal : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }];
       if (newTotal > 0) cBtns.splice(1, 0, { id: "ADD_VOUCHER", title: "\u{1F39F} Add Voucher" });
       await sendButtons(tenant, phone, "Ready to proceed?", cBtns);

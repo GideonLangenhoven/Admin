@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { calculateChatBookingPricing, verifyChatBookingPricing } from "../../supabase/functions/_shared/chat-booking-pricing";
 import { sourceFunction } from "../helpers/source-handler";
 
 // Drives the real WhatsApp handleMsg with in-memory tables; network stays off.
@@ -22,13 +23,13 @@ function bot(state: string, stateData: any, tables: Record<string, any> = {}, ex
   const ordinary = vi.fn(() => { throw new Error("reached ordinary handling"); });
   const handle = sourceFunction("supabase/functions/wa-webhook/index.ts", "handleMsg", {
     getConvo: async () => ({ id: "conversation-a", current_state: state, state_data: stateData }),
-    supabase: { from: (table: string) => query({ data: tables[table] ?? (table === "outbox" ? [] : null) }, filters[table] ||= []), rpc: vi.fn() },
+    supabase: { from: (table: string) => query({ data: tables[table] ?? (table === "outbox" ? [] : null) }, filters[table] ||= []), rpc: extra.rpc || vi.fn() },
     getSubscriptionState: async () => ({ trading: true }), shouldBotReply: async () => ({ active: true }),
     sendText: async (_t: any, _p: any, message: string) => { sent.push(message); },
     sendButtons: async (_t: any, _p: any, body: string) => { sent.push(body); },
     setConvo: async (_id: string, data: any) => { changes.push(data); },
     logE: async () => { throw new Error("Unexpected bot error"); }, typingDelay: async () => undefined,
-    isAvailabilityQuery: ordinary, formatDuration: (m: number) => m + " min", ...extra,
+    isAvailabilityQuery: ordinary, formatDuration: (m: number) => m + " min", calculateChatBookingPricing, ...extra,
   });
   return { handle, sent, changes, filters, ordinary };
 }
@@ -96,4 +97,45 @@ describe("WhatsApp booking flow", () => {
       expect(b.changes).toEqual([{ current_state: "IDLE", state_data: {} }]);
     });
   }
+
+  const summary = { tour_id: tour.id, slot_id: "slot-1", qty: 2, unit_price: 600, base_total: 1200, total: 1200, discount_percent: 0, voucher_deduction: 0 };
+  const extraVoucher = { id: "v-2", code: "WXYZ2345", status: "ACTIVE", current_balance: 500, business_id: "tenant-a" };
+
+  it("Add Voucher at the summary funds the booking with that voucher", async () => {
+    const b = bot("ADD_EXTRA_VOUCHER", summary, { vouchers: extraVoucher });
+    await b.handle(tenant, phone, "wxyz 2345", "text");
+    expect(b.sent[0]).toContain("Voucher applied!"); expect(b.sent[0]).toContain("R700");
+    expect(b.changes.at(-1)).toEqual({ current_state: "CONFIRM_BOOKING", state_data: {
+      ...summary, voucher_id: "v-2", voucher_code: "WXYZ2345", voucher_value: 500, voucher_codes: ["WXYZ2345"], voucher_ids: ["v-2"], voucher_deduction: 500, total: 700,
+    } });
+    // FINALIZE_BOOKING re-prices with the same inputs and must agree (no false "price changed").
+    const next = b.changes.at(-1).state_data;
+    expect(verifyChatBookingPricing({ quotedTotal: next.total, tolerance: 0.005, qty: 2, unitPrice: 600, voucherDeduction: next.voucher_deduction, groupDiscountPercent: 0, groupDiscountMinQty: 1 }).ok).toBe(true);
+  });
+
+  it("the same voucher can't be added twice", async () => {
+    const b = bot("ADD_EXTRA_VOUCHER", { ...summary, voucher_id: "v-2", voucher_code: "WXYZ2345", voucher_deduction: 500, total: 700 }, { vouchers: extraVoucher });
+    await b.handle(tenant, phone, "WXYZ2345", "text");
+    expect(b.sent).toEqual(["That voucher is already on this booking."]);
+    expect(b.changes).toEqual([{ current_state: "CONFIRM_BOOKING" }]);
+  });
+
+  it("a checkout the vouchers fully cover confirms the booking instead of saying the link is unavailable", async () => {
+    const fetch = vi.fn(async () => new Response("{}"));
+    const b = bot("FINALIZE_BOOKING", { ...summary, customer_name: "Synthetic Guest", email: "guest@example.invalid", whatsapp_booking_updates_opt_in: false }, {
+      slots: { id: "slot-1", start_time: "2099-01-01T08:00:00Z", status: "OPEN", tour_id: tour.id, price_per_person_override: null, business_id: "tenant-a" },
+      tours: tour, bookings: { id: "30000000-0000-4000-8000-000000000001", waiver_token: "token-1" },
+    }, {
+      fetch, SUPABASE_URL: "https://test.invalid", SUPABASE_KEY: "service-key", verifyChatBookingPricing,
+      calcDiscount: async () => ({ type: "NONE", percent: 0, label: "" }), logE: async () => undefined,
+      rpc: async () => ({ data: { success: true } }), requestCheckout: async () => ({ fully_covered: true, redirectUrl: "https://example.invalid/success", amount: 0 }),
+    });
+    await b.handle({ business: { id: "tenant-a", booking_site_url: "" } }, phone, "internal_proceed", "text");
+    expect(fetch).toHaveBeenCalledWith("https://test.invalid/functions/v1/confirm-booking", expect.objectContaining({
+      body: JSON.stringify({ booking_id: "30000000-0000-4000-8000-000000000001", booking_token: "token-1" }),
+    }));
+    expect(b.sent.at(-1)).toContain("You\u2019re all set!");
+    expect(b.sent.join("\n")).not.toContain("Payment link unavailable");
+    expect(b.changes.at(-1)).toMatchObject({ current_state: "IDLE", state_data: {} });
+  });
 });
