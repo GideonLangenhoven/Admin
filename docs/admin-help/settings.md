@@ -52,6 +52,8 @@ A copyable snippet to embed your booking widget on your own website.
 
 Per-email-type colour themes and banner images for the emails customers receive (confirmations, invoices, cancellations, photos, and so on).
 
+**Email wording** lets you reword any customer email: pick the email, then change its subject line, heading and main message (for example the post-trip thank-you, listed as "Thank you / trip photos"). Leave a box blank to keep the standard wording. You can use `{customer_name}`, `{tour_name}`, `{ref}` and `{business_name}`. Booking details, payment buttons and links are always included. Click **Preview email** to see it with a sample booking, including unsaved changes; nothing is sent. Click **Save** to apply. Sign-in codes, data-request (POPIA) emails and partner emails can't be reworded.
+
 ## Operations & AI Configuration
 
 Arrival instructions, what to bring and wear, FAQ answers, and the AI chatbot's personality and business knowledge. This content feeds the customer website and WhatsApp assistant; arrival and packing instructions also feed guest emails. It does not change the dashboard help assistant's product guide. Staff with the **Booking Site Config** grant can also manage this section and Embed Widget.
