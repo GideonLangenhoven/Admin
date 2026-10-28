@@ -132,6 +132,11 @@ export function webChatFixture(source = "supabase/functions/web-chat/index.ts", 
     "../_shared/booking-custom-fields.ts": questions,
     "../_shared/platform-invariants.ts": { PLATFORM_INVARIANTS: "Never invent operator facts or grant free trips." },
     "../_shared/bot-prompt.ts": botPrompt,
+    // settings.guestLanguage turns on a fake guest language: "[af] " marks translated text.
+    "../_shared/translate.ts": {
+      readGuestMessage: async (text: string) => settings.guestLanguage && !/^\d+$/.test(text) ? { lang: settings.guestLanguage, english: "EN: " + text } : null,
+      translateOutgoing: async (texts: string[], lang: string) => texts.map(text => lang === "en" ? text : "[" + lang + "] " + text),
+    },
     "../_shared/llm.ts": { llmAvailable: () => settings.llmAvailable, llmText: async (data: any) => {
       calls.push({ kind: "llm", name: data.label, data });
       if (failures["llm"]) throw new Error("Model unavailable");

@@ -3,6 +3,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { withSentry } from "../_shared/sentry.ts";
+import { readGuestMessage, translateOutgoing } from "../_shared/translate.ts";
 import { formatDuration } from "../_shared/duration.ts";
 import { getBusinessAllowedOrigins, getBusinessDisplayName, getTenantByBusinessId, isAllowedOrigin, resolveBookingSiteUrl, resolveManageBookingsUrl, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
 import {
@@ -564,6 +565,8 @@ function rateLimited(clientKey: string, maximum = RATE_LIMIT_MAX): boolean {
 
 type ChatAudit = {
   exchange?: { businessId: string; phone: string; message: string; name: string };
+  // The guest's language: Deno.serve translates the reply; english is the team's copy of the message.
+  language?: { businessId: string; lang: string; english: string | null };
   classification?: Awaited<ReturnType<typeof classifyIntent>>;
 };
 
@@ -857,6 +860,18 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
     const lo = msg.toLowerCase().replace(/[’‘]/g, "'").trim(); const step = state.step || "IDLE";
     const isBtnClick = lo.startsWith("btn:"); const btnVal = isBtnClick ? lo.replace("btn:", "") : "";
 
+    // Guest language (any, auto-detected). Button taps and short messages keep the language we had.
+    if (msg) {
+      const { data: langRow } = await db.from("conversations").select("language").eq("business_id", requestedBusinessId).eq("phone", webPhone).maybeSingle();
+      const read = isBtnClick ? null : await readGuestMessage(msg, requestedBusinessId);
+      const known = langRow?.language || "en";
+      audit.language = { businessId: requestedBusinessId, lang: read?.lang || known, english: read && read.lang !== "en" ? read.english : null };
+      if (read && read.lang !== known) {
+        const { error: langError } = await db.from("conversations").upsert({ business_id: requestedBusinessId, phone: webPhone, language: read.lang === "en" ? null : read.lang, updated_at: now.toISOString() }, { onConflict: "business_id,phone" });
+        if (langError) console.error("WEBCHAT_LANGUAGE_ERR", langError);
+      }
+    }
+
     // A restart is available at every step, including after human handoff.
     if (body.action === "restart" || btnVal === "restart" ||
         (!isBtnClick && /^(?:(?:please|can we|can i|could we|let'?s)\s+)?(?:start over|start again|restart|reset|new chat|back to (?:the )?start)(?:\s+please)?[.!?]*$/.test(lo))) {
@@ -881,7 +896,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
       if (humanConvo?.status === "HUMAN") {
         const { error: messageError } = await db.from("chat_messages").insert({
           business_id: requestedBusinessId, phone: webPhone, direction: "IN",
-          body: msg, sender: state.name || "Website visitor", sender_type: "CUSTOMER",
+          body: msg, body_en: audit.language?.english ?? null, sender: state.name || "Website visitor", sender_type: "CUSTOMER",
         });
         if (messageError) return new Response(JSON.stringify({ error: "Message could not be sent. Please try again." }), { status: 500, headers: gCors(req) });
         await db.from("conversations").update({ updated_at: new Date().toISOString() }).eq("business_id", requestedBusinessId).eq("phone", webPhone);
@@ -922,8 +937,8 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         // so both rows must carry auto_replied — a mismatch silently dropped the
         // whole pair and operators got empty handoff threads.
         const { error: handoffMsgErr } = await db.from("chat_messages").insert([
-          { business_id: requestedBusinessId, phone: phoneKey, direction: "IN", body: customerMsg, sender: name, sender_type: "CUSTOMER", auto_replied: false, intent },
-          { business_id: requestedBusinessId, phone: phoneKey, direction: "OUT", body: botReply, sender: "Bot", sender_type: "BOT", auto_replied: true, intent },
+          { business_id: requestedBusinessId, phone: phoneKey, direction: "IN", body: customerMsg, body_en: audit.language?.english ?? null, sender: name, sender_type: "CUSTOMER", auto_replied: false, intent },
+          { business_id: requestedBusinessId, phone: phoneKey, direction: "OUT", body: botReply, body_en: null, sender: "Bot", sender_type: "BOT", auto_replied: true, intent },
         ]);
         if (handoffMsgErr) throw handoffMsgErr;
         else await scheduleOperatorWebChatNotification(requestedBusinessId, phoneKey, notifyWhatsapp);
@@ -2117,7 +2132,23 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
 
 Deno.serve(withSentry("web-chat", async (req) => {
   const audit: ChatAudit = {};
-  const response = await handleChat(req, audit);
+  let response = await handleChat(req, audit);
+  // The single send point: the reply and its button labels go out in the guest's language.
+  const language = audit.language;
+  let englishReply: string | null = null;
+  if (language && language.lang !== "en" && response.ok) {
+    try {
+      const result = await response.clone().json();
+      if (typeof result.reply === "string" && result.reply) {
+        const buttons = Array.isArray(result.buttons) ? result.buttons : [];
+        const [reply, ...labels] = await translateOutgoing([result.reply, ...buttons.map((b: any) => String(b?.label ?? ""))], language.lang, language.businessId);
+        englishReply = result.reply;
+        result.reply = reply;
+        if (buttons.length) result.buttons = buttons.map((b: any, i: number) => ({ ...b, label: labels[i] }));
+        response = new Response(JSON.stringify(result), { status: response.status, headers: response.headers });
+      }
+    } catch (error) { console.error("WEBCHAT_TRANSLATE_ERR", error); }
+  }
   // One awaited transcript write catches every successful bot response,
   // including early returns. Human exchanges are recorded in handleChat.
   if (audit.exchange && response.ok) {
@@ -2130,8 +2161,8 @@ Deno.serve(withSentry("web-chat", async (req) => {
         intent_confidence: classification?.confidence ?? null,
         classification_model: classification?.model ?? null, classification_ms: classification?.ms ?? null,
       };
-      const messages = [{ ...common, direction: "IN", body: message, sender: name, sender_type: "CUSTOMER", auto_replied: false }];
-      if (result.reply) messages.push({ ...common, direction: "OUT", body: result.reply, sender: "Bot", sender_type: "BOT", auto_replied: true });
+      const messages = [{ ...common, direction: "IN", body: message, body_en: language?.english ?? null, sender: name, sender_type: "CUSTOMER", auto_replied: false }];
+      if (result.reply) messages.push({ ...common, direction: "OUT", body: result.reply, body_en: englishReply !== result.reply ? englishReply : null, sender: "Bot", sender_type: "BOT", auto_replied: true });
       const { error } = await db.from("chat_messages").insert(messages);
       if (error) console.error("WEBCHAT_TRANSCRIPT_ERR", error);
       const { error: conversationError } = await db.from("conversations").upsert({

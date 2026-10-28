@@ -26,6 +26,7 @@ import { calculateChatBookingPricing, checkChatPromo, rands, verifyChatBookingPr
 import { applicableBookingQuestions, captureQuestionFields, validateQuestionAnswers } from "../_shared/booking-custom-fields.ts";
 import { genVoucherCode, getPaidPortions } from "../_shared/vouchers.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
+import { readGuestMessage, translateOutgoing } from "../_shared/translate.ts";
 import { formatTourMeetingPoints, gateInbound, gateOutbound, isAvailabilityQuery, MEDIA_FALLBACK_REPLY } from "../_shared/bot-guards.ts";
 
 const VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN")!;
@@ -316,7 +317,29 @@ async function getBusinessSiteUrls(tenant: TenantContext) {
   });
 }
 
+// The guest's language for this conversation (business:phone → ISO 639-1), set on each inbound turn.
+const guestLanguage = new Map<string, string>();
+// Everything the guest reads in a text or interactive message, translated in one call and re-clipped to Meta's limits.
+async function translateWaBody(tenant: TenantContext, body: any, lang: string) {
+  const slots: Array<[any, string, number]> = [];
+  if (body.text?.body) slots.push([body.text, "body", 4096]);
+  const it = body.interactive;
+  if (it?.body?.text) slots.push([it.body, "text", 1024]);
+  if (it?.action?.button) slots.push([it.action, "button", 20]);
+  for (const b of it?.action?.buttons || []) slots.push([b.reply, "title", 20]);
+  for (const sec of it?.action?.sections || []) {
+    if (sec.title) slots.push([sec, "title", 24]);
+    for (const r of sec.rows || []) { slots.push([r, "title", 24]); if (r.description) slots.push([r, "description", 72]); }
+  }
+  if (!slots.length) return body;
+  const out = await translateOutgoing(slots.map(([o, k]) => String(o[k])), lang, tenant.business.id);
+  slots.forEach(([o, k, max], i) => { o[k] = clip(out[i], max); });
+  return body;
+}
 async function sendWA(tenant: TenantContext, to: any, body: any) {
+  const lang = guestLanguage.get(tenant.business.id + ":" + to);
+  const englishBody = body?.text?.body || body?.interactive?.body?.text || null;
+  if (lang && lang !== "en") body = await translateWaBody(tenant, structuredClone(body), lang);
   const res = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
     method: "POST",
     headers: { Authorization: "Bearer " + tenant.credentials.waToken, "Content-Type": "application/json" },
@@ -355,7 +378,7 @@ async function sendWA(tenant: TenantContext, to: any, body: any) {
   await recordWaMessage(tenant.business.id, { to: to, kind: "text", body: auditBody, status: res.ok ? "SENT" : "FAILED", providerMessageId: data?.messages?.[0]?.id || null, error: res.ok ? null : String(data?.error?.message || "WhatsApp send failed") });
 
   if (res.ok && auditBody) {
-    await supabase.from("chat_messages").insert({ business_id: tenant.business.id, phone: to, direction: "OUT", body: auditBody, sender: "Bot", auto_replied: true });
+    await supabase.from("chat_messages").insert({ business_id: tenant.business.id, phone: to, direction: "OUT", body: auditBody, body_en: englishBody !== auditBody ? englishBody : null, sender: "Bot", auto_replied: true });
   }
 
   return data;
@@ -1016,6 +1039,14 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
     const input = (text || "").trim().toLowerCase();
     const rawText = (text || "").trim();
+    // Guest language (any, auto-detected) for real inbound text only: sendWA translates what goes out,
+    // and the team gets an English copy. Short messages ("ok", "2") keep the language we had.
+    if (waMessageId) {
+      const read = msgType === "text" && !quiet ? await readGuestMessage(rawText, tenant.business.id) : null;
+      guestLanguage.set(tenant.business.id + ":" + phone, read?.lang || convo.language || "en");
+      if (read && read.lang !== (convo.language || "en")) await setConvo(convo.id, { language: read.lang === "en" ? null : read.lang });
+      if (read && read.lang !== "en" && inboundMsgId) await supabase.from("chat_messages").update({ body_en: read.english }).eq("id", inboundMsgId).eq("business_id", tenant.business.id);
+    }
     let rid = "";
     if (msgType === "interactive" && interactive) {
       rid = (interactive.button_reply && interactive.button_reply.id) || (interactive.list_reply && interactive.list_reply.id) || "";

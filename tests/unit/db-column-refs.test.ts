@@ -47,7 +47,9 @@ const baseSchemaFor = (file: string) => ["components/booking/ArrivalApproval.tsx
     ? { ...SCHEMA, ...OTA_LOCAL_SCHEMA }
     : file.startsWith("app/marketing/") || file === "supabase/functions/_shared/marketing-delivery.ts"
       ? { ...SCHEMA, ...MARKETING_LOCAL_SCHEMA } : SCHEMA;
-const schemaFor = (file: string) => ({...baseSchemaFor(file),...GUIDE_SCHEMA});
+// 20261028200000_chat_guest_language.sql: not live until the bot round deploys.
+const CHAT_LANGUAGE_SCHEMA = { conversations: [...(SCHEMA.conversations || []), "language"], chat_messages: [...(SCHEMA.chat_messages || []), "body_en"] };
+const schemaFor = (file: string) => ({...baseSchemaFor(file),...GUIDE_SCHEMA,...CHAT_LANGUAGE_SCHEMA});
 
 const ROOTS = ["supabase/functions", "app", "booking/app", "components"];
 

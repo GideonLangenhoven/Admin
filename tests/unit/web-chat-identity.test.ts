@@ -80,6 +80,7 @@ function fixture({ modelAvailable = true, modelReply = "Use the harbour meeting 
     "../_shared/bot-prompt.ts": sourceExports("supabase/functions/_shared/bot-prompt.ts", { "./platform-invariants.ts": {}, "./duration.ts": duration }),
     "../_shared/chat-contact.ts": contact,
     "../_shared/booking-custom-fields.ts": questions,
+    "../_shared/translate.ts": { readGuestMessage: async () => null, translateOutgoing: async (texts: string[]) => texts },
     "../_shared/llm.ts": { llmAvailable: () => modelAvailable, llmText: async (options: any) => {
       llmCalls.push(options);
       return options.label === "web-date" ? "2026-10-04" : modelReply;

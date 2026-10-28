@@ -9,7 +9,7 @@ const reply = (status: number, body: string) => new Response(body, { status, hea
 function sender(...responses: Response[]) {
   const fetch = vi.fn(async () => responses.shift()!);
   const send = sourceFunction(wa, "sendWA", {
-    fetch, Deno: { env: { get: () => "reopen_template" } }, recordWaMessage: async () => undefined,
+    fetch, Deno: { env: { get: () => "reopen_template" } }, recordWaMessage: async () => undefined, guestLanguage: new Map(),
     supabase: { from: () => ({ insert: async () => ({ error: null }) }) },
   });
   return { fetch, send: () => send(tenant, "27825550100", { type: "text", text: { body: "Hi" } }) };

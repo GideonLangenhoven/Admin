@@ -11,6 +11,7 @@ function bot(status = "BOT") {
   const chain: any = { then: (resolve: any) => resolve({ data: [] }), maybeSingle: async () => ({ data: null }), single: async () => ({ data: { id: "m" } }) };
   for (const name of ["select", "insert", "update", "eq", "gte", "order", "limit"]) chain[name] = () => chain;
   const handle = sourceFunction(wa, "handleMsg", {
+    readGuestMessage: async () => null, guestLanguage: new Map(),
     startTyping: (_t: any, id: string) => { typing.push(id); return () => stopped.push(id); },
     getConvo: async () => ({ id: "conversation-a", status, current_state: "IDLE", state_data: {} }),
     supabase: { from: () => chain, rpc: async () => ({ data: 1, error: null }) },

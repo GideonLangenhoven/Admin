@@ -46,6 +46,8 @@ function MessageList({
                 : "bg-[var(--ck-surface-sunken)] border border-[var(--ck-border-subtle)] text-[var(--ck-text)] rounded-bl-md"
                 }`}>
                 <p className="whitespace-pre-wrap">{m.body}</p>
+                {/* The guest's language: the English copy of a translated message. */}
+                {m.body_en && <p className="mt-1 whitespace-pre-wrap border-t pt-1 text-xs" style={{ borderColor: "var(--ck-border-subtle)", color: "var(--ck-text-muted)" }}><span className="font-semibold">English:</span> {m.body_en}</p>}
                 <p className="text-xs mt-1" style={{ color: "var(--ck-text-muted)" }}>
                   {fmtTime(m.created_at)} · {m.sender || (isOut ? "Admin" : "Customer")}
                 </p>

@@ -5,6 +5,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getTenantByBusinessId, getAdminAppOrigins, isAllowedOrigin, recordWaMessage, sendWhatsappTemplate, getBusinessDisplayName } from "../_shared/tenant.ts";
 import { requireAuth, type AuthResult } from "../_shared/auth.ts";
+import { translateOutgoing } from "../_shared/translate.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -160,7 +161,7 @@ Deno.serve(withSentry("admin-reply", async (req: Request) => {
         // tenant's conversation when the same customer talks to two operators.
         const { data: convo } = await supabase
             .from("conversations")
-            .select("business_id, customer_name, email, status")
+            .select("business_id, customer_name, email, status, language")
             .eq("phone", to)
             .eq("business_id", reqBusinessId)
             .limit(1).single();
@@ -177,6 +178,11 @@ Deno.serve(withSentry("admin-reply", async (req: Request) => {
         if (convo?.status !== "HUMAN") {
             message = "👤 A human has joined the chat.\n\n" + message;
         }
+        // The guest's language: the team writes in English, the guest reads it in theirs,
+        // and the Inbox keeps the English original as body_en.
+        const english = message;
+        if (convo?.language) message = (await translateOutgoing([message], convo.language, actualBusinessId))[0];
+        const bodyEn = message !== english ? english : null;
 
         // Web-chat conversations have no WhatsApp number — their phone is the
         // literal "web" or "web:<visitor-id>". Deliver through the web-chat
@@ -186,7 +192,7 @@ Deno.serve(withSentry("admin-reply", async (req: Request) => {
         if (isWebChat) {
             const { error: webInsErr } = await supabase.from("chat_messages").insert({
                 business_id: actualBusinessId, phone: to, direction: "OUT",
-                body: message, sender: "Admin", sender_type: "ADMIN",
+                body: message, body_en: bodyEn, sender: "Admin", sender_type: "ADMIN",
             });
             if (webInsErr) return new Response(JSON.stringify({ ok: false, error: "Failed to log message", details: webInsErr }), { status: 200, headers: getCors(req) });
             await supabase.from("conversations").update({ status: "HUMAN", handled_by: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
@@ -252,7 +258,7 @@ Deno.serve(withSentry("admin-reply", async (req: Request) => {
                         business_id: actualBusinessId,
                         phone: to,
                         direction: "OUT",
-                        body: "⏳ (window closed, sent them a 'please reply' message; this delivers when they respond) " + message,
+                        body: "⏳ (window closed, sent them a 'please reply' message; this delivers when they respond) " + message, body_en: bodyEn,
                         sender: "Admin",
                     });
                     await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
@@ -297,7 +303,7 @@ Deno.serve(withSentry("admin-reply", async (req: Request) => {
                         business_id: actualBusinessId,
                         phone: to,
                         direction: "OUT",
-                        body: message,
+                        body: message, body_en: bodyEn,
                         sender: "Admin",
                     });
                     await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
@@ -312,7 +318,7 @@ Deno.serve(withSentry("admin-reply", async (req: Request) => {
                 console.error("admin_outreach template failed:", templateData);
                 const emailedA = await tryEmailFallback(supabase, actualBusinessId, to, convo?.email, convo?.customer_name, message);
                 if (emailedA) {
-                    await supabase.from("chat_messages").insert({ business_id: actualBusinessId, phone: to, direction: "OUT", body: "📧 (sent by email, WhatsApp window closed) " + message, sender: "Admin" });
+                    await supabase.from("chat_messages").insert({ business_id: actualBusinessId, phone: to, direction: "OUT", body: "📧 (sent by email, WhatsApp window closed) " + message, body_en: bodyEn, sender: "Admin" });
                     await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
                     return new Response(JSON.stringify({ ok: true, channel: "email", via_email: true, message: "WhatsApp's 24-hour window is closed and the approved template would not send, so we sent your message to the customer by email instead." }), { status: 200, headers: getCors(req) });
                 }
@@ -329,7 +335,7 @@ Deno.serve(withSentry("admin-reply", async (req: Request) => {
             // Guaranteed-communication fallback: try email regardless of the WA error cause.
             const emailedB = await tryEmailFallback(supabase, actualBusinessId, to, convo?.email, convo?.customer_name, message);
             if (emailedB) {
-                await supabase.from("chat_messages").insert({ business_id: actualBusinessId, phone: to, direction: "OUT", body: "📧 (sent by email, WhatsApp failed) " + message, sender: "Admin" });
+                await supabase.from("chat_messages").insert({ business_id: actualBusinessId, phone: to, direction: "OUT", body: "📧 (sent by email, WhatsApp failed) " + message, body_en: bodyEn, sender: "Admin" });
                 await supabase.from("conversations").update({ status: "HUMAN", updated_at: new Date().toISOString() }).eq("phone", to).eq("business_id", actualBusinessId);
                 // The reason rides along even though the send succeeded by email.
                 // Reporting only the success is how a tenant stays on a broken
@@ -351,7 +357,7 @@ Deno.serve(withSentry("admin-reply", async (req: Request) => {
             business_id: actualBusinessId,
             phone: to,
             direction: "OUT",
-            body: message,
+            body: message, body_en: bodyEn,
             sender: "Admin"
         });
 
