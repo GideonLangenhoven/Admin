@@ -53,6 +53,15 @@ function bot(state: string, stateData: any, tables: Record<string, any> = {}, ex
 }
 
 describe("WhatsApp booking flow", () => {
+  it("accepts a name in any script", async () => {
+    const consent = vi.fn(async () => undefined);
+    const b = bot("ASK_DETAILS", { qty: 1 }, {}, { askBookingWhatsappConsent: consent });
+    await b.handle(tenant, phone, "李明, li.ming@example.invalid", "text");
+    expect(b.sent.join("\n")).not.toContain("need your full name");
+    expect(consent).toHaveBeenCalled();
+    expect(b.changes.at(-1)).toMatchObject({ current_state: "ASK_WHATSAPP_UPDATES", state_data: { customer_name: "李明", email: "li.ming@example.invalid" } });
+  });
+
   it("a tour without a description, and a party of one, read naturally", async () => {
     const b = bot("PICK_TOUR", {}, { tours: { ...tour, description: null } });
     await b.handle(tenant, phone, "", "interactive", { list_reply: { id: "TOUR_" + tour.id } });

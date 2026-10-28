@@ -1992,8 +1992,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         if (emailMatch) {
           if (!dEmail) dEmail = emailMatch[0].toLowerCase();
           const rest = dc.replace(emailMatch[0], "").replace(/[<>()\[\]"',;]/g, " ").replace(/\s+/g, " ").trim();
-          if (rest && !dName && /[a-zA-Z]{2,}/.test(rest) && !rest.includes("?") && rest.split(" ").length <= 5) dName = rest;
-        } else if (dc.match(/[a-zA-Z]/) && !dName && !dc.includes("?") && dc.split(/\s+/).length <= 5) {
+          if (rest && !dName && /\p{L}{2,}/u.test(rest) && !rest.includes("?") && rest.split(" ").length <= 5) dName = rest;
+        } else if (/\p{L}/u.test(dc) && !dName && !dc.includes("?") && dc.split(/\s+/).length <= 5) {
           // Question-looking or essay-length text is not a name — re-prompt instead
           // of saving "do you provide wetsuits?" as the customer's name.
           dName = dc;
