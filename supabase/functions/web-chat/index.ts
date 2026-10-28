@@ -40,6 +40,19 @@ async function bookingDiscount(businessId: string, qty: number, phone?: string) 
   return data as { type: string; percent: number; label: string };
 }
 
+// The same opt-out as the email footer link (contact status), plus the customer's
+// consent flag; either one records the withdrawal campaigns check before sending.
+async function unsubscribeFromMarketing(businessId: string, email: string) {
+  const lower = email.toLowerCase();
+  const [contacts, customers] = await Promise.all([
+    db.from("marketing_contacts").update({ status: "unsubscribed", updated_at: new Date().toISOString() }).eq("business_id", businessId).eq("email", lower).select("id"),
+    db.from("customers").update({ marketing_consent: false }).eq("business_id", businessId).eq("email_lower", lower).select("id"),
+  ]);
+  if (contacts.error) throw contacts.error;
+  if (customers.error) throw customers.error;
+  return (contacts.data?.length || 0) + (customers.data?.length || 0) > 0;
+}
+
 async function notifyOperatorOfWebChat(businessId: string, phone: string) {
   if (!ADMIN_PUSH_URL || !ADMIN_PUSH_SECRET) return;
   try {
@@ -904,10 +917,9 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
       if (!customer.valid || customer.businessId !== requestedBusinessId || !customer.email?.includes("@")) {
         return new Response(JSON.stringify({ reply: "Please verify your email in My Bookings so we can update your marketing preferences.", manageBookingsUrl: resolveManageBookingsUrl(requestTenant.business), state: ns }), { status: 200, headers: gCors(req) });
       }
-      const { error } = await db.from("customers").update({ marketing_consent: false }).eq("business_id", requestedBusinessId).eq("email", customer.email);
-      if (error) throw error;
+      const found = await unsubscribeFromMarketing(requestedBusinessId, customer.email);
       audit.exchange = { businessId: requestedBusinessId, phone: webPhone, message: msg, name: "Website visitor" };
-      return new Response(JSON.stringify({ reply: "You've been unsubscribed from marketing messages. Booking messages will still be sent.", state: ns }), { status: 200, headers: gCors(req) });
+      return new Response(JSON.stringify({ reply: found ? "You've been unsubscribed from marketing messages. Booking messages will still be sent." : "We don't have " + customer.email + " on our marketing list, so you won't get marketing messages from us.", state: ns }), { status: 200, headers: gCors(req) });
     }
     // Handle persistent "Talk to a human" button anywhere in the flow.
     if (isBtnClick && (btnVal === "human" || btnVal === "btn:human")) {
@@ -2021,9 +2033,9 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
           manageBookingsUrl: resolveManageBookingsUrl(requestTenant.business), state: { step: "IDLE" },
         }), { status: 200, headers: gCors(req) });
       }
-      await db.from("customers").update({ marketing_consent: false })
-        .eq("business_id", requestedBusinessId).eq("email", customer.email);
-      reply = "You've been unsubscribed from marketing messages. We'll only contact you about your bookings.";
+      reply = await unsubscribeFromMarketing(requestedBusinessId, customer.email)
+        ? "You've been unsubscribed from marketing messages. We'll only contact you about your bookings."
+        : "We don't have " + customer.email + " on our marketing list, so you won't get marketing messages from us.";
       ns = { step: "IDLE" };
       return new Response(JSON.stringify({ reply, state: ns, intent: classification.intent }), { status: 200, headers: gCors(req) });
     }

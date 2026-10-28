@@ -75,14 +75,28 @@ describe("web chat conversational routing", () => {
   it("only updates the verified customer's marketing consent for this operator", async () => {
     const f = webChatFixture();
     f.rows.customers = [
-      { business_id: "a", email: "guest@fixture.invalid", marketing_consent: true },
-      { business_id: "b", email: "guest@fixture.invalid", marketing_consent: true },
-      { business_id: "a", email: "other@fixture.invalid", marketing_consent: true },
+      { business_id: "a", email: "Guest@fixture.invalid", email_lower: "guest@fixture.invalid", marketing_consent: true },
+      { business_id: "b", email: "guest@fixture.invalid", email_lower: "guest@fixture.invalid", marketing_consent: true },
+      { business_id: "a", email: "other@fixture.invalid", email_lower: "other@fixture.invalid", marketing_consent: true },
+    ];
+    f.rows.marketing_contacts = [
+      { business_id: "a", email: "guest@fixture.invalid", status: "active" },
+      { business_id: "b", email: "guest@fixture.invalid", status: "active" },
     ];
     const response = await f.request({ chat_session: await f.session(), customer_session: await f.verifiedCustomer(), message: "Please unsubscribe me from marketing", state: { step: "ASK_DETAILS" } });
     expect(response.status).toBe(200);
-    expect((await response.json()).state.step).toBe("ASK_DETAILS");
+    const result = await response.json();
+    expect(result.state.step).toBe("ASK_DETAILS");
+    expect(result.reply).toMatch(/you(?:'|’)ve been unsubscribed/i);
     expect(f.rows.customers.map(customer => customer.marketing_consent)).toEqual([false, true, true]);
+    // The same status the email footer link sets; campaigns check it before every send.
+    expect(f.rows.marketing_contacts.map(contact => contact.status)).toEqual(["unsubscribed", "active"]);
+  });
+
+  it("does not claim an unsubscribe when the email is on no marketing list", async () => {
+    const f = webChatFixture();
+    const response = await f.request({ chat_session: await f.session(), customer_session: await f.verifiedCustomer(), message: "Please unsubscribe me from marketing" });
+    expect((await response.json()).reply).toBe("We don't have guest@fixture.invalid on our marketing list, so you won't get marketing messages from us.");
   });
 
   for (const message of ["I don't want to unsubscribe", "I don’t want to unsubscribe"]) {
