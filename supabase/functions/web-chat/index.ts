@@ -875,9 +875,12 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
     // ===== ESCALATION PRE-CHECK =====
     // Catches medical / legal / data / fraud / press / human-handoff signals
     // regardless of current step. Never swallowed by booking-flow fallbacks.
+    // A form step's answer is data ("nut allergy", a gift message), not a request:
+    // there, only an explicit ask for a person hands the chat over.
+    const freeTextStep = ["ASK_DETAILS", "ASK_CUSTOM_FIELD", "GIFT_RECIPIENT", "GIFT_MESSAGE", "GIFT_BUYER_NAME", "GIFT_BUYER_EMAIL"].includes(step);
     if (!isBtnClick) {
       const esc = detectEscalation(lo);
-      if (esc) {
+      if (esc && (!freeTextStep || esc.intent === "ESCALATE_HUMAN")) {
         if (esc.intent === "ESCALATE_HUMAN") esc.reply += urgentContact(requestTenant.business);
         await flagHumanHandoff(esc.intent, msg, esc.reply);
         return new Response(JSON.stringify({
@@ -1184,7 +1187,6 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
     if (!isBtnClick && stepPrompts[step] && !personalGiftMessage) {
       const informational = /\bpark|\bpayment|\bpay by|\bpay with|\bcard\b|\bcash\b|\beft\b|\bcancellation|\bcancel.*\?|\brefund|\bpolicy|\bbring\b|\bwear\b|\bmeet|\bwhere\b|\bhow long|\bhow much|\bweather|\bage\b|\byears? old|\bfit\b|\bfitness|\binclud|\bwhat time|\bwhat (?:is|are)\b|\bswim/.test(lo);
       const question = /\b(?:tell|show|explain) (?:me|us)\b|\b(?:get|go) to\b.*\bshop\b/.test(lo) || lo.includes("?") || /^(?:where|when|why|how|which)\b|^what\s+(?:is|are|do|does|should|can|about)\b|^(?:can|could|would|do|does|is|are)\s+(?:i|we|you|my|the|there|a|it|this)\b/.test(lo);
-      const freeTextStep = ["ASK_DETAILS", "ASK_CUSTOM_FIELD", "GIFT_RECIPIENT", "GIFT_MESSAGE", "GIFT_BUYER_NAME", "GIFT_BUYER_EMAIL"].includes(step);
       const answersCurrentStep =
         (step === "ASK_QTY" && parseChatQuantity(lo) !== null) ||
         (step === "PICK_DATE" && (isAvailabilityQuery(lo) || /^(?:today|tomorrow|(?:this|next)\s+\w+|\d{4}-\d{2}-\d{2}|\d{1,2}\s+\w+)[.!?]*$/.test(lo))) ||
