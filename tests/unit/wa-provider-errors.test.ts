@@ -34,18 +34,22 @@ describe("WhatsApp provider errors", () => {
     expect(await checkout({ type: "BOOKING" })).toEqual({ error: "Payment link unavailable" });
   });
 
-  it("a forecast error gives the morning-check message, not a calm-seas all-clear", async () => {
-    const sent: string[] = []; const errors: string[] = [];
-    const booking = { data: null };
-    const chain: any = { select: () => chain, in: () => chain, eq: () => chain, order: () => chain, limit: () => chain, single: async () => booking };
-    const check = sourceFunction(wa, "checkWeatherConcern", {
-      supabase: { from: () => chain }, fmtTime: () => "", tenantTimeZone: () => "Africa/Johannesburg", console: { ...console, error: (...args: any[]) => { errors.push(args.join(" ")); } }, fetch: async () => reply(400, JSON.stringify({ error: true, reason: "forecast_days out of range" })),
-      sendText: async (_t: any, _p: any, message: string) => { sent.push(message); }, sendButtons: async () => undefined,
-    });
-    expect(await check(tenant, "27825550100", "how does the weather look tomorrow")).toBe(true);
-    expect(sent[0]).toContain("We check conditions every morning");
-    expect(sent[0]).not.toContain("looking good");
-    expect(errors.join("\n")).toContain("Forecast unavailable: 400/400");
+  it("answers weather questions with the operator's policy, never a forecast", async () => {
+    const ask = async (business: any) => {
+      const sent: string[] = []; const fetch = vi.fn();
+      const chain: any = { select: () => chain, in: () => chain, eq: () => chain, order: () => chain, limit: () => chain, single: async () => ({ data: null }) };
+      const check = sourceFunction(wa, "checkWeatherConcern", {
+        supabase: { from: () => chain }, fmtTime: () => "", fetch, getFaqAnswer: sourceFunction(wa, "getFaqAnswer", {}),
+        sendText: async (_t: any, _p: any, message: string) => { sent.push(message); }, sendButtons: async () => undefined,
+      });
+      expect(await check({ ...tenant, business: { ...tenant.business, ...business } }, "27825550100", "how does the weather look tomorrow")).toBe(true);
+      expect(fetch).not.toHaveBeenCalled();
+      return sent[0];
+    };
+    expect(await ask({ faq_json: { weather: "Hikes run in light rain; storms mean we reschedule." } })).toBe("Hikes run in light rain; storms mean we reschedule.");
+    const generic = await ask({});
+    expect(generic).toContain("We check conditions before every trip");
+    expect(generic).not.toMatch(/swell|wind|looking good/i);
   });
 });
 

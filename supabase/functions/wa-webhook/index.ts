@@ -627,92 +627,17 @@ async function checkWeatherConcern(tenant: TenantContext, phone: string, input: 
     .in("phone", [phone, "+" + phone]).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
     .order("created_at", { ascending: false }).limit(1).single();
   let bkInfo = "";
-  let bkTime = "";
   if (wBkr.data) {
     const wSlot = (wBkr.data as any).slots;
     const wTour = (wBkr.data as any).tours;
     if (wSlot) {
       bkInfo = "Your *" + (wTour?.name || "tour") + "* is on " + fmtTime(tenant, wSlot.start_time) + ".\n\n";
-      bkTime = wSlot.start_time;
     }
   }
 
-  // Pick the tenant's default spot, not merely the first one — same selection
-  // the admin weather widget uses (app/page.tsx: find(isDefault) || [0]).
-  // Falling through to hardcoded Cape Town coords means forecasting somebody
-  // else's weather, so say so loudly in the logs when it happens.
-  const defaultWeatherSpot = { lat: -33.908, lon: 18.398 };
-  const weatherSpots = Array.isArray(tenant.business.weather_widget_locations) ? tenant.business.weather_widget_locations : [];
-  const configuredWeatherSpot = weatherSpots.find((l: any) => l?.isDefault) || weatherSpots[0];
-  if (!configuredWeatherSpot) {
-    console.warn("WEATHER_SPOT_FALLBACK business=" + tenant.business.id + " — no weather_widget_locations configured, using hardcoded Cape Town coords");
-  }
-  const weatherLat = Number(configuredWeatherSpot?.lat ?? defaultWeatherSpot.lat);
-  const weatherLon = Number(configuredWeatherSpot?.lon ?? defaultWeatherSpot.lon);
-
-  // Fetch live weather from Open-Meteo for the tenant's configured weather spot.
-  let weatherMsg = "";
-  try {
-    // L12: Calculate the day index based on the booking's slot start_time relative to today
-    let weatherDayIndex = 1; // default to tomorrow
-    if (bkTime) {
-      const bkDate = new Date(bkTime);
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      weatherDayIndex = Math.max(0, Math.floor((bkDate.getTime() - todayStart.getTime()) / (24 * 60 * 60 * 1000)));
-    }
-    const forecastDays = Math.max(weatherDayIndex + 1, 2);
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + weatherDayIndex);
-    const dateStr = targetDate.toISOString().split("T")[0];
-    const wUrl = "https://api.open-meteo.com/v1/forecast?latitude=" + weatherLat + "&longitude=" + weatherLon + "&daily=wind_speed_10m_max,wind_direction_10m_dominant,weather_code&hourly=wind_speed_10m,wind_direction_10m,visibility,temperature_2m&timezone=" + encodeURIComponent(tenantTimeZone(tenant)) + "&forecast_days=" + forecastDays;
-    const mUrl = "https://marine-api.open-meteo.com/v1/marine?latitude=" + weatherLat + "&longitude=" + weatherLon + "&daily=wave_height_max,wave_period_max&timezone=" + encodeURIComponent(tenantTimeZone(tenant)) + "&forecast_days=" + forecastDays;
-    const [wRes, mRes] = await Promise.all([fetch(wUrl), fetch(mUrl)]);
-    // An error body has no forecast; read as zeros it would promise calm seas.
-    if (!wRes.ok || !mRes.ok) throw new Error("Forecast unavailable: " + wRes.status + "/" + mRes.status);
-    const wData = await wRes.json();
-    const mData = await mRes.json();
-
-    // L12: Use the correct day index for the booking day
-    const maxWind = wData?.daily?.wind_speed_10m_max?.[weatherDayIndex] || 0;
-    const windDir = wData?.daily?.wind_direction_10m_dominant?.[weatherDayIndex] || 0;
-    const swell = mData?.daily?.wave_height_max?.[weatherDayIndex] || 0;
-    const weatherCode = wData?.daily?.weather_code?.[weatherDayIndex] || 0;
-
-    // Check visibility at tour hours (7-9am = indices 7-9) on the booking day
-    let minVis = 99999;
-    const hourlyVis = wData?.hourly?.visibility || [];
-    const hourlyTimes = wData?.hourly?.time || [];
-    for (let hi = 0; hi < hourlyTimes.length; hi++) {
-      if (hourlyTimes[hi].startsWith(dateStr) && hi % 24 >= 6 && hi % 24 <= 10) {
-        if (hourlyVis[hi] < minVis) minVis = hourlyVis[hi];
-      }
-    }
-    const foggy = minVis < 1000; // less than 1km visibility
-
-    // Wind direction name
-    const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
-    const dirName = dirs[Math.round(windDir / 22.5) % 16];
-    const isSE = dirName.includes("SE");
-    const windLimit = isSE ? 25 : 20;
-    const windBad = maxWind > windLimit;
-    const swellBad = swell > 2.6;
-
-    const concerns: string[] = [];
-    if (swellBad) concerns.push("swell is " + swell.toFixed(1) + "m (above 2.6m)");
-    if (windBad) concerns.push("wind gusts up to " + Math.round(maxWind) + "km/h " + dirName + (isSE ? " (limit 25km/h for SE)" : " (limit 20km/h)"));
-    if (foggy) concerns.push("low visibility/fog expected");
-
-    const weatherDayLabel = weatherDayIndex === 0 ? "today" : weatherDayIndex === 1 ? "tomorrow" : "your trip day";
-    if (concerns.length > 0) {
-      weatherMsg = "Looking at " + weatherDayLabel + "\u2019s forecast, conditions may be challenging \u26A0\uFE0F\n\n" + concerns.map(function (c) { return "\u2022 " + c; }).join("\n") + "\n\nWe\u2019ll let you know for sure on the morning of the trip, about an hour before. Please keep your phone nearby \u{1F4F1}\n\nIf we do cancel, we\u2019ll let you know your options.";
-    } else {
-      weatherMsg = weatherDayLabel.charAt(0).toUpperCase() + weatherDayLabel.slice(1) + "\u2019s looking good! \u2600\uFE0F\n\n\u{1F30A} Swell: " + swell.toFixed(1) + "m\n\u{1F4A8} Wind: " + Math.round(maxWind) + "km/h " + dirName + "\n\nConditions look favourable for your trip. We\u2019ll still confirm on the morning of your trip about an hour before. Keep your phone nearby \u{1F4F1}";
-    }
-  } catch (e) {
-    console.error("Weather API err:", e);
-    weatherMsg = "We check conditions every morning before trips go out. If the swell is high, there\u2019s heavy fog, or strong winds, we may need to postpone.\n\nWe\u2019ll let you know on the morning of your trip, about an hour before launch. Keep your phone nearby \u{1F4F1}";
-  }
+  // No forecast: the bot can't know each operator's spot or limits, and the go/no-go
+  // call is the operator's on the day. The operator's own weather FAQ answer comes first.
+  const weatherMsg = (await getFaqAnswer(tenant, "weather")) || "We check conditions before every trip. If the weather means we can\u2019t go out, we\u2019ll message you before your trip to let you know what happens next. Keep your phone nearby \u{1F4F1}";
 
   await sendText(tenant, phone, bkInfo + weatherMsg);
   await sendButtons(tenant, phone, "Anything else?", [{ id: "ASK", title: "\u2753 Another Question" }, { id: "IDLE", title: "\u2B05 Menu" }]);
