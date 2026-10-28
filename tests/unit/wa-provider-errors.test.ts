@@ -48,3 +48,13 @@ describe("WhatsApp provider errors", () => {
     expect(errors.join("\n")).toContain("Forecast unavailable: 400/400");
   });
 });
+
+describe("WhatsApp slot price", () => {
+  const price = (result: any) => sourceFunction(wa, "getSlotPrice", { supabase: { from: () => ({ select: () => ({ eq: () => ({ single: async () => result }) }) }) } });
+  it("never falls back to a made-up R600", async () => {
+    await expect(price({ data: null, error: { message: "timeout" } })({ tour_id: "tour-a" })).rejects.toThrow("PRICE_UNAVAILABLE");
+    await expect(price({ data: { base_price_per_person: null }, error: null })({ tour_id: "tour-a" })).rejects.toThrow("PRICE_UNAVAILABLE");
+    expect(await price({ data: { base_price_per_person: 450 }, error: null })({ tour_id: "tour-a" })).toBe(450);
+    expect(await price({ data: null, error: null })({ tour_id: "tour-a", price_per_person_override: 520 })).toBe(520);
+  });
+});

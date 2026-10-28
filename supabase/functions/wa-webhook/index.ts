@@ -450,7 +450,10 @@ function fmtTime(tenant: TenantContext, iso: any) { return formatDateTime(tenant
 async function getSlotPrice(slot: any) {
   if (slot.price_per_person_override) return Number(slot.price_per_person_override);
   const t = await supabase.from("tours").select("base_price_per_person").eq("id", slot.tour_id).single();
-  return Number(t.data?.base_price_per_person || 600);
+  // Never quote a made-up price: a failed lookup ends the turn with the retry message.
+  const price = Number(t.data?.base_price_per_person);
+  if (t.error || !(price > 0)) throw new Error("PRICE_UNAVAILABLE tour=" + slot.tour_id);
+  return price;
 }
 async function getAvailSlotsForTour(tenant: TenantContext, tourId: any, days: number = 14) {
   const later = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
@@ -1857,10 +1860,10 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         const oavl = os.capacity_total - os.booked - (os.held || 0);
         // PostgREST types embedded many-to-one relations as arrays; runtime is an object
         const osTour: any = Array.isArray(os.tours) ? os.tours[0] : os.tours;
-        const opri = os.price_per_person_override || osTour?.base_price_per_person || 600;
+        const opri = os.price_per_person_override || osTour?.base_price_per_person;
         const otime = formatTimeOnly(tenant, os.start_time, { hour: "2-digit", minute: "2-digit" });
         const tName = osTour?.name ? osTour.name + " \u2022 " : "";
-        timeTxt += (ti + 1) + ". " + tName + otime + " (" + oavl + " spots, " + rands(opri) + "/pp)\n";
+        timeTxt += (ti + 1) + ". " + tName + otime + " (" + oavl + " spots" + (opri ? ", " + rands(opri) + "/pp" : "") + ")\n";
         slotMap[ti + 1] = os.id;
       }
       if (openSlots.length > maxDisplay) timeTxt += "\n...and " + (openSlots.length - maxDisplay) + " more times available!";
