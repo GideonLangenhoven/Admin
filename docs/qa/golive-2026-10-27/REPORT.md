@@ -334,3 +334,48 @@ Still open:
   SUPER_ADMIN, including the sandbox card refund (H2).
 
 The branches are not pushed; the `deploy-2026-10-28-1` tags are.
+
+## 6. Deployed 28 Oct 2026 (tag deploy-2026-10-28-2)
+
+Weather-cancel options, requested after section 5 shipped. Operators pick the
+options guests get (Refund, Voucher, Reschedule) once per trip, using toggle
+buttons in four places: Slots "Weather cancel", the Cancel days dialog,
+Bookings "Weather-cancel departure" and Broadcasts weather mode. "Cancel &
+notify only" is unchanged. Cancelling one booking, or a selection of bookings,
+still offers all three.
+
+- **Database.** `20261028100000_weather_cancel_options` adds
+  `bookings.cancellation_options`: all three options by default, limited by a
+  CHECK constraint. `cancel_booking_transaction` stores the pick in the same
+  UPDATE as the cancellation. All 287 bookings hold all three options,
+  including the 15 awaiting a decision. The drift check is unchanged.
+- **Guest side.** The email, the WhatsApp notice, the options reminder and My
+  Bookings list only the offered options. `rebook-booking` and the WhatsApp bot
+  refuse any other choice server-side. Staff can still settle any of the three
+  from Refunds.
+- **Edge functions (6):** weather-cancel, send-email, rebook-booking,
+  auto-messages, my-bookings-lookup and wa-webhook. Their live source matches
+  d147c7e byte for byte. The jsr.io bundler timeouts recurred; my-bookings-lookup
+  needed 12 attempts.
+- **Apps.** Admin `dpl_7yRmZttwu4EDM9bNPQ5e7WbejowG` (d147c7e) and booking
+  `dpl_F3BCtroKUMrPewVtkf5iqgQ2Xmd8` (284a390), promoted after the migration
+  and functions.
+- **Gates.** Same baseline as section 3: the 8 known unit failures and the 6
+  known lint errors. This release adds 11 unit tests and a 24th local
+  PostgreSQL group. The local `next build` ran out of disk space, so with the
+  owner's agreement Vercel's production builds (not yet serving traffic)
+  served as the build gate before the migration.
+
+Found but not fixed (pre-existing):
+
+- **wa-webhook tenant filters.** MY_BOOKINGS_LIST loads a booking by id with no
+  `business_id` filter, and the `WEATHER_REFUND_` handler updates by id only.
+- **Legacy WhatsApp credit paths.** CONFIRM_WX_REFUND only re-sets
+  ACTION_REQUIRED but tells the guest a refund was submitted.
+  CONFIRM_VOUCHER_CONVERT issues a voucher for `total_amount` with direct
+  writes, bypassing `rebook-booking`.
+- **Combo legs.** On a combo whose policy is credit-voucher-only, a trip
+  offered only Refund leaves that guest no self-service option. They have to
+  contact the operator.
+- **Bulk "selected bookings" weather cancel** goes through `cancel-booking` and
+  has no option picker; the owner scoped this release to per trip.
