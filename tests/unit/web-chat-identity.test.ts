@@ -194,10 +194,11 @@ describe("web chat catalog and marketing boundaries", () => {
   it("marketing opt-out affects only the verified email within its tenant", async () => {
     const f = fixture();
     f.setIntent("MARKETING_OPTOUT");
+    // email_lower is a generated column (lower(email)) in the database.
     f.rows.customers.push(
-      { business_id: "a", email: "owner@fixture.invalid", marketing_consent: true },
-      { business_id: "a", email: "other@fixture.invalid", marketing_consent: true },
-      { business_id: "b", email: "owner@fixture.invalid", marketing_consent: true },
+      { business_id: "a", email: "owner@fixture.invalid", email_lower: "owner@fixture.invalid", marketing_consent: true },
+      { business_id: "a", email: "other@fixture.invalid", email_lower: "other@fixture.invalid", marketing_consent: true },
+      { business_id: "b", email: "owner@fixture.invalid", email_lower: "owner@fixture.invalid", marketing_consent: true },
     );
     const response = await f.post({ chat_session: await f.session(), customer_session: await f.verifiedCustomer(), email: "%", message: "unsubscribe", state: { step: "QUESTION" } });
     expect(response.status).toBe(200);
