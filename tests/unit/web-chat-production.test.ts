@@ -430,14 +430,50 @@ describe("web chat automatic discount settings", () => {
 });
 
 describe("web chat booking copy", () => {
-  it("asks for a voucher only, and points a promo code to the website", async () => {
+  it("takes a promo code in chat, priced like checkout and passed to it", async () => {
+    // Owner decision 2026-10-28: promo codes are accepted in chat. A promo replaces the automatic discount.
     const f = webChatFixture();
+    f.settings.promos = { SPRING10: { code: "SPRING10", business_id: "a", discount_type: "PERCENT", discount_value: 10 } };
     const token = await f.session();
     const details = await f.post(token, "Fixture Guest, guest@fixture.invalid, +27110000000", { ...f.bookingState, step: "ASK_DETAILS" });
-    expect(details.reply).toContain("Do you have a voucher code?");
-    const promo = await f.post(token, "PROMO-AB12CD", details.state);
-    expect(promo.state.step).toBe("ASK_VOUCHER");
-    expect(promo.reply).toContain("Promo codes can be used when you book on our website.");
+    expect(details.reply).toContain("Do you have a voucher or promo code?");
+    const missing = await f.post(token, "NOPE-123", details.state);
+    expect(missing.state.step).toBe("ASK_VOUCHER");
+    expect(missing.reply).toBe("Can't find that code. Double-check it?");
+    const summary = await f.post(token, "spring10", details.state);
+    expect(summary.state).toMatchObject({ step: "CONFIRM", total: 720, discount: 80, promo: { code: "SPRING10" } });
+    expect(summary.reply).toContain("Promo SPRING10 applied: R80 off.");
+    // A tampered state can't change the promo's value: CONFIRM prices it from the server's answer.
+    const tampered = { ...summary.state, promo: { code: "SPRING10", discountType: "PERCENT", discountValue: 100 } };
+    const paid = await f.post(token, "btn:confirm", tampered);
+    expect(paid.paymentUrl).toBe("https://pay.fixture.invalid/checkout-a");
+    const checkout = f.calls.find((c: any) => c.kind === "fetch" && c.name.endsWith("/create-checkout"));
+    expect(checkout.data).toMatchObject({ amount: 720, promo_code: "SPRING10" });
+    expect(f.calls.some((c: any) => c.kind === "rpc" && c.name === "confirm_voucher_booking")).toBe(false);
+  });
+
+  it("drops a promo this guest already used before anything is booked", async () => {
+    const f = webChatFixture();
+    f.settings.promos = { SPRING10: { code: "SPRING10", business_id: "a", discount_type: "PERCENT", discount_value: 10, usedBy: ["guest@fixture.invalid"] } };
+    const token = await f.session();
+    const state = { ...f.bookingState, total: 720, baseTotal: 800, discount: 80, promo: { code: "SPRING10", discountType: "PERCENT", discountValue: 10 } };
+    const reply = await f.post(token, "btn:confirm", state);
+    expect(reply.reply).toBe("You have already used this promo code. I've taken the promo code off. Do you have another voucher or promo code?");
+    expect(reply.state).toMatchObject({ step: "ASK_VOUCHER", promo: null, total: 800, discount: 0 });
+    expect(f.rows.bookings).toHaveLength(0);
+  });
+
+  it("a promo that covers the whole trip books through checkout, which records its use", async () => {
+    const f = webChatFixture();
+    f.settings.promos = { FREEDAY: { code: "FREEDAY", business_id: "a", discount_type: "PERCENT", discount_value: 100 } };
+    f.settings.checkout = "fully-covered";
+    const token = await f.session();
+    const summary = await f.post(token, "FREEDAY", { ...f.bookingState, step: "ASK_VOUCHER", baseTotal: 800, discount: 0 });
+    expect(summary.state.total).toBe(0);
+    const booked = await f.post(token, "btn:confirm", summary.state);
+    expect(booked.reply).toContain("You're booked!");
+    expect(f.calls.some((c: any) => c.kind === "rpc" && c.name === "confirm_voucher_booking")).toBe(false);
+    expect(f.calls.some((c: any) => c.kind === "fetch" && c.name.endsWith("/confirm-booking"))).toBe(true);
   });
 
   it("shows the Terms on the summary, before the guest taps Confirm", async () => {

@@ -123,6 +123,29 @@ describe("WhatsApp booking flow", () => {
     expect(b.sent.join("\n")).toContain("this trip is on us!");
   });
 
+  it("takes a promo code at the summary, and re-checks it once the email is known", async () => {
+    // Owner decision 2026-10-28: promo codes are accepted in chat. A promo replaces the automatic discount.
+    const promoRpc = (used = false) => async (name: string, args: any) => name === "validate_promo_code"
+      ? { data: args.p_code.toUpperCase() === "SPRING10" && !used ? { valid: true, code: "SPRING10", discount_type: "PERCENT", discount_value: 10 } : { valid: false, error: used ? "You have already used this promo code" : "Invalid promo code" }, error: null }
+      : { data: null, error: null };
+    const sd = { qty: 2, unit_price: 600, base_total: 1200, total: 1140, discount_percent: 5, discount_type: "GROUP", tour_id: tour.id, slot_id: "slot-a" };
+    const extra = { checkChatPromo: (await import("../../supabase/functions/_shared/chat-booking-pricing")).checkChatPromo };
+    const b = bot("ADD_EXTRA_VOUCHER", sd, {}, { ...extra, rpc: promoRpc() });
+    await b.handle(tenant, phone, "spring10", "text");
+    expect(b.sent.at(-1)).toContain("Promo SPRING10 applied:* R120 off\n\nTotal: *R1080*");
+    expect(b.changes.at(-1).state_data).toMatchObject({ promo: { code: "SPRING10" }, discount_percent: 0, total: 1080 });
+    const miss = bot("ADD_EXTRA_VOUCHER", sd, {}, { ...extra, rpc: promoRpc() });
+    await miss.handle(tenant, phone, "nope", "text");
+    expect(miss.sent[0]).toBe("That code doesn\u2019t seem valid. Check for typos and try again.");
+    // Once the email is known, a promo this guest already used comes off before anything is booked.
+    const slot = { id: "slot-a", status: "OPEN", start_time: new Date(Date.now() + 86_400_000).toISOString(), tour_id: tour.id };
+    const used = bot("FINALIZE_BOOKING", { ...b.changes.at(-1).state_data, customer_name: "Guest", email: "guest@example.invalid" }, { slots: slot, tours: tour }, { ...extra, rpc: promoRpc(true) });
+    await used.handle(tenant, phone, "internal_proceed", "text");
+    expect(used.sent[0]).toContain("You have already used this promo code");
+    expect(used.changes[0]).toMatchObject({ current_state: "CONFIRM_BOOKING", state_data: { promo: null } });
+    expect(used.filters.bookings || []).toEqual([]);
+  });
+
   it("a tenant with more than 10 tours pages through them with a More tours row", async () => {
     const pageTourRows = sourceFunction(wa, "pageTourRows", {});
     const rows = Array.from({ length: 21 }, (_, i) => ({ id: "TOUR_" + i, title: "Tour " + i }));

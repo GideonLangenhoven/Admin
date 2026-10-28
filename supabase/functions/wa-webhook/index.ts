@@ -22,7 +22,7 @@ import { retrieveKb, retrieveKbContext } from "../_shared/kb.ts";
 import { assembleBotSystem, buildBlockB, buildBlockC, cancellationPolicyPrompt } from "../_shared/bot-prompt.ts";
 import { hashedUserKey } from "../_shared/openrouter-provider.ts";
 import { botReply, type BotOut, type BotUsage } from "../_shared/bot-llm.ts";
-import { calculateChatBookingPricing, rands, verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
+import { calculateChatBookingPricing, checkChatPromo, rands, verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
 import { applicableBookingQuestions, captureQuestionFields, validateQuestionAnswers } from "../_shared/booking-custom-fields.ts";
 import { genVoucherCode, getPaidPortions } from "../_shared/vouchers.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
@@ -1896,16 +1896,16 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       else summary += "\n*Total: " + rands(finalTotal) + "*";
       summary += waTermsNotice(tenant) + "\n\nLook good?";
       const confirmBtns = [{ id: "CONFIRM", title: finalTotal > 0 ? "\u2705 Pay " + rands(finalTotal) : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }];
-      if (finalTotal > 0) confirmBtns.splice(1, 0, { id: "ADD_VOUCHER", title: "\u{1F39F} Add Voucher" });
+      if (finalTotal > 0) confirmBtns.splice(1, 0, { id: "ADD_VOUCHER", title: "\u{1F39F} Voucher or promo" });
       await sendButtons(tenant, phone, summary, confirmBtns);
-      await setConvo(convo.id, { current_state: "CONFIRM_BOOKING", state_data: { ...sd, slot_id: slotId, tour_id: slot.tour_id, unit_price: price, base_total: baseTotal, total: finalTotal, discount_type: disc.type, discount_percent: disc.percent, voucher_deduction: voucherDeduction || 0 } });
+      await setConvo(convo.id, { current_state: "CONFIRM_BOOKING", state_data: { ...sd, promo: null, slot_id: slotId, tour_id: slot.tour_id, unit_price: price, base_total: baseTotal, total: finalTotal, discount_type: disc.type, discount_percent: disc.percent, voucher_deduction: voucherDeduction || 0 } });
     }
 
     // ===== CONFIRM BOOKING =====
     else if (state === "CONFIRM_BOOKING") {
       if (rid === "IDLE" || /^(no|nope|cancel)\b/.test(input)) { await sendText(tenant, phone, "No worries, cancelled! Type *menu* whenever you\u2019re ready."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
       if (rid === "ADD_VOUCHER") {
-        await sendText(tenant, phone, "Enter your voucher code:");
+        await sendText(tenant, phone, "Enter your voucher or promo code:");
         await setConvo(convo.id, { current_state: "ADD_EXTRA_VOUCHER" });
         return;
       }
@@ -2035,8 +2035,18 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const finalUnitPrice = finalSlotCheck.data.price_per_person_override != null
         ? Number(finalSlotCheck.data.price_per_person_override)
         : Number(finalTourCheck.data?.base_price_per_person || 0);
-      const finalDiscount = await calcDiscount(tenant, Number(sd.qty || 0), phone);
+      // Now that we have the email: a promo this guest already used is dropped before anything is booked.
+      if (sd.promo) {
+        const recheck = await checkChatPromo(supabase, tenant.business.id, sd.promo.code, Number(sd.base_total || 0), sd.email);
+        if (!recheck.promo) {
+          await sendButtons(tenant, phone, recheck.error + "\n\nI\u2019ve taken the promo code off. Continue without it, or try another code.", [{ id: "CONFIRM", title: "\u2705 Continue" }, { id: "ADD_VOUCHER", title: "\u{1F39F} Voucher or promo" }, { id: "IDLE", title: "\u274C Cancel" }]);
+          await setConvo(convo.id, { current_state: "CONFIRM_BOOKING", state_data: { ...sd, promo: null } });
+          return;
+        }
+      }
+      const finalDiscount = sd.promo ? { type: "", percent: 0, label: "" } : await calcDiscount(tenant, Number(sd.qty || 0), phone);
       const finalPriceCheck = verifyChatBookingPricing({
+        promo: sd.promo,
         quotedTotal: Number(sd.total || 0),
         tolerance: 0.005,
         qty: Number(sd.qty || 0),
@@ -2108,7 +2118,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const termsNotice = waTermsNotice(tenant);
 
       // VOUCHER BOOKING — skip payment
-      if (verifiedSd.voucher_id && verifiedSd.total <= 0) {
+      // A promo code goes through checkout, which records its use.
+      if (verifiedSd.voucher_id && verifiedSd.total <= 0 && !verifiedSd.promo) {
         // Funding, capacity and confirmation commit together. A stale voucher
         // must not leave a PAID booking or a partially drained voucher stack.
         const voucherConfirmation = await supabase.rpc("confirm_voucher_booking", {
@@ -2183,6 +2194,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         customer_name: sd.customer_name, qty: verifiedSd.qty,
         voucher_ids: verifiedSd.voucher_ids || [verifiedSd.voucher_id].filter(Boolean),
         voucher_codes: verifiedSd.voucher_codes || [verifiedSd.voucher_code].filter(Boolean),
+        promo_code: verifiedSd.promo?.code || null,
       });
       const ref = booking.id.substring(0, 8).toUpperCase();
       if (yocoData?.fully_covered) {
@@ -2396,14 +2408,23 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // ===== ADD EXTRA VOUCHER =====
     else if (state === "ADD_EXTRA_VOUCHER") {
       const xcode = rawText.toUpperCase().replace(/\s/g, "");
-      if (xcode.length !== 8) { await sendText(tenant, phone, "Voucher codes are 8 characters long. Try again:"); return; }
-      const xvr = await supabase.from("vouchers").select().eq("code", xcode).eq("status", "ACTIVE").eq("business_id", tenant.business.id).single();
+      const isVoucherShape = xcode.length === 8;
+      const xvr = isVoucherShape ? await supabase.from("vouchers").select().eq("code", xcode).eq("status", "ACTIVE").eq("business_id", tenant.business.id).single() : { data: null };
       if (!xvr.data) {
-        const xUsed = await supabase.from("vouchers").select("status").eq("code", xcode).eq("business_id", tenant.business.id).single();
+        const xUsed = isVoucherShape ? await supabase.from("vouchers").select("status").eq("code", xcode).eq("business_id", tenant.business.id).single() : { data: null };
         if (xUsed.data && xUsed.data.status === "REDEEMED") {
           await sendText(tenant, phone, "This voucher has already been redeemed. Each code can only be used once.");
         } else {
-          await sendText(tenant, phone, "That code doesn\u2019t seem valid. Check for typos and try again.");
+          // Not a voucher: try it as a promo code, by the storefront's rule.
+          const pc = sd.promo ? { error: "There\u2019s already a promo code on this booking." } : await checkChatPromo(supabase, tenant.business.id, rawText.trim(), Number(sd.base_total || 0), sd.email);
+          if (pc.promo) {
+            const pPriced = calculateChatBookingPricing({ qty: Number(sd.qty), unitPrice: Number(sd.unit_price), promo: pc.promo, voucherDeduction: sd.voucher_id ? Number(sd.voucher_value || 0) : 0 });
+            const pBtns = [{ id: "CONFIRM", title: pPriced.total > 0 ? "\u2705 Pay " + rands(pPriced.total) : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }];
+            await sendButtons(tenant, phone, "\u{1F3F7} *Promo " + pc.promo.code + " applied:* " + rands(pPriced.discount) + " off\n\n" + (pPriced.total > 0 ? "Total: *" + rands(pPriced.total) + "*" : "Your trip is now *completely FREE!*"), pBtns);
+            await setConvo(convo.id, { current_state: "CONFIRM_BOOKING", state_data: { ...sd, promo: pc.promo, discount_type: "", discount_percent: 0, voucher_deduction: pPriced.voucherDeduction, total: pPriced.total } });
+            return;
+          }
+          await sendText(tenant, phone, pc.error === "Invalid promo code" ? "That code doesn\u2019t seem valid. Check for typos and try again." : pc.error);
         }
         await sendButtons(tenant, phone, "Options:", [{ id: "ADD_VOUCHER", title: "\u{1F39F} Try Again" }, { id: "CONFIRM", title: "\u2705 Continue" }, { id: "IDLE", title: "\u274C Cancel" }]);
         await setConvo(convo.id, { current_state: "CONFIRM_BOOKING" });
@@ -2425,7 +2446,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       vCodes.push(xcode);
       vIds.push(xvr.data.id);
       // Same pricing as the summary and FINALIZE_BOOKING: group discount first, then the vouchers.
-      const xPriced = calculateChatBookingPricing({ qty: Number(sd.qty), unitPrice: Number(sd.unit_price), groupDiscountPercent: Number(sd.discount_percent || 0), groupDiscountMinQty: 1, voucherDeduction: Number(sd.voucher_deduction || 0) + xVal });
+      const xPriced = calculateChatBookingPricing({ qty: Number(sd.qty), unitPrice: Number(sd.unit_price), groupDiscountPercent: Number(sd.discount_percent || 0), groupDiscountMinQty: 1, promo: sd.promo, voucherDeduction: Number(sd.voucher_deduction || 0) + xVal });
       const newTotal = xPriced.total;
       let xMsg = "\u{1F39F} *Voucher applied!* (" + rands(xVal) + " credit)\n\n";
       if (newTotal === 0) xMsg += "Your trip is now *completely FREE!*";
@@ -2434,7 +2455,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // voucher_id/voucher_code mark the booking as voucher-funded for FINALIZE_BOOKING.
       const updatedSd = { ...sd, voucher_id: sd.voucher_id || xvr.data.id, voucher_code: sd.voucher_code || xcode, voucher_value: Number(sd.voucher_value || 0) + xVal, voucher_codes: vCodes, voucher_ids: vIds, voucher_deduction: xPriced.voucherDeduction, total: newTotal };
       const cBtns = [{ id: "CONFIRM", title: newTotal > 0 ? "\u2705 Pay " + rands(newTotal) : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }];
-      if (newTotal > 0) cBtns.splice(1, 0, { id: "ADD_VOUCHER", title: "\u{1F39F} Add Voucher" });
+      if (newTotal > 0) cBtns.splice(1, 0, { id: "ADD_VOUCHER", title: "\u{1F39F} Voucher or promo" });
       await sendButtons(tenant, phone, "Ready to proceed?", cBtns);
       await setConvo(convo.id, { current_state: "CONFIRM_BOOKING", state_data: updatedSd });
     }

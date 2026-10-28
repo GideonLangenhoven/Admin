@@ -20,7 +20,7 @@ export function webChatFixture(source = "supabase/functions/web-chat/index.ts") 
   const rows: Record<string, any[]> = { businesses: [business], tours: [tour], slots: [slot], conversations: [], chat_messages: [], chat_faq_entries: [], bookings: [], vouchers: [], holds: [] };
   const calls: { kind: string; name: string; data: any }[] = [];
   const failures: Record<string, any> = {};
-  const settings = { trading: true, llmAvailable: true, llmReply: "That is our fixture answer.", holdAvailable: true, checkout: "ok", humanPush: false, email: "ok" };
+  const settings: any = { trading: true, llmAvailable: true, llmReply: "That is our fixture answer.", holdAvailable: true, checkout: "ok", humanPush: false, email: "ok", promos: {} };
   const discount = { type: "GROUP", percent: 5, label: "Group discount", minQty: 6, phone: "" };
   let sequence = 0;
   const rateCounts: Record<string, number> = {}; // public.check_rate_limit, without the minute window
@@ -73,6 +73,12 @@ export function webChatFixture(source = "supabase/functions/web-chat/index.ts") 
       if (name === "check_rate_limit") { rateCounts[data.p_ip + "|" + data.p_endpoint] = (rateCounts[data.p_ip + "|" + data.p_endpoint] || 0) + 1; return { data: rateCounts[data.p_ip + "|" + data.p_endpoint] <= data.p_max, error: null }; }
       if (name === "list_available_slots") return { data: rows.slots.filter(row => row.business_id === data.p_business_id && (!data.p_tour_id || row.tour_id === data.p_tour_id) && row.status === "OPEN" && row.start_time >= data.p_range_start && row.start_time <= data.p_range_end), error: null };
       if (name === "resolve_booking_discount") return { data: data.p_qty >= discount.minQty && (!discount.phone || data.p_phone === discount.phone) ? discount : { type: "", percent: 0, label: "" }, error: null };
+      if (name === "validate_promo_code") {
+        const promo = settings.promos[String(data.p_code).trim().toUpperCase()];
+        if (!promo || promo.business_id !== data.p_business_id) return { data: { valid: false, error: "Invalid promo code" }, error: null };
+        if ((promo.usedBy || []).includes(data.p_customer_email)) return { data: { valid: false, error: "You have already used this promo code" }, error: null };
+        return { data: { valid: true, code: promo.code, discount_type: promo.discount_type, discount_value: promo.discount_value }, error: null };
+      }
       if (name === "slot_available_capacity") return { data: rows.slots.find(row => row.id === data.p_slot_id)?.available_capacity ?? 0, error: null };
       if (name === "create_hold_with_capacity_check") {
         if (!settings.holdAvailable) return { data: { success: false, error: "Those spots were just taken." }, error: null };
@@ -141,8 +147,10 @@ export function webChatFixture(source = "supabase/functions/web-chat/index.ts") 
       if (settings.checkout === "error") return Response.json({ error: "Gateway unavailable" }, { status: 503 });
       if (settings.checkout === "unsafe-url") return Response.json({ id: "checkout-a", redirectUrl: "javascript:alert(1)" });
       if (settings.checkout === "missing-url") return Response.json({ id: "checkout-a", success: true });
+      if (settings.checkout === "fully-covered") return Response.json({ fully_covered: true, redirectUrl: "https://a.booking.fixture.invalid/success", amount: 0 });
       return Response.json({ id: "checkout-a", redirectUrl: "https://pay.fixture.invalid/checkout-a" });
     }
+    if (String(url).endsWith("/confirm-booking")) return Response.json({ ok: true });
     if (String(url).endsWith("/send-email")) {
       if (settings.email === "throw") throw new Error("Email service unavailable");
       if (settings.email === "error") return Response.json({ error: "Email service unavailable" }, { status: 503 });

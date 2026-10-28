@@ -4,7 +4,11 @@ export type ChatBookingPricingInput = {
   voucherDeduction?: number;
   groupDiscountMinQty?: number;
   groupDiscountPercent?: number;
+  // A promo code replaces the automatic discount, as prepare_booking_checkout prices it.
+  promo?: ChatPromo | null;
 };
+
+export type ChatPromo = { code: string; discountType: string; discountValue: number };
 
 export type ChatBookingPricing = {
   unitPrice: number;
@@ -43,7 +47,10 @@ export function calculateChatBookingPricing(input: ChatBookingPricingInput): Cha
   const groupMin = Number(input.groupDiscountMinQty ?? 6);
   const groupPercent = Number(input.groupDiscountPercent ?? 5);
   const baseTotal = money(qty * unitPrice);
-  const discount = qty >= groupMin && groupPercent > 0
+  const promo = input.promo;
+  const discount = promo
+    ? money(Math.min(baseTotal, promo.discountType === "PERCENT" ? baseTotal * promo.discountValue / 100 : promo.discountValue))
+    : qty >= groupMin && groupPercent > 0
     ? money(baseTotal * (groupPercent / 100))
     : 0;
   const subtotal = money(baseTotal - discount);
@@ -82,4 +89,14 @@ export function verifyChatBookingPricing(
   }
 
   return { ok: true, pricing };
+}
+
+// The storefront's own check (validate_promo_code). Checkout re-prices the code on the server.
+export async function checkChatPromo(db: any, businessId: string, code: string, orderAmount: number, email?: string | null): Promise<{ promo?: ChatPromo; error?: string }> {
+  const { data, error } = await db.rpc("validate_promo_code", {
+    p_business_id: businessId, p_code: code, p_order_amount: orderAmount, p_customer_email: email || null,
+  });
+  if (error || !data) return { error: "I couldn't check that code just now. Please try again in a minute." };
+  if (!data.valid) return { error: String(data.error || "Invalid promo code") };
+  return { promo: { code: String(data.code), discountType: String(data.discount_type), discountValue: Number(data.discount_value) } };
 }

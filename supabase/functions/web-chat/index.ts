@@ -16,7 +16,7 @@ import {
 import { classifyIntent, priorityForIntent, findFaqMatch, loadFaqCandidates } from "../_shared/intent.ts";
 import { getSubscriptionState } from "../_shared/subscription.ts";
 import { applicableBookingQuestions, captureQuestionFields, validateQuestionAnswers } from "../_shared/booking-custom-fields.ts";
-import { calculateChatBookingPricing, rands, verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
+import { calculateChatBookingPricing, checkChatPromo, rands, verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
 import { genVoucherCode } from "../_shared/vouchers.ts";
 import { parseChatContact, validateChatContact } from "../_shared/chat-contact.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
@@ -38,7 +38,6 @@ const ADMIN_PUSH_SECRET = Deno.env.get("ADMIN_PUSH_SECRET") || "";
 // No phone: a typed number is unverified, so returning-guest offers (and the
 // booking history they reveal) stay on WhatsApp, where Meta verifies the number.
 // Chat redeems vouchers only; promo codes (sent by marketing automations) are checked on the booking site.
-const PROMO_HINT = " Promo codes can be used when you book on our website.";
 
 async function bookingDiscount(businessId: string, qty: number) {
   const { data, error } = await db.rpc("resolve_booking_discount", { p_business_id: businessId, p_phone: null, p_qty: qty });
@@ -610,6 +609,19 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
     }
     const _requestTimezone = requestTenant.business.timezone || "UTC";
     function fmt(iso) { const d = new Date(iso); if (isNaN(d.getTime())) return "?"; return d.toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long", timeZone: _requestTimezone }) + " at " + d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: _requestTimezone }); }
+    // A code that isn't a voucher is tried as a promo code, by the storefront's rule. It replaces
+    // the automatic discount, as checkout prices it; CONFIRM checks it again before booking.
+    async function promoStep(code: string, notFound: string) {
+      const pc = await checkChatPromo(db, requestedBusinessId, code, Number(ns.baseTotal ?? ns.qty * ns.tprice), ns.email);
+      if (!pc.promo) return { ns, reply: pc.error === "Invalid promo code" ? notFound : pc.error, buttons: [{ label: "Continue without a code", value: "no_voucher" }] };
+      const priced = calculateChatBookingPricing({ qty: Number(ns.qty), unitPrice: Number(ns.tprice), promo: pc.promo });
+      const next = { ...ns, step: "CONFIRM", vid: null, vcode: null, vded: 0, promo: pc.promo, baseTotal: priced.baseTotal, discount: priced.discount, total: priced.total };
+      return {
+        ns: next,
+        reply: "\u{1F3F7} Promo " + pc.promo.code + " applied: " + rands(priced.discount) + " off.\n\n\u{1F6F6} " + next.tname + "\n\u{1F4C5} " + fmt(next.slotTime) + "\n\u{1F465} " + next.qty + " " + pl(next.qty, "person", "people") + "\n\u{1F4B0} " + rands(next.total) + "\n\nLook good?",
+        buttons: [{ label: "\u2705 Confirm" + (next.total > 0 ? " & Pay " + rands(next.total) : " (FREE)"), value: "confirm" }, { label: "\u274C Cancel", value: "cancel_booking" }],
+      };
+    }
     function fmtS(iso) { const d = new Date(iso); if (isNaN(d.getTime())) return "?"; return d.toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short", timeZone: _requestTimezone }) + " " + d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: _requestTimezone }); }
     function fmtDate(iso) { const d = new Date(iso); if (isNaN(d.getTime())) return "?"; return d.toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short", timeZone: _requestTimezone }); }
     function fmtTime(iso) { const d = new Date(iso); if (isNaN(d.getTime())) return "?"; return d.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit", timeZone: _requestTimezone }); }
@@ -1027,7 +1039,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         if (gbTours.length === 0) { ns = { step: "IDLE" }; reply = NO_AVAILABILITY_REPLY; buttons = NO_AVAILABILITY_BUTTONS; }
         else { buttons = gbTours.map(tourBtn); reply = "Which tour are you keen on?"; }
       } else if (prevStep === "ASK_VOUCHER") {
-        reply = "Do you have a voucher code?";
+        reply = "Do you have a voucher or promo code?";
         buttons = [{ label: "No voucher, continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
       } else if (prevStep === "PICK_DATE" || prevStep === "PICK_TIME") {
         const backSlots = await getSlots(requestedBusinessId, ns.tid, now);
@@ -1202,7 +1214,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
       PICK_TIME: "choose an available time, or type it here.", ASK_QTY: "how many people will be joining?",
       ASK_DETAILS: "please share your full name, email address, and phone number.",
       ASK_CUSTOM_FIELD: promptForCustomField(nextCustomField(ns.custom_field_defs, ns.custom_fields)),
-      ASK_VOUCHER: "do you have a voucher code?", ENTER_VOUCHER: "enter your voucher code, or say skip.",
+      ASK_VOUCHER: "do you have a voucher or promo code?", ENTER_VOUCHER: "enter your voucher or promo code, or say skip.",
       CONFIRM: "review the summary above, then confirm when you're ready.",
       GIFT_PICK_TOUR: "which tour is the gift for?", GIFT_RECIPIENT: "what is the recipient's name?",
       GIFT_MESSAGE: "add a gift message, or say skip.", GIFT_BUYER_NAME: "what is your name?",
@@ -1350,7 +1362,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         buttons = null;
       } else {
         ns = { ...ns, step: "ASK_VOUCHER", name: dName, email: dEmail, phone: dPhone };
-        reply = "Thanks " + dName.split(" ")[0] + "! \u{1F44D} Do you have a voucher code?"; buttons = [{ label: "No voucher, continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
+        reply = "Thanks " + dName.split(" ")[0] + "! \u{1F44D} Do you have a voucher or promo code?"; buttons = [{ label: "No voucher, continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
       }
       if (priceChanged) reply = "Your total is " + rands(pricing.total) + (pricing.discount > 0 ? " (" + discount.percent + "% automatic discount, " + rands(pricing.discount) + " saved)" : "") + ".\n\n" + reply;
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
@@ -1363,7 +1375,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
       const currentField = nextCustomField(defs, values);
       if (!currentField) {
         ns = { ...ns, step: "ASK_VOUCHER" };
-        reply = "Perfect. Do you have a voucher code?";
+        reply = "Perfect. Do you have a voucher or promo code?";
         buttons = [{ label: "No voucher, continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
         return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
       }
@@ -1384,26 +1396,26 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         reply = "Got it.\n\n" + promptForCustomField(upcomingField);
       } else {
         ns.step = "ASK_VOUCHER";
-        reply = "Perfect. Do you have a voucher code?";
+        reply = "Perfect. Do you have a voucher or promo code?";
         buttons = [{ label: "No voucher, continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
       }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
     }
     if (step === "ASK_VOUCHER") {
       if (btnVal === "no_voucher" || (!isBtnClick && skipsVoucher(msg))) {
-        ns = { ...ns, step: "CONFIRM", vid: null, vcode: null, vded: 0, total: Number(ns.baseTotal ?? ns.qty * ns.tprice) - Number(ns.discount || 0) };
+        ns = { ...ns, promo: null, step: "CONFIRM", vid: null, vcode: null, vded: 0, total: Number(ns.baseTotal ?? ns.qty * ns.tprice) - Number(ns.discount || 0) };
         reply = "Here's your booking summary:\n\n🛶 " + ns.tname + "\n📅 " + fmt(ns.slotTime) + "\n👥 " + ns.qty + " " + pl(ns.qty, "person", "people") + "\n💰 " + rands(ns.total) + "\n\nLook good?";
         buttons = [{ label: "✅ Confirm" + (ns.total > 0 ? " & Pay " + rands(ns.total) : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }];
-      } else if (btnVal === "has_voucher") { ns.step = "ENTER_VOUCHER"; reply = "Type your 8-character voucher code:"; }
+      } else if (btnVal === "has_voucher") { ns.step = "ENTER_VOUCHER"; reply = "Type your voucher or promo code:"; }
       else {
         const vc = msg.toUpperCase().replace(/\s/g, "");
         if (vc.length === 8) {
           // C2: Filter vouchers by business_id to prevent cross-tenant usage
           const { data: vd } = await db.from("vouchers").select("*").eq("code", vc).eq("business_id", requestedBusinessId).single();
-          if (vd && vd.status === "ACTIVE" && (!vd.expires_at || new Date(vd.expires_at).getTime() > now.getTime())) { const subtotal = Math.max(0, Number(ns.baseTotal ?? ns.qty * ns.tprice) - Number(ns.discount || 0)); const vv = Number(vd.current_balance ?? vd.value ?? vd.purchase_amount ?? 0); const dd = Math.min(vv, subtotal); const nt = Math.max(0, subtotal - dd); ns = { ...ns, step: "CONFIRM", vcode: vc, vid: vd.id, vded: dd, total: nt, vtype: vd.type }; reply = "🎉 Voucher applied! " + rands(dd) + " off." + (nt > 0 ? " New total: " + rands(nt) : " It's completely FREE!") + "\n\n🛶 " + ns.tname + "\n📅 " + fmt(ns.slotTime) + "\n👥 " + ns.qty + " " + pl(ns.qty, "person", "people") + "\n💰 " + (nt > 0 ? rands(nt) : "FREE"); buttons = [{ label: "✅ Confirm" + (nt > 0 ? " & Pay " + rands(nt) : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
+          if (vd && vd.status === "ACTIVE" && (!vd.expires_at || new Date(vd.expires_at).getTime() > now.getTime())) { const subtotal = Math.max(0, Number(ns.baseTotal ?? ns.qty * ns.tprice) - Number(ns.discount || 0)); const vv = Number(vd.current_balance ?? vd.value ?? vd.purchase_amount ?? 0); const dd = Math.min(vv, subtotal); const nt = Math.max(0, subtotal - dd); ns = { ...ns, promo: null, step: "CONFIRM", vcode: vc, vid: vd.id, vded: dd, total: nt, vtype: vd.type }; reply = "🎉 Voucher applied! " + rands(dd) + " off." + (nt > 0 ? " New total: " + rands(nt) : " It's completely FREE!") + "\n\n🛶 " + ns.tname + "\n📅 " + fmt(ns.slotTime) + "\n👥 " + ns.qty + " " + pl(ns.qty, "person", "people") + "\n💰 " + (nt > 0 ? rands(nt) : "FREE"); buttons = [{ label: "✅ Confirm" + (nt > 0 ? " & Pay " + rands(nt) : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
           else if (vd && vd.status === "REDEEMED") { reply = "That voucher's already been used. Got another?"; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
-          else { reply = "Can't find that voucher. Double-check it?" + PROMO_HINT; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
-        } else { reply = "Voucher codes have 8 characters. Try again?" + PROMO_HINT; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
+          else ({ ns, reply, buttons } = await promoStep(msg.trim(), "Can't find that code. Double-check it?"));
+        } else ({ ns, reply, buttons } = await promoStep(msg.trim(), "Can't find that code. Double-check it?"));
       }
       if (ns.step === "CONFIRM") reply += await termsNotice(requestedBusinessId);
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
@@ -1411,15 +1423,15 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
     // ===== ENTER_VOUCHER =====
     if (step === "ENTER_VOUCHER") {
       const noVc = btnVal === "no_voucher" || (!isBtnClick && skipsVoucher(msg));
-      if (noVc) { ns = { ...ns, step: "CONFIRM", vid: null, vcode: null, vded: 0, total: Number(ns.baseTotal ?? ns.qty * ns.tprice) - Number(ns.discount || 0) }; reply = "No problem! Here's your booking summary:\n\n" + ns.tname + "\n" + ns.qty + " " + pl(ns.qty, "person", "people") + " \u2022 " + rands(ns.total) + "\n\nReady to confirm?"; buttons = [{ label: "\u2705 Confirm & Pay " + rands(ns.total), value: "confirm" }, { label: "\u274C Cancel", value: "cancel_booking" }]; reply += await termsNotice(requestedBusinessId); return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
+      if (noVc) { ns = { ...ns, promo: null, step: "CONFIRM", vid: null, vcode: null, vded: 0, total: Number(ns.baseTotal ?? ns.qty * ns.tprice) - Number(ns.discount || 0) }; reply = "No problem! Here's your booking summary:\n\n" + ns.tname + "\n" + ns.qty + " " + pl(ns.qty, "person", "people") + " \u2022 " + rands(ns.total) + "\n\nReady to confirm?"; buttons = [{ label: "\u2705 Confirm & Pay " + rands(ns.total), value: "confirm" }, { label: "\u274C Cancel", value: "cancel_booking" }]; reply += await termsNotice(requestedBusinessId); return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
       const vc2 = msg.toUpperCase().replace(/\s/g, "");
       if (vc2.length === 8) {
         // C2: Filter vouchers by business_id to prevent cross-tenant usage
         const { data: vd2 } = await db.from("vouchers").select("*").eq("code", vc2).eq("business_id", requestedBusinessId).single();
-        if (vd2 && vd2.status === "ACTIVE" && (!vd2.expires_at || new Date(vd2.expires_at).getTime() > now.getTime())) { const subtotal = Math.max(0, Number(ns.baseTotal ?? ns.qty * ns.tprice) - Number(ns.discount || 0)); const vv2 = Number(vd2.current_balance ?? vd2.value ?? vd2.purchase_amount ?? 0); const dd2 = Math.min(vv2, subtotal); const nt2 = Math.max(0, subtotal - dd2); ns = { ...ns, step: "CONFIRM", vcode: vc2, vid: vd2.id, vded: dd2, total: nt2, vtype: vd2.type }; reply = "🎉 " + rands(dd2) + " off!" + (nt2 > 0 ? " Total now " + rands(nt2) : " FREE!") + "\n\nReady to confirm?"; buttons = [{ label: "✅ Confirm" + (nt2 > 0 ? " & Pay " + rands(nt2) : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
+        if (vd2 && vd2.status === "ACTIVE" && (!vd2.expires_at || new Date(vd2.expires_at).getTime() > now.getTime())) { const subtotal = Math.max(0, Number(ns.baseTotal ?? ns.qty * ns.tprice) - Number(ns.discount || 0)); const vv2 = Number(vd2.current_balance ?? vd2.value ?? vd2.purchase_amount ?? 0); const dd2 = Math.min(vv2, subtotal); const nt2 = Math.max(0, subtotal - dd2); ns = { ...ns, promo: null, step: "CONFIRM", vcode: vc2, vid: vd2.id, vded: dd2, total: nt2, vtype: vd2.type }; reply = "🎉 " + rands(dd2) + " off!" + (nt2 > 0 ? " Total now " + rands(nt2) : " FREE!") + "\n\nReady to confirm?"; buttons = [{ label: "✅ Confirm" + (nt2 > 0 ? " & Pay " + rands(nt2) : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
         else if (vd2 && vd2.status === "REDEEMED") { reply = "Already used. Got another?"; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
-        else { reply = "Voucher not found. Check and try again?" + PROMO_HINT; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
-      } else { reply = "That doesn't look like a voucher code. Want to continue without one?" + PROMO_HINT; buttons = [{ label: "No voucher, continue", value: "no_voucher" }, { label: "Try again", value: "btn:yes_voucher" }]; }
+        else ({ ns, reply, buttons } = await promoStep(msg.trim(), "Code not found. Check and try again?"));
+      } else ({ ns, reply, buttons } = await promoStep(msg.trim(), "Code not found. Check and try again?"));
       if (ns.step === "CONFIRM") reply += await termsNotice(requestedBusinessId);
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
     }
@@ -1470,10 +1482,24 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
           serverUnitPrice = Number(_slotData.price_per_person_override);
         }
         const discount = await bookingDiscount(requestedBusinessId, Number(ns.qty || 0));
+        // ns comes back from the browser unsigned: the promo is re-checked by its code and priced from the server's answer.
+        let promo = null;
+        if (ns.promo?.code) {
+          const pc = await checkChatPromo(db, requestedBusinessId, String(ns.promo.code), Number(ns.qty || 0) * serverUnitPrice, ns.email);
+          if (!pc.promo) {
+            const auto = verifyChatBookingPricing({ quotedTotal: -1, qty: Number(ns.qty || 0), unitPrice: serverUnitPrice, groupDiscountPercent: discount.percent, groupDiscountMinQty: 1 }).pricing;
+            ns = { ...ns, step: "ASK_VOUCHER", promo: null, vid: null, vcode: null, vded: 0, tprice: serverUnitPrice, baseTotal: auto?.baseTotal, discount: auto?.discount || 0, total: auto?.total };
+            reply = String(pc.error).replace(/\.?$/, ".") + " I've taken the promo code off. Do you have another voucher or promo code?";
+            buttons = [{ label: "No code, continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
+            return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
+          }
+          promo = pc.promo;
+        }
         const priceCheck = verifyChatBookingPricing({
+          promo,
           quotedTotal: ft,
           tolerance: 0.005,
-          groupDiscountPercent: discount.percent,
+          groupDiscountPercent: promo ? 0 : discount.percent,
           groupDiscountMinQty: 1,
           qty: Number(ns.qty || 0),
           unitPrice: serverUnitPrice,
@@ -1539,7 +1565,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         const purchaseId = await chatPurchaseId(requestedBusinessId, visitorId, ns.checkout_attempt, "BOOKING");
 
         // Persist the resolved offer so checkout uses the same discount and audit details.
-        const { data: bk, error: bookingInsertError } = await db.from("bookings").insert({ id: purchaseId, business_id: businessId, tour_id: ns.tid, slot_id: ns.slotId, customer_name: ns.name, phone: ns.phone || "", email: ns.email, qty: ns.qty, unit_price: serverUnitPrice, total_amount: ft, original_total: serverBaseTotal, discount_amount: serverDiscount, discount_type: serverDiscount > 0 ? "PERCENT" : null, discount_percent: discount.percent, discount_notes: serverDiscount > 0 ? discount.label : null, total_captured: 0, total_refunded: 0, status: "PENDING", source: "WEB_CHAT", terms_accepted_at: new Date().toISOString(), custom_fields: ns.custom_fields || {} }).select().single();
+        const { data: bk, error: bookingInsertError } = await db.from("bookings").insert({ id: purchaseId, business_id: businessId, tour_id: ns.tid, slot_id: ns.slotId, customer_name: ns.name, phone: ns.phone || "", email: ns.email, qty: ns.qty, unit_price: serverUnitPrice, total_amount: ft, original_total: serverBaseTotal, discount_amount: serverDiscount, discount_type: serverDiscount > 0 ? "PERCENT" : null, discount_percent: promo ? 0 : discount.percent, discount_notes: promo ? "Promo " + promo.code : serverDiscount > 0 ? discount.label : null, total_captured: 0, total_refunded: 0, status: "PENDING", source: "WEB_CHAT", terms_accepted_at: new Date().toISOString(), custom_fields: ns.custom_fields || {} }).select().single();
         if (bookingInsertError?.code === "23505") {
           const existingResponse = await existingChatBooking(req, businessId, purchaseId, ns, now);
           if (existingResponse) return existingResponse;
@@ -1549,7 +1575,8 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         // is the displayed evidence that the customer was told before paying.
         const confirmTerms = bk ? await termsNotice(businessId) : "";
         if (!bk) { reply = "Something went wrong. Try the Book Now page?"; ns = { step: "IDLE" }; }
-        else if (ft <= 0) {
+        // A promo code goes through checkout, which records its use.
+        else if (ft <= 0 && !promo) {
           const confirmed = await db.rpc("confirm_voucher_booking", { p_booking_id: bk.id, p_voucher_ids: ns.vid ? [ns.vid] : [] });
           if (confirmed.error || confirmed.data?.ok !== true) {
             // A transport error can arrive after the transaction committed.
@@ -1602,11 +1629,20 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
           let yd: any = null;
           let checkoutStatus = 0;
           try {
-            const yr = await fetch(SU + "/functions/v1/create-checkout", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ amount: ft, booking_id: bk.id, business_id: businessId, type: "BOOKING", voucher_ids: ns.vid ? [ns.vid] : [] }), signal: AbortSignal.timeout(25_000) });
+            const yr = await fetch(SU + "/functions/v1/create-checkout", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ amount: ft, booking_id: bk.id, business_id: businessId, type: "BOOKING", voucher_ids: ns.vid ? [ns.vid] : [], promo_code: promo?.code || null }), signal: AbortSignal.timeout(25_000) });
             checkoutStatus = yr.status;
             yd = await yr.json();
             if (!yr.ok) yd = { error: yd?.error || "Payment service unavailable" };
           } catch (error) { console.error("WEB_CHAT_CHECKOUT_ERR", error); }
+          if (yd?.fully_covered) {
+            // The promo covers it all, so checkout confirmed the booking; confirm-booking sends the email once.
+            try {
+              await fetch(SU + "/functions/v1/confirm-booking", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK, "x-tenant-business-id": businessId }, body: JSON.stringify({ booking_id: bk.id, booking_token: bk.waiver_token }) });
+            } catch (error) { console.error("WEB_CHAT_CONFIRM_BOOKING_ERR booking=" + bk.id, error); }
+            reply = "\u{1F389} You're booked!\n\nRef: " + bk.id.substring(0, 8).toUpperCase() + "\nConfirmation email on its way.\n\n\u{1F4CD} " + meetingPointText + confirmTerms;
+            ns = { step: "IDLE" };
+            return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) });
+          }
           // The checkout service persists its URL before replying. Recover it
           // when its response was lost rather than cancelling a valid checkout.
           if (!checkoutUrl(yd?.redirectUrl)) {
