@@ -11,7 +11,7 @@ import {
   sendWhatsappTextForTenant,
 } from "../_shared/tenant.ts";
 import { verifyCustomerSession } from "../_shared/customer-session.ts";
-import { getPaidPortions } from "../_shared/vouchers.ts";
+import { genVoucherCode, getPaidPortions } from "../_shared/vouchers.ts";
 import { guestNeverContacted } from "../_shared/guest-contact.ts";
 import { getComboLegPolicy, validateComboDates } from "../_shared/combo.ts";
 
@@ -28,13 +28,6 @@ function getCors(req?: any) {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Content-Type": "application/json",
   };
-}
-
-function genVoucherCode() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
-  return code;
 }
 
 // Insert a voucher with retry on unique constraint violation (code collision)

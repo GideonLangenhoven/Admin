@@ -561,7 +561,7 @@ async function hasActiveBookings(tenant: TenantContext, phone: any) {
 // ===== REFERRAL SYSTEM =====
 function genReferralCode(name: any) {
   const clean = ((name || "REF") + "").split(" ")[0].toUpperCase().substring(0, 4);
-  const rand = Math.random().toString(36).substring(2, 6).toUpperCase();
+  const rand = genVoucherCode().slice(0, 4);
   return clean + rand;
 }
 async function getOrCreateReferral(tenant: TenantContext, phone: any, name: any) {

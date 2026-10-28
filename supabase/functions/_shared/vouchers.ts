@@ -4,8 +4,7 @@
 // voucher. bookings.converted_to_voucher_id is the idempotency marker: every
 // flow that turns a booking's value into a voucher stamps it, so no booking
 // can ever be reissued twice.
-// ponytail: rebook-booking still carries local copies of genVoucherCode
-// (Math.random) and insertVoucherWithRetry, and wa-webhook of
+// ponytail: rebook-booking and wa-webhook still carry local copies of
 // insertVoucherWithRetry — fold them onto this module the next time either
 // file is open for surgery.
 

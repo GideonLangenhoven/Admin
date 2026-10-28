@@ -13,11 +13,11 @@ describe("voucher codes", () => {
     random.mockRestore();
   });
 
-  it("both bots mint codes with it", () => {
-    for (const file of ["supabase/functions/web-chat/index.ts", "supabase/functions/wa-webhook/index.ts"]) {
+  it("every function that mints a code uses it", () => {
+    for (const file of ["web-chat", "wa-webhook", "rebook-booking", "marketing-automation-dispatch"].map((f) => `supabase/functions/${f}/index.ts`)) {
       const src = readFileSync(file, "utf8");
       expect(src).toMatch(/import \{[^}]*\bgenVoucherCode\b[^}]*\} from "\.\.\/_shared\/vouchers\.ts"/);
-      expect(src).not.toMatch(/function genVoucherCode|Math\.random\(\) \* 31/);
+      expect(src).not.toMatch(/function genVoucherCode|Math\.random\(\)(\.toString\(36\)| \* (31|chars\.length))/);
     }
   });
 });

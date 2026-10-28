@@ -9,6 +9,7 @@ import { fillMarketingTokens } from "../_shared/marketing-tokens.ts";
 import { replaceLegacyMarketingSocialIcons } from "../_shared/marketing-email-html.ts";
 
 import { marketingCalendarDate } from "../_shared/marketing-calendar.ts";
+import { genVoucherCode } from "../_shared/vouchers.ts";
 import { confirmMarketingDelivery, reserveMarketingDelivery, finishMarketingDelivery, marketingDeliveryOutcome } from "../_shared/marketing-delivery.ts";
 
 const RAW_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "";
@@ -560,7 +561,7 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
             const validDays = Number(config?.valid_days) || 30;
 
             // Generate code
-            const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+            const randomPart = genVoucherCode().slice(0, 6);
             const code = prefix + "-" + randomPart;
 
             // Insert voucher into the existing vouchers table. V-13a fix:
@@ -646,7 +647,7 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
             const maxUses = config?.max_uses || 1;
 
             // Generate unique code: PREFIX-RANDOM6
-            const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase();
+            const randomPart = genVoucherCode().slice(0, 6);
             const code = prefix + "-" + randomPart;
 
             // Insert into promotions table

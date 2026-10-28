@@ -35,7 +35,7 @@ describe("voucher-aware reschedule and WA flows", () => {
 
   it("paid-portions helper lives in _shared and is imported by both consumers", () => {
     expect(shared).toContain("export function getPaidPortions(");
-    expect(fn).toContain('import { getPaidPortions } from "../_shared/vouchers.ts"');
+    expect(fn).toMatch(/import \{[^}]*\bgetPaidPortions\b[^}]*\} from "\.\.\/_shared\/vouchers\.ts"/);
     expect(wa).toMatch(/import \{[^}]*\bgetPaidPortions\b[^}]*\} from "\.\.\/_shared\/vouchers\.ts"/);
   });
 
