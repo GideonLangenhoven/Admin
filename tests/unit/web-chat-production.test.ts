@@ -379,7 +379,7 @@ describe("web chat automatic discount settings", () => {
     const result = await f.post(await f.session(), "4", { ...f.bookingState, step: "ASK_QTY", phone: "" });
     expect(result.state).toMatchObject({ qty: 4, baseTotal: 1600, discount: 192, total: 1408 });
     expect(result.reply).toContain("12% automatic discount");
-    expect(f.calls.find(call => call.name === "resolve_booking_discount")?.data).toEqual({ p_business_id: "a", p_phone: null, p_qty: 4 });
+    expect(f.calls.find(call => call.name === "resolve_booking_discount")?.data).toEqual({ p_business_id: "a", p_phone: null, p_qty: 4, p_email: null });
   });
 
   it("respects disabled offers even for six or more guests", async () => {

@@ -35,6 +35,7 @@ function loadSource(
       if (name === "../_shared/guest-contact.ts") return loadSource("supabase/functions/_shared/guest-contact.ts", {}, env, fetchImpl).exports;
       if (name === "../_shared/vouchers.ts") return loadSource("supabase/functions/_shared/vouchers.ts", {}, env, fetchImpl).exports;
       if (name === "../_shared/otp-attempts.ts") return loadSource("supabase/functions/_shared/otp-attempts.ts", {}, env, fetchImpl).exports;
+      if (name === "../_shared/customer-session.ts") return loadSource("supabase/functions/_shared/customer-session.ts", {}, env, fetchImpl).exports;
       throw new Error("Unexpected handler import: " + name);
     },
     fetch: fetchImpl,

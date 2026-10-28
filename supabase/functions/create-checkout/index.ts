@@ -13,6 +13,7 @@ import { blockIfNotTrading } from "../_shared/subscription.ts";
 import { requireAuth, canAccessBusiness } from "../_shared/auth.ts";
 import { bookingSuccessUrl } from "../_shared/booking-success.ts";
 import { withinIpRateLimit } from "../_shared/otp-attempts.ts";
+import { verifyCustomerSession } from "../_shared/customer-session.ts";
 import { applicableBookingQuestions, captureQuestionFields, questionConfigurationChanged, validateQuestionAnswers } from "../_shared/booking-custom-fields.ts";
 
 const BOOKING_SUCCESS_URL = Deno.env.get("BOOKING_SUCCESS_URL") || "";
@@ -177,6 +178,15 @@ Deno.serve(withSentry("create-checkout", async (req: any) => {
     let promoId: string | null = null;
     let appliedPromoCode = "";
     if (type === "BOOKING" && bookingId) {
+      // A guest who proved their email (the emailed My Bookings code) gets their
+      // returning-guest discount; the RPC re-checks the booking is theirs and unpriced.
+      if (body.customer_session && checkoutBooking) {
+        const customer = await verifyCustomerSession(String(body.customer_session));
+        if (customer.valid && customer.email && customer.businessId === checkoutBooking.business_id) {
+          const loyal = await supabase.rpc("apply_verified_booking_discount", { p_booking_id: bookingId, p_email: customer.email });
+          if (loyal.error) console.error("VERIFIED_DISCOUNT_ERR", loyal.error.message);
+        }
+      }
       const priced = await supabase.rpc("prepare_booking_checkout", {
         p_booking_id: bookingId, p_promo_code: body.promo_code ?? null,
         p_voucher_ids: body.voucher_ids ?? null, p_voucher_codes: body.voucher_codes ?? null,
