@@ -1590,13 +1590,13 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
           });
           if (holdRes.error || holdRes.data?.success !== true) {
             // Hold failed — the booking was never real; delete instead of leaving a junk CANCELLED row
-            await db.from("bookings").delete().eq("id", bk.id);
+            await db.from("bookings").delete().eq("id", bk.id).eq("business_id", businessId);
             reply = holdRes.data?.error || "Sorry, those spots were just taken! Please try another time slot.";
             ns = { step: "IDLE" };
             return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons, paymentUrl: pay }), { status: 200, headers: gCors(req) });
           }
           paymentExpiresAt = Number.isFinite(Date.parse(holdRes.data.expires_at)) ? holdRes.data.expires_at : holdExpiry;
-          await db.from("bookings").update({ status: "HELD" }).eq("id", bk.id);
+          await db.from("bookings").update({ status: "HELD" }).eq("id", bk.id).eq("business_id", businessId);
           const bookingUrls = await getBusinessSiteUrls(businessId);
           let yd: any = null;
           let checkoutStatus = 0;
@@ -2004,7 +2004,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
             const { data: saved } = await db.from("vouchers").select("payment_url,yoco_checkout_id").eq("id", gv.id).eq("business_id", requestedBusinessId).maybeSingle();
             if (checkoutUrl(saved?.payment_url)) gyd = { redirectUrl: saved.payment_url, id: saved.yoco_checkout_id };
           }
-          if (checkoutUrl(gyd?.redirectUrl)) { await db.from("vouchers").update({ yoco_checkout_id: gyd.id, payment_url: gyd.redirectUrl }).eq("id", gv.id); pay = checkoutUrl(gyd.redirectUrl); reply = "\ud83c\udf81 Voucher created! Click below to pay " + rands(ns.gtprice) + ".\n\nOnce paid, we\u2019ll email the voucher to " + ns.gbuyeremail + " \u2709\ufe0f"; }
+          if (checkoutUrl(gyd?.redirectUrl)) { await db.from("vouchers").update({ yoco_checkout_id: gyd.id, payment_url: gyd.redirectUrl }).eq("id", gv.id).eq("business_id", requestedBusinessId); pay = checkoutUrl(gyd.redirectUrl); reply = "\ud83c\udf81 Voucher created! Click below to pay " + rands(ns.gtprice) + ".\n\nOnce paid, we\u2019ll email the voucher to " + ns.gbuyeremail + " \u2709\ufe0f"; }
           else {
             const { error: cleanupError } = await db.from("vouchers").delete().eq("id", gv.id).eq("business_id", requestedBusinessId).eq("status", "PENDING");
             if (cleanupError) console.error("WEB_CHAT_GIFT_CLEANUP_ERR", cleanupError);

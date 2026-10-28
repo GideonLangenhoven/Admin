@@ -1171,7 +1171,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         if (lastIn?.id) {
           await supabase.from("chat_messages")
             .update({ bot_skipped_reason: botGate.reason })
-            .eq("id", lastIn.id);
+            .eq("id", lastIn.id).eq("business_id", tenant.business.id);
         }
       } catch { /* non-critical */ }
       return;
@@ -1359,7 +1359,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // Check intent (skip if rid already set from button click)
       const intent = rid ? null : await detectIntent(tenant, input, phone);
       if (intent && inboundMsgId) {
-        await supabase.from("chat_messages").update({ intent: intent, auto_replied: true }).eq("id", inboundMsgId);
+        await supabase.from("chat_messages").update({ intent: intent, auto_replied: true }).eq("id", inboundMsgId).eq("business_id", tenant.business.id);
       }
       if (intent === "THANKS" && !rid) {
         if (WA_BOT_V2 === "on") {
@@ -2231,8 +2231,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         p_qty: verifiedSd.qty,
         p_expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       });
-      if (holdRes.error || !holdRes.data?.success) { await supabase.from("bookings").delete().eq("id", booking.id); await sendText(tenant, phone, holdRes.data?.error || "Sorry, those spots were just taken! Please try another time slot."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
-      await supabase.from("bookings").update({ status: "HELD" }).eq("id", booking.id);
+      if (holdRes.error || !holdRes.data?.success) { await supabase.from("bookings").delete().eq("id", booking.id).eq("business_id", tenant.business.id); await sendText(tenant, phone, holdRes.data?.error || "Sorry, those spots were just taken! Please try another time slot."); await setConvo(convo.id, { current_state: "IDLE", state_data: {} }); return; }
+      await supabase.from("bookings").update({ status: "HELD" }).eq("id", booking.id).eq("business_id", tenant.business.id);
       await logE(tenant, "hold_created", { booking_id: booking.id }, booking.id);
 
       const yocoData = await requestCheckout({
@@ -2788,7 +2788,7 @@ async function processWhatsappValue(tenant: TenantContext, value: any, message: 
             if (!original || original.status === "FAILED") continue;
             await supabase.from("wa_messages")
               .update({ status: "FAILED", error: errCode + ": " + errMsg })
-              .eq("id", original.id);
+              .eq("id", original.id).eq("business_id", tenant.business.id);
             const windowClosed = errCode === 131047 || errCode === 131026;
             // Only recover free-form text. A failed TEMPLATE send must never
             // trigger another template — that would loop.
