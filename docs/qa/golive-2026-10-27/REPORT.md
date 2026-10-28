@@ -384,8 +384,8 @@ Found but not fixed (pre-existing):
 
 The owner asked for both bots to be production-ready. The work is 42 commits on
 the admin repo's `golive/bot-review-2026-10-28` (6392443..5f270b6) and one on
-the booking repo's branch of the same name (c4a2859). Every fix has a
-regression test that fails without it. There are no migrations, and the
+the booking repo's branch of the same name (c4a2859). Every P1 and P2 fix has a
+regression test that fails without it; one P3 copy change (6f6d155) has none. There are no migrations, and the
 security baseline is unchanged.
 
 **P1 (12)**
