@@ -478,6 +478,10 @@ security baseline is unchanged.
     onboarding-wizard and send-otp, which import `_shared/otp-attempts.ts`.
 - **Admin app:** the Data Requests fulfil route.
 - **Booking app:** ChatWidget.
+- **Baseline.** The branch merges `deploy-2026-10-28-3` (email wording,
+  deployed by a parallel session; ae8c7c3), so the admin deploy keeps it. The
+  production drift check matches the baseline: 1429 grants, 108 tables and
+  244 policies.
 
 Open, needing an owner decision or a migration:
 
