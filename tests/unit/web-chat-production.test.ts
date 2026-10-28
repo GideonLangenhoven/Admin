@@ -422,3 +422,16 @@ describe("web chat automatic discount settings", () => {
     }
   });
 });
+
+describe("web chat booking copy", () => {
+  it("a one-guest booking reads 1 person, with no em dashes", async () => {
+    const f = webChatFixture();
+    const token = await f.session();
+    const quote = await f.post(token, "1", { ...f.bookingState, step: "ASK_QTY", name: "", email: "", phone: "" });
+    const details = await f.post(token, "Fixture Guest, guest@fixture.invalid, +27110000000", quote.state);
+    const summary = await f.post(token, "btn:no_voucher", details.state);
+    const seen = [quote, details, summary].map(r => r.reply + JSON.stringify(r.buttons || [])).join("\n");
+    expect(summary.reply).toContain("1 person");
+    expect(seen).not.toMatch(/people|—/);
+  });
+});

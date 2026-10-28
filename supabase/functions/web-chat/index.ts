@@ -220,7 +220,7 @@ function nextCustomField(defs, values) {
 }
 function promptForCustomField(field) {
   if (!field) return "Please share the next booking detail.";
-  return field.label + (field.required ? " (required)" : " (optional — say skip)") + (field.placeholder ? "\n" + field.placeholder : "");
+  return field.label + (field.required ? " (required)" : " (optional, or say skip)") + (field.placeholder ? "\n" + field.placeholder : "");
 }
 function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
 function parseChatTime(text: string): string | null {
@@ -609,7 +609,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
     function availabilityReplyForDate(openSlots, requestedKey, label) {
       const matching = openSlots.filter(function (slot) { return dateKey(slot.start_time) === requestedKey; });
       if (matching.length > 0) {
-        return "Yes — here's what's available " + label + ":\n\n" + matching.slice(0, 8).map(function (slot) {
+        return "Yes, here's what's available " + label + ":\n\n" + matching.slice(0, 8).map(function (slot) {
           return "• " + (slot.tour_name || "Trip") + " at " + fmtTime(slot.start_time) + " (" + Number(slot.available_capacity || 0) + " spots)";
         }).join("\n");
       }
@@ -1019,7 +1019,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         else { buttons = gbTours.map(tourBtn); reply = "Which tour are you keen on?"; }
       } else if (prevStep === "ASK_VOUCHER") {
         reply = "Do you have a voucher or promo code?";
-        buttons = [{ label: "No voucher \u2014 continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
+        buttons = [{ label: "No voucher, continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
       } else if (prevStep === "PICK_DATE" || prevStep === "PICK_TIME") {
         const backSlots = await getSlots(requestedBusinessId, ns.tid, now);
         if (prevStep === "PICK_TIME") {
@@ -1223,7 +1223,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
             calendar = Object.values(days);
           } else buttons = [...choices.filter((slot) => dateKey(slot.start_time) === ns.selectedDate).map((slot) => ({ label: fmtTime(slot.start_time) + " (" + slot.available_capacity + " spots)", value: slot.id })), ...buttons];
         }
-        if (step === "ASK_VOUCHER") buttons = [{ label: "No voucher — continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }, ...buttons];
+        if (step === "ASK_VOUCHER") buttons = [{ label: "No voucher, continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }, ...buttons];
         if (step === "ENTER_VOUCHER") buttons = [{ label: "Continue without a voucher", value: "no_voucher" }, ...buttons];
         if (step === "CONFIRM") buttons = [{ label: "Confirm" + (ns.total > 0 ? " & Pay R" + ns.total : " (FREE)"), value: "confirm" }, { label: "Cancel", value: "cancel_booking" }, ...buttons];
         if (step === "GIFT_CONFIRM") buttons = [{ label: "Purchase R" + ns.gtprice, value: "gift_confirm" }, { label: "Cancel", value: "cancel_booking" }, ...buttons];
@@ -1341,7 +1341,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         buttons = null;
       } else {
         ns = { ...ns, step: "ASK_VOUCHER", name: dName, email: dEmail, phone: dPhone };
-        reply = "Thanks " + dName.split(" ")[0] + "! \u{1F44D} Do you have a voucher or promo code?"; buttons = [{ label: "No voucher \u2014 continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
+        reply = "Thanks " + dName.split(" ")[0] + "! \u{1F44D} Do you have a voucher or promo code?"; buttons = [{ label: "No voucher, continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
       }
       if (priceChanged) reply = "Your total is R" + pricing.total + (pricing.discount > 0 ? " (" + discount.percent + "% automatic discount, R" + pricing.discount + " saved)" : "") + ".\n\n" + reply;
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
@@ -1355,7 +1355,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
       if (!currentField) {
         ns = { ...ns, step: "ASK_VOUCHER" };
         reply = "Perfect. Do you have a voucher or promo code?";
-        buttons = [{ label: "No voucher \u2014 continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
+        buttons = [{ label: "No voucher, continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
         return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
       }
       const skipping = /^(?:skip|prefer not to say)[.!]*$/i.test(msg.trim());
@@ -1376,14 +1376,14 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
       } else {
         ns.step = "ASK_VOUCHER";
         reply = "Perfect. Do you have a voucher or promo code?";
-        buttons = [{ label: "No voucher \u2014 continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
+        buttons = [{ label: "No voucher, continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
       }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
     }
     if (step === "ASK_VOUCHER") {
       if (btnVal === "no_voucher" || (!isBtnClick && skipsVoucher(msg))) {
         ns = { ...ns, step: "CONFIRM", vid: null, vcode: null, vded: 0, total: Number(ns.baseTotal ?? ns.qty * ns.tprice) - Number(ns.discount || 0) };
-        reply = "Here's your booking summary:\n\n🛶 " + ns.tname + "\n📅 " + fmt(ns.slotTime) + "\n👥 " + ns.qty + " people\n💰 R" + ns.total + "\n\nLook good?";
+        reply = "Here's your booking summary:\n\n🛶 " + ns.tname + "\n📅 " + fmt(ns.slotTime) + "\n👥 " + ns.qty + " " + pl(ns.qty, "person", "people") + "\n💰 R" + ns.total + "\n\nLook good?";
         buttons = [{ label: "✅ Confirm" + (ns.total > 0 ? " & Pay R" + ns.total : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }];
       } else if (btnVal === "has_voucher") { ns.step = "ENTER_VOUCHER"; reply = "Type your 8-character voucher code:"; }
       else {
@@ -1391,7 +1391,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         if (vc.length === 8) {
           // C2: Filter vouchers by business_id to prevent cross-tenant usage
           const { data: vd } = await db.from("vouchers").select("*").eq("code", vc).eq("business_id", requestedBusinessId).single();
-          if (vd && vd.status === "ACTIVE" && (!vd.expires_at || new Date(vd.expires_at).getTime() > now.getTime())) { const subtotal = Math.max(0, Number(ns.baseTotal ?? ns.qty * ns.tprice) - Number(ns.discount || 0)); const vv = Number(vd.current_balance ?? vd.value ?? vd.purchase_amount ?? 0); let dd = vv; if (vd.type === "FREE_TRIP") { const ftPax = Math.min(vd.pax_limit || 1, ns.qty); const ftSlotCost = ns.tprice * ftPax; const ftPurchaseVal = Number(vd.purchase_value || vd.purchase_amount || vd.value || 0); if (ftSlotCost > ftPurchaseVal) { dd = Math.min(ftPurchaseVal, subtotal); } else { dd = Math.min(vv, ftSlotCost, subtotal); } } else { dd = Math.min(vv, subtotal); } const nt = Math.max(0, subtotal - dd); ns = { ...ns, step: "CONFIRM", vcode: vc, vid: vd.id, vded: dd, total: nt, vtype: vd.type, vpaxlimit: vd.pax_limit || 1, vpurchasevalue: Number(vd.purchase_value || vd.purchase_amount || vd.value || 0) }; reply = "🎉 Voucher applied! R" + dd + " off." + (nt > 0 ? " New total: R" + nt : " It's completely FREE!") + "\n\n🛶 " + ns.tname + "\n📅 " + fmt(ns.slotTime) + "\n👥 " + ns.qty + " people\n💰 " + (nt > 0 ? "R" + nt : "FREE"); buttons = [{ label: "✅ Confirm" + (nt > 0 ? " & Pay R" + nt : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
+          if (vd && vd.status === "ACTIVE" && (!vd.expires_at || new Date(vd.expires_at).getTime() > now.getTime())) { const subtotal = Math.max(0, Number(ns.baseTotal ?? ns.qty * ns.tprice) - Number(ns.discount || 0)); const vv = Number(vd.current_balance ?? vd.value ?? vd.purchase_amount ?? 0); let dd = vv; if (vd.type === "FREE_TRIP") { const ftPax = Math.min(vd.pax_limit || 1, ns.qty); const ftSlotCost = ns.tprice * ftPax; const ftPurchaseVal = Number(vd.purchase_value || vd.purchase_amount || vd.value || 0); if (ftSlotCost > ftPurchaseVal) { dd = Math.min(ftPurchaseVal, subtotal); } else { dd = Math.min(vv, ftSlotCost, subtotal); } } else { dd = Math.min(vv, subtotal); } const nt = Math.max(0, subtotal - dd); ns = { ...ns, step: "CONFIRM", vcode: vc, vid: vd.id, vded: dd, total: nt, vtype: vd.type, vpaxlimit: vd.pax_limit || 1, vpurchasevalue: Number(vd.purchase_value || vd.purchase_amount || vd.value || 0) }; reply = "🎉 Voucher applied! R" + dd + " off." + (nt > 0 ? " New total: R" + nt : " It's completely FREE!") + "\n\n🛶 " + ns.tname + "\n📅 " + fmt(ns.slotTime) + "\n👥 " + ns.qty + " " + pl(ns.qty, "person", "people") + "\n💰 " + (nt > 0 ? "R" + nt : "FREE"); buttons = [{ label: "✅ Confirm" + (nt > 0 ? " & Pay R" + nt : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
           else if (vd && vd.status === "REDEEMED") { reply = "That voucher's already been used. Got another?"; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
           else { reply = "Can't find that code. Double-check it?"; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
         } else { reply = "Voucher codes are 8 characters. Try again?"; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
@@ -1401,7 +1401,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
     // ===== ENTER_VOUCHER =====
     if (step === "ENTER_VOUCHER") {
       const noVc = btnVal === "no_voucher" || (!isBtnClick && skipsVoucher(msg));
-      if (noVc) { ns = { ...ns, step: "CONFIRM", vid: null, vcode: null, vded: 0, total: Number(ns.baseTotal ?? ns.qty * ns.tprice) - Number(ns.discount || 0) }; reply = "No problem! Here's your booking summary:\n\n" + ns.tname + "\n" + ns.qty + " people \u2022 R" + ns.total + "\n\nReady to confirm?"; buttons = [{ label: "\u2705 Confirm & Pay R" + ns.total, value: "confirm" }, { label: "\u274C Cancel", value: "cancel_booking" }]; return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
+      if (noVc) { ns = { ...ns, step: "CONFIRM", vid: null, vcode: null, vded: 0, total: Number(ns.baseTotal ?? ns.qty * ns.tprice) - Number(ns.discount || 0) }; reply = "No problem! Here's your booking summary:\n\n" + ns.tname + "\n" + ns.qty + " " + pl(ns.qty, "person", "people") + " \u2022 R" + ns.total + "\n\nReady to confirm?"; buttons = [{ label: "\u2705 Confirm & Pay R" + ns.total, value: "confirm" }, { label: "\u274C Cancel", value: "cancel_booking" }]; return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
       const vc2 = msg.toUpperCase().replace(/\s/g, "");
       if (vc2.length === 8) {
         // C2: Filter vouchers by business_id to prevent cross-tenant usage
@@ -1409,7 +1409,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         if (vd2 && vd2.status === "ACTIVE" && (!vd2.expires_at || new Date(vd2.expires_at).getTime() > now.getTime())) { const subtotal = Math.max(0, Number(ns.baseTotal ?? ns.qty * ns.tprice) - Number(ns.discount || 0)); const vv2 = Number(vd2.current_balance ?? vd2.value ?? vd2.purchase_amount ?? 0); let dd2 = vv2; if (vd2.type === "FREE_TRIP") { const ft2Pax = Math.min(vd2.pax_limit || 1, ns.qty); const ft2SlotCost = ns.tprice * ft2Pax; const ft2PurchaseVal = Number(vd2.purchase_value || vd2.purchase_amount || vd2.value || 0); if (ft2SlotCost > ft2PurchaseVal) { dd2 = Math.min(ft2PurchaseVal, subtotal); } else { dd2 = Math.min(vv2, ft2SlotCost, subtotal); } } else { dd2 = Math.min(vv2, subtotal); } const nt2 = Math.max(0, subtotal - dd2); ns = { ...ns, step: "CONFIRM", vcode: vc2, vid: vd2.id, vded: dd2, total: nt2, vtype: vd2.type, vpaxlimit: vd2.pax_limit || 1, vpurchasevalue: Number(vd2.purchase_value || vd2.purchase_amount || vd2.value || 0) }; reply = "🎉 R" + dd2 + " off!" + (nt2 > 0 ? " Total now R" + nt2 : " FREE!") + "\n\nReady to confirm?"; buttons = [{ label: "✅ Confirm" + (nt2 > 0 ? " & Pay R" + nt2 : " (FREE)"), value: "confirm" }, { label: "❌ Cancel", value: "cancel_booking" }]; }
         else if (vd2 && vd2.status === "REDEEMED") { reply = "Already used. Got another?"; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
         else { reply = "Code not found. Check and try again?"; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
-      } else { reply = "That doesn't look like a voucher code. Want to continue without one?"; buttons = [{ label: "No voucher \u2014 continue", value: "no_voucher" }, { label: "Try again", value: "btn:yes_voucher" }]; }
+      } else { reply = "That doesn't look like a voucher code. Want to continue without one?"; buttons = [{ label: "No voucher, continue", value: "no_voucher" }, { label: "Try again", value: "btn:yes_voucher" }]; }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
     }
     // ===== CONFIRM =====
@@ -1491,13 +1491,13 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
           if (!_voucherRecheck || _voucherRecheck.status !== "ACTIVE" || (_voucherRecheck.expires_at && new Date(_voucherRecheck.expires_at).getTime() <= now.getTime())) {
             reply = "Sorry, your voucher is no longer valid. Please try again without a voucher.";
             ns = { ...ns, step: "ASK_VOUCHER", vid: null, vcode: null, vded: 0, total: serverBaseTotal - serverDiscount };
-            buttons = [{ label: "No voucher \u2014 continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
+            buttons = [{ label: "No voucher, continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
             return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
           }
           if (Number(_voucherRecheck.current_balance) < serverVded) {
             reply = "Sorry, the voucher balance has changed. Please try applying your voucher again.";
             ns = { ...ns, step: "ASK_VOUCHER", vid: null, vcode: null, vded: 0, total: serverBaseTotal - serverDiscount };
-            buttons = [{ label: "No voucher \u2014 continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
+            buttons = [{ label: "No voucher, continue", value: "no_voucher" }, { label: "Yes, I have a code", value: "has_voucher" }];
             return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
           }
         }
@@ -1523,7 +1523,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         ns.custom_fields = questions.length ? captureQuestionFields(questions, answers.answers, requestedBusinessId, ns.tid) : {};
         if (typeof ns.checkout_attempt !== "string" || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(ns.checkout_attempt)) {
           ns.checkout_attempt = crypto.randomUUID();
-          return new Response(JSON.stringify({ reply: "Please confirm your booking for " + ns.qty + " people at R" + ft + ".", state: ns, buttons: [{ label: "Confirm & Pay R" + ft, value: "confirm" }, { label: "Cancel", value: "cancel_booking" }] }), { status: 200, headers: gCors(req) });
+          return new Response(JSON.stringify({ reply: "Please confirm your booking for " + ns.qty + " " + pl(ns.qty, "person", "people") + " at R" + ft + ".", state: ns, buttons: [{ label: "Confirm & Pay R" + ft, value: "confirm" }, { label: "Cancel", value: "cancel_booking" }] }), { status: 200, headers: gCors(req) });
         }
         const purchaseId = await chatPurchaseId(requestedBusinessId, visitorId, ns.checkout_attempt, "BOOKING");
 
@@ -1568,8 +1568,8 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
           // L1: Use dynamic meeting point instead of hardcoded address
           const wcLoc = requestTenant?.business?.location_phrase; const wcWtb = requestTenant?.business?.what_to_bring;
           // Email above is the canonical confirmation; WhatsApp only when no email on file.
-          if (ns.phone && !ns.email) { try { await fetch(SU + "/functions/v1/send-whatsapp-text", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ to: ns.phone, message: "\u{1F389} *Booking Confirmed!*\n\n\u{1F4CB} Ref: " + vRef + "\n\u{1F6F6} " + ns.tname + "\n\u{1F4C5} " + fmtS(ns.slotTime) + "\n\u{1F465} " + ns.qty + " people\n\u{1F39F} Paid with voucher\n" + (waiverLink ? "\n\u{1F4DD} Waiver: " + waiverLink + "\n" : "\n") + "\n\u{1F4CD} *Meeting Point:*\n" + meetingPointText + "\nArrive 15 min early\n" + (wcWtb ? "\n\u{1F392} *Bring:* " + wcWtb + "\n" : "") + "\n" + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!") }) }); } catch (e) { console.log("webchat voucher wa err"); } }
-          reply = "\u{1F389} You're booked!\n\nRef: " + vRef + (confirmationEmailSent ? "\nConfirmation email on its way." : "\nYour booking is confirmed, but we couldn't send the email. Check My Bookings below or ask our team for a copy.") + "\n\n\u{1F4CD} " + meetingPointText + " \u2014 arrive 15 min early. " + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!") + termsNotice; ns = { step: "IDLE" };
+          if (ns.phone && !ns.email) { try { await fetch(SU + "/functions/v1/send-whatsapp-text", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ to: ns.phone, message: "\u{1F389} *Booking Confirmed!*\n\n\u{1F4CB} Ref: " + vRef + "\n\u{1F6F6} " + ns.tname + "\n\u{1F4C5} " + fmtS(ns.slotTime) + "\n\u{1F465} " + ns.qty + " " + pl(ns.qty, "person", "people") + "\n\u{1F39F} Paid with voucher\n" + (waiverLink ? "\n\u{1F4DD} Waiver: " + waiverLink + "\n" : "\n") + "\n\u{1F4CD} *Meeting Point:*\n" + meetingPointText + "\nArrive 15 min early\n" + (wcWtb ? "\n\u{1F392} *Bring:* " + wcWtb + "\n" : "") + "\n" + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!") }) }); } catch (e) { console.log("webchat voucher wa err"); } }
+          reply = "\u{1F389} You're booked!\n\nRef: " + vRef + (confirmationEmailSent ? "\nConfirmation email on its way." : "\nYour booking is confirmed, but we couldn't send the email. Check My Bookings below or ask our team for a copy.") + "\n\n\u{1F4CD} " + meetingPointText + "\nPlease arrive 15 minutes early. " + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!") + termsNotice; ns = { step: "IDLE" };
         } else {
           // Atomic capacity check + hold creation to prevent overbooking
           const holdExpiry = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
@@ -1661,7 +1661,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
             const bSlot: any = Array.isArray(b.slots) ? b.slots[0] : b.slots;
             const bTour: any = Array.isArray(b.tours) ? b.tours[0] : b.tours;
             const bTime = bSlot?.start_time ? fmtS(bSlot.start_time) : "?";
-            reply += (bTour?.name || "Tour") + " \u2014 " + bTime + "\n" + b.qty + " people \u2014 " + b.status + "\nRef: " + bRef + "\n\n";
+            reply += (bTour?.name || "Tour") + ", " + bTime + "\n" + b.qty + " " + pl(b.qty, "person", "people") + ", " + b.status + "\nRef: " + bRef + "\n\n";
           }
           reply += "What would you like to do with your booking?";
           // M2: Show comprehensive action buttons based on booking timing
@@ -1724,7 +1724,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         } catch { /* An unavailable policy needs operator review. */ }
         if (cnPct !== null && cnPct > 0) {
           const refAmt = Math.round(b.total_amount * (cnPct / 100) * 100) / 100;
-          reply = "Cancel your booking for " + b.qty + " people? The policy currently allows a " + cnPct + "% refund. The final amount is checked when you confirm.";
+          reply = "Cancel your booking for " + b.qty + " " + pl(b.qty, "person", "people") + "? The policy currently allows a " + cnPct + "% refund. The final amount is checked when you confirm.";
           buttons = [{ label: "✅ Yes, Cancel", value: "btn:confirm_cancel" }, { label: "No, keep it", value: "btn:cancel_action" }];
           ns = { ...ns, step: "CONFIRM_CANCEL", booking_id: b.id, qty: b.qty, refund: refAmt, hours: hrs, slot_id: b.slot_id };
         } else {
@@ -1742,11 +1742,11 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
           // 12-24h: can only add, not remove
           const { data: mqSc } = await db.rpc("slot_available_capacity", { p_slot_id: b.slot_id });
           ns = { ...ns, step: "MODIFY_QTY", booking_id: b.id, slot_id: b.slot_id, current_qty: b.qty, unit_price: b.total_amount / b.qty, max_avail: b.qty + Number(mqSc || 0), hours_before: hrs, add_only: true };
-          reply = "Your booking currently has " + b.qty + " people. You can add more guests (removal not available within 24 hours). How many total?";
+          reply = "Your booking currently has " + b.qty + " " + pl(b.qty, "person", "people") + ". You can add more guests (removal not available within 24 hours). How many total?";
         } else {
           const { data: mqSc2 } = await db.rpc("slot_available_capacity", { p_slot_id: b.slot_id });
           ns = { ...ns, step: "MODIFY_QTY", booking_id: b.id, slot_id: b.slot_id, current_qty: b.qty, unit_price: b.total_amount / b.qty, max_avail: b.qty + Number(mqSc2 || 0), hours_before: hrs, add_only: false };
-          reply = "Your booking currently has " + b.qty + " people. How many should it be?";
+          reply = "Your booking currently has " + b.qty + " " + pl(b.qty, "person", "people") + ". How many should it be?";
         }
       }
       else if (act.includes("update") && act.includes("name") || act.includes("change") && act.includes("name")) {
@@ -1853,7 +1853,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
       if (newQ === ns.current_qty) { reply = "That\u2019s the same! No changes needed \u{1F60A}"; ns = { step: "IDLE" }; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
       if (ns.hours_before < 12) { reply = "Guest changes within 12 hours need the operator's help. Please contact the team."; return new Response(JSON.stringify({ reply, state: { step: "IDLE" } }), { status: 200, headers: gCors(req) }); }
       // M2: Enforce add-only restriction within 12-24h window
-      if (ns.add_only && newQ < ns.current_qty) { reply = "Within 24 hours of the trip, you can only add guests, not remove them. Current: " + ns.current_qty + " people."; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
+      if (ns.add_only && newQ < ns.current_qty) { reply = "Within 24 hours of the trip, you can only add guests, not remove them. Current: " + ns.current_qty + " " + pl(ns.current_qty, "person", "people") + "."; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
       const adding = newQ > ns.current_qty;
       const { data: change, error: changeError } = await db.functions.invoke("rebook-booking", {
         body: { booking_id: ns.booking_id, action: adding ? "ADD_GUESTS" : "REMOVE_GUESTS", new_qty: newQ,
@@ -1863,10 +1863,10 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         reply = change?.error || "We couldn't change the guest count. Please try again or contact the operator.";
       } else if (adding && Number(change.diff) > 0) {
         pay = checkoutUrl(change.payment_url);
-        reply = pay ? "Pay the extra R" + Number(change.diff) + " to confirm " + newQ + " people. Your current guest count stays unchanged until payment."
+        reply = pay ? "Pay the extra R" + Number(change.diff) + " to confirm " + newQ + " " + pl(newQ, "person", "people") + ". Your current guest count stays unchanged until payment."
           : "We couldn't create the payment link. Your current guest count is unchanged; please try My Bookings or contact the operator.";
       } else {
-        reply = "Updated to " + newQ + " people!" + (!adding ? " Check My Bookings for refund or credit details." : "");
+        reply = "Updated to " + newQ + " " + pl(newQ, "person", "people") + "!" + (!adding ? " Check My Bookings for refund or credit details." : "");
       }
       ns = { step: "IDLE" }; return new Response(JSON.stringify({ reply: reply, state: ns, paymentUrl: pay, paymentExpiresAt: pay && Number.isFinite(Date.parse(change.hold_expires_at)) ? change.hold_expires_at : null }), { status: 200, headers: gCors(req) });
     }
@@ -1912,8 +1912,8 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         const matches = tours.filter((tour) => tour.name.toLowerCase() === requestedName || tour.name.toLowerCase().includes(requestedName));
         if (requestedName && matches.length === 1) gPicked = matches[0];
       }
-      if (gPicked) { ns = { step: "GIFT_RECIPIENT", checkout_attempt: crypto.randomUUID(), gtid: gPicked.id, gtname: gPicked.name, gtprice: gPicked.base_price_per_person, gbid: gPicked.business_id }; reply = "" + gPicked.name + " voucher (R" + gPicked.base_price_per_person + ") \u2014 great choice! Who is it for? (Their name)"; }
-      else { reply = "Which tour? " + tours.map(function(t) { return t.name; }).join(" or ") + "?"; buttons = tours.map(function (gt2) { return { label: gt2.name + " \u2014 R" + gt2.base_price_per_person, value: gt2.id }; }); }
+      if (gPicked) { ns = { step: "GIFT_RECIPIENT", checkout_attempt: crypto.randomUUID(), gtid: gPicked.id, gtname: gPicked.name, gtprice: gPicked.base_price_per_person, gbid: gPicked.business_id }; reply = "" + gPicked.name + " voucher (R" + gPicked.base_price_per_person + "). Great choice! Who is it for? (Their name)"; }
+      else { reply = "Which tour? " + tours.map(function(t) { return t.name; }).join(" or ") + "?"; buttons = tours.map(function (gt2) { return { label: gt2.name + ": R" + gt2.base_price_per_person, value: gt2.id }; }); }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
     }
     if (step === "GIFT_RECIPIENT") {
@@ -1938,7 +1938,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         ns = { ...ns, step: "GIFT_CONFIRM", gbuyeremail: gem[0] };
         reply = "Here\u2019s the voucher summary:\n\n\ud83c\udf81 " + ns.gtname + " Voucher\n\ud83d\udc64 For: " + ns.grecipient + "\n" + (ns.gmessage ? "\ud83d\udcac \"" + ns.gmessage + "\"\n" : "") + "\ud83d\udcb0 R" + ns.gtprice + "\n\nReady to purchase?";
         buttons = [{ label: "\u2705 Purchase R" + ns.gtprice, value: "gift_confirm" }, { label: "\u274c Cancel", value: "cancel_booking" }];
-      } else { reply = "That doesn\u2019t look right \u2014 try your email again?"; }
+      } else { reply = "That doesn\u2019t look like an email address. Please try again."; }
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
     }
     if (step === "GIFT_CONFIRM") {
@@ -1950,7 +1950,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         }
         if (Number(ns.gtprice) !== giftPrice || ns.gtname !== giftTour.name) {
           return new Response(JSON.stringify({
-            reply: "Please confirm the current gift voucher price: " + giftTour.name + " — R" + giftPrice + ".",
+            reply: "Please confirm the current gift voucher price for " + giftTour.name + ": R" + giftPrice + ".",
             state: { ...ns, gtprice: giftPrice, gtname: giftTour.name },
             buttons: [{ label: "✅ Purchase R" + giftPrice, value: "gift_confirm" }, { label: "❌ Cancel", value: "cancel_booking" }],
           }), { status: 200, headers: gCors(req) });
