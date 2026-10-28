@@ -430,6 +430,16 @@ describe("web chat automatic discount settings", () => {
 });
 
 describe("web chat booking copy", () => {
+  it("asks for a voucher only, and points a promo code to the website", async () => {
+    const f = webChatFixture();
+    const token = await f.session();
+    const details = await f.post(token, "Fixture Guest, guest@fixture.invalid, +27110000000", { ...f.bookingState, step: "ASK_DETAILS" });
+    expect(details.reply).toContain("Do you have a voucher code?");
+    const promo = await f.post(token, "PROMO-AB12CD", details.state);
+    expect(promo.state.step).toBe("ASK_VOUCHER");
+    expect(promo.reply).toContain("Promo codes can be used when you book on our website.");
+  });
+
   it("shows the Terms on the summary, before the guest taps Confirm", async () => {
     // A voucher-paid booking completes on that tap; the notice used to arrive afterwards.
     const f = webChatFixture();
