@@ -361,8 +361,25 @@ async function sendWA(tenant: TenantContext, to: any, body: any) {
   return data;
 }
 async function sendText(tenant: TenantContext, to: any, t: any) { return sendWA(tenant, to, { type: "text", text: { body: t } }); }
+// Meta rejects an interactive message that breaks its limits and the guest
+// gets nothing, so the helpers enforce them for every caller. Lengths count
+// UTF-16 units (the stricter reading) and never split an emoji.
+function clip(text: any, max: number) {
+  const s = String(text ?? "").trim();
+  if (s.length <= max) return s;
+  let out = "";
+  for (const ch of s) { if (out.length + ch.length > max - 1) break; out += ch; }
+  return out.trimEnd() + "\u2026";
+}
+// An interactive body holds 1024 characters; a longer one goes out as text first.
+async function interactiveBody(tenant: TenantContext, to: any, text: any, short: string) {
+  if (String(text).length <= 1024) return text;
+  await sendText(tenant, to, text);
+  return short;
+}
 async function sendButtons(tenant: TenantContext, to: any, bt: any, btns: any) {
-  return sendWA(tenant, to, { type: "interactive", interactive: { type: "button", body: { text: bt }, action: { buttons: btns.map(function (b: any) { return { type: "reply", reply: { id: b.id, title: b.title.substring(0, 20) } }; }) } } });
+  const body = await interactiveBody(tenant, to, bt, "Choose an option:");
+  return sendWA(tenant, to, { type: "interactive", interactive: { type: "button", body: { text: body }, action: { buttons: btns.slice(0, 3).map(function (b: any) { return { type: "reply", reply: { id: b.id, title: clip(b.title, 20) } }; }) } } });
 }
 async function askBookingWhatsappConsent(tenant: TenantContext, phone: string, repeat = false) {
   const operator = getBusinessDisplayName(tenant.business);
@@ -372,7 +389,14 @@ async function askBookingWhatsappConsent(tenant: TenantContext, phone: string, r
   return sendButtons(tenant, phone, prompt, [{ id: "WA_UPDATES_YES", title: "Yes, send updates" }, { id: "WA_UPDATES_NO", title: "No thanks" }]);
 }
 async function sendList(tenant: TenantContext, to: any, bt: any, btnTxt: any, secs: any) {
-  return sendWA(tenant, to, { type: "interactive", interactive: { type: "list", body: { text: bt }, action: { button: btnTxt.substring(0, 20), sections: secs } } });
+  const body = await interactiveBody(tenant, to, bt, "Choose from the list:");
+  let room = 10; // rows across all sections
+  // ponytail: a tenant with more than 10 tours loses the rest from the list; typing the name still works.
+  const sections = secs.map(function (sec: any) {
+    const rows = sec.rows.slice(0, Math.max(room, 0)); room -= rows.length;
+    return { ...(sec.title ? { title: clip(sec.title, 24) } : {}), rows: rows.map(function (r: any) { return { id: r.id, title: clip(r.title, 24), ...(r.description ? { description: clip(r.description, 72) } : {}) }; }) };
+  }).filter(function (sec: any) { return sec.rows.length > 0; });
+  return sendWA(tenant, to, { type: "interactive", interactive: { type: "list", body: { text: body }, action: { button: clip(btnTxt, 20), sections: sections } } });
 }
 async function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 async function typingDelay() { await delay(800 + Math.floor(Math.random() * 1200)); }
