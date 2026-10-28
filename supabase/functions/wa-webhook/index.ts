@@ -1161,11 +1161,20 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // Re-check persisted cancellation policy even for old interactive buttons or conversation state.
     const actionBookingId = rid.match(/^(?:BK_|ACT_[A-Z_]+_|WEATHER_REFUND_)([0-9a-f-]{36})$/i)?.[1] || sd.booking_id;
     if (actionBookingId && !isResetKeyword) {
-      const managed = await supabase.from("bookings").select("status, cancellation_self_service")
+      const managed = await supabase.from("bookings").select("status, cancellation_self_service, cancellation_options")
         .eq("id", actionBookingId).eq("business_id", tenant.business.id).maybeSingle();
       if (managed.error) throw managed.error;
       if (managed.data?.status === "CANCELLED" && managed.data.cancellation_self_service === false) {
         await sendText(tenant, phone, "This cancellation is being handled by our team. Please contact us directly for follow-up.");
+        await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+        return;
+      }
+      // A weather cancellation may offer only some outcomes.
+      const waOption = /^ACT_RESCH_/.test(rid) ? "RESCHEDULE"
+        : /^ACT_VOUCHER_/.test(rid) || state === "CONFIRM_VOUCHER_CONVERT" ? "VOUCHER"
+        : /^(ACT_WX_REFUND_|WEATHER_REFUND_)/.test(rid) || state === "CONFIRM_WX_REFUND_ACTION" ? "REFUND" : "";
+      if (managed.data?.status === "CANCELLED" && waOption && Array.isArray(managed.data.cancellation_options) && !managed.data.cancellation_options.includes(waOption)) {
+        await sendText(tenant, phone, "That option isn’t offered for this cancellation. Type *menu* and open *My Bookings* to see your options.");
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
         return;
       }
@@ -1174,7 +1183,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
     // Weather cancellation response intercept
     if ((input === "1" || input === "2" || input === "3" || input === "1️⃣" || input === "2️⃣" || input === "3️⃣" || input.includes("refund") || input.includes("voucher") || input.includes("reschedule")) && (state === "IDLE" || state === "MENU")) {
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const cb = await supabase.from("bookings").select("id, status, cancellation_reason, slot_id, qty, total_amount, tour_id, refund_status, cancellation_self_service")
+      const cb = await supabase.from("bookings").select("id, status, cancellation_reason, slot_id, qty, total_amount, tour_id, refund_status, cancellation_self_service, cancellation_options")
         .eq("business_id", tenant.business.id)
         .eq("phone", phone)
         .eq("status", "CANCELLED")
@@ -1191,6 +1200,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         if (input.includes("1") || input.includes("reschedule")) choiceDesc = "RESCHEDULE";
         else if (input.includes("2") || input.includes("voucher")) choiceDesc = "VOUCHER";
         else if (input.includes("3") || input.includes("refund")) choiceDesc = "REFUND";
+        if (choiceDesc && Array.isArray(cb.data.cancellation_options) && !cb.data.cancellation_options.includes(choiceDesc)) {
+          await sendText(tenant, phone, "That option isn’t offered for this cancellation. Type *menu* and open *My Bookings* to see your options.");
+          await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+          return;
+        }
 
         if (choiceDesc) {
           state = "BOOKING_ACTIONS";
@@ -1595,11 +1609,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             await setConvo(convo.id, { current_state: "BOOKING_ACTIONS", state_data: { booking_id: bk.id, slot_id: bk.slot_id, qty: bk.qty, total: bk.total_amount, unit_price: bkUnitPrice, hours_before: bkhrs, tour_id: bk.tour_id, is_weather: true } });
             return;
           } else {
+            // Only the outcomes the operator offered for this weather cancellation.
+            const offered: string[] = bk.cancellation_options || ["RESCHEDULE", "VOUCHER", "REFUND"];
             actRows = [
-              { id: "ACT_RESCH_" + bk.id, title: "\u{1F504} Reschedule", description: "Move to a new date" },
-              { id: "ACT_VOUCHER_" + bk.id, title: "\u{1F39F} Convert to Voucher", description: "Get a gift voucher" },
-              { id: "ACT_WX_REFUND_" + bk.id, title: "\u{1F4B8} 100% Refund", description: "Full weather refund" },
-            ];
+              offered.includes("RESCHEDULE") && { id: "ACT_RESCH_" + bk.id, title: "\u{1F504} Reschedule", description: "Move to a new date" },
+              offered.includes("VOUCHER") && { id: "ACT_VOUCHER_" + bk.id, title: "\u{1F39F} Convert to Voucher", description: "Get a gift voucher" },
+              offered.includes("REFUND") && { id: "ACT_WX_REFUND_" + bk.id, title: "\u{1F4B8} 100% Refund", description: "Full weather refund" },
+            ].filter(Boolean);
           }
         } else {
           await sendButtons(tenant, phone, detail, [{ id: "IDLE", title: "\u2B05 Back" }]);

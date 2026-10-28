@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useRef, useState } from "react";
 import { List } from "@phosphor-icons/react";
 import { useSearchParams } from "next/navigation";
-import { confirmCancellation } from "../lib/cancellation-choice";
+import { CANCEL_OPTIONS, confirmCancellation, describeOptions } from "../lib/cancellation-choice";
 import { confirmAction, notify } from "../lib/app-notify";
 import { getAdminTimezone, zonedToUtc, utcToLocalParts, changeLocalTime, normalize24HourTime } from "../lib/admin-timezone";
 import { businessDateKey, businessDayRange, isDateKey } from "../lib/simple-view";
@@ -10,6 +10,7 @@ import { supabase } from "../lib/supabase";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
 import CalendarHeader from "../../components/CalendarHeader";
+import OptionToggles from "../../components/OptionToggles";
 import WeekView from "../../components/WeekView";
 import DayView from "../../components/DayView";
 import { Slot } from "../../components/WeekView";
@@ -127,6 +128,7 @@ function Slots() {
   // Cancel Day State
   const [showCancelDay, setShowCancelDay] = useState(false);
   const [cancelDayOfferChoice, setCancelDayOfferChoice] = useState(true);
+  const [cancelDayOptions, setCancelDayOptions] = useState(() => CANCEL_OPTIONS.map((option) => option.id));
   const [showReopenDay, setShowReopenDay] = useState(false);
   const [selectedCancelDates, setSelectedCancelDates] = useState<string[]>([]);
 
@@ -239,12 +241,13 @@ function Slots() {
       bookedSeats > 0
         ? `Cancel "${slotLabel}" for ${bookedSeats} booked seat(s)? This closes the slot and notifies customers. Use Close to stop new bookings only.`
         : `Close "${slotLabel}"? There are no bookings to cancel.`,
+      isWeather,
     );
     if (!handling) return;
     setCancellingSlot(true);
     try {
       const { data, error } = await supabase.functions.invoke("weather-cancel", {
-        body: { slot_ids: [slot.id], business_id: businessId, reason: isWeather ? "weather conditions" : "operator cancellation", is_weather: isWeather, offer_choice: handling.offerChoice },
+        body: { slot_ids: [slot.id], business_id: businessId, reason: isWeather ? "weather conditions" : "operator cancellation", is_weather: isWeather, offer_choice: handling.offerChoice, options: handling.options },
       });
       if (error) throw error;
       const cancelled = (data as any)?.bookings_cancelled ?? 0;
@@ -260,9 +263,10 @@ function Slots() {
   async function handleCancelDay() {
     if (cancellingWeather || selectedCancelDates.length === 0) return;
     const offerChoice = cancelDayOfferChoice;
+    const options = cancelDayOptions;
     const confirmed = await confirmAction({
       title: "Cancel selected days",
-      message: `Close departures and cancel bookings for ${selectedCancelDates.length} selected day(s)? ${offerChoice ? "Guests can choose a refund, voucher or new date in My Bookings." : "Guests must contact you for refunds, vouchers or rescheduling. These options will be unavailable in My Bookings."}`,
+      message: `Close departures and cancel bookings for ${selectedCancelDates.length} selected day(s)? ${offerChoice ? `Guests can choose ${describeOptions(options)} in My Bookings.` : "Guests must contact you for refunds, vouchers or rescheduling. These options will be unavailable in My Bookings."}`,
       tone: "warning",
       confirmLabel: "Cancel days",
       cancelLabel: "Keep bookings",
@@ -299,7 +303,7 @@ function Slots() {
 
       // Delegate to weather-cancel edge function (atomic per-slot capacity, customer notifications)
       const { data, error } = await supabase.functions.invoke("weather-cancel", {
-        body: { slot_ids: allSlotIds, business_id: businessId, reason: "weather conditions", offer_choice: offerChoice },
+        body: { slot_ids: allSlotIds, business_id: businessId, reason: "weather conditions", offer_choice: offerChoice, ...(offerChoice ? { options } : {}) },
       });
       if (error) throw error;
       const cancelled = (data as any)?.bookings_cancelled ?? 0;
@@ -1290,8 +1294,13 @@ function Slots() {
               <legend className="mb-2 text-sm font-semibold">After cancellation</legend>
               <label className="flex min-h-11 cursor-pointer items-start gap-3 py-2">
                 <input type="radio" name="cancel-day-handling" value="guests" checked={cancelDayOfferChoice} onChange={() => setCancelDayOfferChoice(true)} className="mt-1 h-4 w-4 shrink-0 accent-[var(--ck-accent)]" />
-                <span className="min-w-0 text-sm"><span className="block font-semibold">Guests choose</span><span style={{ color: "var(--ck-text-muted)" }}>Refund, voucher or reschedule in My Bookings.</span></span>
+                <span className="min-w-0 text-sm"><span className="block font-semibold">Guests choose</span><span style={{ color: "var(--ck-text-muted)" }}>From the options selected below, in My Bookings.</span></span>
               </label>
+              {cancelDayOfferChoice && (
+                <div className="pb-2 pl-7">
+                  <OptionToggles label="Options to offer" options={CANCEL_OPTIONS} picked={cancelDayOptions} onChange={setCancelDayOptions} />
+                </div>
+              )}
               <label className="flex min-h-11 cursor-pointer items-start gap-3 py-2">
                 <input type="radio" name="cancel-day-handling" value="operator" checked={!cancelDayOfferChoice} onChange={() => setCancelDayOfferChoice(false)} className="mt-1 h-4 w-4 shrink-0 accent-[var(--ck-accent)]" />
                 <span className="min-w-0 text-sm"><span className="block font-semibold">Contact operator</span><span style={{ color: "var(--ck-text-muted)" }}>You handle refunds, vouchers and rescheduling. No guest choices in My Bookings.</span></span>
@@ -1307,7 +1316,7 @@ function Slots() {
               </button>
               <button data-demo-action="slot.cancel-days"
                 onClick={handleCancelDay}
-                disabled={cancellingWeather || selectedCancelDates.length === 0}
+                disabled={cancellingWeather || selectedCancelDates.length === 0 || (cancelDayOfferChoice && cancelDayOptions.length === 0)}
                 className="ui-btn disabled:opacity-50"
                 style={{ background: "var(--ck-danger)", color: "#fff" }}
               >

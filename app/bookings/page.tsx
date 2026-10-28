@@ -1262,7 +1262,7 @@ export default function Bookings() {
     const slotId = group.bookings[0]?.slot_id;
     if (!slotId) return;
 
-    const handling = await confirmCancellation("Cancel slot due to weather", `Cancel "${group.timeLabel}" due to weather? This closes the slot, cancels all bookings and notifies customers.`);
+    const handling = await confirmCancellation("Cancel slot due to weather", `Cancel "${group.timeLabel}" due to weather? This closes the slot, cancels all bookings and notifies customers.`, true);
     if (!handling) return;
 
     setCancellingWeatherId(slotId);
@@ -1270,7 +1270,7 @@ export default function Bookings() {
       // Delegate to weather-cancel edge function — atomic per-slot capacity, customer notifications,
       // and self-service compensation links. Replaces the previous N+1 read-then-write loop.
       const { data, error } = await supabase.functions.invoke("weather-cancel", {
-        body: { slot_ids: [slotId], business_id: businessId, reason: "weather conditions", offer_choice: handling.offerChoice },
+        body: { slot_ids: [slotId], business_id: businessId, reason: "weather conditions", offer_choice: handling.offerChoice, options: handling.options },
       });
       if (error) throw error;
       const cancelled = (data as any)?.bookings_cancelled ?? activeBks.length;

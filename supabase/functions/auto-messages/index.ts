@@ -716,7 +716,7 @@ async function sendOnePaymentReminder(bookingId: string, businessId: string | nu
 // the cancellation sent: by the operator from Refunds, and once automatically
 // after REFUND_CHOICE_REMINDER_DAYS.
 const REFUND_CHOICE_REMINDER_DAYS = 3;
-const REFUND_CHOICE_FIELDS = "id, business_id, status, refund_status, refund_amount, converted_to_voucher_id, cancellation_self_service, cancellation_reason, customer_name, email, phone, tours(name), slots(start_time)";
+const REFUND_CHOICE_FIELDS = "id, business_id, status, refund_status, refund_amount, converted_to_voucher_id, cancellation_self_service, cancellation_options, cancellation_reason, customer_name, email, phone, tours(name), slots(start_time)";
 
 async function sendRefundChoiceReminder(bk: any, source: "operator" | "automatic"): Promise<{ ok: boolean; error?: string }> {
   if (bk.status !== "CANCELLED" || bk.refund_status !== "ACTION_REQUIRED" || !(Number(bk.refund_amount) > 0) || bk.converted_to_voucher_id) {
@@ -736,6 +736,7 @@ async function sendRefundChoiceReminder(bk: any, source: "operator" | "automatic
       start_time: bk.slots?.start_time ? formatTenantDateTime(tenant.business, bk.slots.start_time, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "",
       reason: reason.replace(/^(weather cancellation|cancelled by operator):\s*/i, ""),
       total_amount: Number(bk.refund_amount), is_weather: /^weather cancellation/i.test(reason), offer_choice: true,
+      cancellation_options: bk.cancellation_options,
     } }),
   }).catch((e) => { console.error("REFUND_CHOICE_REMINDER_ERR", bk.id, e); return null; });
   if (!res?.ok) return { ok: false, error: "The email could not be sent. Please try again." };

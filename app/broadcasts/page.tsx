@@ -196,7 +196,7 @@ export default function BroadcastsPage() {
 
   async function sendWeatherCancel() {
     if (selectedSlotIds.length === 0) return;
-    const handling = await confirmCancellation("Cancel selected slots", "Cancel " + selectedSlotIds.length + " slot(s) and notify " + bookings.length + " customer(s)? This will close each slot, cancel all bookings, and send WhatsApp plus email.");
+    const handling = await confirmCancellation("Cancel selected slots", "Cancel " + selectedSlotIds.length + " slot(s) and notify " + bookings.length + " customer(s)? This will close each slot, cancel all bookings, and send WhatsApp plus email.", true);
     if (!handling) return;
     setCancellingWeather(true); setWeatherResult(null);
 
@@ -205,7 +205,7 @@ export default function BroadcastsPage() {
       // for slot closure, tenant-scoped booking cancellation, atomic capacity
       // release, refund_status ACTION_REQUIRED, and customer notifications.
       const { data, error } = await supabase.functions.invoke("weather-cancel", {
-        body: { slot_ids: selectedSlotIds, business_id: businessId, reason: weatherReason, log_broadcast: true, offer_choice: handling.offerChoice },
+        body: { slot_ids: selectedSlotIds, business_id: businessId, reason: weatherReason, log_broadcast: true, offer_choice: handling.offerChoice, options: handling.options },
       });
       if (error) throw error;
       setWeatherResult({ affected: (data as any)?.bookings_cancelled ?? 0, sent: (data as any)?.notified ?? 0 });

@@ -10,7 +10,7 @@ const booking = {
 };
 function query(result: any, filters: any[] = []) {
   const chain: any = {};
-  for (const name of ["select", "update", "insert", "eq", "in", "not", "gt", "order", "limit"]) {
+  for (const name of ["select", "update", "insert", "eq", "in", "not", "gt", "gte", "lte", "order", "limit"]) {
     chain[name] = (...args: any[]) => { filters.push([name, ...args]); return chain; };
   }
   chain.single = chain.maybeSingle = async () => result;
@@ -36,9 +36,9 @@ function cancelFixture(single = false, source = "WEB") {
   }, { SUPABASE_URL: "https://synthetic.invalid", SUPABASE_SERVICE_ROLE_KEY: "synthetic-service" }, async (_input, init) => {
     emails.push(JSON.parse(String(init?.body))); return Response.json({ ok: true });
   });
-  return { rpc, wa, emails, post: (offer?: unknown) => handler(new Request("https://synthetic.invalid/cancel", {
+  return { rpc, wa, emails, post: (offer?: unknown, extra: Record<string, unknown> = {}) => handler(new Request("https://synthetic.invalid/cancel", {
     method: "POST", headers: { Authorization: "Bearer synthetic-admin" },
-    body: JSON.stringify({ booking_id: booking.id, business_id: "tenant-a", slot_ids: ["slot-a"], ...(offer === undefined ? {} : { offer_choice: offer }) }),
+    body: JSON.stringify({ booking_id: booking.id, business_id: "tenant-a", slot_ids: ["slot-a"], ...(offer === undefined ? {} : { offer_choice: offer }), ...extra }),
   })) };
 }
 
@@ -100,8 +100,8 @@ describe("operator cancellation notification only", () => {
   });
 });
 
-function rebookFixture(actor: "customer" | "admin" | "service", selfService = false) {
-  const b = { ...booking, status: "CANCELLED", cancellation_self_service: selfService };
+function rebookFixture(actor: "customer" | "admin" | "service", selfService = false, options?: string[]) {
+  const b = { ...booking, status: "CANCELLED", cancellation_self_service: selfService, cancellation_options: options };
   const rpc = vi.fn();
   const handler = sourceHandler("supabase/functions/rebook-booking/index.ts", {
     "../_shared/tenant.ts": { createServiceClient: () => ({ rpc,
@@ -111,9 +111,9 @@ function rebookFixture(actor: "customer" | "admin" | "service", selfService = fa
     "../_shared/customer-session.ts": { verifyCustomerSession: async () => ({ valid: true, businessId: "tenant-a", email: b.email }) },
     "../_shared/vouchers.ts": {}, "../_shared/combo.ts": {},
   }, { SUPABASE_SERVICE_ROLE_KEY: "synthetic-service" });
-  return { rpc, post: (action: string) => handler(new Request("https://synthetic.invalid/rebook", {
+  return { rpc, post: (action: string, extra: Record<string, unknown> = {}) => handler(new Request("https://synthetic.invalid/rebook", {
     method: "POST", headers: { Authorization: "Bearer " + (actor === "service" ? "synthetic-service" : "synthetic-admin") },
-    body: JSON.stringify({ booking_id: b.id, action, ...(actor === "customer" ? { customer_session: "synthetic-session" } : {}) }),
+    body: JSON.stringify({ booking_id: b.id, action, ...(actor === "customer" ? { customer_session: "synthetic-session" } : {}), ...extra }),
   })) };
 }
 
@@ -225,4 +225,139 @@ it("weather slot and broadcast callers submit notify-only and can be dismissed s
       else expect(invoke).not.toHaveBeenCalled();
     }
   }
+});
+
+describe("weather cancellation options", () => {
+  const notOffered = "That option isn’t offered for this cancellation. Type *menu* and open *My Bookings* to see your options.";
+
+  it("stores, emails and messages only the options the operator picked", async () => {
+    const f = cancelFixture(); expect((await f.post(true, { options: ["REFUND", "VOUCHER"] })).status).toBe(200);
+    expect([...f.rpc.mock.calls[0][1].p_options]).toEqual(["VOUCHER", "REFUND"]);
+    expect(f.emails[0].data).toMatchObject({ offer_choice: true, cancellation_options: ["VOUCHER", "REFUND"] });
+    const message = f.wa.mock.calls[0][2].full_message;
+    expect(message).toContain("You can get a voucher or request a full refund from your bookings page");
+    expect(message).not.toMatch(/reschedule/i);
+  });
+
+  it("offers all three when no options are sent, and rejects a bad pick before cancelling anything", async () => {
+    const f = cancelFixture(); expect((await f.post(true)).status).toBe(200);
+    expect([...f.rpc.mock.calls[0][1].p_options]).toEqual(["RESCHEDULE", "VOUCHER", "REFUND"]);
+    expect(f.wa.mock.calls[0][2].full_message).toContain("You can reschedule, get a voucher or request a full refund");
+    for (const options of [[], ["CASH"], "REFUND", [1], ["toString"]]) {
+      const bad = cancelFixture(); expect((await bad.post(true, { options })).status).toBe(400);
+      expect(bad.rpc).not.toHaveBeenCalled(); expect(bad.wa).not.toHaveBeenCalled();
+    }
+  });
+
+  it("the options email shows only the offered buttons", () => {
+    const render = sourceFunction("supabase/functions/send-email/index.ts", "cancellationHtml", { heroImg: () => "", isWeatherCancel: sourceFunction("supabase/functions/send-email/index.ts", "isWeatherCancel", {}) });
+    const data = { customer_name: "Synthetic", ref: "SYNTHETIC", _manageUrl: "https://synthetic.invalid/my-bookings", offer_choice: true };
+    expect(render({ ...data, is_weather: true })).toContain("Pick a new date, convert to a voucher or request a full refund.");
+    const voucherOnly = render({ ...data, is_weather: true, cancellation_options: ["VOUCHER"] });
+    expect(voucherOnly).toContain("Convert to a voucher."); expect(voucherOnly).toContain("Get a Voucher");
+    expect(voucherOnly).not.toMatch(/Choose a New Date|Request a Refund/);
+    const operator = render({ ...data, cancellation_options: ["RESCHEDULE", "REFUND"] });
+    expect(operator).toContain("Request Refund"); expect(operator).not.toContain("Get a Voucher");
+  });
+
+  it("guests and the WhatsApp bot can only take an offered option; tenant admins can still resolve", async () => {
+    for (const actor of ["customer", "service"] as const) {
+      const f = rebookFixture(actor, true, ["VOUCHER"]);
+      for (const [action, extra] of [["RESCHEDULE", {}], ["CLAIM_CREDIT", { credit_action: "REFUND" }]] as const) {
+        const response = await f.post(action, extra);
+        expect(response.status).toBe(403); expect((await response.json()).error).toContain("isn't offered");
+      }
+    }
+    for (const f of [rebookFixture("customer", true, ["RESCHEDULE"]), rebookFixture("admin", true, ["VOUCHER"])]) {
+      const response = await f.post("RESCHEDULE");
+      expect(response.status).toBe(400); expect((await response.json()).error).toContain("new_slot_id required");
+    }
+  });
+
+  for (const [state, input] of [["CONFIRM_WX_REFUND_ACTION", "yes"], ["CONFIRM_VOUCHER_CONVERT", "yes"], ["IDLE", "refund"]]) {
+    it(`WhatsApp refuses an option that was not offered (${state})`, async () => {
+      const sent: string[] = []; const changes: any[] = []; const filters: any[] = [];
+      const offered = state === "CONFIRM_VOUCHER_CONVERT" ? ["REFUND"] : ["VOUCHER"];
+      const db = { from: (table: string) => query({ data: table === "bookings" ? { ...booking, status: "CANCELLED", cancellation_reason: "Weather cancellation", cancellation_self_service: true, cancellation_options: offered } : table === "outbox" ? [] : null }, filters) };
+      const handle = sourceFunction("supabase/functions/wa-webhook/index.ts", "handleMsg", {
+        getConvo: async () => ({ id: "conversation-a", current_state: state, state_data: state === "IDLE" ? {} : { booking_id: booking.id } }),
+        supabase: db, getSubscriptionState: async () => ({ trading: true }), shouldBotReply: async () => ({ active: true }),
+        sendText: async (_t: any, _p: any, message: string) => { sent.push(message); },
+        setConvo: async (_id: string, data: any) => { changes.push(data); },
+        logE: async () => { throw new Error("Unexpected bot error"); },
+      });
+      await handle({ business: { id: "tenant-a" } }, booking.phone, input, "text");
+      expect(sent).toEqual([notOffered]);
+      expect(changes[0]).toEqual({ current_state: "IDLE", state_data: {} });
+      expect(filters.some(f => f[0] === "update")).toBe(false);
+    });
+  }
+
+  it("My Bookings shows only the offered options", () => {
+    const Card = sourceExports("booking/app/my-bookings/BookingCard.tsx", {
+      "react/jsx-runtime": jsx, "next/link": { default: "a" }, "next/navigation": { useRouter: () => ({ push: vi.fn() }) },
+      "../lib/pricing": { paidPortions: () => ({ cashPaid: 900, voucherPaid: 0 }) },
+      "../lib/format": { fmtDate: () => "21 Oct", fmtTime: () => "18:00" },
+      "../lib/duration": { isMultiDay: () => false, tourEndDate: () => null },
+      "./constants": { getTimeTier: () => "PAST", getHrsBefore: () => -1, getCountdownText: () => null },
+      "./ActionBtn": { default: "action-button" },
+    }).default as (props: any) => any;
+    function labels(node: any): string[] {
+      if (!node || typeof node !== "object") return [];
+      if (Array.isArray(node)) return node.flatMap(labels);
+      return [...(node.props?.label ? [node.props.label] : []), ...labels(node.props?.children)];
+    }
+    const render = (options?: string[]) => labels(Card({ countdownTick: 0, tripPhotos: {}, expandedWhatToBring: {}, variant: "card",
+      b: { ...booking, status: "CANCELLED", cancellation_self_service: true, cancellation_options: options } }));
+    expect(render()).toEqual(expect.arrayContaining(["Pick a new date", "Voucher · R900", "Refund · R900.00"]));
+    expect(render(["VOUCHER"])).toContain("Voucher · R900");
+    expect(render(["VOUCHER"]).filter(label => label === "Pick a new date" || label.startsWith("Refund"))).toEqual([]);
+  });
+
+  it("weather dialogs show the three options and return the operator's pick", async () => {
+    const confirm = vi.fn(async (payload: any) => { payload.onPicks(["VOUCHER"]); return true; });
+    const exports = sourceExports("app/lib/cancellation-choice.ts", { "./app-notify": { confirmAction: confirm } });
+    expect(await (exports.confirmCancellation as any)("Cancel trip", "Synthetic trip", true)).toEqual({ offerChoice: true, options: ["VOUCHER"] });
+    expect([...(confirm.mock.calls[0][0] as any).picks].map((pick: any) => pick.label)).toEqual(["Refund", "Voucher", "Reschedule"]);
+    const plain = vi.fn(async (_payload: any) => "alt");
+    const plainExports = sourceExports("app/lib/cancellation-choice.ts", { "./app-notify": { confirmAction: plain } });
+    expect(await (plainExports.confirmCancellation as any)("Cancel trip", "Synthetic trip")).toEqual({ offerChoice: false });
+    expect((plain.mock.calls[0][0] as any).picks).toBeUndefined();
+  });
+
+  it("every trip-level weather cancel asks for the options and sends the pick", async () => {
+    const slot = { id: "slot-a", start_time: "2099-10-21T16:00Z", booked: 2, tours: { name: "Synthetic trip" } };
+    for (const [file, name, arg] of [
+      ["app/bookings/page.tsx", "cancelSlotWeather", { timeLabel: "Synthetic trip", bookings: [{ ...booking, slot_id: "slot-a" }] }],
+      ["app/broadcasts/page.tsx", "sendWeatherCancel", undefined],
+      ["app/slots/page.tsx", "cancelSlotAndRefund", slot],
+    ] as const) {
+      const invoke = vi.fn(async (_name: string, _init: any) => ({ data: { bookings_cancelled: 1, notified: 2 } }));
+      const confirmCancellation = vi.fn(async (..._args: any[]) => ({ offerChoice: true, options: ["REFUND"] }));
+      const run = sourceFunction(file, name, {
+        businessId: "tenant-a", selectedSlotIds: ["slot-a"], bookings: [booking], weatherReason: "weather",
+        confirmCancellation, supabase: { functions: { invoke } }, getAdminTimezone: () => "Africa/Johannesburg",
+        setCancellingWeatherId: vi.fn(), setCancellingWeather: vi.fn(), setWeatherResult: vi.fn(), setCancellingSlot: vi.fn(), setSelectedSlot: vi.fn(),
+        setSelectedSlotIds: vi.fn(), setBookings: vi.fn(), setSelectedDate: vi.fn(), loadSlots: vi.fn(), loadHistory: vi.fn(), load: vi.fn(),
+        notify: vi.fn(), loadBookings: vi.fn(), describeFnError: async () => "",
+      });
+      await run(arg, true);
+      expect(confirmCancellation.mock.calls[0][2]).toBe(true);
+      expect(invoke.mock.calls[0][1].body).toMatchObject({ offer_choice: true, options: ["REFUND"] });
+    }
+  });
+
+  it("Cancel days sends the picked options, and none when guests contact the operator", async () => {
+    for (const [offer, options, expected] of [[true, ["VOUCHER"], ["VOUCHER"]], [false, [], undefined]] as const) {
+      const invoke = vi.fn(async (_name: string, _init: any) => ({ data: { bookings_cancelled: 1, slots_closed: 1 } }));
+      const run = sourceFunction("app/slots/page.tsx", "handleCancelDay", {
+        cancellingWeather: false, selectedCancelDates: ["2099-10-21"], cancelDayOfferChoice: offer, cancelDayOptions: options,
+        confirmAction: async () => true, describeOptions: (ids: string[]) => ids.join(", "), businessId: "tenant-a",
+        supabase: { functions: { invoke }, from: () => query({ data: [{ id: "slot-a" }] }) },
+        setCancellingWeather: vi.fn(), notify: vi.fn(), setShowCancelDay: vi.fn(), setSelectedCancelDates: vi.fn(), load: vi.fn(), describeFnError: async () => "",
+      });
+      await run();
+      expect(invoke.mock.calls[0][1].body.options).toEqual(expected);
+    }
+  });
 });

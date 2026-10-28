@@ -14,6 +14,10 @@ export type AppConfirmPayload = {
   confirmLabel?: string;
   cancelLabel?: string;
   altLabel?: string;
+  // Toggle buttons above the actions, all on at first. Confirm needs at least
+  // one on and reports the selection through onPicks before resolving true.
+  picks?: { id: string; label: string }[];
+  onPicks?: (ids: string[]) => void;
 };
 
 export type AppConfirmResult = boolean | "alt";

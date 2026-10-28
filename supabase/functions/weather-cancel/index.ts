@@ -7,6 +7,8 @@ import { requireAuth, type AuthResult } from "../_shared/auth.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createServiceClient();
+// What a guest may choose after the cancellation, in the order guests read them.
+const OPTION_WORDS: Record<string, string> = { RESCHEDULE: "reschedule", VOUCHER: "get a voucher", REFUND: "request a full refund" };
 
 function getCors(req?: any) {
   const origins = getAdminAppOrigins();
@@ -40,6 +42,15 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ error: "offer_choice must be a boolean" }), { status: 400, headers: getCors(req) });
     }
     const offerChoice = body.offer_choice !== false;
+    // The operator picks which of the three options guests get; omitted means all.
+    const requested = body.options;
+    if (requested !== undefined && (!Array.isArray(requested) || requested.length === 0
+      || requested.some((o: unknown) => typeof o !== "string" || !Object.hasOwn(OPTION_WORDS, o)))) {
+      return new Response(JSON.stringify({ error: "options must list one or more of RESCHEDULE, VOUCHER, REFUND" }), { status: 400, headers: getCors(req) });
+    }
+    const options = Object.keys(OPTION_WORDS).filter(o => requested === undefined || requested.includes(o));
+    const offerWords = options.map(o => OPTION_WORDS[o]);
+    const offerText = offerWords.length > 1 ? offerWords.slice(0, -1).join(", ") + " or " + offerWords[offerWords.length - 1] : offerWords[0];
 
     if (!business_id && !auth.isServiceRole) business_id = auth.businessId;
 
@@ -90,7 +101,7 @@ Deno.serve(async (req: any) => {
       const cancelled = await supabase.rpc("cancel_booking_transaction", {
         p_booking_id: b.id, p_business_id: business_id,
         p_reason: (isWeather ? "Weather cancellation: " : "Cancelled by operator: ") + cancelReason,
-        p_allow_late_choice: true, p_weather: true, p_offer_choice: offerChoice,
+        p_allow_late_choice: true, p_weather: true, p_offer_choice: offerChoice, p_options: options,
       });
       if (cancelled.error || !cancelled.data?.ok) {
         failedCancels.push({ id: b.id, error: cancelled.data?.error || cancelled.error?.message || "Cancellation failed" });
@@ -135,7 +146,7 @@ Deno.serve(async (req: any) => {
               "Hi " + firstName + ", we\u2019re sorry but your " + tourName + " on " + startTime +
               " has been cancelled due to " + cancelReason + ".\n\n" +
               "Ref: " + ref + "\n\n" +
-              "You can reschedule, get a voucher, or request a full refund from your bookings page:\n" +
+              "You can " + offerText + " from your bookings page:\n" +
               manageBookingUrl + "\n\n" +
               ((tenant.business as any).location_phrase ? "We hope to see you " + (tenant.business as any).location_phrase + " soon. " : "We hope to see you again soon. ") + brandName
             : "Trip Cancelled \u26C5\n\n" +
@@ -177,6 +188,7 @@ Deno.serve(async (req: any) => {
                 is_weather: isWeather,
                 is_unpaid: !isPaid,
                 offer_choice: customerChoice,
+                cancellation_options: options,
                 notification_only: !offerChoice,
                 is_ota: isOta,
               },
@@ -199,6 +211,7 @@ Deno.serve(async (req: any) => {
         reason: cancelReason,
         bookings_cancelled: affected.length - failedCancels.length,
         offer_choice: offerChoice,
+        options,
         paid_action_required: [...outcomes.values()].filter(outcome => outcome.refund_action_required === true).length,
         failed_cancels: failedCancels,
       },

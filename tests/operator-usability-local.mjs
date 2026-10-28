@@ -45,6 +45,7 @@ try{
  await migration('20261015171000_operator_booking_transaction.sql');
  await migration('20261015172000_operator_cancellation_money.sql');
  await migration('20261020170000_cancellation_notification_only.sql');
+ await migration('20261028100000_weather_cancel_options.sql');
  await db.query('create table logs(id uuid default gen_random_uuid(),business_id uuid,booking_id uuid,event text,payload jsonb,created_at timestamptz default now())');
  await migration('20261015120000_payment_recovery.sql');
  await migration('20261016110000_unpaid_booking_recovery.sql');
@@ -249,6 +250,22 @@ try{
   }
   await assert.rejects(as(db,'authenticated',110,()=>rpc('cancel_booking_transaction',[id(80),id(1),'Not allowed',true,true,false])),/permission denied/);
   const wrong=await as(db,'service_role',110,()=>rpc('cancel_booking_transaction',[id(80),id(2),'Wrong tenant',true,true,false]));assert.equal(wrong.ok,false);
+ });
+ await check('weather cancellation stores the operator-picked options; an empty or unknown pick cancels nothing',async()=>{
+  await db.query("insert into slots(id,business_id,tour_id,start_time,capacity_total,status,booked,held) values($1,$2,$3,now()+interval '3 days',20,'OPEN',0,0)",[id(98),id(1),id(3)]);
+  for(const n of [95,96,97])await as(db,'authenticated',110,()=>rpc('create_operator_booking',[id(1),id(n),payload({status:'PAID',slot_id:id(98)})]));
+  const picked=await as(db,'service_role',110,()=>rpc('cancel_booking_transaction',[id(95),id(1),'Weather cancellation: synthetic',true,true,true,['REFUND','VOUCHER']]));
+  assert.equal(picked.ok,true);assert.equal(picked.refund_action_required,true);
+  let b=(await db.query('select cancellation_options,refund_notes from bookings where id=$1',[id(95)])).rows[0];
+  assert.deepEqual(b.cancellation_options,['REFUND','VOUCHER']);assert.equal(b.refund_notes,'Customer to choose refund or voucher via My Bookings');
+  await as(db,'service_role',110,()=>rpc('cancel_booking_transaction',[id(96),id(1),'Weather cancellation: synthetic',true,true]));
+  b=(await db.query('select cancellation_options,refund_notes from bookings where id=$1',[id(96)])).rows[0];
+  assert.deepEqual(b.cancellation_options,['RESCHEDULE','VOUCHER','REFUND']);assert.equal(b.refund_notes,'Customer to choose reschedule, voucher or refund via My Bookings');
+  for(const bad of [[],['CASH']]){
+   await assert.rejects(as(db,'service_role',110,()=>rpc('cancel_booking_transaction',[id(97),id(1),'Weather cancellation: synthetic',true,true,true,bad])),/cancellation_options_check/);
+   assert.equal((await db.query('select status from bookings where id=$1',[id(97)])).rows[0].status,'PAID');
+  }
+  await assert.rejects(as(db,'authenticated',110,()=>rpc('cancel_booking_transaction',[id(97),id(1),'Not allowed',true,true,true,['VOUCHER']])),/permission denied/);
  });
  await check('existing expiry policy releases an expired hold exactly once',async()=>{
   const cancellation=readFileSync('supabase/migrations/20260911150000_booking_cancellation.sql','utf8');

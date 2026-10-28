@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { notify } from "../lib/app-notify";
+import { describeOptions } from "../lib/cancellation-choice";
 import { getAdminTimezone } from "../lib/admin-timezone";
 import { processRefundAction, type ActionResult, type RefundOutcome } from "../lib/booking-actions";
 import { functionError } from "../lib/function-error";
@@ -48,7 +49,7 @@ export default function Refunds() {
     const requestId = ++loadRequestRef.current;
     try {
       const { data: pending, error: pendingError } = await supabase.from("bookings")
-        .select("id, customer_name, phone, email, qty, total_amount, total_captured, total_refunded, payment_method, refund_status, refund_amount, refund_notes, cancellation_reason, cancellation_self_service, cancelled_at, yoco_checkout_id, slots(start_time), tours(name)")
+        .select("id, customer_name, phone, email, qty, total_amount, total_captured, total_refunded, payment_method, refund_status, refund_amount, refund_notes, cancellation_reason, cancellation_self_service, cancellation_options, cancelled_at, yoco_checkout_id, slots(start_time), tours(name)")
         .eq("business_id", expectedBusinessId)
         // ACTION_REQUIRED: a weather/operator cancellation parked the money until
         // the guest (or, if they were told so, the operator) picks refund,
@@ -342,7 +343,7 @@ export default function Refunds() {
       const res = await supabase.functions.invoke("auto-messages", { body: { action: "refund_choice_reminder_one", booking_id: id } });
       const problem = await functionError(res, "The email could not be sent. Please try again.");
       notify(problem ? { title: "Options not sent", message: problem, tone: "error" }
-        : { title: "Options resent", message: "The guest has been emailed their refund, voucher and new date options.", tone: "success" });
+        : { title: "Options resent", message: "The guest has been emailed their options again.", tone: "success" });
     } finally {
       setProcessing(null);
     }
@@ -405,7 +406,7 @@ export default function Refunds() {
                       <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>{b.slots?.start_time ? fmtTime(b.slots.start_time) : "No departure date"} · {b.qty} {b.qty === 1 ? "guest" : "guests"}</p>
                       <p className="mt-2 text-xs" style={{ color: "var(--ck-text-muted)" }}>Booking {b.id.substring(0, 8).toUpperCase()}</p>
                       <p className="mt-2 text-xs font-medium" style={{ color: "var(--ck-text)" }}>{guestChooses
-                        ? "Waiting for the guest to choose: refund, voucher or new date."
+                        ? `Waiting for the guest to choose ${describeOptions(b.cancellation_options || ["REFUND", "VOUCHER", "RESCHEDULE"])}.`
                         : "The guest was told you will be in touch. Choose a refund or voucher for them."}</p>
                       <p className="mt-1 text-xs" style={{ color: "var(--ck-text-muted)" }}>Cancelled {days === 0 ? "today" : days === 1 ? "1 day ago" : `${days} days ago`}.{guestChooses ? " Guests get one automatic reminder after 3 days." : ""}</p>
                     </div>

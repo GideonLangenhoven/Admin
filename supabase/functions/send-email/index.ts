@@ -1397,6 +1397,11 @@ function cancellationHtml(d: Record<string, unknown>) {
   // other cancellation email (refund already chosen or processed) must confirm
   // the outcome, never re-offer the three options.
   const offerChoice = d.offer_choice === true && !notificationOnly;
+  // A weather cancellation may offer only some of the three (weather-cancel options).
+  const offered = Array.isArray(d.cancellation_options) ? d.cancellation_options : ["RESCHEDULE", "VOUCHER", "REFUND"];
+  const offerWords = [["RESCHEDULE", "pick a new date"], ["VOUCHER", "convert to a voucher"], ["REFUND", "request a full refund"]]
+    .filter(([id]) => offered.includes(id)).map(([, words]) => words);
+  const offerText = offerWords.length > 1 ? offerWords.slice(0, -1).join(", ") + " or " + offerWords[offerWords.length - 1] : offerWords[0] || "";
   const refundAmt = d.refund_amount != null && d.refund_amount !== "" ? String(d.refund_amount) : "";
   const isRefundConfirmed = !notificationOnly && !hasVoucher && !isForfeit && !offerChoice && refundAmt !== "";
   const cancelText = hasVoucher
@@ -1472,10 +1477,10 @@ function cancellationHtml(d: Record<string, unknown>) {
               <tr>
                 <td style="padding: 24px; text-align: center;">
                   <p style="margin: 0 0 6px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #047857;">Your options</p>
-                  <p style="margin: 0 0 16px 0; font-size: 14px; color: #166534; line-height: 1.5;">Pick a new date, convert to a voucher, or request a full refund.</p>
-                  ${emailBtn("Choose a New Date", manageUrl, "#166534")}
-                  ${emailBtn("Get a Voucher", manageUrl, "#166534")}
-                  ${emailBtn("Request a Refund", manageUrl, "#166534")}
+                  <p style="margin: 0 0 16px 0; font-size: 14px; color: #166534; line-height: 1.5;">${offerText.charAt(0).toUpperCase() + offerText.slice(1)}.</p>
+                  ${offered.includes("RESCHEDULE") ? emailBtn("Choose a New Date", manageUrl, "#166534") : ""}
+                  ${offered.includes("VOUCHER") ? emailBtn("Get a Voucher", manageUrl, "#166534") : ""}
+                  ${offered.includes("REFUND") ? emailBtn("Request a Refund", manageUrl, "#166534") : ""}
                 </td>
               </tr>
             </table>
@@ -1496,9 +1501,9 @@ function cancellationHtml(d: Record<string, unknown>) {
         </tr>
         <tr>
           <td style="padding: 0 30px 30px; text-align: center;">
-            ${emailBtn("Reschedule", manageUrl, "#1b3b36")}
-            ${emailBtn("Get a Voucher", manageUrl, "#1b3b36")}
-            ${emailBtn("Request Refund", manageUrl, "#1b3b36")}
+            ${offered.includes("RESCHEDULE") ? emailBtn("Reschedule", manageUrl, "#1b3b36") : ""}
+            ${offered.includes("VOUCHER") ? emailBtn("Get a Voucher", manageUrl, "#1b3b36") : ""}
+            ${offered.includes("REFUND") ? emailBtn("Request Refund", manageUrl, "#1b3b36") : ""}
             <p style="font-size: 12px; color: #999; margin: 12px 0 0 0;">Or reply to this email and we&rsquo;ll sort it out for you.</p>
           </td>
         </tr>

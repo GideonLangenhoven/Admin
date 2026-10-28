@@ -10,6 +10,7 @@ import {
   type AppNoticePayload,
   type AppNoticeTone,
 } from "../app/lib/app-notify";
+import OptionToggles from "./OptionToggles";
 
 type NoticeItem = AppNoticePayload & {
   id: string;
@@ -30,6 +31,7 @@ const TONE_STYLES: Record<AppNoticeTone, { rail: string; chipBg: string; chipFg:
 export default function AppNotifications() {
   const [notices, setNotices] = useState<NoticeItem[]>([]);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
   const timeoutsRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
@@ -52,6 +54,7 @@ export default function AppNotifications() {
       },
       confirm(payload) {
         return new Promise<AppConfirmResult>((resolve) => {
+          setPicked(payload.picks?.map((pick) => pick.id) ?? []);
           setConfirmState({ ...payload, resolve });
         });
       },
@@ -93,6 +96,7 @@ export default function AppNotifications() {
 
   function resolveConfirm(value: AppConfirmResult) {
     if (!confirmState) return;
+    if (value === true) confirmState.onPicks?.(picked);
     confirmState.resolve(value);
     setConfirmState(null);
   }
@@ -137,11 +141,17 @@ export default function AppNotifications() {
               <div className="min-w-0 flex-1">
                 <p className="text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>{confirmState.title || "Please confirm"}</p>
                 <p className="mt-1 text-sm leading-6" style={{ color: "var(--ck-text)" }}>{confirmState.message}</p>
+                {confirmState.picks && (
+                  <div className="mt-3">
+                    <OptionToggles label="Options to offer" options={confirmState.picks} picked={picked} onChange={setPicked} />
+                  </div>
+                )}
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   <button
                     type="button"
                     onClick={() => resolveConfirm(true)}
-                    className={`ui-btn ${confirmState.tone === "error" || confirmState.tone === "warning" ? "ui-btn-danger" : "ui-btn-primary"}`}
+                    disabled={!!confirmState.picks && picked.length === 0}
+                    className={`ui-btn disabled:opacity-50 ${confirmState.tone === "error" || confirmState.tone === "warning" ? "ui-btn-danger" : "ui-btn-primary"}`}
                   >
                     {confirmState.confirmLabel || "Confirm"}
                   </button>

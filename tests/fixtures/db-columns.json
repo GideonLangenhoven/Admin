@@ -114,6 +114,7 @@
     "allow_unpaid",
     "arrived_count",
     "business_id",
+    "cancellation_options",
     "cancellation_reason",
     "cancellation_self_service",
     "cancelled_at",

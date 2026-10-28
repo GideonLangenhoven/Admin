@@ -62,7 +62,7 @@ test("money parked by a weather cancellation is visible with its state, apart fr
   const { section } = await open(page, {});
   await expect(section).toContainText("2 waiting for a decision");
   const guest = section.locator(`[data-awaiting-id="${GUEST_CHOOSES}"]`);
-  await expect(guest).toContainText("Waiting for the guest to choose: refund, voucher or new date.");
+  await expect(guest).toContainText("Waiting for the guest to choose a refund, a voucher or a new date.");
   await expect(guest).toContainText("Cancelled 3 days ago. Guests get one automatic reminder after 3 days.");
   await expect(guest.getByRole("button", { name: "Resend options" })).toBeVisible();
   const operator = section.locator(`[data-awaiting-id="${OPERATOR_HANDLES}"]`);

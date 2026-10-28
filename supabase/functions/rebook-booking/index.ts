@@ -1344,6 +1344,14 @@ Deno.serve(async function (req: any) {
       && Number(booking.refund_amount || 0) > 0
       && !booking.converted_to_voucher_id;
 
+    // A weather cancellation may offer only some outcomes; guests get only
+    // those. Tenant admins can still resolve the booking any way.
+    const chosen = action === "RESCHEDULE" ? "RESCHEDULE"
+      : action === "CLAIM_CREDIT" && ["VOUCHER", "REFUND"].includes(String(body.credit_action)) ? String(body.credit_action) : "";
+    if (claimEligible && chosen && !authz.isAdmin && Array.isArray(booking.cancellation_options) && !booking.cancellation_options.includes(chosen)) {
+      return fail(req, "That option isn't offered for this cancellation. Choose one of the options in My Bookings, or contact the operator.", 403);
+    }
+
     if (action === "CLAIM_CREDIT") {
       if (!claimEligible) return fail(req, "No claimable credit on this booking", 400);
       return await handleClaimCredit(req, booking, body);
