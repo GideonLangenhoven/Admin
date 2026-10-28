@@ -760,65 +760,69 @@ async function handleSmartAvail(tenant: TenantContext, phone: string, input: str
 
 function matchFAQ(input: any) {
   const i = input.toLowerCase();
+  // Short keywords match whole words only: "rate" isn't in "great", "hen" isn't in "when",
+  // "age" isn't in "message", "eft" isn't in "left". Longer stems ("cancel", "swim") stay substrings.
+  const wholeWords = new Set(["go", "pin", "map", "age", "rate", "fee", "rand", "deal", "kid", "car", "team", "hen", "pet", "fit", "eat", "rain", "wind", "cost", "park", "wear", "pack", "event", "risk", "eft", "end"]);
+  const has = (k: string) => wholeWords.has(k) ? new RegExp("\\b" + k + "(?:s|es|ed|ing|y|er)?\\b").test(i) : i.includes(k);
   // Meeting point
-  if (i.includes("where") && (i.includes("meet") || i.includes("go") || i.includes("find") || i.includes("located"))) return "meeting_point";
-  if (i.includes("meeting point") || i.includes("location") || i.includes("address") || i.includes("directions") || i.includes("get there")) return "meeting_point";
-  if (i.includes("map") || i.includes("pin") || i.includes("gps")) return "meeting_point";
+  if (has("where") && (has("meet") || has("go") || has("find") || has("located"))) return "meeting_point";
+  if (has("meeting point") || has("location") || has("address") || has("directions") || has("get there")) return "meeting_point";
+  if (has("map") || has("pin") || has("gps")) return "meeting_point";
   // What to bring
-  if (i.includes("bring") || i.includes("wear") || i.includes("pack") || i.includes("prepare") || i.includes("need to take") || i.includes("what do i need")) return "what_to_bring";
-  if (i.includes("clothes") || i.includes("gear") || i.includes("equipment") || i.includes("sunscreen")) return "what_to_bring";
+  if (has("bring") || has("wear") || has("pack") || has("prepare") || has("need to take") || has("what do i need")) return "what_to_bring";
+  if (has("clothes") || has("gear") || has("equipment") || has("sunscreen")) return "what_to_bring";
   // Cancellation
-  if ((i.includes("cancel") && (i.includes("policy") || i.includes("what if") || i.includes("can i"))) || (i.includes("refund") && !i.includes("my")) || (i.includes("change") && i.includes("mind"))) return "cancellation";
-  if (i.includes("money back") || i.includes("get refund")) return "cancellation";
+  if ((has("cancel") && (has("policy") || has("what if") || has("can i"))) || (has("refund") && !has("my")) || (has("change") && has("mind"))) return "cancellation";
+  if (has("money back") || has("get refund")) return "cancellation";
   // Duration
-  if (i.includes("how long") || i.includes("duration") || i.includes("how much time") || i.includes("how many hours") || i.includes("how many minutes")) return "duration";
-  if (i.includes("what time") && (i.includes("finish") || i.includes("end") || i.includes("done"))) return "duration";
+  if (has("how long") || has("duration") || has("how much time") || has("how many hours") || has("how many minutes")) return "duration";
+  if (has("what time") && (has("finish") || has("end") || has("done"))) return "duration";
   // Safety
-  if (i.includes("safe") || i.includes("danger") || i.includes("risk") || i.includes("drown") || i.includes("scary")) return "safety";
-  if (i.includes("swim") || i.includes("experience") && (i.includes("need") || i.includes("require"))) return "safety";
-  if (i.includes("beginner") || i.includes("first time") || i.includes("never") && i.includes("before")) return "safety";
-  if (i.includes("can't swim") || i.includes("cant swim") || i.includes("nervous")) return "safety";
+  if (has("safe") || has("danger") || has("risk") || has("drown") || has("scary")) return "safety";
+  if (has("swim") || has("experience") && (has("need") || has("require"))) return "safety";
+  if (has("beginner") || has("first time") || has("never") && has("before")) return "safety";
+  if (has("can't swim") || has("cant swim") || has("nervous")) return "safety";
   // Weather
-  if (i.includes("weather") || i.includes("rain") || i.includes("wind") || i.includes("cold") || i.includes("storm")) return "weather";
-  if (i.includes("what if") && (i.includes("rain") || i.includes("bad weather") || i.includes("windy"))) return "weather";
+  if (has("weather") || has("rain") || has("wind") || has("cold") || has("storm")) return "weather";
+  if (has("what if") && (has("rain") || has("bad weather") || has("windy"))) return "weather";
   // Pricing
-  if (i.includes("price") || i.includes("cost") || i.includes("how much") || i.includes("rate") || i.includes("fee") || i.includes("charge") || i.includes("rand") || i.includes("expensive")) return "pricing";
-  if (i.includes("pay") && !i.includes("payment")) return "pricing";
-  if (i.includes("discount") || i.includes("special") || i.includes("deal") || i.includes("promo")) return "pricing";
+  if (has("price") || has("cost") || has("how much") || has("rate") || has("fee") || has("charge") || has("rand") || has("expensive")) return "pricing";
+  if (has("pay") && !has("payment")) return "pricing";
+  if (has("discount") || has("special") || has("deal") || has("promo")) return "pricing";
   // Age
-  if (i.includes("age") || i.includes("child") || i.includes("kid") || i.includes("baby") || i.includes("toddler") || i.includes("young") || i.includes("old enough")) return "age";
-  if (i.includes("family") || i.includes("families") || i.includes("my son") || i.includes("my daughter") || i.includes("my child")) return "age";
+  if (has("age") || has("child") || has("kid") || has("baby") || has("toddler") || has("young") || has("old enough")) return "age";
+  if (has("family") || has("families") || has("my son") || has("my daughter") || has("my child")) return "age";
   // Parking
-  if (i.includes("park") || i.includes("parking") || i.includes("car")) return "parking";
+  if (has("park") || has("parking") || has("car")) return "parking";
   // Groups
-  if (i.includes("group") || i.includes("team") || i.includes("corporate") || i.includes("birthday") || i.includes("party") || i.includes("event") || i.includes("hen") || i.includes("bachelor")) return "groups";
+  if (has("group") || has("team") || has("corporate") || has("birthday") || has("party") || has("event") || has("hen") || has("bachelor")) return "groups";
   // What to expect
-  if (i.includes("expect") || i.includes("what happens") || i.includes("what is it like") || i.includes("tell me about") || i.includes("describe") || i.includes("what do you do")) return "what_to_expect";
-  if (i.includes("itinerary") || i.includes("programme") || (i.includes("schedule") && !i.includes("reschedule")) || i.includes("typical")) return "what_to_expect";
+  if (has("expect") || has("what happens") || has("what is it like") || has("tell me about") || has("describe") || has("what do you do")) return "what_to_expect";
+  if (has("itinerary") || has("programme") || (has("schedule") && !has("reschedule")) || has("typical")) return "what_to_expect";
   // Camera / phone
-  if (i.includes("camera") || i.includes("gopro") || i.includes("phone") && (i.includes("bring") || i.includes("take") || i.includes("waterproof"))) return "camera";
-  if (i.includes("dry bag")) return "camera";
+  if (has("camera") || has("gopro") || has("phone") && (has("bring") || has("take") || has("waterproof"))) return "camera";
+  if (has("dry bag")) return "camera";
   // Dog / pet
-  if (i.includes("dog") || i.includes("pet") || i.includes("animal")) return "dog";
+  if (has("dog") || has("pet") || has("animal")) return "dog";
   // Fitness / weight
-  if (i.includes("fitness") || i.includes("fit") && i.includes("need") || i.includes("weight") || i.includes("heavy") || i.includes("overweight") || i.includes("disabled") || i.includes("wheelchair") || i.includes("mobility")) return "fitness";
+  if (has("fitness") || has("fit") && has("need") || has("weight") || has("heavy") || has("overweight") || has("disabled") || has("wheelchair") || has("mobility")) return "fitness";
   // Pregnant
-  if (i.includes("pregnant") || i.includes("pregnancy") || i.includes("expecting")) return "pregnant";
+  if (has("pregnant") || has("pregnancy") || has("expecting")) return "pregnant";
   // Glasses
-  if (i.includes("glasses") || i.includes("spectacles") || i.includes("contact") && i.includes("lens") || i.includes("contacts")) return "glasses";
+  if (has("glasses") || has("spectacles") || has("contact") && has("lens") || has("contacts")) return "glasses";
   // Food / drinks
-  if (i.includes("food") || i.includes("eat") || i.includes("drink") || i.includes("hungry") || i.includes("snack") || i.includes("wine") || i.includes("alcohol") || i.includes("bubbly")) return "food";
+  if (has("food") || has("eat") || has("drink") || has("hungry") || has("snack") || has("wine") || has("alcohol") || has("bubbly")) return "food";
   // Payment methods
-  if (i.includes("cash") || i.includes("eft") || i.includes("transfer") || (i.includes("pay") && (i.includes("how") || i.includes("method") || i.includes("card") || i.includes("international")))) return "payment";
-  if (i.includes("deposit") || i.includes("split") && i.includes("pay")) return "payment";
+  if (has("cash") || has("eft") || has("transfer") || (has("pay") && (has("how") || has("method") || has("card") || has("international")))) return "payment";
+  if (has("deposit") || has("split") && has("pay")) return "payment";
   // Tour differences
-  if ((i.includes("difference") || i.includes("compare") || i.includes("which") && i.includes("tour") || i.includes("which one") || i.includes("best tour")) && !i.includes("book")) return "difference";
+  if ((has("difference") || has("compare") || has("which") && has("tour") || has("which one") || has("best tour")) && !has("book")) return "difference";
   // Hours
-  if (i.includes("hours") || i.includes("open") || i.includes("operating") || (i.includes("what time") && !i.includes("finish") && !i.includes("end") && !i.includes("my"))) return "hours";
+  if (has("hours") || has("open") || has("operating") || (has("what time") && !has("finish") && !has("end") && !has("my"))) return "hours";
   // Holidays
-  if (i.includes("holiday") || i.includes("public holiday") || i.includes("christmas") || i.includes("new year") || i.includes("easter") || i.includes("festive")) return "holidays";
+  if (has("holiday") || has("public holiday") || has("christmas") || has("new year") || has("easter") || has("festive")) return "holidays";
   // Tours overview
-  if ((i.includes("what tour") || i.includes("which tour") || i.includes("tour") && i.includes("offer") || i.includes("options") || i.includes("what do you do")) && !i.includes("book")) return "tours_overview";
+  if ((has("what tour") || has("which tour") || has("tour") && has("offer") || has("options") || has("what do you do")) && !has("book")) return "tours_overview";
   return null;
 }
 
