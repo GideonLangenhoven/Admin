@@ -1717,7 +1717,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           pvShown++;
           dateMap[pvShown] = pvKeys[pvk];
           if (pvd.open > 0) { previewMsg += pvShown + ". " + pvd.label + ": " + pvd.open + " trip" + (pvd.open > 1 ? "s" : "") + " available\n"; }
-          else if (pvd.closed > 0 && pvd.open === 0 && pvd.full === 0) { previewMsg += pvShown + ". " + pvd.label + ": \u274C Closed (weather)\n"; }
+          else if (pvd.closed > 0 && pvd.open === 0 && pvd.full === 0) { previewMsg += pvShown + ". " + pvd.label + ": \u274C Closed\n"; }
           else { previewMsg += pvShown + ". " + pvd.label + ": Fully booked\n"; }
         }
         if (pvShown > 0) { previewMsg += "\nReply with a number, or type a date (e.g. 'Saturday' or '20 Jul')"; }
@@ -1896,7 +1896,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const sr2 = await supabase.from("slots").select("*").eq("id", slotId).single();
       const slot = sr2.data;
       if (!slot) { await sendText(tenant, phone, "That slot is no longer available. Let\u2019s pick another date. Type a date to try again!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
-      if (slot.status !== "OPEN") { await sendText(tenant, phone, "That slot has been closed (possibly due to weather). Let\u2019s pick another date. Type a new date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
+      if (slot.status !== "OPEN") { await sendText(tenant, phone, "That trip is no longer open for booking. Let\u2019s pick another date. Type a new date!"); await setConvo(convo.id, { current_state: "PICK_DATE" }); return; }
       // M5: 60-min cutoff check at slot selection
       const slotStartMs = new Date(slot.start_time).getTime();
       if (slotStartMs - Date.now() < 60 * 60 * 1000) { await sendText(tenant, phone, "Sorry, bookings close 60 minutes before the trip starts. Please pick a later time from the list (reply with its number), or type *menu* to start over."); return; }
