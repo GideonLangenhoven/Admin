@@ -43,7 +43,7 @@ async function requestCheckout(body: Record<string, unknown>) {
     headers: { Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
     body: JSON.stringify({ ...body, skip_notifications: true }),
   });
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) return { error: data?.reason || data?.error || "Payment link unavailable" };
   return data;
 }
@@ -322,14 +322,14 @@ async function sendWA(tenant: TenantContext, to: any, body: any) {
     headers: { Authorization: "Bearer " + tenant.credentials.waToken, "Content-Type": "application/json" },
     body: JSON.stringify({ messaging_product: "whatsapp", to: to, ...body }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({ error: { message: "HTTP " + res.status } }));
   console.log("WA:" + JSON.stringify(data));
 
   const auditBody = body?.text?.body || body?.interactive?.body?.text || null;
 
-  // If we get an error about outside the 24 hour window (code 131047 or similar),
-  // we fallback to sending a generic template message to wake the user up.
-  if (!res.ok && data.error && (data.error.code === 131047 || (data.error.message && data.error.message.includes("24")))) {
+  // Outside the 24 hour window (Meta code 131047): send the reopen template instead.
+  // Matching "24" in the message text also caught unrelated errors ("1024 characters").
+  if (!res.ok && data.error?.code === 131047) {
     console.log("Outside 24h window, sending template fallback...");
     const templateRes = await fetch("https://graph.facebook.com/v19.0/" + tenant.credentials.waPhoneId + "/messages", {
       method: "POST",
@@ -665,6 +665,8 @@ async function checkWeatherConcern(tenant: TenantContext, phone: string, input: 
     const wUrl = "https://api.open-meteo.com/v1/forecast?latitude=" + weatherLat + "&longitude=" + weatherLon + "&daily=wind_speed_10m_max,wind_direction_10m_dominant,weather_code&hourly=wind_speed_10m,wind_direction_10m,visibility,temperature_2m&timezone=" + encodeURIComponent(tenantTimeZone(tenant)) + "&forecast_days=" + forecastDays;
     const mUrl = "https://marine-api.open-meteo.com/v1/marine?latitude=" + weatherLat + "&longitude=" + weatherLon + "&daily=wave_height_max,wave_period_max&timezone=" + encodeURIComponent(tenantTimeZone(tenant)) + "&forecast_days=" + forecastDays;
     const [wRes, mRes] = await Promise.all([fetch(wUrl), fetch(mUrl)]);
+    // An error body has no forecast; read as zeros it would promise calm seas.
+    if (!wRes.ok || !mRes.ok) throw new Error("Forecast unavailable: " + wRes.status + "/" + mRes.status);
     const wData = await wRes.json();
     const mData = await mRes.json();
 
