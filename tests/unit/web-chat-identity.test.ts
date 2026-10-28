@@ -9,6 +9,7 @@ const faq = sourceExports("supabase/functions/_shared/intent.ts", {}) as any;
 const duration = sourceExports("supabase/functions/_shared/duration.ts", {}) as any;
 const questions = sourceExports("supabase/functions/_shared/booking-custom-fields.ts", {}) as any;
 const pricing = sourceExports("supabase/functions/_shared/chat-booking-pricing.ts", {}) as any;
+const vouchers = sourceExports("supabase/functions/_shared/vouchers.ts", {}) as any;
 const contact = sourceExports("supabase/functions/_shared/chat-contact.ts", {}) as any;
 
 function fixture({ modelAvailable = true, modelReply = "Use the harbour meeting point." } = {}) {
@@ -75,7 +76,7 @@ function fixture({ modelAvailable = true, modelReply = "Use the harbour meeting 
       classifyIntent: async () => ({ intent, confidence: 1 }), priorityForIntent: () => "NORMAL",
     },
     "../_shared/subscription.ts": { getSubscriptionState: async () => ({ trading: true }) },
-    "../_shared/chat-booking-pricing.ts": pricing, "../_shared/platform-invariants.ts": {},
+    "../_shared/chat-booking-pricing.ts": pricing, "../_shared/vouchers.ts": vouchers, "../_shared/platform-invariants.ts": {},
     "../_shared/bot-prompt.ts": sourceExports("supabase/functions/_shared/bot-prompt.ts", { "./platform-invariants.ts": {}, "./duration.ts": duration }),
     "../_shared/chat-contact.ts": contact,
     "../_shared/booking-custom-fields.ts": questions,

@@ -4,15 +4,16 @@
 // voucher. bookings.converted_to_voucher_id is the idempotency marker: every
 // flow that turns a booking's value into a voucher stamps it, so no booking
 // can ever be reissued twice.
-// ponytail: rebook-booking and wa-webhook still carry their own local copies
-// of genVoucherCode/insertVoucherWithRetry — fold them onto this module the
-// next time either file is open for surgery.
+// ponytail: rebook-booking still carries local copies of genVoucherCode
+// (Math.random) and insertVoucherWithRetry, and wa-webhook of
+// insertVoucherWithRetry — fold them onto this module the next time either
+// file is open for surgery.
 
+// A code is spendable credit, so it comes from the CSPRNG (Math.random is predictable).
+// 32 symbols divide 256 evenly, so byte % 32 has no bias.
 export function genVoucherCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
-  return code;
+  return Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) => chars[byte % 32]).join("");
 }
 
 // Insert a voucher with retry on unique constraint violation (code collision)

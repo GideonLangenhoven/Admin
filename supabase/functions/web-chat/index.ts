@@ -17,6 +17,7 @@ import { classifyIntent, priorityForIntent, findFaqMatch, loadFaqCandidates } fr
 import { getSubscriptionState } from "../_shared/subscription.ts";
 import { applicableBookingQuestions, captureQuestionFields, validateQuestionAnswers } from "../_shared/booking-custom-fields.ts";
 import { calculateChatBookingPricing, rands, verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
+import { genVoucherCode } from "../_shared/vouchers.ts";
 import { parseChatContact, validateChatContact } from "../_shared/chat-contact.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
 import { cancellationPolicyPrompt } from "../_shared/bot-prompt.ts";
@@ -1974,11 +1975,11 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
           return new Response(JSON.stringify({ reply: "Please confirm the gift purchase at " + rands(giftPrice) + ".", state: ns, buttons: [{ label: "Purchase " + rands(giftPrice), value: "gift_confirm" }] }), { status: 200, headers: gCors(req) });
         }
         const purchaseId = await chatPurchaseId(requestedBusinessId, visitorId, ns.checkout_attempt, "GIFT_VOUCHER");
-        let vcode = Array.from({ length: 8 }, function () { return "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 31)]; }).join("");
+        let vcode = genVoucherCode();
         // Retry on unique constraint violation (code collision)
         let gv: any = null;
         for (let _retry = 0; _retry < 5; _retry++) {
-          if (_retry > 0) vcode = Array.from({ length: 8 }, function () { return "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 31)]; }).join("");
+          if (_retry > 0) vcode = genVoucherCode();
           const _ins = await db.from("vouchers").insert({ id: purchaseId, business_id: requestedBusinessId, code: vcode, status: "PENDING", type: "FREE_TRIP", value: ns.gtprice, purchase_amount: ns.gtprice, current_balance: ns.gtprice, recipient_name: ns.grecipient, gift_message: ns.gmessage || null, buyer_name: ns.gbuyername, buyer_email: ns.gbuyeremail, tour_name: ns.gtname, gift_tour_id: giftTour.id, expires_at: new Date(now.getTime() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString() }).select().single();
           if (!_ins.error) { gv = _ins.data; break; }
           if (_ins.error.code !== "23505") break;

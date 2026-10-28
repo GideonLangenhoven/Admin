@@ -24,7 +24,7 @@ import { hashedUserKey } from "../_shared/openrouter-provider.ts";
 import { botReply, type BotOut, type BotUsage } from "../_shared/bot-llm.ts";
 import { calculateChatBookingPricing, rands, verifyChatBookingPricing } from "../_shared/chat-booking-pricing.ts";
 import { applicableBookingQuestions, captureQuestionFields, validateQuestionAnswers } from "../_shared/booking-custom-fields.ts";
-import { getPaidPortions } from "../_shared/vouchers.ts";
+import { genVoucherCode, getPaidPortions } from "../_shared/vouchers.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
 import { formatTourMeetingPoints, gateOutbound, isAvailabilityQuery, MEDIA_FALLBACK_REPLY } from "../_shared/bot-guards.ts";
 
@@ -529,11 +529,6 @@ async function calcDiscount(tenant: TenantContext, qty: any, phone: any) {
   if (result.error || !result.data) throw new Error("Could not verify booking discounts");
   return result.data as { type: string; percent: number; label: string };
 
-}
-function genVoucherCode() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let code = "";
-  for (let i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
-  return code;
 }
 async function insertVoucherWithRetry(payload: any, maxRetries = 5) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {

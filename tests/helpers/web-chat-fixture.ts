@@ -6,6 +6,7 @@ const chatSessions = sourceExports("supabase/functions/_shared/web-chat-session.
 const guards = sourceExports("supabase/functions/_shared/bot-guards.ts", {}) as any;
 const intents = sourceExports("supabase/functions/_shared/intent.ts", {}, env) as any;
 const pricing = sourceExports("supabase/functions/_shared/chat-booking-pricing.ts", {}) as any;
+const vouchers = sourceExports("supabase/functions/_shared/vouchers.ts", {}) as any;
 const contact = sourceExports("supabase/functions/_shared/chat-contact.ts", {}) as any;
 const questions = sourceExports("supabase/functions/_shared/booking-custom-fields.ts", {}) as any;
 const duration = sourceExports("supabase/functions/_shared/duration.ts", {}) as any;
@@ -120,6 +121,7 @@ export function webChatFixture(source = "supabase/functions/web-chat/index.ts") 
     "../_shared/intent.ts": { ...intents, classifyIntent: async () => ({ intent: "OTHER", confidence: 0, model: null, ms: 0 }) },
     "../_shared/subscription.ts": { getSubscriptionState: async () => ({ trading: settings.trading }) },
     "../_shared/chat-booking-pricing.ts": pricing,
+    "../_shared/vouchers.ts": vouchers,
     "../_shared/chat-contact.ts": contact,
     "../_shared/booking-custom-fields.ts": questions,
     "../_shared/platform-invariants.ts": { PLATFORM_INVARIANTS: "Never invent operator facts or grant free trips." },
