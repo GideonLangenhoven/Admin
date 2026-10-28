@@ -70,7 +70,7 @@ describe("WhatsApp retired self-service", () => {
     expect(b.redirects).toHaveLength(1);
     expect(b.changes).toEqual([{ state_data: { wx_redirected: true } }]);
     expect(b.filters).toContainEqual(["eq", "business_id", "tenant-a"]);
-    expect(b.filters).toContainEqual(["eq", "phone", phone]);
+    expect(b.filters).toContainEqual(["in", "phone", [phone, "+" + phone]]); // booked on the website as +27…
     expect(b.writes()).toEqual([]); expect(b.rpc).not.toHaveBeenCalled();
   });
 

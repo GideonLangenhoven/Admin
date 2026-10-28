@@ -534,7 +534,8 @@ async function insertVoucherWithRetry(payload: any, maxRetries = 5) {
   return { data: null, error: { message: "Failed to generate unique voucher code after " + maxRetries + " attempts" } };
 }
 async function hasActiveBookings(tenant: TenantContext, phone: any) {
-  const r = await supabase.from("bookings").select("id").eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "HELD", "CONFIRMED"]).limit(1);
+  // WhatsApp sends "27…"; the booking site stores "+27…". Bookings lookups match both.
+  const r = await supabase.from("bookings").select("id").in("phone", [phone, "+" + phone]).eq("business_id", tenant.business.id).in("status", ["PAID", "HELD", "CONFIRMED"]).limit(1);
   return (r.data || []).length > 0;
 }
 
@@ -561,7 +562,7 @@ async function validateReferralCode(tenant: TenantContext, code: any, phone: any
 
 // ===== REPEAT BOOKING =====
 async function getLastCompletedBooking(tenant: TenantContext, phone: any) {
-  const r = await supabase.from("bookings").select("*, tours(id, name, base_price_per_person)").eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["COMPLETED", "PAID"]).order("created_at", { ascending: false }).limit(1).single();
+  const r = await supabase.from("bookings").select("*, tours(id, name, base_price_per_person)").in("phone", [phone, "+" + phone]).eq("business_id", tenant.business.id).in("status", ["COMPLETED", "PAID"]).order("created_at", { ascending: false }).limit(1).single();
   return r.data;
 }
 
@@ -613,7 +614,7 @@ async function checkWeatherConcern(tenant: TenantContext, phone: string, input: 
 
   // Check if they have a booking
   const wBkr = await supabase.from("bookings").select("id, slots(start_time), tours(name)")
-    .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
+    .in("phone", [phone, "+" + phone]).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
     .order("created_at", { ascending: false }).limit(1).single();
   let bkInfo = "";
   let bkTime = "";
@@ -886,7 +887,7 @@ async function buildBotSystemForTurn(tenant: TenantContext, phone: string, userT
     getActiveTours(tenant),
     retrieveKb(supabase, bizId, userText),
     supabase.from("bookings").select("id, status, qty, total_amount, slots(start_time), tours(name)")
-      .eq("phone", phone).eq("business_id", bizId).in("status", ["PAID", "HELD", "CONFIRMED"])
+      .in("phone", [phone, "+" + phone]).eq("business_id", bizId).in("status", ["PAID", "HELD", "CONFIRMED"])
       .order("created_at", { ascending: false }).limit(3),
     getAvailSlots(tenant, 5),
     supabase.from("wa_messages").select("id", { count: "exact", head: true })
@@ -1235,7 +1236,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const cb = await supabase.from("bookings").select("cancellation_reason, refund_status, cancellation_self_service, cancellation_options")
         .eq("business_id", tenant.business.id)
-        .eq("phone", phone)
+        .in("phone", [phone, "+" + phone])
         .eq("status", "CANCELLED")
         .gt("cancelled_at", yesterday)
         .order("cancelled_at", { ascending: false }).limit(1).maybeSingle();
@@ -1290,7 +1291,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const recentBk = await supabase.from("bookings")
         .select("id, slot_id")
         .eq("business_id", tenant.business.id)
-        .eq("phone", phone)
+        .in("phone", [phone, "+" + phone])
         .in("status", ["PAID", "CONFIRMED", "COMPLETED"])
         .order("created_at", { ascending: false })
         .limit(1)
@@ -2528,7 +2529,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       if (wantChangeName) {
         const nmBkr = await supabase.from("bookings").select("id, customer_name, slots(start_time), tours(name)")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
+          .in("phone", [phone, "+" + phone]).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
           .order("created_at", { ascending: false }).limit(1).single();
         if (nmBkr.data) {
           const nmBk = nmBkr.data; const nmRef = nmBk.id.substring(0, 8).toUpperCase();
@@ -2544,7 +2545,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // Handle payment link resend
       if (wantPaymentLink) {
         const payBkr = await supabase.from("bookings").select("id, status, total_amount, yoco_checkout_id, slots(start_time), tours(name)")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["HELD", "PENDING"])
+          .in("phone", [phone, "+" + phone]).eq("business_id", tenant.business.id).in("status", ["HELD", "PENDING"])
           .order("created_at", { ascending: false }).limit(1).single();
         if (payBkr.data && payBkr.data.yoco_checkout_id) {
           // Create new checkout
@@ -2568,7 +2569,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // Handle confirmation email resend
       if (wantConfirmEmail) {
         const emBkr = await supabase.from("bookings").select("id, email, customer_name, qty, total_amount, status, slots(start_time), tours(name)")
-          .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
+          .in("phone", [phone, "+" + phone]).eq("business_id", tenant.business.id).in("status", ["PAID", "CONFIRMED"])
           .order("created_at", { ascending: false }).limit(1).single();
         if (emBkr.data) {
           const emBk = emBkr.data; const emRef = emBk.id.substring(0, 8).toUpperCase();
@@ -2638,7 +2639,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       let gemContext = "";
       // Get their bookings for context
       const ctxBkr = await supabase.from("bookings").select("id, status, qty, total_amount, slots(start_time), tours(name)")
-        .eq("phone", phone).eq("business_id", tenant.business.id).in("status", ["PAID", "HELD", "CONFIRMED"])
+        .in("phone", [phone, "+" + phone]).eq("business_id", tenant.business.id).in("status", ["PAID", "HELD", "CONFIRMED"])
         .order("created_at", { ascending: false }).limit(3);
       const ctxBookings = ctxBkr.data || [];
       if (ctxBookings.length > 0) {
