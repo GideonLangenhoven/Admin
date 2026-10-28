@@ -518,3 +518,40 @@ Open, needing an owner decision or a migration:
   for up to about 135 s after the reply is sent. Replies and state are saved
   first, and Meta's retries are deduplicated by `processed_wa_messages`.
   Production `llm_usage` has no `wa-v2-shadow` rows.
+
+## 8. Bot round: owner decisions of 28 Oct 2026 (NOT deployed)
+
+Branch `golive/bot-sota-2026-10-28` (admin repo, 251fe05..626b96d) and the booking repo's branch of the same name (369446b, d2742d7). One commit and a test for each item. The unit suite is at the 8 known failures, tsc and check:edge pass, and lint shows the 6 known errors.
+
+| # | Change | Commit |
+|---|--------|--------|
+| 1 | WhatsApp weather questions get the operator's policy, never a forecast | 251fe05 |
+| 2 | A FREE_TRIP voucher is credit up to its value, for any group size (both bots) | ed9e568 |
+| 3 | WA inbound injection gate; CSPRNG codes; "More tours" paging past 9; v2 shadow runs after Meta's 200 | af6f730, 6149016, 935ba8c, e04707a |
+| 4 | Meta's real typing indicator plus read receipts; the fake pause is gone | 7dd917f |
+| 5 | Weather-cancel replies name only the offered options; notify-only hands the chat to the team | 8ced2a4 |
+| 6 | Promo codes in both chats, re-checked server-side, `promo_code` passed to checkout | 9d6c8d1 |
+| 7 | Any language, auto-detected, on both bots; the Inbox shows the English; team replies are translated | 53994f8 |
+| 8 | Turnstile on new web chat sessions, enforced only when `TURNSTILE_SECRET_KEY` is set | 812246b, a755dc5, booking 369446b |
+| 9 | Returning-guest discount for verified guests on every channel, priced in checkout | 626b96d, booking d2742d7 |
+
+**Migrations, not applied live:**
+- `20261028200000_chat_guest_language.sql` adds `conversations.language` and `chat_messages.body_en`. It was applied twice on a local Postgres (idempotent; the CHECK constraint rejects anything that isn't a 2-letter code).
+- `20261028210000_verified_loyalty_discount.sql` adds an email to `resolve_booking_discount` and creates the service-role-only `apply_verified_booking_discount`. It is verified by `node tests/verified-loyalty-local.mjs <socket dir> <port>`.
+- Apply both before the functions deploy. The current web-chat code already sends `p_email`.
+
+**Deploy scope:**
+- Edge functions: wa-webhook, web-chat, admin-reply, create-checkout, rebook-booking, marketing-automation-dispatch.
+- The admin app (Inbox English line).
+- The booking app (Turnstile widget plus CSP, and checkout "Email me a code").
+
+**Owner steps for Turnstile:**
+1. Create a Cloudflare Turnstile widget for the booking domains.
+2. Set the edge secret `TURNSTILE_SECRET_KEY`.
+3. Set the booking Vercel env `NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
+
+**Known gaps:**
+- Translation: the bots' keyword logic still runs on the guest's original words, not the English translation. The end-of-chat message and WhatsApp templates are not translated.
+- Booking site: the page total doesn't show the loyalty discount. It says the discount "is taken off at payment", and the Yoco amount is the true amount.
+- Booking site: unverified guests still get no automatic group discount there. This is unchanged from before.
+- Web chat verification: there is no in-chat code entry. Guests are linked to My Bookings, and the widget picks up the session on their next message.
