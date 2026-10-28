@@ -26,7 +26,7 @@ import { calculateChatBookingPricing, rands, verifyChatBookingPricing } from "..
 import { applicableBookingQuestions, captureQuestionFields, validateQuestionAnswers } from "../_shared/booking-custom-fields.ts";
 import { genVoucherCode, getPaidPortions } from "../_shared/vouchers.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
-import { formatTourMeetingPoints, gateOutbound, isAvailabilityQuery, MEDIA_FALLBACK_REPLY } from "../_shared/bot-guards.ts";
+import { formatTourMeetingPoints, gateInbound, gateOutbound, isAvailabilityQuery, MEDIA_FALLBACK_REPLY } from "../_shared/bot-guards.ts";
 
 const VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -411,7 +411,16 @@ function screenReply(text: string) {
   if (out.leakDetected) console.warn("WA_LLM_LEAK:" + out.matches.join(","));
   return out.reply;
 }
+// Web chat's inbound screen: an injection attempt gets the refusal and never reaches the model.
+function injectionRefusal(text: string): string | null {
+  const gate = gateInbound(text);
+  if (gate.safe) return null;
+  console.warn("WA_INJECTION:" + gate.reason);
+  return gate.reply || null;
+}
 async function gemFallback(tenant: TenantContext, msg: string, phone?: any, extraContext?: string): Promise<string | null> {
+  const refusal = injectionRefusal(msg);
+  if (refusal) return refusal;
   // Ground the answer in the tenant's vector KB (returns "" when nothing relevant)
   const kbCtx = await retrieveKbContext(supabase, tenant.business.id, msg);
   const ctx = [kbCtx, extraContext].filter(Boolean).join("\n\n") || undefined;
@@ -879,6 +888,11 @@ async function buildBotSystemForTurn(tenant: TenantContext, phone: string, userT
 // silent). false → caller falls through to the legacy path.
 async function botAnswerV2(tenant: TenantContext, phone: any, convo: any, userText: string, mode: "send" | "shadow"): Promise<boolean> {
   try {
+    const refusal = injectionRefusal(userText);
+    if (refusal) {
+      if (mode === "send") await sendText(tenant, phone, refusal);
+      return true;
+    }
     // The v2 path calls botReply directly, bypassing llmText, so the fair-use
     // ceiling has to be applied here too. Returning false drops the turn to the
     // legacy bot rather than leaving the customer with nothing. Shadow runs are
@@ -2596,7 +2610,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         if (WA_BOT_V2 === "on" && await botAnswerV2(tenant, phone, convo, rawText, "send")) return;
         const askKbCtx = await retrieveKbContext(supabase, tenant.business.id, rawText);
         if (askKbCtx) gemContext = askKbCtx + "\n" + gemContext;
-        const ctxOut = await llmText({
+        const ctxOut = injectionRefusal(rawText) ?? await llmText({
           system: buildGeminiInstruction(tenant, gemContext),
           user: rawText,
           maxTokens: 400,
