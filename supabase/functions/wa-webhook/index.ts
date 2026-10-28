@@ -26,7 +26,7 @@ import { calculateChatBookingPricing, verifyChatBookingPricing } from "../_share
 import { applicableBookingQuestions, captureQuestionFields, validateQuestionAnswers } from "../_shared/booking-custom-fields.ts";
 import { getPaidPortions } from "../_shared/vouchers.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
-import { formatTourMeetingPoints, isAvailabilityQuery } from "../_shared/bot-guards.ts";
+import { formatTourMeetingPoints, isAvailabilityQuery, MEDIA_FALLBACK_REPLY } from "../_shared/bot-guards.ts";
 
 const VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -1174,6 +1174,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
     }
     if (quiet) { console.warn("WA_RATE_LIMITED business=" + tenant.business.id); return; }
+    // The bot reads text only; the team sees the original in the Inbox.
+    if (!["text", "interactive", "button", "image", "document"].includes(msgType)) { await sendText(tenant, phone, MEDIA_FALLBACK_REPLY); return; }
 
     let state = convo.current_state || "IDLE";
     let sd = convo.state_data || {};
@@ -2840,7 +2842,9 @@ async function processWhatsappValue(tenant: TenantContext, value: any, message: 
       else if (mt === "interactive") { inter = message.interactive; txt = (inter.button_reply && inter.button_reply.title) || (inter.list_reply && inter.list_reply.title) || ""; }
       else if (mt === "document") txt = "[Document Sent]";
       else if (mt === "image") txt = "[Image Sent]";
-      else { console.log("SKIP non-text msg type:" + mt + " from:" + ph); return new Response("OK", { status: 200 }); }
+      else if (mt === "button") txt = (message.button && message.button.text) || ""; // a template quick-reply tap
+      else if (mt === "reaction" || mt === "system") { console.log("SKIP msg type:" + mt + " from:" + ph); return new Response("OK", { status: 200 }); }
+      else txt = "[" + mt + " message]"; // voice note, location, sticker...: logged for the Inbox, answered below
       console.log("F:" + ph + " B:" + tenant.business.id + " T:" + txt);
       // One number can't run up the tenant's AI allowance by scripting messages: past
       // 20 a minute the bot stays quiet. STOP, DELETE and the Inbox still work.
