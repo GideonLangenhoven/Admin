@@ -545,53 +545,39 @@ async function getLastCompletedBooking(tenant: TenantContext, phone: any) {
 
 // ===== SMART AVAILABILITY =====
 function parseTimeRef(tenant: TenantContext, input: string): { start: Date, end: Date, label: string } | null {
+  // Every boundary is a wall-clock time in the tenant's timezone.
   const i = input.toLowerCase();
-  const now = new Date();
-  const tzNow = new Date(now.toLocaleString("en-US", { timeZone: tenantTimeZone(tenant) }));
-  const today = new Date(tzNow.getFullYear(), tzNow.getMonth(), tzNow.getDate());
-  let targetDate: Date | null = null;
-  let label = "";
-  if (i.includes("tomorrow") || i.includes("tmrw")) { targetDate = new Date(today); targetDate.setDate(targetDate.getDate() + 1); label = "tomorrow"; }
-  else if (i.includes("today") || i.includes("this afternoon") || i.includes("this morning")) { targetDate = new Date(today); label = "today"; }
-  else {
-    const days: string[] = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-    for (let d = 0; d < days.length; d++) {
-      if (i.includes(days[d]) || i.includes(days[d].substring(0, 3))) {
-        const currentDay = today.getDay(); let diff = d - currentDay; if (diff <= 0) diff += 7;
-        targetDate = new Date(today); targetDate.setDate(targetDate.getDate() + diff);
-        label = days[d].charAt(0).toUpperCase() + days[d].slice(1); break;
-      }
-    }
+  const todayKey = tenantTodayKey(tenant);
+  const at = (key: string, hour: number) => new Date(zonedDateTimeToUtcIso(tenant, key, hour));
+  const dow = new Date(todayKey + "T12:00:00Z").getUTCDay();
+  if (/\bweekend\b/.test(i)) {
+    // On a Saturday or Sunday, "this weekend" is the one under way.
+    const sat = addDaysToKey(todayKey, dow === 0 ? -1 : 6 - dow);
+    return { start: at(sat, 0), end: at(addDaysToKey(sat, 2), 0), label: "this weekend" };
   }
-  if (i.includes("weekend")) {
-    const sat = new Date(today); let daysToSat = 6 - sat.getDay(); if (daysToSat <= 0) daysToSat += 7;
-    sat.setDate(sat.getDate() + daysToSat);
-    const mon = new Date(sat); mon.setDate(mon.getDate() + 2);
-    return { start: sat, end: mon, label: "this weekend" };
+  if (/\bnext week\b/.test(i)) {
+    const mon = addDaysToKey(todayKey, (8 - dow) % 7 || 7);
+    return { start: at(mon, 0), end: at(addDaysToKey(mon, 7), 0), label: "next week" };
   }
-  if (i.includes("next week")) {
-    const nextMon = new Date(today); const toMon = (8 - nextMon.getDay()) % 7 || 7;
-    nextMon.setDate(nextMon.getDate() + toMon);
-    const nextSun = new Date(nextMon); nextSun.setDate(nextSun.getDate() + 7);
-    return { start: nextMon, end: nextSun, label: "next week" };
+  let dateKey = /\bthis (morning|afternoon|evening)\b/.test(i) ? todayKey : parseLocalDate(tenant, i);
+  const ord = !dateKey && i.match(/\b(\d{1,2})(st|nd|rd|th)\b/);
+  if (ord) {
+    // "the 21st": this month, or next month once it has passed.
+    const [ty, tmo] = todayKey.split("-").map(Number);
+    dateKey = keyFromParts(ty, tmo, Number(ord[1]));
+    if (dateKey && dateKey < todayKey) dateKey = keyFromParts(tmo === 12 ? ty + 1 : ty, tmo % 12 + 1, Number(ord[1]));
   }
-  if (!targetDate) {
-    const dm = i.match(/(\d{1,2})\s*(st|nd|rd|th)/);
-    if (dm) {
-      targetDate = new Date(today); targetDate.setDate(parseInt(dm[1]));
-      if (targetDate < today) targetDate.setMonth(targetDate.getMonth() + 1);
-      label = targetDate.toLocaleDateString("en-ZA", { weekday: "short", day: "numeric", month: "short", timeZone: tenantTimeZone(tenant) });
-    }
-  }
-  if (!targetDate) return null;
-  const start = new Date(targetDate); let end = new Date(targetDate); end.setDate(end.getDate() + 1);
-  if (i.includes("morning") || i.includes("early")) { start.setHours(5, 0, 0, 0); end = new Date(targetDate); end.setHours(12, 0, 0, 0); label += " morning"; }
-  else if (i.includes("afternoon")) { start.setHours(12, 0, 0, 0); end = new Date(targetDate); end.setHours(17, 0, 0, 0); label += " afternoon"; }
-  else if (i.includes("evening") || i.includes("sunset")) { start.setHours(16, 0, 0, 0); end = new Date(targetDate); end.setHours(21, 0, 0, 0); label += " evening"; }
-  const tm = i.match(/(\d{1,2})\s*(am|pm)/);
-  if (tm) {
-    let hr = parseInt(tm[1]); if (tm[2] === "pm" && hr < 12) hr += 12; if (tm[2] === "am" && hr === 12) hr = 0;
-    start.setHours(hr, 0, 0, 0); end = new Date(targetDate); end.setHours(hr + 2, 0, 0, 0);
+  if (!dateKey) return null;
+  let label = dateKey === todayKey ? "today" : dateKey === addDaysToKey(todayKey, 1) ? "tomorrow"
+    : formatDateOnly(tenant, at(dateKey, 12), { weekday: "short", day: "numeric", month: "short" });
+  let start = at(dateKey, 0); let end = at(addDaysToKey(dateKey, 1), 0);
+  if (/\b(morning|early)\b/.test(i)) { start = at(dateKey, 5); end = at(dateKey, 12); label += " morning"; }
+  else if (/\bafternoon\b/.test(i)) { start = at(dateKey, 12); end = at(dateKey, 17); label += " afternoon"; }
+  else if (/\b(evening|sunset)\b/.test(i)) { start = at(dateKey, 16); end = at(dateKey, 21); label += " evening"; }
+  const tm = i.match(/\b(\d{1,2})\s*(am|pm)\b/);
+  if (tm && Number(tm[1]) >= 1 && Number(tm[1]) <= 12) {
+    const hr = Number(tm[1]) % 12 + (tm[2] === "pm" ? 12 : 0);
+    start = at(dateKey, hr); end = at(dateKey, hr + 2);
   }
   return { start: start, end: end, label: label };
 }
@@ -701,9 +687,11 @@ async function handleSmartAvail(tenant: TenantContext, phone: string, input: str
   if (!timeRef) return false;
 
   // No hard slot limits; pull all within the boundaries user asked for
-  const r = await supabase.from("slots").select("id, start_time, capacity_total, booked, held, tour_id, tours(name, base_price_per_person)")
+  // Bookings close 60 minutes before departure (same cutoff as the booking flow).
+  const from = new Date(Math.max(timeRef.start.getTime(), Date.now() + 60 * 60 * 1000));
+  const r = await supabase.from("slots").select("id, start_time, capacity_total, booked, held, tour_id, price_per_person_override, tours(name, base_price_per_person)")
     .eq("business_id", tenant.business.id).eq("status", "OPEN")
-    .gte("start_time", timeRef.start.toISOString())
+    .gte("start_time", from.toISOString())
     .lt("start_time", timeRef.end.toISOString())
     .order("start_time", { ascending: true });
   const slots = (r.data || []).filter(function (s: any) { return s.capacity_total - s.booked - (s.held || 0) > 0; });
@@ -720,11 +708,12 @@ async function handleSmartAvail(tenant: TenantContext, phone: string, input: str
     const s = displaySlots[si]; const tour = (s as any).tours;
     const avail = s.capacity_total - s.booked - (s.held || 0);
     msg += "\u{1F6F6} *" + (tour?.name || "Tour") + "*\n";
-    msg += "   " + fmtTime(tenant, s.start_time) + ", " + avail + " spots, R" + (tour?.base_price_per_person || "600") + "/pp\n\n";
+    const pp = (s as any).price_per_person_override ?? tour?.base_price_per_person;
+    msg += "   " + fmtTime(tenant, s.start_time) + ", " + avail + (avail === 1 ? " spot" : " spots") + (pp != null ? ", R" + pp + "/pp" : "") + "\n\n";
   }
 
   if (slots.length > 8) {
-    msg += "...and several other times available! Click 'Pick a Date' to browse the full calendar.\n\nWant to book one of these?";
+    msg += "...and more times. Tap *Book Now* to see them all.\n\nWant to book one of these?";
   } else {
     msg += "Want to book one of these?";
   }
