@@ -21,6 +21,7 @@ import dynamic from "next/dynamic";
 import { CaretDown } from "@phosphor-icons/react";
 import { DatePicker } from "../../components/DatePicker";
 import WhatsAppBotSection from "./components/WhatsAppBotSection";
+import EmailWordingSection, { type EmailOverrides } from "./components/EmailWordingSection";
 import { DemoFeatureLink } from "../../components/DemoActionGuide";
 import { isDemoPathVisible } from "../lib/demo-guide";
 import RemoveIntegrationButton from "../../components/RemoveIntegrationButton";
@@ -267,6 +268,7 @@ export default function SettingsPage() {
     const [emailImgs, setEmailImgs] = useState({ payment: "", confirm: "", invoice: "", gift: "", cancel: "", cancel_weather: "", indemnity: "", admin: "", voucher: "", photos: "" });
     const [emailImgsSaving, setEmailImgsSaving] = useState(false);
     const [emailTagline, setEmailTagline] = useState("");
+    const [emailOverrides, setEmailOverrides] = useState<EmailOverrides>({});
     const [activityVerbPast, setActivityVerbPast] = useState("");
     const [locationPhrase, setLocationPhrase] = useState("");
     const [emailImgsMessage, setEmailImgsMessage] = useState({ type: "", text: "" });
@@ -959,6 +961,7 @@ export default function SettingsPage() {
             setGooglePlaceId(data.google_place_id || "");
             setEmailColor(data.email_color || "#1b3b36");
             setEmailTagline(data.email_tagline || "");
+            setEmailOverrides(data.email_overrides && typeof data.email_overrides === "object" ? data.email_overrides : {});
             setActivityVerbPast(data.activity_verb_past || "");
             setLocationPhrase(data.location_phrase || "");
             setSocialLinks({
@@ -1547,6 +1550,9 @@ export default function SettingsPage() {
         const { error } = await supabase.from("businesses").update({
             email_color: emailColor,
             email_tagline: emailTagline.trim() || null,
+            email_overrides: Object.fromEntries(Object.entries(emailOverrides)
+                .map(([k, o]) => [k, Object.fromEntries(Object.entries(o).map(([f, v]) => [f, (v || "").trim()]).filter(([, v]) => v))])
+                .filter(([, o]) => Object.keys(o).length)),
             activity_verb_past: activityVerbPast.trim() || null,
             location_phrase: locationPhrase.trim() || null,
             email_img_payment: emailImgs.payment || null,
@@ -2869,7 +2875,7 @@ export default function SettingsPage() {
                 </div>
             </CollapsibleSection>}
 
-            {canAccess("email") && <CollapsibleSection id="email" title="Email Customisation" subtitle="Colour theme and banner images for each email type" openSections={openSections} toggle={toggleSection}>
+            {canAccess("email") && <CollapsibleSection id="email" title="Email Customisation" subtitle="Colour theme, wording and banner images for each email type" openSections={openSections} toggle={toggleSection}>
                 <form data-demo-submit="email.save" onSubmit={handleSaveEmailImages} className="space-y-6">
                     {/* Email Color Picker */}
                     <div className="ui-surface rounded-2xl border border-[var(--ck-border-subtle)] p-5">
@@ -2927,6 +2933,8 @@ export default function SettingsPage() {
                                 placeholder="e.g. Get ready to meet the lions up close on an unforgettable safari." />
                         </label>
                     </div>
+
+                    <EmailWordingSection businessId={businessId} value={emailOverrides} onChange={setEmailOverrides} />
 
                     {([
                         { key: "payment", label: "Payment Link", desc: "Sent when admin creates a booking requiring payment" },

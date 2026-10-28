@@ -279,7 +279,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
       emailColor: "#1b3b36",
       imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "",
       socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "",
-      meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", locationPhrase: "", emailTagline: "", logoUrl: "",
+      meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", locationPhrase: "", emailTagline: "", emailOverrides: {} as Record<string, EmailOverride>, logoUrl: "",
     };
   }
 
@@ -287,7 +287,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
   try {
     const res = await supabase
       .from("businesses")
-      .select("id, name, business_name, subdomain, timezone, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos, social_facebook, social_instagram, social_tiktok, social_youtube, social_twitter, social_linkedin, social_tripadvisor, social_google_reviews, meeting_point_address, arrival_instructions, business_address, what_to_bring, activity_verb_past, location_phrase, email_tagline, logo_url")
+      .select("id, name, business_name, subdomain, timezone, notification_email, footer_line_one, footer_line_two, manage_bookings_url, booking_site_url, gift_voucher_url, waiver_url, directions, email_color, email_img_payment, email_img_confirm, email_img_invoice, email_img_gift, email_img_cancel, email_img_cancel_weather, email_img_indemnity, email_img_admin, email_img_voucher, email_img_photos, social_facebook, social_instagram, social_tiktok, social_youtube, social_twitter, social_linkedin, social_tripadvisor, social_google_reviews, meeting_point_address, arrival_instructions, business_address, what_to_bring, activity_verb_past, location_phrase, email_tagline, email_overrides, logo_url")
       .eq("id", businessId)
       .maybeSingle();
     data = res.data;
@@ -356,6 +356,7 @@ async function loadEmailBranding(d: Record<string, unknown>) {
     activityVerbPast: String(data?.activity_verb_past || ""),
     locationPhrase: String(data?.location_phrase || ""),
     emailTagline: String(data?.email_tagline || ""),
+    emailOverrides: (data?.email_overrides && typeof data.email_overrides === "object" ? data.email_overrides : {}) as Record<string, EmailOverride>,
     logoUrl: String(data?.logo_url || ""),
   };
 }
@@ -679,7 +680,7 @@ function paymentLinkHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
             <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Hi ${d.customer_name},</h2>
-            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">${d.intro || ("You're almost there. Please complete your payment below to secure your spots for the <strong>" + d.tour_name + "</strong>.")}</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;"><!--msg-->${d.intro || ("You're almost there. Please complete your payment below to secure your spots for the <strong>" + d.tour_name + "</strong>.")}<!--/msg--></p>
             ${paymentDueHtml(d)}
             ${d.partial_payment ? "<p>Thank you for your part payment. Please contact the operator to settle the remaining balance before the deadline.</p>" : ""}
             ${d.cancel_phrase && !d.payment_due_label ? `<p style="font-size: 14px; line-height: 1.6; color: #B45309; background:#FEF3C7; border-radius:8px; padding:12px 16px; margin: 0 0 20px 0;">Heads up: if payment isn't made, this booking will be automatically cancelled about <strong>${d.cancel_phrase} before the trip</strong> so the spot can be released. Any trouble paying? Just reply to this email.</p>` : ""}
@@ -746,7 +747,7 @@ function voucherPaymentLinkHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
             <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Hi ${d.buyer_name},</h2>
-            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">Please complete payment for the gift voucher for <strong>${d.recipient_name}</strong>. The voucher code will be emailed after payment is confirmed.</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;"><!--msg-->Please complete payment for the gift voucher for <strong>${d.recipient_name}</strong>. The voucher code will be emailed after payment is confirmed.<!--/msg--></p>
           </td>
         </tr>
         <tr>
@@ -841,7 +842,7 @@ function bookingConfirmHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
             <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">${d.returning_customer ? 'Welcome back' : 'We can\'t wait to see you'}, ${d.customer_name}.</h2>
-            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">Your spots for the <strong>${d.tour_name}</strong> are officially locked in. ${activityFlavor}</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;"><!--msg-->Your spots for the <strong>${d.tour_name}</strong> are officially locked in. ${activityFlavor}<!--/msg--></p>
             ${paymentDueHtml(d)}
           </td>
         </tr>
@@ -968,7 +969,7 @@ function reschedulePaymentLinkHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
             <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Hi ${d.customer_name},</h2>
-            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 8px 0;">Your booking is being moved to a new slot, but it costs a little more. Pay the top-up below to confirm the change.</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 8px 0;"><!--msg-->Your booking is being moved to a new slot, but it costs a little more. Pay the top-up below to confirm the change.<!--/msg--></p>
             <p style="font-size: 13px; color: #888; margin: 0 0 30px 0;">If you don't complete payment within 15 minutes, your original booking stays as it was.</p>
           </td>
         </tr>
@@ -1040,7 +1041,7 @@ function bookingUpdatedHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
             <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Hi ${d.customer_name},</h2>
-            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">${eventMessage}</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;"><!--msg-->${eventMessage}<!--/msg--></p>
           </td>
         </tr>
         <!-- Details Box -->
@@ -1316,12 +1317,12 @@ function giftVoucherHtml(d: Record<string, unknown>, face: string) {
 
   const introHtml = mode === "recipient"
     ? `<h2 style="font-size: 26px; font-family: Georgia, serif; margin: 0 0 12px 0; color: #1b3b36;">Hi ${recipientName},</h2>
-       <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;"><strong>${buyerName}</strong> just sent you a gift: an adventure, on them. Your voucher is below.</p>`
+       <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;"><!--msg--><strong>${buyerName}</strong> just sent you a gift: an adventure, on them. Your voucher is below.<!--/msg--></p>`
     : mode === "buyer_receipt"
       ? `<h2 style="font-size: 26px; font-family: Georgia, serif; margin: 0 0 12px 0; color: #1b3b36;">Hi ${buyerName},</h2>
-         <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">Your gift voucher purchase for <strong>${recipientName}</strong> is confirmed. Keep this copy for your records.</p>`
+         <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;"><!--msg-->Your gift voucher purchase for <strong>${recipientName}</strong> is confirmed. Keep this copy for your records.<!--/msg--></p>`
       : `<h2 style="font-size: 26px; font-family: Georgia, serif; margin: 0 0 12px 0; color: #1b3b36;">Hi ${buyerName},</h2>
-         <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">Your gift voucher purchase for <strong>${recipientName}</strong> is confirmed. Save the attached voucher image to share it with them or print it as a card.</p>`;
+         <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 20px 0;"><!--msg-->Your gift voucher purchase for <strong>${recipientName}</strong> is confirmed. Save the attached voucher image to share it with them or print it as a card.<!--/msg--></p>`;
 
   // How to give / redeem the gift, tailored to who's reading.
   const forwardNote = mode === "recipient"
@@ -1531,7 +1532,7 @@ function cancellationHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
             <h2 style="font-size: 24px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Hi ${d.customer_name},</h2>
-            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;">${cancelText}</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 30px 0;"><!--msg-->${cancelText}<!--/msg--></p>
           </td>
         </tr>
         <!-- Details Box -->
@@ -1601,7 +1602,7 @@ function indemnityHtml(d: Record<string, unknown>) {
         <tr>
           <td style="padding: 40px 40px 10px; text-align: center;">
             <h2 style="font-size: 22px; font-family: Georgia, serif; margin: 0 0 15px 0; color: #1b3b36;">Hi ${d.customer_name},</h2>
-            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 10px 0;">${d.manual_waiver_request ? `Please complete the waiver for your <strong>${d.tour_name}</strong> booking before you arrive.` : `Your <strong>${d.tour_name}</strong> is ${d.first_operator_booking ? "coming up soon" : "tomorrow"}. This is a reminder to arrive early and finish any outstanding pre-trip steps.`}</p>
+            <p style="font-size: 16px; line-height: 1.6; color: #555; margin: 0 0 10px 0;"><!--msg-->${d.manual_waiver_request ? `Please complete the waiver for your <strong>${d.tour_name}</strong> booking before you arrive.` : `Your <strong>${d.tour_name}</strong> is ${d.first_operator_booking ? "coming up soon" : "tomorrow"}. This is a reminder to arrive early and finish any outstanding pre-trip steps.`}<!--/msg--></p>
             <p style="font-size: 15px; line-height: 1.6; color: #555; margin: 0 0 20px 0;">${waiverPending ? "Your waiver is still outstanding. Please complete it before the trip so check-in stays quick on the day." : "Your waiver has already been completed. You are all set for check-in."}</p>
           </td>
         </tr>
@@ -1701,7 +1702,7 @@ function voucherHtml(d: Record<string, unknown>) {
         <!-- Thank You -->
         <tr>
           <td style="text-align: center; padding: 30px 40px 10px;">
-            <p style="font-size: 15px; color: #6b7280; margin: 0;">Thank you for choosing Cape Kayak Adventures</p>
+            <p style="font-size: 15px; color: #6b7280; margin: 0;"><!--msg-->Thank you for choosing Cape Kayak Adventures<!--/msg--></p>
           </td>
         </tr>
         <!-- Voucher Code Box -->
@@ -1762,7 +1763,7 @@ function voucherBalanceHtml(d: Record<string, unknown>) {
         <tr>
           <td style="text-align: center; padding: 30px 40px 10px;">
             <p style="font-size: 16px; color: #333; margin: 0;">Hi ${d.customer_name || "there"},</p>
-            <p style="font-size: 15px; color: #6b7280; margin: 10px 0 0 0;">Your voucher was used for a booking. Here's a summary of your remaining balance.</p>
+            <p style="font-size: 15px; color: #6b7280; margin: 10px 0 0 0;"><!--msg-->Your voucher was used for a booking. Here's a summary of your remaining balance.<!--/msg--></p>
           </td>
         </tr>
         <!-- Booking Details -->
@@ -1865,7 +1866,7 @@ function tripPhotosHtml(d: Record<string, unknown>, branding?: { activityVerbPas
           <td style="padding: 10px 40px 20px; text-align: center;">
             <p style="font-size: 15px; color: #555; line-height: 1.7; margin: 0;">
               Hi ${d.customer_name},<br><br>
-              Thank you for ${verb} with <strong>Cape Kayak Adventures</strong>${d.tour_name ? " on our <strong>" + d.tour_name + "</strong> trip" : ""}! We loved having you out there and hope you enjoyed every moment.
+              <!--msg-->Thank you for ${verb} with <strong>Cape Kayak Adventures</strong>${d.tour_name ? " on our <strong>" + d.tour_name + "</strong> trip" : ""}! We loved having you out there and hope you enjoyed every moment.<!--/msg-->
             </p>
           </td>
         </tr>
@@ -2233,6 +2234,48 @@ const VAT_RATE = 0.15;
 
 function escHtml(raw: string) {
   return raw.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+// Customer emails whose subject / heading / main message the operator may
+// reword (businesses.email_overrides, keyed by these names). Identity, legal,
+// platform and operator-to-operator emails stay fixed. Gift vouchers split by
+// audience. Keep in sync with EMAIL_WORDING in app/settings/page.tsx.
+const CUSTOMISABLE_EMAILS = [
+  "PAYMENT_LINK", "PAYMENT_FAILED", "PAYMENT_EXPIRING", "PAYMENT_REMINDER", "RESCHEDULE_PAYMENT_LINK", "VOUCHER_PAYMENT_LINK",
+  "BOOKING_CONFIRM", "BOOKING_UPDATED", "INVOICE", "GIFT_VOUCHER", "GIFT_VOUCHER_RECIPIENT", "CANCELLATION",
+  "WAIVER_REQUEST", "INDEMNITY", "REMINDER", "FIRST_BOOKING_TRIP", "VOUCHER", "VOUCHER_BALANCE", "TRIP_PHOTOS",
+];
+type EmailOverride = { subject?: unknown; heading?: unknown; message?: unknown };
+
+function emailOverrideKey(type: string, d: Record<string, unknown>) {
+  return type === "GIFT_VOUCHER" && d.gift_recipient_mode === "recipient" ? "GIFT_VOUCHER_RECIPIENT" : type;
+}
+
+// Operator text is plain text: escaped, newlines kept, and only these tokens
+// filled (from already-escaped data). Heading replaces the template's one <h1>;
+// message replaces the <!--msg--> paragraph (templates without one ignore it).
+function applyEmailOverrides(key: string, subject: string, html: string, d: Record<string, unknown>, brandName: string, overrides: Record<string, EmailOverride> | undefined) {
+  const ov = CUSTOMISABLE_EMAILS.includes(key) ? overrides?.[key] : undefined;
+  if (!ov || typeof ov !== "object") return { subject, html };
+  const text = (v: unknown, max: number) => typeof v === "string" ? v.trim().slice(0, max) : "";
+  const fill = (s: string) => escHtml(s).replace(/\{(customer_name|tour_name|ref|business_name)\}/g, (_, k: string) =>
+    k === "business_name" ? escHtml(brandName) : String(d[k] ?? ""));
+  const s = text(ov.subject, 200).replace(/\s+/g, " "), h = text(ov.heading, 120), m = text(ov.message, 2000);
+  if (s) subject = fill(s).replace(/&(amp|lt|gt|quot|#39);/g, (e) => ({ "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'" } as Record<string, string>)[e]);
+  if (h) html = html.replace(/(<h1[^>]*>)[\s\S]*?(<\/h1>)/, (_, open: string, close: string) => open + fill(h) + close);
+  if (m) html = html.replace(/<!--msg-->[\s\S]*?<!--\/msg-->/, () => fill(m).replace(/\n/g, "<br>"));
+  return { subject, html };
+}
+
+function previewEmailData(key: string): Record<string, unknown> {
+  return {
+    email: "preview@bookingtours.co.za", customer_name: "Alex Smith", customer_email: "alex@sample.test",
+    tour_name: "Morning Tour", ref: "AB12CD34", qty: 2, start_time: "Sat, 14 Nov 2026, 09:00", tour_date: "Sat, 14 Nov 2026, 09:00",
+    total_amount: "1200.00", unit_price: "600.00", payment_reference: "SAMPLE", amount_paid: 1200, amount_due: 0, payment_method: "Card", payment_url: "#", waiver_url: "#", waiver_status: "PENDING",
+    invoice_number: "INV-0001", invoice_date: "14 Nov 2026", code: "SAMPLE123", value: "500", expires_at: "14 Nov 2027", remaining_balance: "300",
+    buyer_name: "Jordan Lee", recipient_name: "Sam Lee", gift_message: "Enjoy!", gift_recipient_mode: key === "GIFT_VOUCHER_RECIPIENT" ? "recipient" : "buyer_receipt",
+    photo_urls: ["#"], refund_amount: "600.00", reason: "Bad weather",
+  };
 }
 
 async function buildInvoicePdf(d: Record<string, unknown>, invCtx: InvoiceContext): Promise<Uint8Array> {
@@ -2663,7 +2706,14 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       };
     }
 
-    const type = (parsedBody as { type?: string }).type as string;
+    // Preview (Settings → Email Customisation): render one customisable email
+    // with sample data and the caller's unsaved wording; never sends.
+    const preview = !isAuthHook && (parsedBody as { preview?: unknown }).preview === true;
+    const previewKey = preview ? String((parsedBody as { type?: unknown }).type || "") : "";
+    if (preview && !CUSTOMISABLE_EMAILS.includes(previewKey)) {
+      return new Response(JSON.stringify({ error: "This email can't be previewed" }), { status: 400, headers: getCors(req) });
+    }
+    const type = previewKey === "GIFT_VOUCHER_RECIPIENT" ? "GIFT_VOUCHER" : (parsedBody as { type?: string }).type as string;
     let d = (parsedBody as { data?: Record<string, unknown> }).data as Record<string, unknown>;
     if (typeof type !== "string" || !type || !d || typeof d !== "object" || Array.isArray(d)) {
       return new Response(JSON.stringify({ error: "type and data are required" }), { status: 400, headers: getCors(req) });
@@ -2691,6 +2741,8 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
         d.business_id = businessId;
       }
     }
+    // Sample data only: no booking_id, so every booking/payment lookup below is skipped.
+    if (preview) d = { ...previewEmailData(previewKey), business_id: d.business_id };
     const deliveryIdempotencyKey = serviceCaller && typeof d.delivery_idempotency_key === "string"
       ? String(d.delivery_idempotency_key).slice(0, 256)
       : undefined;
@@ -2709,7 +2761,7 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       }
     }
 
-    if (type === "WAIVER_REQUEST") {
+    if (type === "WAIVER_REQUEST" && !preview) {
       if (!d.booking_id || !d.business_id || !supabase) return new Response(JSON.stringify({ ok: false, error: "Booking required" }), { status: 400, headers: getCors(req) });
       const stored = await supabase.from("bookings").select("id,business_id,email,customer_name,qty,status,waiver_status,waiver_token,waiver_token_expires_at,tours(name),slots(start_time)")
         .eq("id", String(d.booking_id)).eq("business_id", String(d.business_id)).maybeSingle();
@@ -2738,10 +2790,13 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     } catch (brandErr) {
       console.error("BRANDING_LOAD_ERR (using fallbacks):", brandErr);
       const fb = String(d.business_name || d.brand_name || "Your Booking");
-      branding = { businessId: "", brandName: fb, timezone: "UTC", shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", locationPhrase: "", emailTagline: "", logoUrl: "", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
+      branding = { businessId: "", brandName: fb, timezone: "UTC", shortBrandName: fb, footerLineOne: "Thanks for choosing " + fb + ".", footerLineTwo: "Reply to this email if you need anything.", manageBookingUrl: "", bookingSiteUrl: "", voucherUrl: "", waiverUrl: "", directions: "", fromEmail: FROM_EMAIL, replyToEmail: "", emailColor: "#1b3b36", meetingPointAddress: "", arrivalInstructions: "", businessAddress: "", whatToBring: "", activityVerbPast: "", locationPhrase: "", emailTagline: "", emailOverrides: {}, logoUrl: "", imgPayment: "", imgConfirm: "", imgInvoice: "", imgGift: "", imgCancel: "", imgCancelWeather: "", imgIndemnity: "", imgAdmin: "", imgVoucher: "", imgPhotos: "", socialFacebook: "", socialInstagram: "", socialTiktok: "", socialYoutube: "", socialTwitter: "", socialLinkedin: "", socialTripadvisor: "", socialGoogleReviews: "" };
     }
 
-    if (type === "BOOKING_CONFIRM" || type === "INDEMNITY" || type === "REMINDER" || type === "FIRST_BOOKING_TRIP" || type === "WAIVER_REQUEST") {
+    if (preview) {
+      const draft = (parsedBody as { overrides?: unknown }).overrides;
+      if (draft && typeof draft === "object" && !Array.isArray(draft)) branding.emailOverrides = draft as Record<string, EmailOverride>;
+    } else if (type === "BOOKING_CONFIRM" || type === "INDEMNITY" || type === "REMINDER" || type === "FIRST_BOOKING_TRIP" || type === "WAIVER_REQUEST") {
       try { d = await enrichWaiverEmailData(d); } catch (wErr) {
         console.error("WAIVER_ENRICH_ERR:", wErr);
         return new Response(JSON.stringify({ ok: false, error: "Waiver status could not be verified" }), { status: 503, headers: getCors(req) });
@@ -3099,6 +3154,12 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
       }
       default:
         return new Response(JSON.stringify({ error: "Unknown email type: " + type }), { status: 400, headers: getCors(req) });
+    }
+
+    ({ subject, html } = applyEmailOverrides(emailOverrideKey(type, d), subject, html, d, branding.brandName, branding.emailOverrides));
+    if (preview) {
+      const shown = applyBranding(subject, html, branding, type !== "GIFT_VOUCHER");
+      return new Response(JSON.stringify({ ok: true, subject: shown.subject, html: shown.html }), { status: 200, headers: getCors(req) });
     }
 
     // Build the invoice PDF (pro forma until paid) for INVOICE and BOOKING_CONFIRM emails
