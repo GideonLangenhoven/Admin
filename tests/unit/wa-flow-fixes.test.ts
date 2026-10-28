@@ -111,6 +111,18 @@ describe("WhatsApp booking flow", () => {
     expect(b.sent.at(-1)).toContain("you accept our Terms & Privacy Policy: https://a.booking.example.invalid/terms\n\nLook good?");
   });
 
+  it("a free-trip voucher is credit up to its value, whatever the group size", async () => {
+    // Owner decision 2026-10-28: a R600 free trip can pay for two R300 seats.
+    const slot = { id: "slot-a", status: "OPEN", start_time: new Date(Date.now() + 86_400_000).toISOString(), tour_id: tour.id };
+    const voucher = { voucher_id: "v-1", voucher_code: "ABCD2345", voucher_value: 600, voucher_type: "FREE_TRIP", voucher_pax_limit: 1, voucher_purchase_value: 600 };
+    const b = bot("PICK_SLOT", { qty: 2, slot_map: { 1: "slot-a" }, ...voucher }, { slots: slot, tours: tour }, {
+      rpc: async () => ({ data: 10, error: null }), getSlotPrice: async () => 300, fmtTime: () => "Sat 09:00",
+      calcDiscount: async () => ({ type: "", percent: 0, label: "" }),
+    });
+    await b.handle(tenant, phone, "1", "text");
+    expect(b.sent.join("\n")).toContain("this trip is on us!");
+  });
+
   for (const [state, id] of [["PICK_TOUR", "TOUR_"], ["GV_PICK_TOUR", "GV_"]]) {
     it(`${state} only loads a tour that belongs to this tenant and is on sale`, async () => {
       const b = bot(state, {}, { tours: tour });

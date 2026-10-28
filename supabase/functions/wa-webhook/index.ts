@@ -1840,24 +1840,10 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         const saving = priced.discount; finalTotal = priced.total;
         discountMsg = "\n*" + disc.percent + "% " + disc.label + " applied!* You save " + rands(saving);
       }
-      // Check if voucher booking — subtract voucher value from total
-      // Supports FREE_TRIP pax limit (only covers pax_limit guests) and peak arbitrage
+      // A voucher, free trips included, is credit up to its balance for any group size.
       let voucherDeduction = 0;
       if (sd.voucher_id) {
-        const voucherValue = Number(sd.voucher_value || 0);
-        if (sd.voucher_type === "FREE_TRIP") {
-          const coveredPax = Math.min(sd.voucher_pax_limit || 1, sd.qty);
-          const slotCost = price * coveredPax;
-          const purchaseVal = Number(sd.voucher_purchase_value || voucherValue);
-          // Peak arbitrage: if slot price > purchase_value, treat as credit for purchase_value
-          if (slotCost > purchaseVal) {
-            voucherDeduction = Math.min(purchaseVal, finalTotal);
-          } else {
-            voucherDeduction = Math.min(voucherValue, slotCost, finalTotal);
-          }
-        } else {
-          voucherDeduction = Math.min(voucherValue, finalTotal);
-        }
+        voucherDeduction = Math.min(Number(sd.voucher_value || 0), finalTotal);
         finalTotal = Math.max(0, finalTotal - voucherDeduction);
         if (finalTotal === 0) {
           discountMsg = "\n\u{1F39F} *Voucher applied, this trip is on us!*";
@@ -2356,16 +2342,13 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
       if (vr2.data.expires_at && new Date(vr2.data.expires_at) < new Date()) { await sendText(tenant, phone, "Unfortunately this voucher has expired. Type *speak to us* if you think this is a mistake."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
 
-      // Get voucher value + type metadata for FREE_TRIP pax limit and peak arbitrage
       const vVal = Number(vr2.data.current_balance || vr2.data.value || vr2.data.purchase_amount || 0);
       const vType = vr2.data.type || "CREDIT";
-      const vPaxLimit = vr2.data.pax_limit || 1;
-      const vPurchaseValue = Number(vr2.data.purchase_value || vr2.data.purchase_amount || vr2.data.value || 0);
       const tours3 = await getBookableTours(tenant);
       if (tours3.length === 0) { await sendText(tenant, phone, "Your voucher is valid, but there are no open dates right now. Check back soon and we’ll get you booked in!"); await setConvo(convo.id, { current_state: "IDLE" }); return; }
       if (tours3.length === 1) {
         await sendText(tenant, phone, "\u{1F389} Voucher accepted! (" + rands(vVal) + " credit)\n\nHow many people will be joining?");
-        await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { voucher_code: code, voucher_id: vr2.data.id, voucher_value: vVal, voucher_type: vType, voucher_pax_limit: vPaxLimit, voucher_purchase_value: vPurchaseValue, tour_id: tours3[0].id } });
+        await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { voucher_code: code, voucher_id: vr2.data.id, voucher_value: vVal, voucher_type: vType, tour_id: tours3[0].id } });
       } else {
         const vtrows: any[] = [];
         for (let vti = 0; vti < tours3.length; vti++) {
@@ -2374,7 +2357,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         }
         await sendText(tenant, phone, "\u{1F389} Voucher accepted! (" + rands(vVal) + " credit)\n\nWhich tour would you like?");
         await sendList(tenant, phone, "Pick your adventure:", "Choose Tour", [{ title: "Tours", rows: vtrows }]);
-        await setConvo(convo.id, { current_state: "PICK_TOUR", state_data: { voucher_code: code, voucher_id: vr2.data.id, voucher_value: vVal, voucher_type: vType, voucher_pax_limit: vPaxLimit, voucher_purchase_value: vPurchaseValue } });
+        await setConvo(convo.id, { current_state: "PICK_TOUR", state_data: { voucher_code: code, voucher_id: vr2.data.id, voucher_value: vVal, voucher_type: vType } });
       }
     }
 

@@ -452,6 +452,17 @@ describe("web chat booking copy", () => {
     }
   });
 
+  it("a free-trip voucher is credit up to its value, whatever the group size", async () => {
+    // Owner decision 2026-10-28: a R800 free trip can pay for two R400 seats.
+    const f = webChatFixture();
+    f.rows.vouchers.push({ id: "v-a", code: "FREE2345", business_id: "a", status: "ACTIVE", type: "FREE_TRIP", pax_limit: 1, value: 800, purchase_value: 800, current_balance: 800 });
+    const token = await f.session();
+    for (const step of ["ASK_VOUCHER", "ENTER_VOUCHER"]) {
+      const summary = await f.post(token, "FREE2345", { ...f.bookingState, step, baseTotal: 800, discount: 0 });
+      expect(summary.state).toMatchObject({ step: "CONFIRM", vded: 800, total: 0 });
+    }
+  });
+
   it("a one-guest booking reads 1 person, with no em dashes", async () => {
     const f = webChatFixture();
     const token = await f.session();
