@@ -1629,7 +1629,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const tourInfo = await supabase.from("tours").select("*").eq("id", tourId).eq("business_id", tenant.business.id).eq("active", true).eq("hidden", false).maybeSingle();
       if (!tourInfo.data) { await sendText(tenant, phone, "Hmm, can\u2019t find that tour. Let\u2019s try again."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
       const t = tourInfo.data;
-      await sendText(tenant, phone, "*" + t.name + "* \u{1F6F6}\n\n" + t.description + "\n\n\u23F1 " + formatDuration(t.duration_minutes) + "\n\u{1F4B0} " + rands(t.base_price_per_person) + " per person\n\nHow many people will be joining?");
+      await sendText(tenant, phone, "*" + t.name + "* \u{1F6F6}\n\n" + (t.description ? t.description + "\n\n" : "") + "\u23F1 " + formatDuration(t.duration_minutes) + "\n\u{1F4B0} " + rands(t.base_price_per_person) + " per person\n\nHow many people will be joining?");
       // Keep a redeemed voucher (PICK_TOUR is entered with it when the tenant has several tours).
       await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { ...sd, tour_id: tourId } });
     }
@@ -1671,7 +1671,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const fitting = tourSlots.filter(function (s: any) { return s.capacity_total - s.booked - (s.held || 0) >= qty; });
 
       if (fitting.length === 0) {
-        await sendText(tenant, phone, "Ah, we are fully booked for " + qty + " people right now. Want me to add you to the waitlist? I\u2019ll message you as soon as a spot opens up!");
+        await sendText(tenant, phone, "Ah, we are fully booked for " + qty + (qty === 1 ? " person" : " people") + " right now. Want me to add you to the waitlist? I\u2019ll message you as soon as a spot opens up!");
         await sendButtons(tenant, phone, "Options:", [{ id: "WAITLIST_YES", title: "\u{1F4CB} Join Waitlist" }, { id: "BOOK", title: "\u{1F6F6} Try Another Tour" }, { id: "IDLE", title: "\u2B05 Back" }]);
         await setConvo(convo.id, { current_state: "WAITLIST_OFFER", state_data: { ...sd, qty: qty } });
         return;
@@ -1840,7 +1840,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           return;
         }
         if (hasOpenButFull) {
-          await sendText(tenant, phone, "All trips on *" + pdFormatted + "* are fully booked for " + sd.qty + " people. Try another date or a smaller group! \u{1F4C5}");
+          await sendText(tenant, phone, "All trips on *" + pdFormatted + "* are fully booked for " + sd.qty + (sd.qty === 1 ? " person" : " people") + ". Try another date or a smaller group! \u{1F4C5}");
         } else {
           await sendText(tenant, phone, "No available trips on *" + pdFormatted + "*. Try another date! \u{1F4C5}");
         }
@@ -1898,7 +1898,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const slotAvail = Number(slotAvailRes.data || 0);
       // Stay in PICK_SLOT: "another option from the list" must keep working
       // (this used to reset to PICK_DATE, so replying "3" hit the date parser).
-      if (slotAvail < sd.qty) { await sendText(tenant, phone, "Not enough spots left on that trip for " + sd.qty + " people (only " + slotAvail + " left). Try another option from the list or type a new date!"); return; }
+      if (slotAvail < sd.qty) { await sendText(tenant, phone, "Not enough spots left on that trip for " + sd.qty + (sd.qty === 1 ? " person" : " people") + " (only " + slotAvail + " left). Try another option from the list or type a new date!"); return; }
 
       const price = await getSlotPrice(slot);
       const baseTotal = Math.round(price * Number(sd.qty) * 100) / 100;
@@ -2201,7 +2201,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           "\u{1F4CB} Ref: " + vref + "\n" +
           "\u{1F6F6} " + (vtour.data?.name || "Tour") + "\n" +
           "\u{1F4C5} " + (vslot.data ? fmtTime(tenant, vslot.data.start_time) : "TBC") + "\n" +
-          "\u{1F465} " + verifiedSd.qty + " people\n" +
+          "\u{1F465} " + verifiedSd.qty + (verifiedSd.qty === 1 ? " person" : " people") + "\n" +
           "\u{1F39F} Paid with voucher *" + verifiedSd.voucher_code + "*\n\n" +
           (waiverLink ? "\u{1F4DD} Waiver: " + waiverLink + "\n\n" : "") +
           "\u{1F4CD} *Meeting Point:* " + (tenant.business.directions || "Check your confirmation details from " + businessName(tenant) + " for arrival instructions.") + "\n\n" +

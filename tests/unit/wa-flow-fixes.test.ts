@@ -53,6 +53,16 @@ function bot(state: string, stateData: any, tables: Record<string, any> = {}, ex
 }
 
 describe("WhatsApp booking flow", () => {
+  it("a tour without a description, and a party of one, read naturally", async () => {
+    const b = bot("PICK_TOUR", {}, { tours: { ...tour, description: null } });
+    await b.handle(tenant, phone, "", "interactive", { list_reply: { id: "TOUR_" + tour.id } });
+    expect(b.sent[0]).toMatch(/^\*Sunset Paddle\* \u{1F6F6}\n\n\u23F1 120 min/u);
+    const slot = { id: "slot-a", status: "OPEN", start_time: new Date(Date.now() + 86_400_000).toISOString(), tour_id: tour.id };
+    const full = bot("PICK_SLOT", { qty: 1, slot_map: { 1: "slot-a" } }, { slots: slot }, { rpc: async () => ({ data: 0, error: null }) });
+    await full.handle(tenant, phone, "1", "text");
+    expect(full.sent[0]).toContain("for 1 person (only 0 left)");
+  });
+
   it("the summary shows the Terms before the guest taps Confirm", async () => {
     // A voucher-paid booking completes on that tap; the notice used to arrive afterwards.
     const slot = { id: "slot-a", status: "OPEN", start_time: new Date(Date.now() + 86_400_000).toISOString(), tour_id: tour.id };
