@@ -1205,10 +1205,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       state = "IDLE"; sd = {};
     }
 
-    // Greetings trigger welcome
-    // Prefix match so "hi there" / "hello!" also count; the length guard keeps
-    // real requests like "hi, I want to cancel my booking" flowing to intent routing.
-    const isGreeting = /^(hi|hello|hey|howzit|hiya|yo|sup|good\s+(morning|afternoon|evening))\b/.test(input) && input.length <= 20;
+    // A bare greeting ("hi", "hello there!", "good morning 👋") restarts a flow; mid-booking,
+    // "hey, tomorrow?" or "hi, 3 of us" is an answer, not a restart.
+    const isGreeting = /^(hi|hello|hey|howzit|hiya|yo|sup|good\s+(morning|afternoon|evening))(\s+(there|all|again|team|guys))?[^\p{L}\p{N}]*$/u.test(input);
     if (isGreeting && state !== "IDLE") {
       await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
       state = "IDLE"; sd = {};

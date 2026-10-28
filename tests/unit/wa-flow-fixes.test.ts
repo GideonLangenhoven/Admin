@@ -53,6 +53,20 @@ function bot(state: string, stateData: any, tables: Record<string, any> = {}, ex
 }
 
 describe("WhatsApp booking flow", () => {
+  it("only a bare greeting restarts a booking in progress", async () => {
+    const reset = { current_state: "IDLE", state_data: {} };
+    for (const text of ["hey, tomorrow?", "hi, 3 of us"]) {
+      const b = bot("PICK_DATE", { tour_id: tour.id, qty: 3 });
+      await b.handle(tenant, phone, text, "text");
+      expect(b.changes).not.toContainEqual(reset);
+    }
+    for (const text of ["hi", "Hello there!", "good morning \u{1F44B}"]) {
+      const b = bot("PICK_DATE", { tour_id: tour.id, qty: 3 });
+      await b.handle(tenant, phone, text, "text");
+      expect(b.changes[0]).toEqual(reset);
+    }
+  });
+
   it("accepts a name in any script", async () => {
     const consent = vi.fn(async () => undefined);
     const b = bot("ASK_DETAILS", { qty: 1 }, {}, { askBookingWhatsappConsent: consent });
