@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { sourceExports, sourceFunction } from "../helpers/source-handler";
 
@@ -51,5 +52,19 @@ describe("WhatsApp AI reply screen", () => {
     expect(sent).toEqual([guards.INJECTION_REFUSAL_REPLY]);
     expect(calls).toBe(0);
     expect(await gem(tenant, "Where do we meet?", "27825550100")).toBe("ok");
+  });
+
+  it("a v2 shadow run finishes after the webhook answers Meta", async () => {
+    let finish!: () => void;
+    const pending: Promise<void>[] = [];
+    const shadowV2 = sourceFunction(wa, "shadowV2", {
+      botAnswerV2: () => new Promise<boolean>((resolve) => { finish = () => resolve(true); }), console,
+      globalThis: { EdgeRuntime: { waitUntil: (p: Promise<void>) => pending.push(p) } },
+    });
+    expect(shadowV2(tenant, "27825550100", { id: "conversation-a" }, "Where do we meet?")).toBeUndefined();
+    expect(pending).toHaveLength(1);
+    finish();
+    await pending[0];
+    expect(readFileSync(wa, "utf8")).not.toMatch(/await botAnswerV2\([^)]*"shadow"\)/);
   });
 });

@@ -894,6 +894,13 @@ async function buildBotSystemForTurn(tenant: TenantContext, phone: string, userT
   return assembleBotSystem(blockB, blockC);
 }
 
+// Shadow runs are metering only: they finish after Meta has its 200, never before.
+function shadowV2(tenant: TenantContext, phone: any, convo: any, userText: string) {
+  const task = botAnswerV2(tenant, phone, convo, userText, "shadow").then(() => {}, (e) => console.error("WA_V2_SHADOW_ERR", e));
+  const runtime = (globalThis as typeof globalThis & { EdgeRuntime?: { waitUntil: (promise: Promise<void>) => void } }).EdgeRuntime;
+  if (runtime) runtime.waitUntil(task);
+}
+
 // Returns true when the turn is fully handled (something sent, or intentionally
 // silent). false → caller falls through to the legacy path.
 async function botAnswerV2(tenant: TenantContext, phone: any, convo: any, userText: string, mode: "send" | "shadow"): Promise<boolean> {
@@ -1531,7 +1538,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
             { id: "BOOK", title: "\u{1F6F6} Book a Tour" },
             { id: "MORE", title: "\u{1F4AC} More Options" },
           ]);
-          if (WA_BOT_V2 === "shadow") await botAnswerV2(tenant, phone, convo, input || rawText, "shadow");
+          if (WA_BOT_V2 === "shadow") shadowV2(tenant, phone, convo, input || rawText);
         } else {
           await sendText(tenant, phone, "I\u2019m not quite sure what you mean \u{1F60A} You can ask me things like \"where do we meet\" or \"how much does it cost\". Or pick an option below:");
           await sendButtons(tenant, phone, "Quick actions:", [
@@ -2628,7 +2635,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           await sendText(tenant, phone, screenReply(ctxOut));
           await sendButtons(tenant, phone, "Anything else?", [{ id: "ASK", title: "\u2753 Another Question" }, { id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "IDLE", title: "\u2B05 Menu" }]);
           await setConvo(convo.id, { current_state: "MENU" });
-          if (WA_BOT_V2 === "shadow") await botAnswerV2(tenant, phone, convo, rawText, "shadow");
+          if (WA_BOT_V2 === "shadow") shadowV2(tenant, phone, convo, rawText);
           return;
         }
       }
