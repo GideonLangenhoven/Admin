@@ -53,6 +53,20 @@ function bot(state: string, stateData: any, tables: Record<string, any> = {}, ex
 }
 
 describe("WhatsApp booking flow", () => {
+  it("\"resend my confirmation email\" resends the email, and says so only when it was sent", async () => {
+    const booking = { id: "30000000-0000-4000-8000-000000000001", email: "guest@example.invalid", customer_name: "Guest", qty: 2, total_amount: 1200, status: "PAID", slots: { start_time: "2099-01-01T08:00:00Z" }, tours: { name: "Sunset Paddle" } };
+    for (const [status, reply] of [[200, "resent the confirmation"], [500, "Something went wrong sending the email"]] as const) {
+      const requestCheckout = vi.fn();
+      const fetch = vi.fn(async () => new Response("{}", { status }));
+      const b = bot("ASK_MODE", {}, { bookings: booking }, { requestCheckout, fetch, SUPABASE_URL: "https://x.invalid", SUPABASE_KEY: "k", fmtTime: () => "Fri 1 Jan, 10:00" });
+      await b.handle(tenant, phone, "resend my confirmation email", "text");
+      expect(requestCheckout).not.toHaveBeenCalled();
+      expect(String(fetch.mock.calls[0]?.[0])).toContain("/functions/v1/send-email");
+      expect(b.sent.join("\n")).toContain(reply);
+      if (status === 500) expect(b.changes).toContainEqual({ status: "HUMAN" });
+    }
+  });
+
   it("only a bare greeting restarts a booking in progress", async () => {
     const reset = { current_state: "IDLE", state_data: {} };
     for (const text of ["hey, tomorrow?", "hi, 3 of us"]) {

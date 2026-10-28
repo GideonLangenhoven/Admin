@@ -2515,8 +2515,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       const wantReducePeople = (input.includes("reduce") || input.includes("remove") || input.includes("less") || input.includes("fewer")) && (input.includes("people") || input.includes("person") || input.includes("pax"));
       const wantChangeTour = (input.includes("change") || input.includes("switch") || input.includes("swap")) && (input.includes("tour") || input.includes("sea") || input.includes("sunset"));
       const wantChangeName = (input.includes("change") || input.includes("update") || input.includes("wrong")) && (input.includes("name") || input.includes("person"));
-      const wantPaymentLink = input.includes("payment") && (input.includes("link") || input.includes("pay") || input.includes("again") || input.includes("new")) || (input.includes("didn") && input.includes("pay")) || input.includes("resend");
       const wantConfirmEmail = (input.includes("email") || input.includes("confirmation")) && (input.includes("resend") || input.includes("again") || input.includes("didn") || input.includes("not received") || input.includes("haven"));
+      // "Resend my confirmation email" is an email request, not a payment-link one.
+      const wantPaymentLink = !wantConfirmEmail && (input.includes("payment") && (input.includes("link") || input.includes("pay") || input.includes("again") || input.includes("new")) || (input.includes("didn") && input.includes("pay")) || input.includes("resend"));
       const wantReceipt = input.includes("receipt") || input.includes("invoice") || input.includes("proof") && input.includes("payment");
       const wantWrongDate = (input.includes("wrong") && (input.includes("date") || input.includes("day") || input.includes("time"))) || (input.includes("booked") && input.includes("wrong"));
 
@@ -2593,13 +2594,16 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         if (emBkr.data) {
           const emBk = emBkr.data; const emRef = emBk.id.substring(0, 8).toUpperCase();
           try {
-            await fetch(SUPABASE_URL + "/functions/v1/send-email", {
+            const emRes = await fetch(SUPABASE_URL + "/functions/v1/send-email", {
               method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
               body: JSON.stringify({ type: "BOOKING_CONFIRM", data: { booking_id: emBk.id, business_id: tenant.business.id, email: emBk.email, customer_name: emBk.customer_name, ref: emRef, tour_name: (emBk as any).tours?.name || "Tour", start_time: (emBk as any).slots?.start_time ? fmtTime(tenant, (emBk as any).slots.start_time) : "TBC", qty: emBk.qty, total_amount: emBk.total_amount } }),
             });
+            if (!emRes.ok) throw new Error("send-email " + emRes.status);
             await sendText(tenant, phone, "Done! I\u2019ve resent the confirmation to *" + emBk.email + "* \u2709\uFE0F\n\nCheck your inbox (and spam folder). Ref: " + emRef);
           } catch (e) {
+            console.error("CONFIRM_RESEND_ERR", e);
             await sendText(tenant, phone, "Something went wrong sending the email. Let me connect you to our team.");
+            await setConvo(convo.id, { status: "HUMAN" });
           }
         } else {
           await sendText(tenant, phone, "I couldn\u2019t find a confirmed booking to resend. Check My Bookings or contact our team.");
