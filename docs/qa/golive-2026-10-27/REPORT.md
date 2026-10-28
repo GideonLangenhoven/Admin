@@ -379,3 +379,124 @@ Found but not fixed (pre-existing):
   contact the operator.
 - **Bulk "selected bookings" weather cancel** goes through `cancel-booking` and
   has no option picker; the owner scoped this release to per trip.
+
+## 7. WhatsApp and web chat review, 28 Oct 2026 (not deployed yet)
+
+The owner asked for both bots to be production-ready. The work is 42 commits on
+the admin repo's `golive/bot-review-2026-10-28` (6392443..5f270b6) and one on
+the booking repo's branch of the same name (c4a2859). Every fix has a
+regression test that fails without it. There are no migrations, and the
+security baseline is unchanged.
+
+**P1 (12)**
+
+- **Retired self-service.** WhatsApp finished retiring chat self-service for
+  existing bookings: old states, replayed `BK_`/`ACT_`/`WEATHER_REFUND_`
+  buttons and bare 1/2/3 replies to a weather cancel now go to My Bookings.
+  This resolves the first two "found but not fixed" items in section 6.
+- **WhatsApp checkout and booking:**
+  - a redeemed voucher survives the tour pick;
+  - Add Voucher at the summary is honoured at checkout;
+  - a typed yes or no works at both summaries;
+  - booking questions follow the checkout's rules;
+  - availability answers use the tenant's clock and real prices.
+- **WhatsApp messaging:**
+  - payment keywords no longer hand ordinary questions to a human;
+  - interactive messages stay within Meta's limits;
+  - messages parked on a closed 24-hour window are delivered when the guest
+    replies;
+  - one number is limited to 20 messages a minute, so it can't script up a
+    tenant's AI costs.
+- **Web chat:**
+  - answers typed into a form step are not treated as escalations;
+  - rate limits use `cf-connecting-ip`, so a forged `x-forwarded-for` can't
+    dodge them. This is in `_shared/otp-attempts.ts`, which six functions
+    import.
+
+**P2 (22)**
+
+- **Tenant and money:**
+  - a picked tour must belong to the caller's tenant;
+  - a list reply can't start a booking for a hidden or retired tour;
+  - a failed price lookup never quotes or charges the R600 default;
+  - a voucher-only booking that fails to confirm is removed;
+  - voucher codes come from `crypto.getRandomValues`;
+  - a typed phone number no longer unlocks a returning guest's discount in web
+    chat.
+- **Honest replies:**
+  - STOP and DELETE never claim a change that failed; failed deletions land in
+    Data Requests;
+  - unsubscribing from web chat works like the email link;
+  - provider errors (non-JSON Meta and Yoco responses, a failed forecast) take
+    the safe path;
+  - "resend my confirmation email" resends it, rather than a payment link, and
+    only says "Done" when send-email succeeded.
+- **Understanding guests:**
+  - voice notes, locations and template button taps are logged and answered;
+  - guests who booked on the website are recognised by phone in any format;
+  - everyday words ("great", "going") no longer trigger unrelated FAQ answers;
+  - "hey, tomorrow?" mid-booking doesn't restart the booking.
+- **Copy and policy:**
+  - the bot knows the tenant's refund policy;
+  - no hard-coded weather refund promise or Cape Town copy;
+  - AI replies pass the prompt-leak screen in both bots, with em dashes
+    removed;
+  - no em dashes or "1 people" in fixed replies;
+  - rand amounts show both cent digits;
+  - the Terms appear on the summary, before Confirm;
+  - web chat asks for vouchers only and points promo codes to the website.
+- **Chat widget (booking app).** Operator replies show up while the chat is in
+  bot mode (it polls every 20 s, or 4 s with a human, and pauses while the tab
+  is hidden). The 16 px message box stops iOS zooming.
+
+**P3 (7)**
+
+- Writes by row id also filter on `business_id`.
+- A voucher-paid confirmation names the tour and time.
+- No "null" tour description.
+- Names in any script are accepted.
+- The second-trip suggestion always arrives after the confirmation.
+- A closed trip isn't blamed on the weather.
+- Booking status reads "Paid", not "PAID".
+
+**Gates**
+
+- **Unit tests:** 2861 pass. The 8 failures are the known baseline.
+- **Lint:** the 6 known errors, all in test helpers this review didn't touch.
+- **Type checks:**
+  - `tsc` exits 0;
+  - `check:edge` exits 0;
+  - `deno check` passes on all nine functions in scope;
+  - the booking app's `tsc` and `eslint` on ChatWidget are clean.
+
+**Deploy scope when approved**
+
+- **Edge functions (9):**
+  - wa-webhook and web-chat;
+  - process-refund and rebook-booking, which import `_shared/vouchers.ts`;
+  - create-checkout, create-paysafe-checkout, my-bookings-lookup,
+    onboarding-wizard and send-otp, which import `_shared/otp-attempts.ts`.
+- **Admin app:** the Data Requests fulfil route.
+- **Booking app:** ChatWidget.
+
+Open, needing an owner decision or a migration:
+
+- **FREE_TRIP vouchers.** `reserve_voucher_amount` doesn't cap how many people
+  a free-trip voucher covers.
+- **Weather answers** use sea-kayak wind and swell thresholds for every tenant.
+  They fall back to Cape Town coordinates, because no tenant has weather spots
+  set.
+- **Tour lists.** A WhatsApp list shows at most 10 tours (Meta's limit). A
+  tenant with more can't offer the rest in WhatsApp.
+- **Credit claims.** Weather-cancel credit can't be claimed in chat; guests are
+  sent to My Bookings.
+- **CAPTCHA.** web-faq has a per-IP budget but no CAPTCHA.
+- **Math.random codes.** rebook-booking and marketing-automation-dispatch still
+  generate codes with `Math.random`.
+- **Prompt injection.** WhatsApp doesn't screen inbound messages for prompt
+  injection; outbound replies are screened.
+- **LLM latency.** Thinking replies (wa-faq, wa-ask) wait up to 45 s before
+  the Gemini fallback. In shadow mode, the v2 run can hold Meta's webhook open
+  for up to about 135 s after the reply is sent. Replies and state are saved
+  first, and Meta's retries are deduplicated by `processed_wa_messages`.
+  Production `llm_usage` has no `wa-v2-shadow` rows.
