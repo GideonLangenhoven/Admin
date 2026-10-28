@@ -1035,8 +1035,9 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         p_business_id: tenant.business.id, p_phone: phone,
       });
       if (stopError) console.error("WA_STOP_ERR", tenant.business.id, stopError);
-      await sendText(tenant, phone,
-        "You've been unsubscribed from optional WhatsApp messages. You'll still receive essential booking confirmations."
+      await sendText(tenant, phone, stopError
+        ? "Sorry, we couldn't update your preferences just now. Please send STOP again in a minute."
+        : "You've been unsubscribed from optional WhatsApp messages. You'll still receive essential booking confirmations."
       );
       return;
     }
@@ -1064,7 +1065,16 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         p_email: null,
         p_phone: phone,
       });
-      if (delErr) await logE(tenant, "DATA_DELETE_ERROR", { phone, msg: delErr.message });
+      if (delErr) {
+        await logE(tenant, "DATA_DELETE_ERROR", { phone, msg: delErr.message });
+        // The guest was promised removal within 30 days: queue it for the team (Data Requests).
+        const { error: queueErr } = await supabase.from("data_subject_requests").insert({
+          business_id: tenant.business.id, email: "wa:" + phone, request_type: "DELETION", status: "IN_REVIEW",
+          reason: "Requested via WhatsApp DELETE keyword; automatic deletion failed", confirmed_at: new Date().toISOString(),
+          metadata: { source: "whatsapp_delete_keyword", phone },
+        });
+        if (queueErr) console.error("DATA_DELETE_QUEUE_ERR", tenant.business.id, queueErr.message);
+      }
       return;
     }
 

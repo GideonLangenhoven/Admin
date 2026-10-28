@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const db = adminClient();
 
   const { data: request } = await db.from("data_subject_requests")
-    .select("id, status, customer_id, business_id, email, request_type")
+    .select("id, status, customer_id, business_id, email, request_type, metadata")
     .eq("id", id)
     .eq("business_id", caller.business_id)
     .maybeSingle();
@@ -58,6 +58,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     p_request_id: request.id,
     p_admin_id: caller.id,
     p_email: request.email || null,
+    // WhatsApp DELETE requests are keyed by phone ("wa:<phone>" is not a real email).
+    p_phone: request.metadata?.phone || null,
   });
 
   if (error) return NextResponse.json({ error: "Anonymization failed: " + error.message }, { status: 500 });
