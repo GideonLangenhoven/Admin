@@ -468,6 +468,17 @@ async function setConvo(id: any, u: any) { await supabase.from("conversations").
 // Chat self-service for existing bookings (view/reschedule/cancel/change qty/swap tour) is
 // retired — bugs there (duplicate sends, lock-ups) led to routing everything through the
 // dedicated /my-bookings page instead. Call this instead of entering the old flow states.
+// Names only the outcomes the operator offered for this cancellation ("a new date or a voucher").
+function offeredOptionsText(options: any) {
+  const names: Record<string, string> = { RESCHEDULE: "a new date", VOUCHER: "a voucher", REFUND: "a refund" };
+  const list = (Array.isArray(options) ? options : Object.keys(names)).filter((o: string) => names[o]).map((o: string) => names[o]);
+  return list.length > 1 ? list.slice(0, -1).join(", ") + " or " + list[list.length - 1] : list[0] || "";
+}
+// Notify-only cancellations: the team settles it with the guest in this chat.
+async function handCancellationToTeam(tenant: TenantContext, phone: any, convoId: any) {
+  await sendText(tenant, phone, "Our team is handling this cancellation and will reply to you here shortly.");
+  await setConvo(convoId, { status: "HUMAN", current_state: "IDLE", state_data: {} });
+}
 async function sendManageBookingsRedirect(tenant: TenantContext, phone: any, convoId: any) {
   const manageUrl = resolveManageBookingsUrl(tenant.business);
   const msg = "To view, reschedule, cancel, or change your booking, please use the *My Bookings* tab on our website" + (manageUrl ? ": " + manageUrl : ".") + "\n\nIt\u2019s the quickest way to manage your booking directly.";
@@ -1186,8 +1197,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         .eq("id", actionBookingId).eq("business_id", tenant.business.id).maybeSingle();
       if (managed.error) throw managed.error;
       if (managed.data?.status === "CANCELLED" && managed.data.cancellation_self_service === false) {
-        await sendText(tenant, phone, "This cancellation is being handled by our team. Please contact us directly for follow-up.");
-        await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+        await handCancellationToTeam(tenant, phone, convo.id);
         return;
       }
       // A weather cancellation may offer only some outcomes.
@@ -1195,7 +1205,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         : /^ACT_VOUCHER_/.test(rid) || state === "CONFIRM_VOUCHER_CONVERT" ? "VOUCHER"
         : /^(ACT_WX_REFUND_|WEATHER_REFUND_)/.test(rid) || state === "CONFIRM_WX_REFUND_ACTION" ? "REFUND" : "";
       if (managed.data?.status === "CANCELLED" && waOption && Array.isArray(managed.data.cancellation_options) && !managed.data.cancellation_options.includes(waOption)) {
-        await sendText(tenant, phone, "That option isn’t offered for this cancellation. Type *menu* and open *My Bookings* to see your options.");
+        await sendText(tenant, phone, "That option isn’t offered for this cancellation. We can offer " + offeredOptionsText(managed.data.cancellation_options) + ": type *menu* and open *My Bookings* to choose.");
         await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
         return;
       }
@@ -1225,20 +1235,20 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
 
       if (cb.data?.cancellation_reason?.includes("Weather")) {
         if (cb.data.cancellation_self_service === false) {
-          await sendText(tenant, phone, "This cancellation is being handled by our team. Please contact us directly for follow-up.");
-          await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
+          await handCancellationToTeam(tenant, phone, convo.id);
           return;
         }
         if (wxChoices.length === 1 && Array.isArray(cb.data.cancellation_options) && !cb.data.cancellation_options.includes(wxChoices[0])) {
-          await sendText(tenant, phone, "That option isn’t offered for this cancellation. Type *menu* and open *My Bookings* to see your options.");
+          await sendText(tenant, phone, "That option isn’t offered for this cancellation. We can offer " + offeredOptionsText(cb.data.cancellation_options) + ": type *menu* and open *My Bookings* to choose.");
           await setConvo(convo.id, { current_state: "IDLE", state_data: {} });
           return;
         }
         // Still waiting for the guest's choice; once settled, this is an ordinary question.
         // Once per conversation, so "voucher" can still mean a gift voucher afterwards.
         if (cb.data.refund_status === "ACTION_REQUIRED") {
-          await sendManageBookingsRedirect(tenant, phone, convo.id);
-          await setConvo(convo.id, { state_data: { wx_redirected: true } });
+          const manageUrl = resolveManageBookingsUrl(tenant.business);
+          await sendText(tenant, phone, "To choose " + offeredOptionsText(cb.data.cancellation_options) + ", sign in to *My Bookings* with the code we email you" + (manageUrl ? ": " + manageUrl : "."));
+          await setConvo(convo.id, { current_state: "MENU", state_data: { wx_redirected: true } });
           return;
         }
       }

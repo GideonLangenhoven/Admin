@@ -2,6 +2,13 @@ import * as jsx from "react/jsx-runtime";
 import { describe, expect, it, vi } from "vitest";
 import { sourceExports, sourceFunction, sourceHandler } from "../helpers/source-handler";
 
+const waFile = "supabase/functions/wa-webhook/index.ts";
+const offeredOptionsText = sourceFunction(waFile, "offeredOptionsText", {});
+const teamHandoff = "Our team is handling this cancellation and will reply to you here shortly.";
+const handCancellationToTeam = (sent: string[], changes: any[]) => sourceFunction(waFile, "handCancellationToTeam", {
+  sendText: async (_t: any, _p: any, message: string) => { sent.push(message); },
+  setConvo: async (_id: string, data: any) => { changes.push(data); },
+});
 const booking = {
   id: "10000000-0000-4000-8000-000000000001", business_id: "tenant-a", customer_name: "Synthetic Guest",
   email: "synthetic@example.invalid", phone: "27825550100", status: "PAID", source: "WEB", qty: 2,
@@ -143,11 +150,13 @@ describe("customer enforcement", () => {
         supabase: db, getSubscriptionState: async () => ({ trading: true }), shouldBotReply: async () => ({ active: true }),
         sendText: async (_t: any, _p: any, message: string) => { sent.push(message); },
         setConvo: async (_id: string, data: any) => { changes.push(data); },
+        handCancellationToTeam: handCancellationToTeam(sent, changes),
         logE: async () => { throw new Error("Unexpected bot error"); },
       });
       await handle({ business: { id: "tenant-a" } }, booking.phone, state === "IDLE" ? "refund" : "yes", "text");
-      expect(sent).toEqual(["This cancellation is being handled by our team. Please contact us directly for follow-up."]);
-      expect(changes[0]).toEqual({ current_state: "IDLE", state_data: {} });
+      // Notify-only: the team settles it in this chat, never "contact us directly".
+      expect(sent).toEqual([teamHandoff]);
+      expect(changes[0]).toEqual({ status: "HUMAN", current_state: "IDLE", state_data: {} });
       expect(filters).toContainEqual(["eq", "business_id", "tenant-a"]);
       expect(filters.some(f => f[0] === "update")).toBe(false);
     });
@@ -168,10 +177,11 @@ it("stale WhatsApp actions stay blocked when the stored phone uses a different f
     } },
     getSubscriptionState: async () => ({ trading: true }), shouldBotReply: async () => ({ active: true }),
     sendText: async (_t: any, _p: any, message: string) => { sent.push(message); }, setConvo: vi.fn(),
+    handCancellationToTeam: handCancellationToTeam(sent, []),
     logE: async () => { throw new Error("Unexpected bot error"); },
   });
   await handle({ business: { id: "tenant-a" } }, "+" + booking.phone, "yes", "text");
-  expect(sent).toEqual(["This cancellation is being handled by our team. Please contact us directly for follow-up."]);
+  expect(sent).toEqual([teamHandoff]);
 });
 
 it("cancelled customer cards show choices only when enabled", () => {
@@ -230,7 +240,7 @@ it("weather slot and broadcast callers submit notify-only and can be dismissed s
 });
 
 describe("weather cancellation options", () => {
-  const notOffered = "That option isn’t offered for this cancellation. Type *menu* and open *My Bookings* to see your options.";
+  const notOffered = (offer: string) => "That option isn’t offered for this cancellation. We can offer " + offer + ": type *menu* and open *My Bookings* to choose.";
 
   it("stores, emails and messages only the options the operator picked", async () => {
     const f = cancelFixture(); expect((await f.post(true, { options: ["REFUND", "VOUCHER"] })).status).toBe(200);
@@ -287,14 +297,20 @@ describe("weather cancellation options", () => {
         supabase: db, getSubscriptionState: async () => ({ trading: true }), shouldBotReply: async () => ({ active: true }),
         sendText: async (_t: any, _p: any, message: string) => { sent.push(message); },
         setConvo: async (_id: string, data: any) => { changes.push(data); },
-        logE: async () => { throw new Error("Unexpected bot error"); },
+        offeredOptionsText, logE: async () => { throw new Error("Unexpected bot error"); },
       });
       await handle({ business: { id: "tenant-a" } }, booking.phone, input, "text");
-      expect(sent).toEqual([notOffered]);
+      expect(sent).toEqual([notOffered(state === "CONFIRM_VOUCHER_CONVERT" ? "a refund" : "a voucher")]);
       expect(changes[0]).toEqual({ current_state: "IDLE", state_data: {} });
       expect(filters.some(f => f[0] === "update")).toBe(false);
     });
   }
+
+  it("WhatsApp names the offered options in plain words", () => {
+    expect(offeredOptionsText(["VOUCHER"])).toBe("a voucher");
+    expect(offeredOptionsText(["RESCHEDULE", "VOUCHER"])).toBe("a new date or a voucher");
+    expect(offeredOptionsText(null)).toBe("a new date, a voucher or a refund");
+  });
 
   it("My Bookings shows only the offered options", () => {
     const Card = sourceExports("booking/app/my-bookings/BookingCard.tsx", {

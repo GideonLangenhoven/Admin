@@ -35,6 +35,8 @@ function bot(state: string, stateData: any, booking: any) {
     setConvo: async (_id: string, data: any) => { changes.push(data); },
     sendManageBookingsRedirect: async (_t: any, to: string, convoId: string) => { redirects.push([to, convoId]); },
     logE: async () => { throw new Error("Unexpected bot error"); }, isAvailabilityQuery: ordinary,
+    offeredOptionsText: sourceFunction("supabase/functions/wa-webhook/index.ts", "offeredOptionsText", {}),
+    resolveManageBookingsUrl: () => "https://a.booking.example.invalid/my-bookings",
   });
   return { handle, sent, changes, filters, redirects, rpc, ordinary, writes: () => filters.filter(f => f[0] === "update") };
 }
@@ -65,11 +67,11 @@ describe("WhatsApp retired self-service", () => {
     });
   }
 
-  it("a weather-cancel reply that still needs the guest's choice goes to My Bookings once", async () => {
+  it("a weather-cancel reply that still needs the guest's choice goes to My Bookings once, naming the offered options", async () => {
     const b = bot("IDLE", {}, weatherCancel);
     await b.handle(tenant, phone, "Can I get a voucher please", "text");
-    expect(b.redirects).toHaveLength(1);
-    expect(b.changes).toEqual([{ state_data: { wx_redirected: true } }]);
+    expect(b.sent).toEqual(["To choose a new date, a voucher or a refund, sign in to *My Bookings* with the code we email you: https://a.booking.example.invalid/my-bookings"]);
+    expect(b.changes).toEqual([{ current_state: "MENU", state_data: { wx_redirected: true } }]);
     expect(b.filters).toContainEqual(["eq", "business_id", "tenant-a"]);
     expect(b.filters).toContainEqual(["in", "phone", [phone, "+" + phone]]); // booked on the website as +27…
     expect(b.writes()).toEqual([]); expect(b.rpc).not.toHaveBeenCalled();
