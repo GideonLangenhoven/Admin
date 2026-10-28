@@ -85,6 +85,23 @@ async function notifyOperatorOfHumanRequest(businessId: string, phone: string) {
   } catch (error) { console.error("WEB_CHAT_WHATSAPP_ALERT_FAILED", businessId, error); }
 }
 
+// Cloudflare Turnstile, once per new chat session, so scripts can't open chats and run up AI
+// costs. Enforced only once TURNSTILE_SECRET_KEY is set; then it fails closed.
+async function passesTurnstile(token: unknown, ip: string) {
+  const secret = Deno.env.get("TURNSTILE_SECRET_KEY");
+  if (!secret) return true;
+  if (typeof token !== "string" || !token || token.length > 2048) return false;
+  try {
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ secret, response: token, ...(ip ? { remoteip: ip } : {}) }), signal: AbortSignal.timeout(5000),
+    });
+    return (await res.json())?.success === true;
+  } catch (error) {
+    console.error("TURNSTILE_VERIFY_ERR", error);
+    return false;
+  }
+}
 async function scheduleOperatorWebChatNotification(businessId: string, phone: string, humanRequest = false) {
   const task = Promise.allSettled([
     notifyOperatorOfWebChat(businessId, phone),
@@ -650,6 +667,9 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
     const chatToken = typeof body.chat_session === "string" ? body.chat_session : "";
     const visitorId = await verifyWebChatSession(chatToken, requestedBusinessId);
     if (body.action === "session") {
+      if (!visitorId && !(await passesTurnstile(body.turnstile_token, getClientIp(req)))) {
+        return new Response(JSON.stringify({ error: "Please complete the security check to start a chat.", code: "TURNSTILE_REQUIRED" }), { status: 403, headers: gCors(req) });
+      }
       const session = visitorId ? { token: chatToken } : await issueWebChatSession(requestedBusinessId);
       return new Response(JSON.stringify({ chat_session: session.token }), { status: 200, headers: gCors(req) });
     }

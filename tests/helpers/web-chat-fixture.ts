@@ -12,7 +12,7 @@ const questions = sourceExports("supabase/functions/_shared/booking-custom-field
 const duration = sourceExports("supabase/functions/_shared/duration.ts", {}) as any;
 const botPrompt = sourceExports("supabase/functions/_shared/bot-prompt.ts", { "./platform-invariants.ts": { PLATFORM_INVARIANTS: "" }, "./duration.ts": duration }) as any;
 
-export function webChatFixture(source = "supabase/functions/web-chat/index.ts") {
+export function webChatFixture(source = "supabase/functions/web-chat/index.ts", extraEnv: Record<string, string> = {}) {
   const business = { id: "a", business_name: "Fixture Kayak", timezone: "Africa/Johannesburg", booking_site_url: "https://a.booking.fixture.invalid", faq_json: {}, what_to_bring: "Bring a towel and water.", meeting_point_address: "Harbour kiosk" };
   const start = new Date(Date.now() + 72 * 3_600_000).toISOString();
   const tour = { id: "tour-a", business_id: "a", name: "Sea Kayak Tour", base_price_per_person: 400, duration_minutes: 120, active: true, hidden: false };
@@ -139,8 +139,9 @@ export function webChatFixture(source = "supabase/functions/web-chat/index.ts") 
     } },
     "../_shared/kb.ts": { retrieveKbContext: async () => "" },
     "../_shared/customer-session.ts": customerSessions, "../_shared/web-chat-session.ts": chatSessions,
-  }, env, async (url, init) => {
+  }, { ...env, ...extraEnv }, async (url, init) => {
     calls.push({ kind: "fetch", name: String(url), data: JSON.parse(String(init?.body || "{}")) });
+    if (String(url) === "https://challenges.cloudflare.com/turnstile/v0/siteverify") return Response.json({ success: JSON.parse(String(init?.body)).response === "good-token" });
     if (String(url).endsWith("/create-checkout")) {
       if (settings.checkout === "throw") throw new Error("Provider network failure");
       if (settings.checkout === "non-json") return new Response("Upstream unavailable", { status: 503 });

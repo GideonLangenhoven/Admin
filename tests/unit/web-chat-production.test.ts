@@ -430,6 +430,26 @@ describe("web chat automatic discount settings", () => {
 });
 
 describe("web chat booking copy", () => {
+  it("a new chat needs a passed Turnstile check once the secret is set", async () => {
+    const open = webChatFixture();
+    expect(await open.session()).toBeTruthy(); // no key yet: not enforced
+    const f = webChatFixture(undefined, { TURNSTILE_SECRET_KEY: "fixture-turnstile-secret" });
+    for (const token of [undefined, "bad-token"]) {
+      const res = await f.request({ action: "session", turnstile_token: token });
+      expect(res.status).toBe(403);
+      expect((await res.json()).code).toBe("TURNSTILE_REQUIRED");
+    }
+    const res = await f.request({ action: "session", turnstile_token: "good-token" });
+    const chat = (await res.json()).chat_session;
+    expect(chat).toBeTruthy();
+    const verify = f.calls.filter((c: any) => c.name.includes("siteverify")).at(-1);
+    expect(verify.data).toMatchObject({ secret: "fixture-turnstile-secret", response: "good-token", remoteip: "fixture-client" });
+    // Checked once per chat: a live session is reused without another check.
+    const calls = f.calls.length;
+    expect((await (await f.request({ action: "session", chat_session: chat })).json()).chat_session).toBe(chat);
+    expect(f.calls.slice(calls).some((c: any) => c.name.includes("siteverify"))).toBe(false);
+  });
+
   it("takes a promo code in chat, priced like checkout and passed to it", async () => {
     // Owner decision 2026-10-28: promo codes are accepted in chat. A promo replaces the automatic discount.
     const f = webChatFixture();
