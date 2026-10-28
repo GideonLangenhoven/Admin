@@ -1020,46 +1020,6 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       }
     }
 
-    // ── Drain any queued window-closed follow-ups ───────────────────────────
-    // When a sender (weather-cancel/cancel-booking via sendWhatsappWithWindowReopen,
-    // admin-reply, broadcast) couldn't send a free-form message because the 24h
-    // window was closed, it queued the full message in outbox with
-    // status='WAITING_WINDOW' and sent a reopener template. The customer just
-    // replied → window is now open → send the queued messages right away using
-    // this tenant's own WA credentials.
-    try {
-      const { data: queuedMsgs } = await supabase
-        .from("outbox")
-        .select("id, message_body, message_type, booking_id")
-        .eq("status", "WAITING_WINDOW")
-        .eq("business_id", tenant.business.id)
-        .eq("phone", phone);
-      for (const qm of (queuedMsgs || [])) {
-        // Old broadcasts and unknown free-form retries remain held, even on a new inbound reply.
-        if ((qm as any).message_type !== "CANCEL_FOLLOWUP" || !(qm as any).booking_id) continue;
-        const { data: followupBooking, error: followupError } = await supabase.from("bookings")
-          .select("id, business_id, status").eq("id", (qm as any).booking_id).eq("business_id", tenant.business.id).maybeSingle();
-        if (followupError || !operationalCancellationFollowup(tenant.business.id, qm as any, followupBooking)) continue;
-        try {
-          const drainRes = await sendWhatsappFreeformOrSignal(tenant, phone, (qm as any).message_body, (qm as any).booking_id);
-          if (drainRes.ok) {
-            await supabase.from("outbox").update({
-              status: "SENT",
-              sent_at: new Date().toISOString(),
-              attempts: 1,
-            }).eq("id", (qm as any).id);
-          } else {
-            // Window somehow still closed (shouldn't happen after a real inbound) — retry later.
-            await supabase.from("outbox").update({ attempts: 1 }).eq("id", (qm as any).id);
-          }
-        } catch (drainErr: any) {
-          console.error("CANCEL_FOLLOWUP_SEND_ERR", drainErr?.message || drainErr);
-        }
-      }
-    } catch (drainQueryErr: any) {
-      console.error("CANCEL_FOLLOWUP_DRAIN_QUERY_ERR", drainQueryErr?.message || drainQueryErr);
-    }
-    // ─────────────────────────────────────────────────────────────────────────
     const input = (text || "").trim().toLowerCase();
     const rawText = (text || "").trim();
     let rid = "";
@@ -1107,6 +1067,53 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (delErr) await logE(tenant, "DATA_DELETE_ERROR", { phone, msg: delErr.message });
       return;
     }
+
+    // ── Drain any queued window-closed follow-ups ───────────────────────────
+    // When a sender (weather-cancel/cancel-booking via sendWhatsappWithWindowReopen,
+    // admin-reply, broadcast, a failed free-form send) couldn't send because the
+    // 24h window was closed, it queued the full message in outbox with
+    // status='WAITING_WINDOW' and sent a reopener template. The customer just
+    // replied → window is now open → send the queued messages right away using
+    // this tenant's own WA credentials. Runs after STOP/DELETE, so an opt-out
+    // reply releases nothing.
+    try {
+      const { data: queuedMsgs } = await supabase
+        .from("outbox")
+        .select("id, message_body, message_type, booking_id")
+        .eq("status", "WAITING_WINDOW")
+        .eq("business_id", tenant.business.id)
+        .eq("phone", phone)
+        // ponytail: a week-old follow-up is stale (trip passed, link expired) and stays held.
+        .gte("created_at", new Date(Date.now() - 7 * 86_400_000).toISOString());
+      for (const qm of (queuedMsgs || []) as any[]) {
+        const type = String(qm.message_type || "");
+        // Only messages whose sender promised delivery on reply; anything else stays held.
+        if (!["CANCEL_FOLLOWUP", "ADMIN_FOLLOWUP", "WINDOW_CLOSED_RETRY", "BROADCAST", "BROADCAST_FOLLOWUP"].includes(type)) continue;
+        let qb: any = null;
+        if (qm.booking_id) {
+          const res = await supabase.from("bookings").select("id, business_id, status, whatsapp_booking_updates_opt_in")
+            .eq("id", qm.booking_id).eq("business_id", tenant.business.id).maybeSingle();
+          if (res.error || !res.data) continue;
+          qb = res.data;
+        }
+        if (type === "CANCEL_FOLLOWUP" && !operationalCancellationFollowup(tenant.business.id, qm, qb)) continue;
+        // Departure broadcasts are optional updates: honour a STOP sent since.
+        if (type.startsWith("BROADCAST") && !qb?.whatsapp_booking_updates_opt_in) continue;
+        // Claim first so two quick replies can't both send it.
+        const { data: claimed } = await supabase.from("outbox").update({ status: "SENDING" })
+          .eq("id", qm.id).eq("business_id", tenant.business.id).eq("status", "WAITING_WINDOW").select("id");
+        if (!claimed?.length) continue;
+        const drainRes = await sendWhatsappFreeformOrSignal(tenant, phone, qm.message_body, qm.booking_id);
+        await supabase.from("outbox").update(
+          drainRes.ok ? { status: "SENT", sent_at: new Date().toISOString(), attempts: 1, error: null }
+            // Still closed: wait for the next reply. Otherwise list it under Failed Notifications for a retry.
+            : drainRes.windowClosed ? { status: "WAITING_WINDOW", attempts: 1 } : { status: "FAILED", attempts: 1, error: drainRes.error.slice(0, 500) },
+        ).eq("id", qm.id).eq("business_id", tenant.business.id);
+      }
+    } catch (drainQueryErr: any) {
+      console.error("OUTBOX_DRAIN_ERR", drainQueryErr?.message || drainQueryErr);
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     // ── Trading gate ──────────────────────────────────────────────────────────
     // A suspended/paused tenant's storefront is closed and create-checkout
