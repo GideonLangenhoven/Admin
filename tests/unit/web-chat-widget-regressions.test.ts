@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseChatContact } from "../../supabase/functions/_shared/chat-contact";
 import { sourceFunction } from "../helpers/source-handler";
@@ -104,5 +105,19 @@ describe("widget contact validation and asynchronous selection boundaries", () =
     const untrusted = '<img src=x onerror="window.pwned=true"><script>window.pwned=true</script>';
     expect(plainChatText(untrusted)).toBe(untrusted);
     expect(plainChatText("guest_name@example.com")).toBe("guest_name@example.com");
+  });
+});
+
+describe("widget polling and input", () => {
+  const src = readFileSync(widget, "utf8");
+  it("polls for operator replies in bot mode too, slower than with a human, never from a hidden tab", () => {
+    expect(src).toContain("if (!open || !chatSession || !sessionReady) return;\n    if (!lastPollRef.current)");
+    expect(src).toContain("if (polling || document.hidden) return;");
+    expect(src).toContain("}, isHuman ? 4000 : 20_000);");
+  });
+  it("keeps the message box at 16px so iOS doesn't zoom on focus", () => {
+    const input = src.slice(src.indexOf('aria-label="Chat message"'), src.indexOf("/>", src.indexOf('aria-label="Chat message"')));
+    expect(input).toContain("text-base");
+    expect(input).not.toContain("text-sm");
   });
 });
