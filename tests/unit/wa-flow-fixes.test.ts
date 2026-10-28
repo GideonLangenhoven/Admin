@@ -203,7 +203,7 @@ describe("WhatsApp booking flow", () => {
     expect(b.changes.at(-1)).toMatchObject({ current_state: "IDLE", state_data: {} });
   });
 
-  const voucherOnly = (bookingStatus: string, confirmation: any) => bot("FINALIZE_BOOKING", {
+  const voucherOnly = (bookingStatus: string, confirmation: any, extra: Record<string, unknown> = {}) => bot("FINALIZE_BOOKING", {
     ...summary, voucher_id: "v-2", voucher_ids: ["v-2"], voucher_codes: ["WXYZ2345"], voucher_deduction: 1200, total: 0,
     customer_name: "Synthetic Guest", email: "guest@example.invalid", whatsapp_booking_updates_opt_in: false,
   }, {
@@ -213,6 +213,7 @@ describe("WhatsApp booking flow", () => {
     verifyChatBookingPricing, rands, waTermsNotice, calcDiscount: async () => ({ type: "NONE", percent: 0, label: "" }), logE: async () => undefined,
     rpc: async (name: string) => name === "confirm_voucher_booking" ? confirmation : { data: { success: true } },
     getBookableTours: async () => [], resolveWaiverLink: () => "", fmtTime: () => "Fri 1 Jan, 10:00", businessName: () => "Fixture Kayak", fetch: vi.fn(async () => new Response("{}")),
+    ...extra,
   });
 
   it("a voucher-only booking that can't be confirmed is removed, not left pending", async () => {
@@ -221,6 +222,13 @@ describe("WhatsApp booking flow", () => {
     expect(b.filters.bookings).toContainEqual(["delete"]);
     expect(b.filters.bookings).toContainEqual(["eq", "status", "PENDING"]);
     expect(b.sent.at(-1)).toContain("We couldn't confirm that booking");
+  });
+
+  it("the second-trip suggestion follows the confirmation, sent before the function ends", async () => {
+    const b = voucherOnly("PAID", { data: { ok: true }, error: null }, { getBookableTours: async () => [tour, { ...tour, id: "other", name: "Seal Snorkel" }] });
+    await b.handle(tenant, phone, "internal_proceed", "text");
+    expect(b.sent.at(-2)).toContain("You\u2019re all set!");
+    expect(b.sent.at(-1)).toContain("How about adding a *Seal Snorkel*");
   });
 
   it("a voucher confirmation that committed before a network error is reported as booked", async () => {

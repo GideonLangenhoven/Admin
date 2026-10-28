@@ -2193,15 +2193,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         const waiverLink = resolveWaiverLink(tenant.business, booking.id, (booking as any).waiver_token);
         await logE(tenant, "voucher_booking_confirmed", { booking_id: booking.id, voucher_code: verifiedSd.voucher_code }, booking.id);
         // Upsell second trip
-        const otherTours2 = (await getBookableTours(tenant)).filter(function (t: any) { return t.id !== verifiedSd.tour_id; });
-        if (otherTours2.length > 0) {
-          const upsellTour = otherTours2[0];
-          setTimeout(async function () {
-            try {
-              await sendText(tenant, phone, "\u{1F4A1} Psst! How about adding a *" + upsellTour.name + "* to your trip?\n\nJust type *book* to add another tour.");
-            } catch (e) { }
-          }, 5000);
-        }
+        const upsellTour = (await getBookableTours(tenant)).find(function (t: any) { return t.id !== verifiedSd.tour_id; });
         await sendText(tenant, phone,
           "\u{1F389} *You\u2019re all set!*\n\n" +
           "\u{1F4CB} Ref: " + vref + "\n" +
@@ -2224,6 +2216,11 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           });
         } catch (e) { }
         await setConvo(convo.id, { current_state: "IDLE", state_data: {}, last_booking_id: booking.id, customer_name: sd.customer_name, email: email });
+        // Sent here, after the confirmation: a 5s timer could fire after the function had finished, or first.
+        if (upsellTour) {
+          try { await typingDelay(); await sendText(tenant, phone, "\u{1F4A1} Psst! How about adding a *" + upsellTour.name + "* to your trip?\n\nJust type *book* to add another tour."); }
+          catch (e) { console.error("UPSELL_SEND_ERR", e); }
+        }
         return;
       }
 
