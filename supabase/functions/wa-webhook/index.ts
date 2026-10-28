@@ -1571,7 +1571,8 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (!tourInfo.data) { await sendText(tenant, phone, "Hmm, can\u2019t find that tour. Let\u2019s try again."); await setConvo(convo.id, { current_state: "IDLE" }); return; }
       const t = tourInfo.data;
       await sendText(tenant, phone, "*" + t.name + "* \u{1F6F6}\n\n" + t.description + "\n\n\u23F1 " + formatDuration(t.duration_minutes) + "\n\u{1F4B0} R" + t.base_price_per_person + " per person\n\nHow many people will be joining?");
-      await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { tour_id: tourId } });
+      // Keep a redeemed voucher (PICK_TOUR is entered with it when the tenant has several tours).
+      await setConvo(convo.id, { current_state: "ASK_QTY", state_data: { ...sd, tour_id: tourId } });
     }
 
     // ===== FAQ LIST =====

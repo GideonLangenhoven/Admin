@@ -41,4 +41,11 @@ describe("WhatsApp booking flow", () => {
       expect(b.filters.tours).toContainEqual(["eq", "business_id", "tenant-a"]);
     });
   }
+
+  it("a redeemed voucher survives the tour pick", async () => {
+    const voucher = { voucher_code: "ABCD2345", voucher_id: "v-1", voucher_value: 600, voucher_type: "FREE_TRIP", voucher_pax_limit: 1, voucher_purchase_value: 600 };
+    const b = bot("PICK_TOUR", voucher, { tours: tour });
+    await b.handle(tenant, phone, "", "interactive", { list_reply: { id: "TOUR_" + tour.id } });
+    expect(b.changes).toEqual([{ current_state: "ASK_QTY", state_data: { ...voucher, tour_id: tour.id } }]);
+  });
 });
