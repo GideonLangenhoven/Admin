@@ -24,6 +24,7 @@ import { llmText, llmAvailable } from "../_shared/llm.ts";
 import { retrieveKbContext } from "../_shared/kb.ts";
 import { verifyCustomerSession } from "../_shared/customer-session.ts";
 import { issueWebChatSession, verifyWebChatSession } from "../_shared/web-chat-session.ts";
+import { getClientIp, withinIpRateLimit } from "../_shared/otp-attempts.ts";
 const SU = Deno.env.get("SUPABASE_URL");
 const SK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const db = createClient(SU, SK);
@@ -504,8 +505,10 @@ async function adjustSlotBooked(businessId: string, slotId: string, delta: numbe
   if (rpcRes.error) console.error("ADJUST_BOOKED_RPC_ERR slot=" + slotId + " err=" + rpcRes.error.message);
 }
 
-// Basic per-client rate limit for this open endpoint (per-instance, sliding
-// window). Keeps abuse from spamming bookings/Gemini; legit chats never hit it.
+// Per-client rate limits for this open endpoint. Messages and new sessions can
+// reach the AI (billed to the tenant), so they use the shared per-minute DB
+// bucket, keyed on the client IP the platform sets. Polls cost no AI and keep
+// this per-instance window.
 const RATE_LIMIT_MAX = 20;
 const RATE_WINDOW_MS = 60_000;
 const rateBuckets = new Map<string, number[]>();
@@ -527,7 +530,6 @@ type ChatAudit = {
 async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
   if (req.method === "OPTIONS") return new Response("ok", { headers: gCors(req) });
   if (req.method !== "POST") return new Response(JSON.stringify({ error: "Use POST for chat requests." }), { status: 405, headers: gCors(req) });
-  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   const url = new URL(req.url);
   if (url.searchParams.get("__sentry_test") === "1") {
     throw new Error("Sentry test error from web-chat (intentional)");
@@ -542,7 +544,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
     }
     // Four-second human polling must not consume the message/AI budget.
     const polling = body.action === "poll";
-    if (rateLimited(clientIp + (polling ? ":poll" : ":chat"), polling ? 60 : RATE_LIMIT_MAX)) {
+    if (polling ? rateLimited(getClientIp(req) + ":poll", 60) : !(await withinIpRateLimit(db, req, "web-chat", RATE_LIMIT_MAX))) {
       return new Response(JSON.stringify({ reply: "You're sending messages a little fast. Give me a few seconds and try again." }), { status: 429, headers: gCors(req) });
     }
     const hist = (body.messages || []).slice(-12).map((entry) => ({ role: entry.role, text: entry.text.slice(0, 4000) }));

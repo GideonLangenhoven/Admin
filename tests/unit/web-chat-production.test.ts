@@ -324,6 +324,14 @@ describe("web chat request boundaries", () => {
     for (let i = 0; i < 18; i++) expect((await f.request({ action: "poll", chat_session: token })).status).toBe(200);
     for (let i = 0; i < 5; i++) expect((await f.post(token, "What should I bring?")).status).toBe(200);
   });
+  it("rate limits on the client IP the platform sets, not a spoofable forwarded-for", async () => {
+    const f = webChatFixture();
+    const token = await f.session();
+    for (let i = 0; i < 25; i++) await f.request({ chat_session: token, message: "hello", state: { step: "IDLE" } }, { "cf-connecting-ip": "198.51.100.7", "x-forwarded-for": "203.0.113." + i });
+    const keys = f.calls.filter(call => call.kind === "rpc" && call.name === "check_rate_limit").map(call => call.data.p_ip);
+    expect(keys.slice(1).every(ip => ip === "198.51.100.7")).toBe(true);
+    expect((await f.request({ chat_session: token, message: "hello" }, { "cf-connecting-ip": "198.51.100.7" })).status).toBe(429);
+  });
   it("still rate limits repeated messages", async () => {
     const f = webChatFixture();
     const token = await f.session();

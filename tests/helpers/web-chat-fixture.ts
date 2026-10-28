@@ -22,6 +22,7 @@ export function webChatFixture(source = "supabase/functions/web-chat/index.ts") 
   const settings = { trading: true, llmAvailable: true, llmReply: "That is our fixture answer.", holdAvailable: true, checkout: "ok", humanPush: false, email: "ok" };
   const discount = { type: "GROUP", percent: 5, label: "Group discount", minQty: 6, phone: "" };
   let sequence = 0;
+  const rateCounts: Record<string, number> = {}; // public.check_rate_limit, without the minute window
   const db = {
     from(table: string) {
       const filters: ((row: any) => boolean)[] = [];
@@ -68,6 +69,7 @@ export function webChatFixture(source = "supabase/functions/web-chat/index.ts") 
     async rpc(name: string, data: any) {
       calls.push({ kind: "rpc", name, data });
       if (failures["rpc:" + name]) return { data: null, error: failures["rpc:" + name] };
+      if (name === "check_rate_limit") { rateCounts[data.p_ip + "|" + data.p_endpoint] = (rateCounts[data.p_ip + "|" + data.p_endpoint] || 0) + 1; return { data: rateCounts[data.p_ip + "|" + data.p_endpoint] <= data.p_max, error: null }; }
       if (name === "list_available_slots") return { data: rows.slots.filter(row => row.business_id === data.p_business_id && (!data.p_tour_id || row.tour_id === data.p_tour_id) && row.status === "OPEN" && row.start_time >= data.p_range_start && row.start_time <= data.p_range_end), error: null };
       if (name === "resolve_booking_discount") return { data: data.p_qty >= discount.minQty && (!discount.phone || data.p_phone === discount.phone) ? discount : { type: "", percent: 0, label: "" }, error: null };
       if (name === "slot_available_capacity") return { data: rows.slots.find(row => row.id === data.p_slot_id)?.available_capacity ?? 0, error: null };

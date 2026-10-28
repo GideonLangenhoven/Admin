@@ -51,9 +51,12 @@ export function createOpaqueOtpToken() {
   return btoa(raw).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
+// cf-connecting-ip is set by the platform's edge and can't be forged; the
+// first x-forwarded-for hop is whatever the client sent.
 export function getClientIp(req: Request) {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    || req.headers.get("cf-connecting-ip")
+  return req.headers.get("cf-connecting-ip")
+    || req.headers.get("x-real-ip")
+    || req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
     || "";
 }
 
