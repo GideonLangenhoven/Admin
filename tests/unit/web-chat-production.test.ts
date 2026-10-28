@@ -430,6 +430,18 @@ describe("web chat automatic discount settings", () => {
 });
 
 describe("web chat booking copy", () => {
+  it("shows the Terms on the summary, before the guest taps Confirm", async () => {
+    // A voucher-paid booking completes on that tap; the notice used to arrive afterwards.
+    const f = webChatFixture();
+    f.rows.vouchers.push({ id: "v-a", code: "GIFT2345", business_id: "a", status: "ACTIVE", type: "CREDIT", current_balance: 2000 });
+    const token = await f.session();
+    for (const [step, message] of [["ASK_VOUCHER", "btn:no_voucher"], ["ENTER_VOUCHER", "btn:no_voucher"], ["ASK_VOUCHER", "GIFT2345"], ["ENTER_VOUCHER", "GIFT2345"]]) {
+      const summary = await f.post(token, message, { ...f.bookingState, step, baseTotal: 800, discount: 0 });
+      expect(summary.state.step).toBe("CONFIRM");
+      expect(summary.reply).toContain("you accept our Terms & Privacy Policy: https://a.booking.fixture.invalid/terms");
+    }
+  });
+
   it("a one-guest booking reads 1 person, with no em dashes", async () => {
     const f = webChatFixture();
     const token = await f.session();

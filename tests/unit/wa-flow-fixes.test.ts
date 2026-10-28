@@ -20,6 +20,7 @@ function query(result: any, filters: any[]) {
 
 // The real module helpers handleMsg calls for booking questions.
 const wa = "supabase/functions/wa-webhook/index.ts";
+const waTermsNotice = sourceFunction(wa, "waTermsNotice", {});
 const questionHelpers = (db: any, sent: string[], changes: any[]) => {
   const send = async (_t: any, _p: any, message: string) => { sent.push(message); };
   const setConvo = async (_id: string, data: any) => { changes.push(data); };
@@ -46,12 +47,23 @@ function bot(state: string, stateData: any, tables: Record<string, any> = {}, ex
     sendButtons: async (_t: any, _p: any, body: string) => { sent.push(body); },
     setConvo: async (_id: string, data: any) => { changes.push(data); },
     logE: async () => { throw new Error("Unexpected bot error"); }, typingDelay: async () => undefined,
-    isAvailabilityQuery: ordinary, formatDuration: (m: number) => m + " min", calculateChatBookingPricing, rands, ...extra,
+    isAvailabilityQuery: ordinary, formatDuration: (m: number) => m + " min", calculateChatBookingPricing, rands, waTermsNotice, ...extra,
   });
   return { handle, sent, changes, filters, ordinary };
 }
 
 describe("WhatsApp booking flow", () => {
+  it("the summary shows the Terms before the guest taps Confirm", async () => {
+    // A voucher-paid booking completes on that tap; the notice used to arrive afterwards.
+    const slot = { id: "slot-a", status: "OPEN", start_time: new Date(Date.now() + 86_400_000).toISOString(), tour_id: tour.id };
+    const b = bot("PICK_SLOT", { qty: 2, slot_map: { 1: "slot-a" } }, { slots: slot, tours: tour }, {
+      rpc: async () => ({ data: 10, error: null }), getSlotPrice: async () => 600, fmtTime: () => "Sat 09:00",
+      calcDiscount: async () => ({ type: "", percent: 0, label: "" }),
+    });
+    await b.handle({ business: { id: "tenant-a", booking_site_url: "https://a.booking.example.invalid/" } }, phone, "1", "text");
+    expect(b.sent.at(-1)).toContain("you accept our Terms & Privacy Policy: https://a.booking.example.invalid/terms\n\nLook good?");
+  });
+
   for (const [state, id] of [["PICK_TOUR", "TOUR_"], ["GV_PICK_TOUR", "GV_"]]) {
     it(`${state} only loads a tour that belongs to this tenant and is on sale`, async () => {
       const b = bot(state, {}, { tours: tour });
@@ -145,7 +157,7 @@ describe("WhatsApp booking flow", () => {
       slots: { id: "slot-1", start_time: "2099-01-01T08:00:00Z", status: "OPEN", tour_id: tour.id, price_per_person_override: null, business_id: "tenant-a" },
       tours: tour, bookings: { id: "30000000-0000-4000-8000-000000000001", waiver_token: "token-1" },
     }, {
-      fetch, SUPABASE_URL: "https://test.invalid", SUPABASE_KEY: "service-key", verifyChatBookingPricing, rands,
+      fetch, SUPABASE_URL: "https://test.invalid", SUPABASE_KEY: "service-key", verifyChatBookingPricing, rands, waTermsNotice,
       calcDiscount: async () => ({ type: "NONE", percent: 0, label: "" }), logE: async () => undefined,
       rpc: async () => ({ data: { success: true } }), requestCheckout: async () => ({ fully_covered: true, redirectUrl: "https://example.invalid/success", amount: 0 }),
     });
@@ -165,7 +177,7 @@ describe("WhatsApp booking flow", () => {
     slots: { id: "slot-1", start_time: "2099-01-01T08:00:00Z", status: "OPEN", tour_id: tour.id, price_per_person_override: null, business_id: "tenant-a" },
     tours: tour, bookings: { id: "30000000-0000-4000-8000-000000000001", waiver_token: "token-1", status: bookingStatus },
   }, {
-    verifyChatBookingPricing, rands, calcDiscount: async () => ({ type: "NONE", percent: 0, label: "" }), logE: async () => undefined,
+    verifyChatBookingPricing, rands, waTermsNotice, calcDiscount: async () => ({ type: "NONE", percent: 0, label: "" }), logE: async () => undefined,
     rpc: async (name: string) => name === "confirm_voucher_booking" ? confirmation : { data: { success: true } },
     getBookableTours: async () => [], resolveWaiverLink: () => "", fmtTime: () => "Fri 1 Jan, 10:00", businessName: () => "Fixture Kayak", fetch: vi.fn(async () => new Response("{}")),
   });
@@ -223,7 +235,7 @@ describe("WhatsApp booking flow", () => {
     slots: { id: "slot-1", start_time: "2099-01-01T08:00:00Z", status: "OPEN", tour_id: tour.id, price_per_person_override: null, business_id: "tenant-a" },
     tours: tour, bookings: { id: "30000000-0000-4000-8000-000000000001", waiver_token: "token-1" }, businesses: { booking_custom_fields: config },
   }, {
-    verifyChatBookingPricing, rands, calcDiscount: async () => ({ type: "NONE", percent: 0, label: "" }), logE: async () => undefined,
+    verifyChatBookingPricing, rands, waTermsNotice, calcDiscount: async () => ({ type: "NONE", percent: 0, label: "" }), logE: async () => undefined,
     rpc: async () => ({ data: { success: true } }), requestCheckout: async () => ({ id: "checkout-1", redirectUrl: "https://pay.example.invalid/1" }),
   });
 

@@ -197,6 +197,11 @@ async function getBusinessSiteUrls(businessId) {
     termsUrl: bookingSiteUrl ? bookingSiteUrl + "/terms" : "",
   };
 }
+// On the summary, before the guest taps Confirm: a voucher-paid booking completes on that tap.
+async function termsNotice(businessId) {
+  const { termsUrl } = await getBusinessSiteUrls(businessId);
+  return termsUrl ? "\n\nBy completing this booking you accept our Terms & Privacy Policy: " + termsUrl : "";
+}
 async function getBusinessWaiverLink(businessId, bookingId, waiverToken) {
   if (!businessId || !bookingId || !waiverToken) return "";
   const { data } = await db.from("businesses").select("waiver_url").eq("id", businessId).maybeSingle();
@@ -1396,12 +1401,13 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
           else { reply = "Can't find that code. Double-check it?"; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
         } else { reply = "Voucher codes are 8 characters. Try again?"; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
       }
+      if (ns.step === "CONFIRM") reply += await termsNotice(requestedBusinessId);
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
     }
     // ===== ENTER_VOUCHER =====
     if (step === "ENTER_VOUCHER") {
       const noVc = btnVal === "no_voucher" || (!isBtnClick && skipsVoucher(msg));
-      if (noVc) { ns = { ...ns, step: "CONFIRM", vid: null, vcode: null, vded: 0, total: Number(ns.baseTotal ?? ns.qty * ns.tprice) - Number(ns.discount || 0) }; reply = "No problem! Here's your booking summary:\n\n" + ns.tname + "\n" + ns.qty + " " + pl(ns.qty, "person", "people") + " \u2022 " + rands(ns.total) + "\n\nReady to confirm?"; buttons = [{ label: "\u2705 Confirm & Pay " + rands(ns.total), value: "confirm" }, { label: "\u274C Cancel", value: "cancel_booking" }]; return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
+      if (noVc) { ns = { ...ns, step: "CONFIRM", vid: null, vcode: null, vded: 0, total: Number(ns.baseTotal ?? ns.qty * ns.tprice) - Number(ns.discount || 0) }; reply = "No problem! Here's your booking summary:\n\n" + ns.tname + "\n" + ns.qty + " " + pl(ns.qty, "person", "people") + " \u2022 " + rands(ns.total) + "\n\nReady to confirm?"; buttons = [{ label: "\u2705 Confirm & Pay " + rands(ns.total), value: "confirm" }, { label: "\u274C Cancel", value: "cancel_booking" }]; reply += await termsNotice(requestedBusinessId); return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) }); }
       const vc2 = msg.toUpperCase().replace(/\s/g, "");
       if (vc2.length === 8) {
         // C2: Filter vouchers by business_id to prevent cross-tenant usage
@@ -1410,6 +1416,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         else if (vd2 && vd2.status === "REDEEMED") { reply = "Already used. Got another?"; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
         else { reply = "Code not found. Check and try again?"; buttons = [{ label: "Continue without a voucher", value: "no_voucher" }]; }
       } else { reply = "That doesn't look like a voucher code. Want to continue without one?"; buttons = [{ label: "No voucher, continue", value: "no_voucher" }, { label: "Try again", value: "btn:yes_voucher" }]; }
+      if (ns.step === "CONFIRM") reply += await termsNotice(requestedBusinessId);
       return new Response(JSON.stringify({ reply: reply, state: ns, buttons: buttons }), { status: 200, headers: gCors(req) });
     }
     // ===== CONFIRM =====
@@ -1536,8 +1543,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
         // Tacit Terms acceptance for conversational checkout: the timestamp above
         // records consent; this notice (shown with the confirmation/payment step)
         // is the displayed evidence that the customer was told before paying.
-        const ckSiteUrls = bk ? await getBusinessSiteUrls(businessId) : null;
-        const termsNotice = ckSiteUrls?.termsUrl ? "\n\nBy completing this booking you accept our Terms & Privacy Policy: " + ckSiteUrls.termsUrl : "";
+        const confirmTerms = bk ? await termsNotice(businessId) : "";
         if (!bk) { reply = "Something went wrong. Try the Book Now page?"; ns = { step: "IDLE" }; }
         else if (ft <= 0) {
           const confirmed = await db.rpc("confirm_voucher_booking", { p_booking_id: bk.id, p_voucher_ids: ns.vid ? [ns.vid] : [] });
@@ -1569,7 +1575,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
           const wcLoc = requestTenant?.business?.location_phrase; const wcWtb = requestTenant?.business?.what_to_bring;
           // Email above is the canonical confirmation; WhatsApp only when no email on file.
           if (ns.phone && !ns.email) { try { await fetch(SU + "/functions/v1/send-whatsapp-text", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SK }, body: JSON.stringify({ to: ns.phone, message: "\u{1F389} *Booking Confirmed!*\n\n\u{1F4CB} Ref: " + vRef + "\n\u{1F6F6} " + ns.tname + "\n\u{1F4C5} " + fmtS(ns.slotTime) + "\n\u{1F465} " + ns.qty + " " + pl(ns.qty, "person", "people") + "\n\u{1F39F} Paid with voucher\n" + (waiverLink ? "\n\u{1F4DD} Waiver: " + waiverLink + "\n" : "\n") + "\n\u{1F4CD} *Meeting Point:*\n" + meetingPointText + "\nArrive 15 min early\n" + (wcWtb ? "\n\u{1F392} *Bring:* " + wcWtb + "\n" : "") + "\n" + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!") }) }); } catch (e) { console.log("webchat voucher wa err"); } }
-          reply = "\u{1F389} You're booked!\n\nRef: " + vRef + (confirmationEmailSent ? "\nConfirmation email on its way." : "\nYour booking is confirmed, but we couldn't send the email. Check My Bookings below or ask our team for a copy.") + "\n\n\u{1F4CD} " + meetingPointText + "\nPlease arrive 15 minutes early. " + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!") + termsNotice; ns = { step: "IDLE" };
+          reply = "\u{1F389} You're booked!\n\nRef: " + vRef + (confirmationEmailSent ? "\nConfirmation email on its way." : "\nYour booking is confirmed, but we couldn't send the email. Check My Bookings below or ask our team for a copy.") + "\n\n\u{1F4CD} " + meetingPointText + "\nPlease arrive 15 minutes early. " + (wcLoc ? "See you " + wcLoc + "!" : "See you soon!") + confirmTerms; ns = { step: "IDLE" };
         } else {
           // Atomic capacity check + hold creation to prevent overbooking
           const holdExpiry = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
@@ -1608,7 +1614,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
             pay = checkoutUrl(yd.redirectUrl);
             // M9: Generate waiver link for paid bookings
             const paidWaiverLink = await getBusinessWaiverLink(businessId, bk.id, bk.waiver_token);
-            reply = "Your spots are held until " + fmtTime(paymentExpiresAt) + ".\n\nRef: " + bk.id.substring(0, 8).toUpperCase() + "\nComplete payment below to confirm your booking." + (paidWaiverLink ? "\n\n📝 Please also complete your waiver: " + paidWaiverLink : "") + termsNotice;
+            reply = "Your spots are held until " + fmtTime(paymentExpiresAt) + ".\n\nRef: " + bk.id.substring(0, 8).toUpperCase() + "\nComplete payment below to confirm your booking." + (paidWaiverLink ? "\n\n📝 Please also complete your waiver: " + paidWaiverLink : "") + confirmTerms;
           }
           else {
             const errReason = yd?.reason || yd?.error || "unknown error";

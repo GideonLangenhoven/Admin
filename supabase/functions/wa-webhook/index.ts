@@ -400,6 +400,11 @@ async function sendList(tenant: TenantContext, to: any, bt: any, btnTxt: any, se
 }
 async function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 async function typingDelay() { await delay(800 + Math.floor(Math.random() * 1200)); }
+// On the summary, before the guest taps Confirm: a voucher-paid booking completes on that tap.
+function waTermsNotice(tenant: TenantContext) {
+  const base = String(tenant.business.booking_site_url || "").replace(/\/+$/, "");
+  return base ? "\n\nBy completing this booking you accept our Terms & Privacy Policy: " + base + "/terms" : "";
+}
 // The same screen web chat applies: a reply that quotes the prompt becomes a refusal.
 function screenReply(text: string) {
   const out = gateOutbound(text);
@@ -1938,7 +1943,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       else if (sd.voucher_id && finalTotal > 0) summary += discountMsg + "\n*Remaining: " + rands(finalTotal) + "*";
       else if (disc.percent > 0) summary += discountMsg + "\n*Total: " + rands(finalTotal) + "*";
       else summary += "\n*Total: " + rands(finalTotal) + "*";
-      summary += "\n\nLook good?";
+      summary += waTermsNotice(tenant) + "\n\nLook good?";
       const confirmBtns = [{ id: "CONFIRM", title: finalTotal > 0 ? "\u2705 Pay " + rands(finalTotal) : "\u2705 Confirm (FREE)" }, { id: "IDLE", title: "\u274C Cancel" }];
       if (finalTotal > 0) confirmBtns.splice(1, 0, { id: "ADD_VOUCHER", title: "\u{1F39F} Add Voucher" });
       await sendButtons(tenant, phone, summary, confirmBtns);
@@ -2154,8 +2159,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // Tacit Terms acceptance for conversational checkout: the timestamp above
       // records consent; this notice (sent with the confirmation/payment step)
       // is the displayed evidence that the customer was told before paying.
-      const waTermsBase = String(tenant.business.booking_site_url || "").replace(/\/+$/, "");
-      const termsNotice = waTermsBase ? "\n\nBy completing this booking you accept our Terms & Privacy Policy: " + waTermsBase + "/terms" : "";
+      const termsNotice = waTermsNotice(tenant);
 
       // VOUCHER BOOKING — skip payment
       if (verifiedSd.voucher_id && verifiedSd.total <= 0) {
