@@ -272,3 +272,9 @@ describe("Stale session detection", () => {
     expect(isStaleSession("not-a-date")).toBe(false);
   });
 });
+
+describe("Outbound em dashes", () => {
+  it("become commas, since the prompt rule alone doesn't stop them", () => {
+    expect(gateOutbound("Yes — we have space—two seats left.").reply).toBe("Yes, we have space, two seats left.");
+  });
+});

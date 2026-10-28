@@ -26,7 +26,7 @@ import { calculateChatBookingPricing, verifyChatBookingPricing } from "../_share
 import { applicableBookingQuestions, captureQuestionFields, validateQuestionAnswers } from "../_shared/booking-custom-fields.ts";
 import { getPaidPortions } from "../_shared/vouchers.ts";
 import { PLATFORM_INVARIANTS } from "../_shared/platform-invariants.ts";
-import { formatTourMeetingPoints, isAvailabilityQuery, MEDIA_FALLBACK_REPLY } from "../_shared/bot-guards.ts";
+import { formatTourMeetingPoints, gateOutbound, isAvailabilityQuery, MEDIA_FALLBACK_REPLY } from "../_shared/bot-guards.ts";
 
 const VERIFY_TOKEN = Deno.env.get("WA_VERIFY_TOKEN")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -400,11 +400,17 @@ async function sendList(tenant: TenantContext, to: any, bt: any, btnTxt: any, se
 }
 async function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 async function typingDelay() { await delay(800 + Math.floor(Math.random() * 1200)); }
+// The same screen web chat applies: a reply that quotes the prompt becomes a refusal.
+function screenReply(text: string) {
+  const out = gateOutbound(text);
+  if (out.leakDetected) console.warn("WA_LLM_LEAK:" + out.matches.join(","));
+  return out.reply;
+}
 async function gemFallback(tenant: TenantContext, msg: string, phone?: any, extraContext?: string): Promise<string | null> {
   // Ground the answer in the tenant's vector KB (returns "" when nothing relevant)
   const kbCtx = await retrieveKbContext(supabase, tenant.business.id, msg);
   const ctx = [kbCtx, extraContext].filter(Boolean).join("\n\n") || undefined;
-  return await llmText({
+  const reply = await llmText({
     system: buildGeminiInstruction(tenant, ctx),
     user: msg,
     maxTokens: 400,
@@ -415,6 +421,7 @@ async function gemFallback(tenant: TenantContext, msg: string, phone?: any, extr
     businessId: tenant.business.id,
     userKey: phone ? await hashedUserKey(tenant.business.id, String(phone)) : undefined,
   });
+  return reply ? screenReply(reply) : reply;
 }
 async function getConvo(tenant: TenantContext, phone: any) {
   const r = await supabase.from("conversations").select().eq("business_id", tenant.business.id).eq("phone", phone).single();
@@ -955,6 +962,7 @@ async function botAnswerV2(tenant: TenantContext, phone: any, convo: any, userTe
     if (mode === "shadow") return true;
 
     const out = r.out;
+    if (out.message) out.message = screenReply(out.message);
     // HARD RULE: only out.message may ever reach the customer. plan and
     // escalation_reason are internal; a leaked plan is a sev-2.
     switch (out.action) {
@@ -2684,7 +2692,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
           userKey: await hashedUserKey(tenant.business.id, String(phone)),
         });
         if (ctxOut) {
-          await sendText(tenant, phone, ctxOut);
+          await sendText(tenant, phone, screenReply(ctxOut));
           await sendButtons(tenant, phone, "Anything else?", [{ id: "ASK", title: "\u2753 Another Question" }, { id: "BOOK", title: "\u{1F6F6} Book a Tour" }, { id: "IDLE", title: "\u2B05 Menu" }]);
           await setConvo(convo.id, { current_state: "MENU" });
           if (WA_BOT_V2 === "shadow") await botAnswerV2(tenant, phone, convo, rawText, "shadow");

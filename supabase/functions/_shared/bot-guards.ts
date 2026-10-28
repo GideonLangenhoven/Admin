@@ -242,5 +242,6 @@ export function gateOutbound(reply: string): { reply: string; leakDetected: bool
   if (leak.detected) {
     return { reply: KB_REFUSAL_REPLY, leakDetected: true, matches: leak.matches };
   }
-  return { reply, leakDetected: false, matches: [] };
+  // Platform rule 12 asks the model for no em dashes; models still slip.
+  return { reply: reply.replace(/\s*\u2014\s*/g, ", "), leakDetected: false, matches: [] };
 }
