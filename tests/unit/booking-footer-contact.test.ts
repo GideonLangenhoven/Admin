@@ -10,6 +10,7 @@ function footer(contact: Record<string, string | null>) {
     "react/jsx-runtime": jsx,
     "./ThemeProvider": { useTheme: () => ({ business_name: "Fixture Kayak", public_email: null, public_phone: null, public_whatsapp: null, ...contact }) },
     "./BrandLogo": { BrandMark: () => null, BrandWordmark: () => null },
+    "../lib/cookie-consent": { COOKIE_SETTINGS_EVENT: "bt:cookie-settings" },
   }).default as (props: { withBottomNav: boolean }) => any;
   return renderToStaticMarkup(jsx.jsx(Footer, { withBottomNav: false }));
 }
