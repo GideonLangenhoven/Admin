@@ -1614,7 +1614,7 @@ export default function SettingsPage() {
     }
 
     return (
-        <div className="max-w-4xl">
+        <div className="settings-page max-w-4xl">
             <div className="anim-fade-up mb-6 flex flex-wrap items-end justify-between gap-3">
                 <div>
                 <p className="ui-mono-label mb-2">Admin Console</p>
@@ -3330,7 +3330,7 @@ export default function SettingsPage() {
                 server-side, so never show this section to a delegated admin. */}
             {isPrivileged(role) && <CollapsibleSection id="credentials" title="Integration Credentials" subtitle="AES-256 encrypted at rest. Update each integration independently." openSections={openSections} toggle={toggleSection}>
                 <p className="mb-4 text-sm text-[var(--ck-text-muted)]">Enter both values to replace an integration, or remove it to start again.</p>
-                {role === "MAIN_ADMIN" && !readOnly && <p className="mb-4 text-sm"><Link href="/settings/agent-connections" className="underline">AI connections</Link></p>}
+                {role === "MAIN_ADMIN" && !readOnly && <p className="mb-4 text-sm"><Link href="/settings/agent-connections" className="inline-flex min-h-6 items-center underline">AI connections</Link></p>}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
                     {/* WhatsApp */}

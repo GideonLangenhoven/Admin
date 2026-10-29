@@ -316,6 +316,12 @@ th {
     height: 1rem;
   }
 
+  /* Settings text buttons were 16px tall; WCAG 2.5.8 asks for 24px. Zero
+     specificity, so a button that sets its own min-height keeps it. */
+  :where(.settings-page button) {
+    min-height: 1.5rem;
+  }
+
   .ui-table-container {
     container: admin-table / inline-size;
     min-width: 0;
