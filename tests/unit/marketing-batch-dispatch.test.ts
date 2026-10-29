@@ -12,6 +12,10 @@ describe("marketing batch dispatch", () => {
       "guest@sub.example.org",
       "guest@example.test",
       "guest@example.invalid",
+      // Round 2 item 1: the Kayak demo fixture and POPIA-anonymised contacts.
+      "kayak-demo-01@anonymized.local",
+      "token-1@anonymized.example",
+      "guest@example.com.",
     ]) {
       expect(marketingEmailValidationError(email)).toContain("Reserved/test recipient domain");
     }
@@ -42,5 +46,12 @@ describe("marketing batch dispatch", () => {
     const dispatch = readFileSync("supabase/functions/marketing-dispatch/index.ts", "utf8");
     expect(dispatch).toContain('"x-batch-validation": "permissive"');
     expect(dispatch.indexOf("marketingEmailValidationError(item.email)")).toBeLessThan(dispatch.indexOf("tokenRows.push"));
+  });
+
+  it("exits an automation for a demo or anonymised contact before any delivery is reserved", () => {
+    const dispatch = readFileSync("supabase/functions/marketing-automation-dispatch/index.ts", "utf8");
+    const guard = dispatch.indexOf('undeliverableEmail(String(contact.email || "")) ? "undeliverable_recipient"');
+    expect(guard).toBeGreaterThan(0);
+    expect(guard).toBeLessThan(dispatch.indexOf("reserveMarketingDelivery("));
   });
 });

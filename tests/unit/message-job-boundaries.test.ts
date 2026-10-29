@@ -15,7 +15,7 @@ const serviceKey = "fixture-service-credential-not-real";
 const secretKey = "sb_secret_fixture-not-a-real-key";
 const env = { SUPABASE_URL: "https://fixture.invalid", SUPABASE_SERVICE_ROLE_KEY: serviceKey, SUPABASE_SECRET_KEYS: JSON.stringify({ default: secretKey }), RESEND_API_KEY: "fixture-resend", SEND_EMAIL_HOOK_SECRET: "fixture-hook" };
 const endpoints = ["send-email", "send-whatsapp-text", "auto-messages", "cron-tasks", "marketing-dispatch", "marketing-automation-dispatch"];
-const message = { business_id: "a", to: "fixture-phone", message: "Reminder", type: "MARKETING_TEST", data: { business_id: "a", email: "guest@fixture.invalid", html_content: "<p>Hello</p>" } };
+const message = { business_id: "a", to: "fixture-phone", message: "Reminder", type: "MARKETING_TEST", data: { business_id: "a", email: "guest@guests.bookingtours.co.za", html_content: "<p>Hello</p>" } };
 
 // The real handlers and authentication helper run offline. This tiny query
 // double enforces tenant filters; native SQL claims are tested against Postgres.
@@ -29,7 +29,7 @@ function fixture() {
       { user_id: "orphan", business_id: null, role: "ADMIN", suspended: false },
     ],
     businesses: ["a", "b"].map(id => ({ id, name: "Operator " + id, business_name: "Operator " + id, subscription_status: "ACTIVE", booking_site_url: "https://" + id + ".fixture.invalid" })),
-    bookings: ["a", "b"].map(id => ({ id: "booking-" + id, business_id: id, status: "PAID", customer_name: "Guest " + id, email: "guest-" + id + "@fixture.invalid", phone: "phone-" + id, payment_url: "https://pay.fixture.invalid/" + id, total_amount: 100, qty: 1, tours: { name: "Tour " + id }, slots: { start_time: "2027-01-01T10:00:00Z" } })),
+    bookings: ["a", "b"].map(id => ({ id: "booking-" + id, business_id: id, status: "PAID", customer_name: "Guest " + id, email: "guest-" + id + "@guests.bookingtours.co.za", phone: "phone-" + id, payment_url: "https://pay.fixture.invalid/" + id, total_amount: 100, qty: 1, tours: { name: "Tour " + id }, slots: { start_time: "2027-01-01T10:00:00Z" } })),
     marketing_campaigns: ["a", "b"].map(id => ({ id: "campaign-" + id, business_id: id, status: "scheduled", scheduled_at: "2020-01-01T00:00:00Z", template_id: "template-" + id, total_recipients: 1, marketing_templates: { business_id: id, html_content: "<html><body>Hello {{first_name}}</body></html>", subject_line: "Hello" } })),
     marketing_contacts: ["a", "b"].map(id => ({ id: "contact-" + id, business_id: id, email: "guest-" + id + "@gmail.com", status: "active", verifiedMarketingEvidence: true, first_name: "Guest " + id })),
     marketing_automations: ["a", "b"].map(id => ({ id: "auto-" + id, business_id: id, status: "active", trigger_type: "manual", businesses: { timezone: "Africa/Johannesburg" } })),
@@ -172,7 +172,7 @@ describe("R08 authenticated message/job entry points", () => {
     const f = fixture();
     f.failVoucherImage();
     const response = await f.invoke("send-email", { type: "GIFT_VOUCHER", data: {
-      business_id: "a", email: "buyer@fixture.invalid", recipient_name: "Alex", buyer_name: "Sam", code: "GIFT2345", value: 750,
+      business_id: "a", email: "buyer@guests.bookingtours.co.za", recipient_name: "Alex", buyer_name: "Sam", code: "GIFT2345", value: 750,
     } }, serviceKey);
     expect(response.status).toBe(503);
     expect(f.emails).toHaveLength(0);
@@ -180,9 +180,9 @@ describe("R08 authenticated message/job entry points", () => {
 
   it.each(["buyer_receipt", "buyer_forward", "recipient"])("sends a standalone voucher PNG and appropriate %s copy from the voucher sender", async mode => {
     const f = fixture();
-    Object.assign(f.rows.businesses[0], { notification_email: "help@fixture.invalid", social_facebook: "https://facebook.com/operator", logo_url: "https://fixture.invalid/storage/v1/object/public/email-images/logo.png" });
+    Object.assign(f.rows.businesses[0], { notification_email: "help@guests.bookingtours.co.za", social_facebook: "https://facebook.com/operator", logo_url: "https://fixture.invalid/storage/v1/object/public/email-images/logo.png" });
     const response = await f.invoke("send-email", { type: "GIFT_VOUCHER", data: {
-      business_id: "a", email: "buyer@fixture.invalid", gift_recipient_mode: mode,
+      business_id: "a", email: "buyer@guests.bookingtours.co.za", gift_recipient_mode: mode,
       recipient_name: "Alex", buyer_name: "Sam", gift_message: "Enjoy <every> moment & smile!",
       code: "GIFT2345", value: 750, voucher_type: "MONETARY", gift_tour_name: "Sunset paddle",
       gift_image_url: "https://fixture.invalid/storage/v1/object/public/email-images/photo.webp", expires_at: "18 October 2029",
@@ -190,7 +190,7 @@ describe("R08 authenticated message/job entry points", () => {
     expect(response.status).toBe(200);
     const email = f.emails[0];
     expect(email.from).toBe("Operator a <vouchers@bookingtours.co.za>");
-    expect(email.reply_to).toBe("help@fixture.invalid");
+    expect(email.reply_to).toBe("help@guests.bookingtours.co.za");
     expect(email.attachments).toEqual([{ filename: "Voucher-GIFT2345.png", content: "iVBORw0KGgo=" }]);
     expect(f.voucherImages[0]).toMatchObject({ recipientName: "Alex", buyerName: "Sam", message: "Enjoy <every> moment & smile!", value: "750", code: "GIFT2345", monetary: true });
     expect(f.voucherImages[0].logoUrl).toBe(f.rows.businesses[0].logo_url);
@@ -217,7 +217,7 @@ describe("R08 authenticated message/job entry points", () => {
     Object.assign(f.rows.bookings[0], { waiver_status: "PENDING", waiver_token: "waiver-token" });
     const before = Date.now();
     const response = await f.invoke("send-email", { type: "BOOKING_CONFIRM", data: {
-      business_id: "a", booking_id: "booking-a", email: "guest-a@fixture.invalid",
+      business_id: "a", booking_id: "booking-a", email: "guest-a@guests.bookingtours.co.za",
       customer_name: "Guest & Friend", tour_name: "Morning Kayak", ref: "70776283", qty: 2,
       waiver_status: "PENDING", waiver_token: "stale-token", waiver_url: "https://stale.fixture.invalid",
     } }, serviceKey);
@@ -257,7 +257,7 @@ describe("R08 authenticated message/job entry points", () => {
       f.rows.bookings[0].status = status;
       if (status === "DELETED") f.rows.bookings = [];
       const response = await f.invoke("send-email", { type: "BOOKING_CONFIRM", data: {
-        business_id: "a", booking_id: "booking-a", email: "guest-a@fixture.invalid",
+        business_id: "a", booking_id: "booking-a", email: "guest-a@guests.bookingtours.co.za",
         waiver_status: "SIGNED", delivery_idempotency_key: "booking-confirmation/booking-a",
       } }, serviceKey);
       expect(response.status).toBe(status === "DELETED" ? 503 : 409);
@@ -274,7 +274,7 @@ describe("R08 authenticated message/job entry points", () => {
   for (const headers of [{ authorization: "Bearer " + secretKey }, { apikey: secretKey }, { apikey: serviceKey }]) {
     it(`accepts configured server keys for reset emails via ${Object.keys(headers)[0]}`, async () => {
       const f = fixture();
-      const res = await f.invoke("send-email", { type: "ADMIN_WELCOME", data: { email: "staff@fixture.invalid", business_id: "a", reason: "RESET", change_password_url: "https://admin.fixture.invalid/change-password?token=fixture" } }, "", "POST", headers);
+      const res = await f.invoke("send-email", { type: "ADMIN_WELCOME", data: { email: "staff@guests.bookingtours.co.za", business_id: "a", reason: "RESET", change_password_url: "https://admin.fixture.invalid/change-password?token=fixture" } }, "", "POST", headers);
       expect(res.status).toBe(200);
       expect(f.emails).toHaveLength(1);
     });
@@ -353,6 +353,21 @@ describe("R08 message tenant boundaries and legitimate user flows", () => {
     expect((await f.invoke("send-email", { type: "BOOKING_UPDATED", data: { ...message.data, booking_id: "booking-a", ref: "A", tour_name: "Tour a" } })).status).toBe(200);
     expect(f.emails).toHaveLength(1);
   });
+  // Round 2 item 1: on 28 Oct weather refund-choice reminders and trip
+  // reminders went to kayak-demo-NN@anonymized.local and bounced.
+  it.each(["kayak-demo-07@anonymized.local", "guest-12@example.com", "token-1@anonymized.example"])("never sends to the demo or anonymised address %s", async email => {
+    const f = fixture();
+    f.rows.bookings[0].email = email;
+    for (const body of [
+      { type: "CANCELLATION", data: { business_id: "a", email, customer_name: "Guest", ref: "A", tour_name: "Tour a", reason: "Wind", total_amount: 100, is_weather: true, offer_choice: true } },
+      { type: "REMINDER", data: { business_id: "a", booking_id: "booking-a", email, customer_name: "Guest", ref: "A", tour_name: "Tour a" } },
+    ]) {
+      const res = await f.invoke("send-email", body);
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ ok: false, skipped: true, error: "undeliverable_recipient" });
+    }
+    expect(f.emails).toEqual([]);
+  });
   it("prevents admins forging authentication or platform-billing messages", async () => {
     for (const type of ["ADMIN_WELCOME", "MY_BOOKINGS_OTP", "MAGIC_LINK", "PLATFORM_INVOICE_OUTSTANDING", "POPIA_EXPORT_READY"]) {
       const f = fixture();
@@ -362,7 +377,7 @@ describe("R08 message tenant boundaries and legitimate user flows", () => {
   });
   it("preserves signed Auth hooks and rejects unsigned hook-shaped requests", async () => {
     const f = fixture();
-    const body = { user: { email: "customer@fixture.invalid" }, email_data: { email_action_type: "magiclink", token_hash: "fixture-hash", site_url: "https://fixture.invalid" } };
+    const body = { user: { email: "customer@guests.bookingtours.co.za" }, email_data: { email_action_type: "magiclink", token_hash: "fixture-hash", site_url: "https://fixture.invalid" } };
     expect((await f.invoke("send-email", body, "")).status).toBe(401);
     expect(f.emails).toEqual([]);
     expect((await f.invoke("send-email", body, "", "POST", { "webhook-signature": "fixture-valid-signature" })).status).toBe(200);
@@ -390,12 +405,12 @@ describe("R08 message tenant boundaries and legitimate user flows", () => {
     f.rows.bookings[0].status = "PENDING PAYMENT";
     f.rows.bookings[0].payment_failed_at = "2026-10-16T07:00:00Z";
     f.emailResponse({ ok: false });
-    const body = { action: "payment_recovery_email", booking_id: "booking-a", business_id: "a", email: "attacker@fixture.invalid", payment_url: "https://wrong.invalid" };
+    const body = { action: "payment_recovery_email", booking_id: "booking-a", business_id: "a", email: "attacker@guests.bookingtours.co.za", payment_url: "https://wrong.invalid" };
     expect((await f.invoke("auto-messages", body)).status).toBe(400);
     expect(f.writes).toEqual([]);
     f.emailResponse({ ok: true });
     expect((await f.invoke("auto-messages", body)).status).toBe(200);
-    expect(f.emails[1]).toMatchObject({ type: "PAYMENT_FAILED", data: { business_id: "a", booking_id: "booking-a", email: "guest-a@fixture.invalid", payment_url: "https://pay.fixture.invalid/a" } });
+    expect(f.emails[1]).toMatchObject({ type: "PAYMENT_FAILED", data: { business_id: "a", booking_id: "booking-a", email: "guest-a@guests.bookingtours.co.za", payment_url: "https://pay.fixture.invalid/a" } });
     expect(f.rows.bookings[0].payment_recovery_emailed_at).toBeTruthy();
     expect(f.whatsapp).toEqual([]);
   });
@@ -422,7 +437,7 @@ describe("R08 message tenant boundaries and legitimate user flows", () => {
   });
   it("renders the recovery email with rejection copy, tenant branding and Yoco link", async () => {
     const f = fixture();
-    const response = await f.invoke("send-email", { type: "PAYMENT_FAILED", data: { business_id: "a", booking_id: "booking-a", email: "guest-a@fixture.invalid", customer_name: "Guest", ref: "BOOKING-A", tour_name: "Kayaking", tour_date: "Tomorrow", qty: 1, total_amount: "100.00", payment_url: "https://checkout.yoco.com/fixture" } });
+    const response = await f.invoke("send-email", { type: "PAYMENT_FAILED", data: { business_id: "a", booking_id: "booking-a", email: "guest-a@guests.bookingtours.co.za", customer_name: "Guest", ref: "BOOKING-A", tour_name: "Kayaking", tour_date: "Tomorrow", qty: 1, total_amount: "100.00", payment_url: "https://checkout.yoco.com/fixture" } });
     expect(response.status).toBe(200);
     expect(f.emails[0].html).toContain("payment was rejected or could not be completed");
     expect(f.emails[0].html).toContain('href="https://checkout.yoco.com/fixture"');
@@ -437,9 +452,9 @@ describe("R08 message tenant boundaries and legitimate user flows", () => {
       { business_id: "a", booking_id: "older-booking", status: "settled", amount: 600, vouchers: voucher },
       { business_id: "b", booking_id: "booking-a", status: "settled", amount: 100, vouchers: { business_id: "b", code: "FOREIGN", current_balance: 400 } },
     ];
-    expect((await f.invoke("confirm-booking", { booking_id: "booking-a", booking_token: "independent-proof", email: "attacker@fixture.invalid", remaining_balance: 999 }, "", "POST", { "x-tenant-business-id": "a" })).status).toBe(200);
+    expect((await f.invoke("confirm-booking", { booking_id: "booking-a", booking_token: "independent-proof", email: "attacker@guests.bookingtours.co.za", remaining_balance: 999 }, "", "POST", { "x-tenant-business-id": "a" })).status).toBe(200);
     expect(f.emails).toHaveLength(2);
-    expect(f.emails[0].body).toMatchObject({ type: "VOUCHER_BALANCE", data: { email: "guest-a@fixture.invalid", voucher_code: "SAFE", remaining_balance: 300, amount_used: 100 } });
+    expect(f.emails[0].body).toMatchObject({ type: "VOUCHER_BALANCE", data: { email: "guest-a@guests.bookingtours.co.za", voucher_code: "SAFE", remaining_balance: 300, amount_used: 100 } });
     expect(f.emails[1].body.type).toBe("BOOKING_CONFIRM");
   });
 
@@ -457,14 +472,14 @@ describe("R08 message tenant boundaries and legitimate user flows", () => {
     f.customerHistory({ last_booking_at: returning ? "2026-01-01T10:00:00Z" : null });
     f.rows.bookings[0].created_at = "2026-10-15T10:00:00Z";
     // Confirmations render when the booking's queued job is delivered (M2).
-    const response = await f.invoke("send-email", { type: "BOOKING_CONFIRM", data: { business_id: "a", booking_id: "booking-a", email: "guest-a@fixture.invalid", customer_name: "Guest", tour_name: "Kayaking", ref: "BOOKING-A", total_amount: "100.00", qty: 1, returning_customer: !returning, delivery_idempotency_key: "booking-confirmation/booking-a" } }, serviceKey);
+    const response = await f.invoke("send-email", { type: "BOOKING_CONFIRM", data: { business_id: "a", booking_id: "booking-a", email: "guest-a@guests.bookingtours.co.za", customer_name: "Guest", tour_name: "Kayaking", ref: "BOOKING-A", total_amount: "100.00", qty: 1, returning_customer: !returning, delivery_idempotency_key: "booking-confirmation/booking-a" } }, serviceKey);
     expect(response.status).toBe(200);
     expect(f.emails[0].html.includes("Welcome back, Guest.")).toBe(returning);
     expect(f.rpcCalls.find(call => call.name === "customer_booking_history")?.args).toMatchObject({ p_business_id: "a", p_exclude_booking_id: "booking-a", p_before: "2026-10-15T10:00:00Z" });
   });
   it.each([[0,100],[25,75],[100,0]])("confirmation uses captured %s and due %s from the stored booking, never the caller's paid claim",async(captured,due)=>{
     const f=fixture();Object.assign(f.rows.bookings[0],{status:"CONFIRMED",total_amount:100,total_captured:captured});
-    const response=await f.invoke("send-email",{type:"BOOKING_CONFIRM",data:{business_id:"a",booking_id:"booking-a",email:"guest-a@fixture.invalid",customer_name:"Guest",tour_name:"Kayaking",ref:"BOOKING-A",total_amount:999,amount_paid:999,qty:1,delivery_idempotency_key:"booking-confirmation/booking-a"}},serviceKey);
+    const response=await f.invoke("send-email",{type:"BOOKING_CONFIRM",data:{business_id:"a",booking_id:"booking-a",email:"guest-a@guests.bookingtours.co.za",customer_name:"Guest",tour_name:"Kayaking",ref:"BOOKING-A",total_amount:999,amount_paid:999,qty:1,delivery_idempotency_key:"booking-confirmation/booking-a"}},serviceKey);
     expect(response.status).toBe(200);expect(f.emails).toHaveLength(1);
     expect(f.emails[0].html).toMatch(new RegExp("Payment received:[\\s\\S]*?R"+captured.toFixed(2)));
     expect(f.emails[0].html).toMatch(new RegExp("Balance due:[\\s\\S]*?R"+due.toFixed(2)));
@@ -472,13 +487,13 @@ describe("R08 message tenant boundaries and legitimate user flows", () => {
   });
   it("holds a confirmation when the stored payment state is unavailable",async()=>{
     const f=fixture();delete f.rows.bookings[0].status;
-    const response=await f.invoke("send-email",{type:"BOOKING_CONFIRM",data:{business_id:"a",booking_id:"booking-a",email:"guest-a@fixture.invalid",customer_name:"Guest",tour_name:"Kayaking",ref:"BOOKING-A",total_amount:100,qty:1,delivery_idempotency_key:"booking-confirmation/booking-a"}},serviceKey);
+    const response=await f.invoke("send-email",{type:"BOOKING_CONFIRM",data:{business_id:"a",booking_id:"booking-a",email:"guest-a@guests.bookingtours.co.za",customer_name:"Guest",tour_name:"Kayaking",ref:"BOOKING-A",total_amount:100,qty:1,delivery_idempotency_key:"booking-confirmation/booking-a"}},serviceKey);
     expect(response.status).toBe(503);expect(f.emails).toEqual([]);
   });
   it("preserves the operator's chosen location phrase in the delivered photo email", async () => {
     const f = fixture();
     Object.assign(f.rows.businesses[0], { activity_verb_past: "paddling", location_phrase: "on the water" });
-    expect((await f.invoke("send-email", { type: "TRIP_PHOTOS", data: { business_id: "a", email: "guest@fixture.invalid", customer_name: "Guest", photo_urls: ["https://photos.fixture.invalid/one?a=1&b=2", "https://photos.fixture.invalid/two"] } })).status).toBe(200);
+    expect((await f.invoke("send-email", { type: "TRIP_PHOTOS", data: { business_id: "a", email: "guest@guests.bookingtours.co.za", customer_name: "Guest", photo_urls: ["https://photos.fixture.invalid/one?a=1&b=2", "https://photos.fixture.invalid/two"] } })).status).toBe(200);
     expect(f.emails[0].html).toContain("We hope you had an incredible time on the water");
     expect(f.emails[0].html).toContain('href="https://photos.fixture.invalid/one?a=1&amp;b=2"');
     expect(f.emails[0].html).toContain('href="https://photos.fixture.invalid/two"');
@@ -579,7 +594,7 @@ describe("operator waiver and payment deadline emails", () => {
     Object.assign(f.rows.businesses[0],{booking_site_url:"https://a.booking.fixture.invalid"});
     const res=await f.invoke("send-email",{type:"WAIVER_REQUEST",data:{business_id:"a",booking_id:"booking-a",email:"wrong@example.invalid",waiver_url:"https://wrong.invalid"}});
     expect(res.status).toBe(200);expect(f.emails).toHaveLength(1);
-    expect(f.emails[0].to).toContain("guest-a@fixture.invalid");expect(f.emails[0].html).toContain("waiver-secret");
+    expect(f.emails[0].to).toContain("guest-a@guests.bookingtours.co.za");expect(f.emails[0].html).toContain("waiver-secret");
     expect(f.emails[0].html).not.toContain("https://wrong.invalid");expect(f.emails[0].html).not.toContain("tomorrow");
   });
   it("rejects cross-tenant, already-signed and missing-email waiver sends", async () => {
@@ -594,7 +609,7 @@ describe("operator waiver and payment deadline emails", () => {
   it("renders deadline reminders from the saved booking and blocks paid bookings", async () => {
     const f=fixture();const deadline="2099-10-25T09:00:00.000Z";
     Object.assign(f.rows.bookings[0],{source:"ADMIN",status:"PENDING",total_amount:100,total_captured:0,payment_deadline:deadline,payment_url:"https://checkout.yoco.com/fixture"});
-    const body={type:"PAYMENT_EXPIRING",data:{business_id:"a",booking_id:"booking-a",email:"guest-a@fixture.invalid",payment_deadline:deadline,ref:"BOOKING-A",tour_name:"Harbour paddle"}};
+    const body={type:"PAYMENT_EXPIRING",data:{business_id:"a",booking_id:"booking-a",email:"guest-a@guests.bookingtours.co.za",payment_deadline:deadline,ref:"BOOKING-A",tour_name:"Harbour paddle"}};
     const res=await f.invoke("send-email",body);expect(res.status).toBe(200);
     expect(f.emails[0].html).toContain(deadline);expect(f.emails[0].html).toContain("/functions/v1/booking-payment?");expect(f.emails[0].html).toContain("This payment link will expire");
     Object.assign(f.rows.bookings[0],{status:"PAID",total_captured:100});
@@ -605,7 +620,7 @@ describe("operator waiver and payment deadline emails", () => {
 describe("M2: one confirmation per booking, and receipts show the balance", () => {
   it("queues an admin-created confirmation under the booking's one job, so a later payment cannot repeat it", async () => {
     const f = fixture();
-    const data = { business_id: "a", booking_id: "booking-a", email: "guest-a@fixture.invalid", customer_name: "Guest a", ref: "BOOKINGA", tour_name: "Tour a", qty: 1 };
+    const data = { business_id: "a", booking_id: "booking-a", email: "guest-a@guests.bookingtours.co.za", customer_name: "Guest a", ref: "BOOKINGA", tour_name: "Tour a", qty: 1 };
     const admin = await f.invoke("send-email", { type: "BOOKING_CONFIRM", data }, "a");
     expect(admin.status).toBe(202);
     expect(await admin.json()).toEqual({ ok: true, queued: true });
@@ -618,7 +633,7 @@ describe("M2: one confirmation per booking, and receipts show the balance", () =
 
   it("shows what was received and the balance on a part-paid invoice", async () => {
     const f = fixture();
-    const invoice = { business_id: "a", booking_id: "booking-a", email: "guest-a@fixture.invalid", customer_name: "Guest a", customer_email: "guest-a@fixture.invalid",
+    const invoice = { business_id: "a", booking_id: "booking-a", email: "guest-a@guests.bookingtours.co.za", customer_name: "Guest a", customer_email: "guest-a@guests.bookingtours.co.za",
       invoice_number: "INV-7", invoice_date: "27 Oct 2026", tour_name: "Tour a", tour_date: "Sat 8 Nov, 08:00", qty: 3, unit_price: 500, total_amount: 1500,
       payment_method: "Cash", payment_reference: "BOOKINGA" };
     // send-email reads the money from the booking, not the caller.

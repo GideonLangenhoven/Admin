@@ -1,16 +1,11 @@
-const RESERVED_DOMAINS = ["example.com", "example.net", "example.org"];
-const RESERVED_TLDS = ["example", "invalid", "localhost", "test"];
+import { undeliverableEmail } from "./guest-contact.ts";
 
 export function marketingEmailValidationError(email: string): string | null {
   const normalized = email.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return "Invalid recipient email address";
 
-  const domain = normalized.slice(normalized.lastIndexOf("@") + 1).replace(/\.$/, "");
-  if (
-    RESERVED_DOMAINS.some((reserved) => domain === reserved || domain.endsWith("." + reserved)) ||
-    RESERVED_TLDS.some((tld) => domain === tld || domain.endsWith("." + tld))
-  ) {
-    return "Reserved/test recipient domain: " + domain;
+  if (undeliverableEmail(normalized)) {
+    return "Reserved/test recipient domain: " + normalized.slice(normalized.lastIndexOf("@") + 1).replace(/\.$/, "");
   }
 
   return null;

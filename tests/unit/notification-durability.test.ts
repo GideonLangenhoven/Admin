@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { sourceFunction, sourceHandler } from "../helpers/source-handler";
+import { undeliverableEmail } from "../../supabase/functions/_shared/guest-contact";
 
 function workerFixture(response: Response | Error | "hang", finishFails = false, jobOverrides: Record<string, unknown> = {}, eligibility = "ELIGIBLE") {
   const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
@@ -8,7 +9,7 @@ function workerFixture(response: Response | Error | "hang", finishFails = false,
     id: "job-a",
     business_id: "business-a",
     template_type: "PAYMENT_LINK",
-    recipient: "guest@example.invalid",
+    recipient: "guest@guests.bookingtours.co.za",
     dedupe_key: "hold-payment-link/hold-a",
     payload: { business_id: "business-a", booking_id: "booking-a" },
     ...jobOverrides,
@@ -24,6 +25,15 @@ function workerFixture(response: Response | Error | "hang", finishFails = false,
         return { data: args.p_accepted ? "ACCEPTED" : args.p_retryable ? "QUEUED" : "FAILED", error: null };
       }
       throw new Error("Unexpected RPC " + name);
+    }),
+    from: vi.fn((table: string) => {
+      const update = { table, values: {} as Record<string, unknown>, filters: {} as Record<string, unknown> };
+      const chain = {
+        update: (values: Record<string, unknown>) => { update.values = values; return chain; },
+        eq: (column: string, value: unknown) => { update.filters[column] = value; return chain; },
+        select: async () => { calls.push({ name: "update " + table, args: update }); return { data: [{ id: job.id }], error: null }; },
+      };
+      return chain;
     }),
   };
   const fetch = vi.fn(async (_url?: unknown, init?: RequestInit) => {
@@ -47,11 +57,25 @@ function workerFixture(response: Response | Error | "hang", finishFails = false,
     AbortSignal,
     getTenantByBusinessId: vi.fn(),
     formatTenantDateTime: vi.fn(),
+    undeliverableEmail,
   });
   return { run, calls, fetch, recoverDatabase: () => { finishFails = false; } };
 }
 
 describe("durable transactional notification worker", () => {
+  // Round 2 item 1: demo and anonymised addresses only bounce. The claimed job
+  // closes as CANCELLED (never FAILED, never retried) and send-email is not called.
+  it.each(["kayak-demo-03@anonymized.local", "guest-7@example.com"])("cancels the job for %s without sending", async recipient => {
+    const f = workerFixture(Response.json({ ok: true, id: "provider-a" }), false, { recipient });
+    await expect(f.run()).resolves.toMatchObject({ claimed: 1, accepted: 0, failed: 0, cancelled: 1 });
+    expect(f.fetch).not.toHaveBeenCalled();
+    expect(f.calls.find(call => call.name === "finish_notification_job")).toBeUndefined();
+    expect(f.calls.find(call => call.name === "update notification_jobs")?.args).toMatchObject({
+      values: { status: "CANCELLED", last_error: "Not sent: demo or anonymised address", claim_id: null },
+      filters: { id: "job-a", business_id: "business-a", claim_id: "claim-a", status: "PROCESSING" },
+    });
+  });
+
   it("records provider acceptance only from a validated successful response", async () => {
     const f = workerFixture(Response.json({ ok: true, id: "provider-a" }));
     await expect(f.run()).resolves.toMatchObject({ claimed: 1, accepted: 1, retrying: 0, failed: 0 });

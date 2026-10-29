@@ -4,6 +4,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, fetchAllRows, formatTenantDateTime, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
 import { withSentry, captureCheckIn } from "../_shared/sentry.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { undeliverableEmail } from "../_shared/guest-contact.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -215,6 +216,18 @@ async function processNotificationJobs() {
       return "CANCELLED";
     }
     if (eligibility.data !== "ELIGIBLE") throw new Error("Notification eligibility could not be confirmed");
+
+    // Demo and anonymised addresses only bounce; close the job as cancelled
+    // (not failed) so it never reaches Failed Notifications or retries.
+    if (undeliverableEmail(String(job.recipient || ""))) {
+      const skipped = await supabase.from("notification_jobs")
+        .update({ status: "CANCELLED", last_error: "Not sent: demo or anonymised address", claim_id: null, claimed_at: null, updated_at: new Date().toISOString() })
+        .eq("id", job.id).eq("business_id", job.business_id).eq("claim_id", claimId).eq("status", "PROCESSING")
+        .select("id");
+      if (skipped.error || !skipped.data?.length) throw skipped.error || new Error("Notification claim was lost");
+      console.warn("NOTIFICATION_SKIP undeliverable_recipient job=" + job.id + " type=" + job.template_type);
+      return "CANCELLED";
+    }
 
     // Resend retains idempotency keys for 24 hours. If a provider acceptance
     // stayed uncertain beyond that window, never risk a duplicate automatic

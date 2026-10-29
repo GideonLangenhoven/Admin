@@ -13,6 +13,7 @@ import { fillMarketingTokens } from "../_shared/marketing-tokens.ts";
 import { replaceLegacyMarketingSocialIcons } from "../_shared/marketing-email-html.ts";
 import { requireAuth, canAccessBusiness } from "../_shared/auth.ts";
 import { paymentDeadlineUrl } from "../_shared/payment-deadline.ts";
+import { undeliverableEmail } from "../_shared/guest-contact.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "";
 // Leave the outer cron worker one second to receive and persist Resend's
@@ -2859,6 +2860,10 @@ Deno.serve(withSentry("send-email", async (req: Request) => {
     if (!recipientEmail || !isValidEmail(recipientEmail)) {
       console.warn("SEND_EMAIL_SKIP type=" + type + " invalid_email");
       return new Response(JSON.stringify({ ok: false, error: "invalid_email", message: "Recipient email '" + recipientEmail + "' is missing or invalid" }), { status: 200, headers: getCors(req) });
+    }
+    if (undeliverableEmail(recipientEmail)) {
+      console.warn("SEND_EMAIL_SKIP type=" + type + " biz=" + branding.businessId + " undeliverable_recipient domain=" + recipientEmail.split("@").pop());
+      return new Response(JSON.stringify({ ok: false, skipped: true, error: "undeliverable_recipient", message: "Not sent: demo or anonymised address" }), { status: 200, headers: getCors(req) });
     }
     d.email = recipientEmail;
 

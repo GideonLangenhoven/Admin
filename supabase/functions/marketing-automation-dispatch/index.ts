@@ -10,6 +10,7 @@ import { replaceLegacyMarketingSocialIcons } from "../_shared/marketing-email-ht
 
 import { marketingCalendarDate } from "../_shared/marketing-calendar.ts";
 import { genVoucherCode } from "../_shared/vouchers.ts";
+import { undeliverableEmail } from "../_shared/guest-contact.ts";
 import { confirmMarketingDelivery, reserveMarketingDelivery, finishMarketingDelivery, marketingDeliveryOutcome } from "../_shared/marketing-delivery.ts";
 
 const RAW_FROM_EMAIL = Deno.env.get("RESEND_FROM_EMAIL") || "";
@@ -267,13 +268,15 @@ Deno.serve(withSentry("marketing-automation-dispatch", async (req: Request) => {
           results.delayed++;
           continue;
         }
-        if (eligibility.data !== "eligible") {
+        const excluded = eligibility.data !== "eligible" ? eligibility.data
+          : undeliverableEmail(String(contact.email || "")) ? "undeliverable_recipient" : null;
+        if (excluded) {
           await supabase.from("marketing_automation_enrollments").update({ status: "exited", updated_at: new Date().toISOString() })
             .eq("id", enrollment.id).eq("business_id", enrollment.business_id);
           await supabase.from("marketing_automation_logs").insert({ business_id: enrollment.business_id,
             automation_id: enrollment.automation_id, enrollment_id: enrollment.id, contact_id: contact.id,
             step_position: currentStep.position, step_type: currentStep.step_type, action: "excluded",
-            metadata: { reason: eligibility.data } });
+            metadata: { reason: excluded } });
           continue;
         }
         const metadata = enrollment.metadata || {};
