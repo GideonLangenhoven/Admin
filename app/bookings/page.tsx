@@ -927,22 +927,22 @@ export default function Bookings() {
     });
   }
 
+  // Why Edit can't change this booking's guest count, or "" when it can. The Qty
+  // field is disabled with this as its hint, so Save never sends a refused change.
+  function guestCountLock(b: Booking) {
+    // Guest changes on a paid booking move seats and refund or voucher credit together.
+    if (["PAID", "CONFIRMED", "COMPLETED"].includes(b.status) || bookingPaidAmount(b) > 0)
+      return "Locked once a booking is confirmed or paid. Remove guests with Reduce on the booking's page.";
+    // rebook-booking refuses it while a payment link is out (prepare_booking_amendment).
+    if (b.yoco_checkout_id) return "Locked while a payment link is out. Complete payment first, or cancel and create a new booking.";
+    return "";
+  }
+
   async function saveEditBooking() {
     if (!editBooking) return;
     console.log("[BOOKINGS] saveEditBooking", { bookingId: editBooking.id, editForm });
     const qty = Math.max(1, Number(editForm.qty) || 1);
     const total = Number(editForm.total_amount) || 0;
-    // Guest-count changes on a paid booking move money (refund/voucher credit)
-    // and seats — this raw update handles neither. Route through the proper flows.
-    if ((["PAID", "CONFIRMED", "COMPLETED"].includes(editBooking.status) || bookingPaidAmount(editBooking) > 0) && qty !== editBooking.qty) {
-      notify({
-        title: "Guest count locked on paid bookings",
-        message: "Use Reduce guests / Add guests in the booking to adjust seats and refund or voucher credit.",
-        tone: "warning",
-        duration: 8000,
-      });
-      return;
-    }
     setActionBookingId(editBooking.id);
 
     const isPending = ["PENDING", "PENDING PAYMENT", "HELD"].includes(editBooking.status);
@@ -2055,8 +2055,11 @@ export default function Bookings() {
                     const q = Math.max(1, Number(e.target.value) || 1);
                     return { ...p, qty: e.target.value, total_amount: (perPerson * q).toFixed(2) };
                   })}
-                  className="ui-control mt-1 w-full"
+                  disabled={!!guestCountLock(editBooking)}
+                  aria-describedby={guestCountLock(editBooking) ? "edit-qty-hint" : undefined}
+                  className="ui-control mt-1 w-full disabled:opacity-60"
                 />
+                {guestCountLock(editBooking) && <span id="edit-qty-hint" className="mt-1 block text-xs">{guestCountLock(editBooking)}</span>}
               </label>
               <label className="text-sm text-gray-600">
                 Total (ZAR)

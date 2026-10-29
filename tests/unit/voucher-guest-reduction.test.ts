@@ -23,7 +23,7 @@ describe("voucher-aware guest reduction", () => {
   });
 
   it("edit modal blocks qty changes on paid bookings", () => {
-    expect(page).toContain("Guest count locked on paid bookings");
+    expect(page).toContain("Locked once a booking is confirmed or paid.");
   });
 });
 

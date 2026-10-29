@@ -52,10 +52,10 @@ function notices(page: Page) {
   return seen;
 }
 
-async function openGuestAction(page: Page, action: RegExp) {
+async function openGuestAction(page: Page, action: RegExp, id = BOOKING) {
   await page.goto("/bookings");
   await page.getByRole("button", { name: /view guests/i }).first().click();
-  const row = page.locator(`[data-booking-id="${BOOKING}"]`).filter({ visible: true }).first();
+  const row = page.locator(`[data-booking-id="${id}"]`).filter({ visible: true }).first();
   await row.getByRole("button", { name: "Guest actions", exact: true }).click();
   await page.locator("[data-mobile-action-sheet]").getByRole("button", { name: action }).click();
 }
@@ -115,4 +115,22 @@ test("a failed payment link shows the server's reason, not a generic error", asy
   await openGuestAction(page, /^Payment Link/);
   await expect.poll(() => seen.find(n => n.title === "Payment link failed"))
     .toEqual({ title: "Payment link failed", message: "Reservation expired. Please choose a time again.", tone: "error" });
+});
+
+// Round 2, 13a: Qty stayed editable on a paid booking and while a payment link
+// was out, then Save was refused. It is locked there, with the reason.
+test("the guest count is locked, with the reason, on a paid booking and while a link is out", async ({ page }) => {
+  await page.route(/127\.0\.0\.1:3191\/rest\/v1\/(bookings\?|rpc\/list_operator_bookings)/, async route => {
+    if (route.request().method() !== "GET" && !route.request().url().includes("/rpc/")) return route.fallback();
+    const res = await route.fetch();
+    const rows = await res.json();
+    const out = (b: { id?: string }) => b.id === BOOKING ? { ...b, yoco_checkout_id: "ch_synthetic" } : b;
+    return route.fulfill({ response: res, json: Array.isArray(rows) ? rows.map(out) : out(rows) });
+  });
+  for (const [id, reason] of [["10000000-0000-4000-8000-000000000020", "Locked once a booking is confirmed or paid."], [BOOKING, "Locked while a payment link is out."]]) {
+    await openGuestAction(page, /^Edit booking/, id);
+    const qty = page.getByRole("heading", { name: "Edit Booking" }).locator("..").getByLabel("Qty");
+    await expect(qty).toBeDisabled();
+    await expect(qty).toHaveAccessibleDescription(new RegExp("^" + reason));
+  }
 });
