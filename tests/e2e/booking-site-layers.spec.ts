@@ -161,6 +161,10 @@ test.describe("on a first visit", () => {
     const look = await banner.locator("section").evaluate(el => ({ bg: getComputedStyle(el).backgroundColor, blur: getComputedStyle(el).backdropFilter }));
     expect(look.bg).toMatch(/^rgb\(/);
     expect(look.blur).toBe("none");
+    // The title takes the banner's ink, not the theme's heading colour (white on white on dark themes).
+    await page.addStyleTag({ content: "html, body, body * { --text: rgb(255, 255, 255) !important; }" });
+    const ink = await banner.locator("section").evaluate(el => getComputedStyle(el).color);
+    await expect(banner.getByRole("heading", { name: "Cookies" })).toHaveCSS("color", ink);
 
     await banner.getByRole("button", { name: "Reject non-essential" }).click();
     await expect(banner).toBeHidden();
