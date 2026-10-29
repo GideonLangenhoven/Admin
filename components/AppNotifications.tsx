@@ -33,6 +33,7 @@ export default function AppNotifications() {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const timeoutsRef = useRef<Record<string, number>>({});
+  const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const nativeAlert = window.alert.bind(window);
@@ -86,6 +87,15 @@ export default function AppNotifications() {
     };
   }, []);
 
+  // The confirm is modal: focus moves to the safe choice after a closing menu has handed
+  // focus back to its trigger (an effect, so it runs after the menu's cleanup), and returns there.
+  useEffect(() => {
+    if (!confirmState) return;
+    const opener = document.activeElement as HTMLElement | null;
+    cancelRef.current?.focus();
+    return () => opener?.focus();
+  }, [confirmState]);
+
   function dismissNotice(id: string) {
     if (timeoutsRef.current[id]) {
       window.clearTimeout(timeoutsRef.current[id]);
@@ -131,16 +141,23 @@ export default function AppNotifications() {
       </div>
 
       {confirmState && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[101] flex justify-center px-4">
-          <div className="ui-card anim-fade-up pointer-events-auto relative max-h-[calc(100dvh-3rem)] w-full max-w-2xl overflow-y-auto overscroll-contain p-5" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
+        <div className="fixed inset-0 z-[101] flex items-end justify-center bg-black/40 px-4 pb-6">
+          <div role="dialog" aria-modal="true" aria-labelledby="app-confirm-title" aria-describedby="app-confirm-message" onKeyDown={(event) => {
+            if (event.key === "Escape") { event.stopPropagation(); resolveConfirm(false); }
+            if (event.key !== "Tab") return;
+            const buttons = event.currentTarget.querySelectorAll<HTMLElement>("button:not([disabled])");
+            const first = buttons[0], last = buttons[buttons.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+          }} className="ui-card anim-fade-up relative max-h-[calc(100dvh-3rem)] w-full max-w-2xl overflow-y-auto overscroll-contain p-5" style={{ boxShadow: "var(--ck-shadow-lg)" }}>
             <span className="absolute inset-y-0 left-0 w-[3px]" style={{ background: TONE_STYLES[confirmState.tone || "warning"].rail }} aria-hidden="true" />
             <div className="flex items-start gap-3">
               <span className="ui-icon-chip shrink-0" style={{ background: TONE_STYLES[confirmState.tone || "warning"].chipBg, color: TONE_STYLES[confirmState.tone || "warning"].chipFg }}>
                 <Warning size={19} weight="fill" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>{confirmState.title || "Please confirm"}</p>
-                <p className="mt-1 text-sm leading-6" style={{ color: "var(--ck-text)" }}>{confirmState.message}</p>
+                <p id="app-confirm-title" className="text-base font-semibold" style={{ color: "var(--ck-text-strong)" }}>{confirmState.title || "Please confirm"}</p>
+                <p id="app-confirm-message" className="mt-1 text-sm leading-6" style={{ color: "var(--ck-text)" }}>{confirmState.message}</p>
                 {confirmState.picks && (
                   <div className="mt-3">
                     <OptionToggles label="Options to offer" options={confirmState.picks} picked={picked} onChange={setPicked} />
@@ -165,6 +182,7 @@ export default function AppNotifications() {
                     </button>
                   )}
                   <button
+                    ref={cancelRef}
                     type="button"
                     onClick={() => resolveConfirm(false)}
                     className="ui-btn ui-btn-ghost"

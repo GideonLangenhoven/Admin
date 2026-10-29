@@ -1501,6 +1501,15 @@ export default function Bookings() {
     return () => { live = false; };
   }, [rebookBooking, rebookSlotId, rebookReprice]);
 
+  // Rebook is modal: focus moves in after a closing action menu has handed focus
+  // back to its trigger (an effect, so it runs after the menu's cleanup), and returns there.
+  const rebookDialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!rebookBooking?.id) return;
+    const opener = document.activeElement as HTMLElement | null;
+    rebookDialogRef.current?.querySelector<HTMLElement>("button")?.focus();
+    return () => opener?.focus();
+  }, [rebookBooking?.id]);
 
   // A cancelled booking only carries credit while its payout is still parked
   // (weather-cancel refund_status ACTION_REQUIRED). Once a refund/voucher was
@@ -2087,8 +2096,16 @@ export default function Bookings() {
 
       {rebookBooking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="ui-card w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-5">
-            <h3 className="mb-1 text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Rebook Booking</h3>
+          <div ref={rebookDialogRef} role="dialog" aria-modal="true" aria-labelledby="rebook-title" onKeyDown={event => {
+            // An open date calendar takes Escape first.
+            if (event.key === "Escape" && !event.currentTarget.querySelector('[aria-expanded="true"]')) setRebookBooking(null);
+            if (event.key !== "Tab") return;
+            const items = event.currentTarget.querySelectorAll<HTMLElement>("button:not([disabled]), select:not([disabled]), input:not([disabled])");
+            const first = items[0], last = items[items.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+          }} className="ui-card w-full max-w-lg max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain p-5">
+            <h3 id="rebook-title" className="mb-1 text-lg font-semibold" style={{ color: "var(--ck-text-strong)" }}>Rebook Booking</h3>
             <p className="mb-4 text-xs" style={{ color: "var(--ck-text-muted)" }}>
               {rebookBooking.customer_name} · {rebookBooking.tours?.name || "Tour"}
             </p>
