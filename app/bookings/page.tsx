@@ -1868,7 +1868,7 @@ export default function Bookings() {
                 <div className="ui-card max-w-full overflow-x-auto no-scrollbar lg:overflow-visible">
                   <table className="w-full table-fixed text-sm">
                     <thead className="hidden lg:table-header-group">
-                      <tr className="border-b" style={{ background: "var(--ck-surface-sunken)" }}>
+                      <tr className="whitespace-nowrap border-b" style={{ background: "var(--ck-surface-sunken)" }}>
                         <th className="w-8 p-1.5 lg:p-3 text-center">
                           <input type="checkbox"
                             checked={allVisibleIds.length > 0 && allVisibleIds.every(id => selected.has(id))}
@@ -1880,8 +1880,9 @@ export default function Bookings() {
                         <th className="w-10 lg:w-16 p-1.5 lg:p-3 text-left font-semibold text-gray-600 text-[11px] lg:text-sm">Pax</th>
                         <th className="hidden p-3 text-left font-semibold text-gray-600 md:table-cell">Details</th>
                         <th className="hidden p-3 text-left font-semibold text-gray-600 md:table-cell">Service</th>
-                        <th className="hidden p-3 text-right font-semibold text-gray-600 sm:table-cell">Price</th>
-                        <th className="hidden p-3 text-right font-semibold text-gray-600 sm:table-cell">Paid</th>
+                        {/* Below 1200px the table has no room for amounts on one line: Due stays, Price and Paid are on the booking. */}
+                        <th className="hidden p-3 text-right font-semibold text-gray-600 min-[1200px]:table-cell">Price</th>
+                        <th className="hidden p-3 text-right font-semibold text-gray-600 min-[1200px]:table-cell">Paid</th>
                         <th className="p-1.5 lg:p-3 text-right font-semibold text-gray-600 text-[11px] lg:text-sm">Due</th>
                         <th className="hidden p-3 text-left font-semibold text-gray-600 lg:table-cell">Actions</th>
                       </tr>
@@ -1919,9 +1920,9 @@ export default function Bookings() {
                         <td className="p-3 font-display tabular-nums">{day.totalPax}</td>
                         <td className="hidden p-3 md:table-cell"></td>
                         <td className="hidden p-3 md:table-cell"></td>
-                        <td className="hidden p-3 text-right font-display tabular-nums sm:table-cell">{fmtCurrency(day.totalPrice)}</td>
-                        <td className="hidden p-3 text-right font-display tabular-nums sm:table-cell">{fmtCurrency(day.totalPaid)}</td>
-                        <td className={`p-3 text-right font-display tabular-nums ${day.totalDue > 0 ? "text-red-600" : "text-gray-700"}`}>{fmtCurrency(day.totalDue)}</td>
+                        <td className="hidden whitespace-nowrap p-3 text-right font-display tabular-nums min-[1200px]:table-cell">{fmtCurrency(day.totalPrice)}</td>
+                        <td className="hidden whitespace-nowrap p-3 text-right font-display tabular-nums min-[1200px]:table-cell">{fmtCurrency(day.totalPaid)}</td>
+                        <td className={`whitespace-nowrap p-3 text-right font-display tabular-nums ${day.totalDue > 0 ? "text-red-600" : "text-gray-700"}`}>{fmtCurrency(day.totalDue)}</td>
                         <td className="hidden p-3 lg:table-cell"></td>
                       </tr>
                     </tbody>
@@ -2363,14 +2364,14 @@ function SlotRows({
         <td className="p-1.5 lg:p-3 font-semibold text-[11px] lg:text-sm">{slot.totalPax}</td>
         <td className="hidden p-3 text-gray-500 md:table-cell"></td>
         <td className="hidden p-3 text-gray-500 md:table-cell">{services}</td>
-        <td className="hidden p-3 text-right sm:table-cell">{fmtCurrency(slot.totalPrice)}</td>
-        <td className="hidden p-3 text-right sm:table-cell">{fmtCurrency(slot.totalPaid)}</td>
-        <td className={`p-1.5 lg:p-3 text-right font-semibold text-[11px] lg:text-sm ${slot.totalDue > 0 ? "text-red-600" : "text-green-600"}`}>{fmtCurrency(slot.totalDue)}</td>
+        <td className="hidden whitespace-nowrap p-3 text-right min-[1200px]:table-cell">{fmtCurrency(slot.totalPrice)}</td>
+        <td className="hidden whitespace-nowrap p-3 text-right min-[1200px]:table-cell">{fmtCurrency(slot.totalPaid)}</td>
+        <td className={`whitespace-nowrap p-1.5 lg:p-3 text-right font-semibold text-[11px] lg:text-sm ${slot.totalDue > 0 ? "text-red-600" : "text-green-600"}`}>{fmtCurrency(slot.totalDue)}</td>
         <td className="hidden p-3 lg:table-cell">
           <button data-demo-action="booking.weather"
             onClick={(e) => { e.stopPropagation(); onCancelSlot(slot); }}
             disabled={cancellingWeatherId === slot.bookings[0]?.slot_id}
-            className="px-2 py-1 bg-red-50 text-red-600 font-medium rounded text-xs hover:bg-red-100 border border-red-200 disabled:opacity-50 transition-colors"
+            className="whitespace-nowrap px-2 py-1 bg-red-50 text-red-600 font-medium rounded text-xs hover:bg-red-100 border border-red-200 disabled:opacity-50 transition-colors"
             title="Cancel Slot (Weather)"
           >
             {cancellingWeatherId === slot.bookings[0]?.slot_id ? "Cancelling..." : "Cancel Slot"}
@@ -2519,9 +2520,9 @@ function SlotRows({
                 </div>
               </td>
               <td className="hidden p-3 align-top md:table-cell [overflow-wrap:anywhere]">{b.tours?.name || "—"}</td>
-              <td className="hidden p-3 text-right align-top sm:table-cell">{fmtCurrency(bookingValue(b))}</td>
-              <td className="hidden p-3 text-right align-top sm:table-cell">{fmtCurrency(paid)}</td>
-              <td className={`p-1.5 lg:p-3 text-right align-top font-medium text-[11px] lg:text-sm ${refundAmt > 0 ? "text-amber-600" : due > 0 ? "text-red-600" : "text-green-600"}`}>
+              <td className="hidden whitespace-nowrap p-3 text-right align-top min-[1200px]:table-cell">{fmtCurrency(bookingValue(b))}</td>
+              <td className="hidden whitespace-nowrap p-3 text-right align-top min-[1200px]:table-cell">{fmtCurrency(paid)}</td>
+              <td className={`whitespace-nowrap p-1.5 lg:p-3 text-right align-top font-medium text-[11px] lg:text-sm ${refundAmt > 0 ? "text-amber-600" : due > 0 ? "text-red-600" : "text-green-600"}`}>
                 {refundAmt > 0 ? <span title="Refunded">↩ {fmtCurrency(due)}</span> : fmtCurrency(due)}
               </td>
               <td className="hidden p-3 align-top lg:table-cell">
@@ -2530,7 +2531,7 @@ function SlotRows({
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); setOpenActions(actionsOpen ? null : b.id); }}
-                      className="rounded-md border border-gray-200 bg-[var(--ck-surface)] px-2 py-0.5 text-[10px] font-semibold text-gray-600 hover:bg-gray-50"
+                      className="whitespace-nowrap rounded-md border border-gray-200 bg-[var(--ck-surface)] px-2 py-0.5 text-[10px] font-semibold text-gray-600 hover:bg-gray-50"
                     >
                       Actions ▾
                     </button>
