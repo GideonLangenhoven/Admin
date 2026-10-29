@@ -7,6 +7,19 @@ export type CallerAdmin = {
   business_id: string;
 };
 
+// Roles that must hold an AAL2 (TOTP-verified) session, e.g. "SUPER_ADMIN,MAIN_ADMIN". Empty = not enforced.
+// Set it only after those admins have enrolled a factor, or they lose access to privileged API routes.
+// Mirrors ENFORCE_ADMIN_AAL2_ROLES in supabase/functions/_shared/auth.ts. The token was already validated by getUser().
+function lacksRequiredAal2(role: string, token: string): boolean {
+  const required = (process.env.ENFORCE_ADMIN_AAL2_ROLES || "").split(",").map((r) => r.trim()).filter(Boolean);
+  if (!required.includes(role)) return false;
+  try {
+    return JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8")).aal !== "aal2";
+  } catch {
+    return true;
+  }
+}
+
 export async function getCallerAdmin(
   req: Request,
   opts?: { skipSubscriptionCheck?: boolean },
@@ -33,6 +46,7 @@ export async function getCallerAdmin(
     .maybeSingle();
 
   if (!adminRow || adminRow.suspended) return null;
+  if (lacksRequiredAal2(adminRow.role, token)) return null;
   // Shared demo credentials may browse GET-backed dashboard data, but can
   // never use a service-role API route to mutate data or contact customers.
   if (adminRow.read_only && req.method !== "GET") return null;

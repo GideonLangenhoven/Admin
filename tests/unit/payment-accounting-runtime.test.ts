@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { sourceFunction, sourceHandler } from "../helpers/source-handler";
+import { sourceExports, sourceFunction, sourceHandler } from "../helpers/source-handler";
 import { getPaidPortions } from "../../supabase/functions/_shared/vouchers";
 import * as voucherBalances from "../../supabase/functions/_shared/voucher-balances";
 
@@ -14,7 +14,8 @@ function paymentFixture(overrides: Record<string, any> = {}) {
     from(table: string) {
       let patch: any, insert: any;
       const execute = async () => {
-        if (patch || insert) calls.push({ table, patch, insert });
+        // The service-key audit row is expected on every internal call; these tests track financial writes.
+        if ((patch || insert) && !(table === "logs" && insert?.event === "SERVICE_KEY_CALL")) calls.push({ table, patch, insert });
         if (table === "bookings") {
           if (patch) Object.assign(booking, patch);
           return { data: { ...booking }, error: null };
@@ -79,6 +80,8 @@ function paymentFixture(overrides: Record<string, any> = {}) {
   const mocks = {
     "../_shared/voucher-balances.ts": voucherBalances,
     "../_shared/tenant.ts": tenant,
+    // process-refund authenticates through the real shared helper (here: the service-key path).
+    "../_shared/auth.ts": sourceExports("supabase/functions/_shared/auth.ts", { "https://esm.sh/@supabase/supabase-js@2": { createClient: () => db } }, env),
     "../_shared/vouchers.ts": { getPaidPortions, reissueVoucherPortion },
     "../_shared/combo.ts": { getComboLegPolicy: async () => null }, "../_shared/waiver.ts": {},
     "../_shared/sentry.ts": { withSentry: (_name: string, fn: any) => fn },

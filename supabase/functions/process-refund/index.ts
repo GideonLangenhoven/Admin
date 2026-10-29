@@ -5,11 +5,10 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, getTenantByBusinessId, sendWhatsappTextForTenant, getAdminAppOrigins, isAllowedOrigin } from "../_shared/tenant.ts";
 import { getPaidPortions, reissueVoucherPortion } from "../_shared/vouchers.ts";
 import { getComboLegPolicy } from "../_shared/combo.ts";
+import { requireAuth, canAccessBusiness, auditServiceCall, AuthError } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const SERVICE_KEYS = new Set([SUPABASE_KEY, ...Object.values(JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") || "{}"))]
-  .filter((key): key is string => typeof key === "string" && key.length > 0));
 const supabase = createServiceClient();
 const REFUND_ADMIN_ROLES = new Set(["OPERATOR", "ADMIN", "MAIN_ADMIN", "SUPER_ADMIN"]);
 
@@ -22,46 +21,34 @@ function getCors(req?: any) {
 
 // Caller authorization — this function moves money, so it must never be
 // callable anonymously (verify_jwt is false for internal cross-function
-// calls, which use the service-role key as Bearer). Two caller classes:
+// calls, which use the service-role key as Bearer). Two caller classes,
+// both resolved by the shared requireAuth:
 //   1. Internal (yoco-webhook, batch-refund, weather flows) — service key.
 //   2. Admin dashboard — Supabase Auth JWT of an active admin whose
 //      business matches the booking (SUPER_ADMIN exempt).
-async function authorizeRefund(req: any, booking: any): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
-  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
-  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  const apiKey = (req.headers.get("apikey") || "").trim();
-  if (SERVICE_KEYS.has(token) || SERVICE_KEYS.has(apiKey)) return { ok: true };
-  if (!token) return { ok: false, status: 401, message: "Admin session required" };
-  try {
-    const { data: userRes, error: authErr } = await supabase.auth.getUser(token);
-    if (authErr || !userRes?.user) return { ok: false, status: 401, message: "Admin session required" };
-    const { data: admin, error: adminErr } = await supabase
-      .from("admin_users")
-      .select("business_id, role, suspended, read_only")
-      .eq("user_id", userRes.user.id)
-      .maybeSingle();
-    if (adminErr) return { ok: false, status: 503, message: "Admin access could not be verified" };
-    if (!admin || admin.suspended) return { ok: false, status: 403, message: "Admin access required" };
-    if (admin.read_only) return { ok: false, status: 403, message: "This demonstration account is read-only." };
-    if (REFUND_ADMIN_ROLES.has(admin.role) && (admin.role === "SUPER_ADMIN" || admin.business_id === booking.business_id)) return { ok: true };
-    return { ok: false, status: 403, message: "You can only refund bookings for your own business" };
-  } catch {
-    return { ok: false, status: 401, message: "Admin session required" };
-  }
-}
-
 Deno.serve(withSentry("process-refund", async (req: any) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: getCors(req) });
   const respond = (data: any, status = 200) => new Response(JSON.stringify(data), { status, headers: getCors(req) });
   try {
+    // Authenticate before touching any booking, so callers learn nothing about which booking IDs exist.
+    let auth;
+    try {
+      auth = await requireAuth(req);
+    } catch (e) {
+      if (e instanceof AuthError && e.kind === "unavailable") return respond({ error: "Admin access could not be verified" }, 503);
+      if (e instanceof AuthError && e.kind === "mfa_required") return respond({ error: "Multi-factor authentication required" }, 403);
+      if (e instanceof AuthError && e.kind === "not_admin") return respond({ error: "Admin access required" }, 403);
+      if (e instanceof AuthError && e.kind === "read_only") return respond({ error: "This demonstration account is read-only." }, 403);
+      return respond({ error: "Admin session required" }, 401);
+    }
+    if (!auth.isServiceRole && !REFUND_ADMIN_ROLES.has(auth.role)) return respond({ error: "Admin access required" }, 403);
     const body = await req.json();
     if (!body.booking_id) return respond({ error: "booking_id required" }, 400);
-    if (!req.headers.get("authorization") && !req.headers.get("apikey")) return respond({ error: "Admin session required" }, 401);
     const loaded = await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("id", body.booking_id).single();
     const booking = loaded.data;
-    if (loaded.error || !booking) return respond({ error: "Booking not found" }, 404);
-    const authorized = await authorizeRefund(req, booking);
-    if (authorized.ok === false) return respond({ error: authorized.message }, authorized.status);
+    // One answer for "no such booking" and "not your booking".
+    if (loaded.error || !booking || !canAccessBusiness(auth, booking.business_id)) return respond({ error: "Booking not found" }, 404);
+    await auditServiceCall(supabase, auth, "process-refund", booking.business_id);
     if (body.amount != null && (!Number.isFinite(Number(body.amount)) || Number(body.amount) <= 0)) return respond({ error: "Invalid refund amount" }, 400);
     const combo = await getComboLegPolicy(supabase, booking);
     if (combo && combo.cancellation_policy !== "POLICY_REFUND") return respond({ error: "This combo must use its voucher cancellation flow." }, 400);

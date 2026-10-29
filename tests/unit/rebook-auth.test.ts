@@ -27,9 +27,10 @@ describe("rebook-booking caller authorization (S1)", () => {
     expect(rebook).toContain("session.businessId !== booking.business_id");
   });
 
-  it("admin JWTs must belong to the booking's business (SUPER_ADMIN exempt)", () => {
-    expect(rebook).toContain('admin.role === "SUPER_ADMIN" || admin.business_id === booking.business_id');
-    expect(rebook).toContain("admin.suspended");
+  it("admin JWTs go through the shared requireAuth + canAccessBusiness (business match, exact SUPER_ADMIN, suspended refused)", () => {
+    expect(rebook).toContain("await requireAuth(req)");
+    expect(rebook).toContain("canAccessBusiness(admin, booking.business_id)");
+    expect(rebook).not.toMatch(/\/super\/i/);
   });
 
   it("unauthenticated callers are rejected", () => {

@@ -1897,7 +1897,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (newQty > sd.qty) {
         const addCount = newQty - sd.qty;
         const changed = await fetch(SUPABASE_URL + "/functions/v1/rebook-booking", {
-          method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+          method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY, "x-caller-function": "wa-webhook" },
           body: JSON.stringify({ booking_id: sd.booking_id, action: "ADD_GUESTS", new_qty: newQty }),
         });
         const result = await changed.json();
@@ -1944,7 +1944,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         let rd: any = null;
         try {
           const rr = await fetch(SUPABASE_URL + "/functions/v1/rebook-booking", {
-            method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+            method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY, "x-caller-function": "wa-webhook" },
             body: JSON.stringify({ booking_id: sd.booking_id, action: "REMOVE_GUESTS", new_qty: sd.new_qty, excess_action: wantRefund ? "REFUND" : "VOUCHER" }),
           });
           rd = await rr.json();
@@ -2283,6 +2283,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       if (sd.is_reschedule) {
         await sendText(tenant, phone, "Processing your change... \u23F3");
         const { data: rbData, error: rbErr } = await supabase.functions.invoke("rebook-booking", {
+          headers: { "x-caller-function": "wa-webhook" },
           body: {
             booking_id: sd.booking_id,
             action: "RESCHEDULE",
@@ -3092,6 +3093,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
         return;
       }
       const { data: changed, error: changeError } = await supabase.functions.invoke("rebook-booking", {
+        headers: { "x-caller-function": "wa-webhook" },
         body: { booking_id: existingBooking.data.id, action: newQty > existingBooking.data.qty ? "ADD_GUESTS" : "REMOVE_GUESTS", new_qty: newQty },
       });
       if (changeError || !changed?.ok) {
@@ -3202,6 +3204,7 @@ async function handleMsg(tenant: TenantContext, phone: any, text: any, msgType: 
       // Call rebook-booking
       await sendText(tenant, phone, "Processing your reschedule... \u23F3");
       const { data: rbkData, error: rbkErr } = await supabase.functions.invoke("rebook-booking", {
+        headers: { "x-caller-function": "wa-webhook" },
         body: {
           booking_id: sd.booking_id,
           action: "RESCHEDULE",

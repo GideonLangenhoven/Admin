@@ -430,7 +430,7 @@ async function refundUnfulfilledPayment(bookingId: string, paymentId: string, ch
   });
   if (recorded.error || !recorded.data?.ok) throw new Error("Could not record unfulfilled payment");
   const response = await fetch(SUPABASE_URL + "/functions/v1/process-refund", {
-    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY },
+    method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SUPABASE_KEY, "x-caller-function": "yoco-webhook" },
     body: JSON.stringify({ booking_id: bookingId, amount: cents / 100, keep_booking: Boolean(holdId) }),
   });
   const result = await response.json();
@@ -502,7 +502,7 @@ Deno.serve(withSentry("yoco-webhook", async (req: any) => {
       }
       // The refund handler also completes voucher reissue and notification.
       const resumed = await fetch(SUPABASE_URL + "/functions/v1/process-refund", {
-        method: "POST", headers: { Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        method: "POST", headers: { Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "x-caller-function": "yoco-webhook" },
         body: JSON.stringify({ booking_id: found.data.booking_id, resume_refund: true }),
       });
       const followupOk = resumed.ok || type === "refund.failed";

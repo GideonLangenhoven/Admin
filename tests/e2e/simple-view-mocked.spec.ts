@@ -1402,7 +1402,7 @@ for (const path of ["/bookings", "/simple/bookings"]) {
   });
 }
 
-test("bookings show full names, keep history at the far left on mobile, and show sources in View", async ({ page }, testInfo) => {
+test("bookings show full names, keep the name tappable on mobile, and show sources in View", async ({ page }, testInfo) => {
   test.setTimeout(180_000);
   await installMockBackend(page);
   const fixture = dayFixtures(new Date().toISOString());
@@ -1446,13 +1446,8 @@ test("bookings show full names, keep history at the far left on mobile, and show
       }
       if (width < 1024) {
         const row = table.locator(`tr[data-booking-id="${rows[0].id}"]`).filter({ visible: true });
-        const badge = row.getByRole("button", { name: `3 previous paid bookings for ${rows[0].customer_name}`, exact: true });
-        const badgeBox = (await badge.boundingBox())!;
-        const rowBox = (await row.boundingBox())!;
-        expect(badgeBox.x - rowBox.x).toBeLessThanOrEqual(17);
-        expect(badgeBox.width).toBeGreaterThanOrEqual(44);
-        const nameBox = (await row.getByText(rows[0].customer_name, { exact: true }).boundingBox())!;
-        expect(badgeBox.x + badgeBox.width).toBeLessThan(nameBox.x);
+        const nameButton = row.getByRole("button", { name: rows[0].customer_name, exact: true });
+        expect((await nameButton.boundingBox())!.height).toBeGreaterThanOrEqual(44);
         await row.getByRole("checkbox", { name: `Select ${rows[0].customer_name}`, exact: true }).check();
         await row.getByRole("checkbox", { name: `Select ${rows[0].customer_name}`, exact: true }).uncheck();
       }
@@ -1488,16 +1483,13 @@ test("bookings show the prior paid booking and recognise returning guests", asyn
   for (const checkbox of await page.getByRole("checkbox", { name: "Expand All", exact: true }).all()) await checkbox.check();
   for (const width of [390, 1536]) {
     await page.setViewportSize({ width, height: 1000 });
-    const badge = page.getByRole("button", { name: `3 previous paid bookings for ${rows[0].customer_name}`, exact: true });
-    await expect(badge).toHaveText("3");
-    const name = page.getByText(rows[0].customer_name, { exact: true }).filter({ visible: true }).first();
-    expect((await badge.boundingBox())!.x + (await badge.boundingBox())!.width).toBeLessThanOrEqual((await name.boundingBox())!.x);
+    const badge = page.getByRole("button", { name: rows[0].customer_name, exact: true }).filter({ visible: true });
     await expect(page.getByText("No previous paid bookings", { exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /previous paid bookings for Sam/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Sam/ })).toHaveCount(0);
     await badge.hover();
     const tooltip = page.getByRole("tooltip");
-    await expect(tooltip).toContainText("3 previous paid bookings");
-    await expect(tooltip).toContainText("Last booking: 10 Jan 2026");
+    await expect(tooltip).toContainText("Previous bookings: 3");
+    await expect(tooltip).toContainText("Last booked: 10 Jan 2026");
     expect(await tooltip.evaluate(element => { const r=element.getBoundingClientRect();return element.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)); })).toBe(true);
     await page.screenshot({ path: `/private/tmp/booking-history-badge-${width}.png` });
     await page.mouse.move(0, 0);

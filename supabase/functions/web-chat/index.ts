@@ -1778,6 +1778,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
       }
 
       const { data: rbData, error: rbErr } = await db.functions.invoke("rebook-booking", {
+        headers: { "x-caller-function": "web-chat" },
         body: { booking_id: ns.booking_id, action: "RESCHEDULE", new_slot_id: rsId, excess_action: "VOUCHER" }
       });
       if (rbErr || rbData?.ok !== true || !Number.isFinite(Number(rbData.diff))) { reply = rbData?.error || "We couldn't verify the change to your booking. Please check My Bookings or contact our team before retrying."; ns = { step: "IDLE" }; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
@@ -1797,6 +1798,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
     if (step === "CONFIRM_CANCEL") {
       if (btnVal === "confirm_cancel" || (!isBtnClick && (confirmsPurchase(msg) || /^(?:(?:yes[, ]+|please\s+))?cancel(?: (?:it|my booking|the booking))?(?: please)?[.!]*$/.test(lo)))) {
         const { data: cancelled, error: cancelError } = await db.functions.invoke("rebook-booking", {
+          headers: { "x-caller-function": "web-chat" },
           body: { booking_id: ns.booking_id, action: "CANCEL_REFUND" },
         });
         if (cancelError || cancelled?.ok !== true) {
@@ -1820,6 +1822,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
       if (ns.add_only && newQ < ns.current_qty) { reply = "Within 24 hours of the trip, you can only add guests, not remove them. Current: " + ns.current_qty + " people."; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
       const adding = newQ > ns.current_qty;
       const { data: change, error: changeError } = await db.functions.invoke("rebook-booking", {
+        headers: { "x-caller-function": "web-chat" },
         body: { booking_id: ns.booking_id, action: adding ? "ADD_GUESTS" : "REMOVE_GUESTS", new_qty: newQ,
           ...(!adding ? { excess_action: "REFUND" } : {}) },
       });
@@ -1848,6 +1851,7 @@ async function handleChat(req: Request, audit: ChatAudit): Promise<Response> {
     if (step === "UPDATE_NAME") {
       if (msg.trim().length < 2) { reply = "Please enter the new name:"; return new Response(JSON.stringify({ reply: reply, state: ns }), { status: 200, headers: gCors(req) }); }
       const { data: updated, error: updateError } = await db.functions.invoke("rebook-booking", {
+        headers: { "x-caller-function": "web-chat" },
         body: { booking_id: ns.booking_id, action: "UPDATE_CONTACT", contact_name: msg.trim() },
       });
       reply = updateError || updated?.ok !== true ? "We couldn't update the name. Please try My Bookings." : "Updated! Booking is now under *" + msg.trim() + "* \u2705";

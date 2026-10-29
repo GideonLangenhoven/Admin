@@ -32,7 +32,12 @@ function cancelFixture(single = false, source = "WEB") {
       resolveManageBookingsUrl: () => "https://synthetic.invalid/my-bookings", getAdminAppOrigins: () => ["https://synthetic.invalid"],
       isAllowedOrigin: () => true, formatTenantDateTime: () => "21 Oct 2099",
     },
-    "../_shared/auth.ts": { requireAuth: async () => ({ role: "MAIN_ADMIN", businessId: "tenant-a" }) },
+    "../_shared/auth.ts": {
+      requireAuth: async () => ({ userId: "admin-a", role: "MAIN_ADMIN", businessId: "tenant-a", isServiceRole: false }),
+      canAccessBusiness: (auth: any, businessId: string) => Boolean(businessId) && (auth.isServiceRole || auth.role === "SUPER_ADMIN" || auth.businessId === businessId),
+      auditServiceCall: async () => undefined,
+      AuthError: class extends Error {},
+    },
   }, { SUPABASE_URL: "https://synthetic.invalid", SUPABASE_SERVICE_ROLE_KEY: "synthetic-service" }, async (_input, init) => {
     emails.push(JSON.parse(String(init?.body))); return Response.json({ ok: true });
   });
@@ -103,11 +108,15 @@ describe("operator cancellation notification only", () => {
 function rebookFixture(actor: "customer" | "admin" | "service", selfService = false) {
   const b = { ...booking, status: "CANCELLED", cancellation_self_service: selfService };
   const rpc = vi.fn();
+  const db = {
+    rpc,
+    auth: { getUser: async () => ({ data: { user: { id: "synthetic-admin" } } }) },
+    from: (table: string) => query({ data: table === "admin_users" ? { business_id: "tenant-a", role: "MAIN_ADMIN" } : b }),
+  };
   const handler = sourceHandler("supabase/functions/rebook-booking/index.ts", {
-    "../_shared/tenant.ts": { createServiceClient: () => ({ rpc,
-      auth: { getUser: async () => ({ data: { user: { id: "synthetic-admin" } } }) },
-      from: (table: string) => query({ data: table === "admin_users" ? { business_id: "tenant-a", role: "MAIN_ADMIN" } : b }),
-    }) },
+    "../_shared/tenant.ts": { createServiceClient: () => db },
+    // The real shared helper over this fixture's database (admin and service-key paths).
+    "../_shared/auth.ts": sourceExports("supabase/functions/_shared/auth.ts", { "https://esm.sh/@supabase/supabase-js@2": { createClient: () => db } }, { SUPABASE_SERVICE_ROLE_KEY: "synthetic-service" }),
     "../_shared/customer-session.ts": { verifyCustomerSession: async () => ({ valid: true, businessId: "tenant-a", email: b.email }) },
     "../_shared/vouchers.ts": {}, "../_shared/combo.ts": {},
   }, { SUPABASE_SERVICE_ROLE_KEY: "synthetic-service" });

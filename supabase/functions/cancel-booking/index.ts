@@ -11,6 +11,7 @@ import {
   isAllowedOrigin,
   formatTenantDateTime,
 } from "../_shared/tenant.ts";
+import { requireAuth, canAccessBusiness, auditServiceCall, AuthError } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -26,33 +27,6 @@ function getCors(req?: any) {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Content-Type": "application/json",
   };
-}
-
-/**
- * Verify the caller is an authenticated admin and return their business_id + role.
- * Returns null on any failure (missing header, invalid token, no admin row, suspended).
- */
-async function verifyAdminSession(req: any) {
-  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
-  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  if (!token) return null;
-  try {
-    const { data: userRes, error: authErr } = await supabase.auth.getUser(token);
-    if (authErr || !userRes?.user) return null;
-    const { data: admin } = await supabase
-      .from("admin_users")
-      .select("id, business_id, role, suspended, read_only")
-      .eq("user_id", userRes.user.id)
-      .maybeSingle();
-    if (!admin || admin.suspended || admin.read_only) return null;
-    return {
-      user_id: userRes.user.id as string,
-      business_id: admin.business_id as string,
-      role: admin.role as string,
-    };
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -93,9 +67,15 @@ Deno.serve(async (req: any) => {
       return new Response(JSON.stringify({ error: "booking_id required" }), { status: 400, headers: getCors(req) });
     }
 
-    const session = await verifyAdminSession(req);
-    if (!session) {
-      return new Response(JSON.stringify({ error: "Admin session required" }), { status: 401, headers: getCors(req) });
+    let session;
+    try {
+      session = await requireAuth(req);
+    } catch (e) {
+      const kind = e instanceof AuthError ? e.kind : "";
+      const [status, error] = kind === "read_only" ? [403, "This demonstration account is read-only."]
+        : kind === "unavailable" ? [503, "Admin access could not be verified"]
+        : kind === "mfa_required" ? [403, "Multi-factor authentication required"] : [401, "Admin session required"];
+      return new Response(JSON.stringify({ error }), { status, headers: getCors(req) });
     }
 
     const { data: booking, error: loadErr } = await supabase
@@ -104,14 +84,12 @@ Deno.serve(async (req: any) => {
       .eq("id", booking_id)
       .maybeSingle();
 
-    if (loadErr || !booking) {
+    // Tenant guard (SUPER_ADMIN only by exact role match). "No such booking" and
+    // "not your booking" get the same answer so IDs cannot be probed.
+    if (loadErr || !booking || !canAccessBusiness(session, booking.business_id)) {
       return new Response(JSON.stringify({ error: "Booking not found" }), { status: 404, headers: getCors(req) });
     }
-
-    // Tenant guard: non-super admins can only cancel their own tenant's bookings
-    if (!/super/i.test(session.role || "") && session.business_id !== booking.business_id) {
-      return new Response(JSON.stringify({ error: "You can only cancel bookings for your own business" }), { status: 403, headers: getCors(req) });
-    }
+    await auditServiceCall(supabase, session, "cancel-booking", booking.business_id);
 
     const tenant = await getTenantByBusinessId(supabase, booking.business_id);
     const brandName = getBusinessDisplayName(tenant.business);
@@ -219,8 +197,8 @@ Deno.serve(async (req: any) => {
       booking_id: booking_id,
       event: "booking_cancelled",
       payload: {
-        admin_user_id: session.user_id,
-        admin_business_id: session.business_id,
+        admin_user_id: session.userId,
+        admin_business_id: session.businessId,
         admin_role: session.role,
         reason: cancelReason,
         was_paid: isPaid,
