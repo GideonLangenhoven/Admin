@@ -58,6 +58,30 @@ it("uses the current page map and permissions when retrieval misses, even with s
   expect(directory).not.toContain("/settings/agent-connections :");
 });
 
+// Round 2, item 7 (M12): asked where refund percentages are set, the help
+// assistant didn't know whenever search missed the Refunds article section.
+it("knows where refund percentages are set when retrieval misses", async () => {
+  const llmText = vi.fn(async () => "Settings → Booking Site Configuration → Cancellation Policy.");
+  const q: any = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: { settings_permissions: {} } }) };
+  const handler = sourceHandler("supabase/functions/admin-help-chat/index.ts", {
+    "../_shared/tenant.ts": {
+      createServiceClient: () => ({ from: () => q, rpc: async () => ({ data: [] }) }),
+      getAdminAppOrigins: () => ["https://test.invalid"], isAllowedOrigin: () => true,
+    },
+    "../_shared/auth.ts": { requireAuth: async () => ({ readOnly: false, role: "MAIN_ADMIN", businessId: "test", userId: "staff" }) },
+    "../_shared/llm.ts": { llmText, llmAvailable: () => true },
+    "../_shared/kb.ts": { embedText: async () => null },
+    "../_shared/demo-guide.ts": guide,
+  });
+  const response = await handler(new Request("https://test.invalid", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ question: "Where do I change the refund percentages for cancellations?", page: "/refunds" }),
+  }));
+  expect(response.status).toBe(200);
+  const prompt = (llmText.mock.calls[0] as any)[0].system as string;
+  expect(prompt).toContain("Settings → Booking Site Configuration → Cancellation Policy");
+});
+
 it("keeps the read-only demo guide available after hidden search hits are filtered", async () => {
   const llmText = vi.fn(async () => "Explore the demo's booking and departure views.");
   const q: any = { select: () => q, eq: () => q, maybeSingle: async () => ({ data: { settings_permissions: {} } }) };
