@@ -2524,7 +2524,8 @@ function SlotRows({
                   <span className="text-[10px] text-gray-500 lg:hidden pl-[10px]">
                     {b.tours?.name || "—"} · {b.phone || "No mobile"}
                   </span>
-                  {b.payment_deadline && !isPaid(b) && b.status !== "CANCELLED" && (
+                  {/* cron-tasks never expires a booking allowed without payment. */}
+                  {b.payment_deadline && !isPaid(b) && b.status !== "CANCELLED" && !b.allow_unpaid && (
                     <PaymentExpiryBadge deadline={b.payment_deadline} className="lg:ml-0 ml-[10px]" />
                   )}
                 </div>

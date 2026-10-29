@@ -9,7 +9,7 @@ const HELD = { status: "HELD", payment_deadline: "2026-10-17T08:10:00Z" }; // no
 
 test.beforeEach(async ({ request }) => { await request.post(`${FIXTURE}/__fixture/reset`); });
 
-async function setup(page: Page) {
+async function setup(page: Page, held: Record<string, unknown> = HELD) {
   await page.addInitScript(() => {
     localStorage.setItem("ck_admin_role", "MAIN_ADMIN");
     localStorage.setItem("ck_admin_email", "operator@example.invalid");
@@ -26,7 +26,7 @@ async function setup(page: Page) {
     if (url.pathname === "/rest/v1/rpc/list_operator_bookings" || (url.pathname === "/rest/v1/bookings" && req.method() === "GET")) {
       const res = await route.fetch();
       const rows = await res.json();
-      const edit = (row: { id?: string }) => row.id === BOOKING ? { ...row, ...HELD } : row;
+      const edit = (row: { id?: string }) => row.id === BOOKING ? { ...row, ...held } : row;
       return route.fulfill({ response: res, json: Array.isArray(rows) ? rows.map(edit) : edit(rows) });
     }
     return route.continue();
@@ -45,4 +45,18 @@ test("the bookings list shows the same countdown", async ({ page }) => {
   await page.goto("/bookings");
   await page.getByRole("checkbox", { name: "Expand All" }).first().check();
   await expect(page.locator(`[data-booking-id="${BOOKING}"]`).filter({ visible: true }).first()).toContainText("Expires in 2d 3h");
+});
+
+// Round 2, 13d: a booking allowed without payment never expires (cron-tasks
+// skips it), yet both screens counted down to its deadline.
+test("a booking allowed without payment shows no countdown", async ({ page }) => {
+  await setup(page, { ...HELD, allow_unpaid: true });
+  await page.goto(`/bookings/${BOOKING}`);
+  await expect(page.getByText("Allowed without payment", { exact: true })).toBeVisible();
+  await expect(page.getByText(/^Expires in/)).toHaveCount(0);
+  await page.goto("/bookings");
+  await page.getByRole("checkbox", { name: "Expand All" }).first().check();
+  const row = page.locator(`[data-booking-id="${BOOKING}"]`).filter({ visible: true }).first();
+  await expect(row).toContainText("Partial Example");
+  await expect(row).not.toContainText("Expires in");
 });

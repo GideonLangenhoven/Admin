@@ -1219,7 +1219,10 @@ export default function BookingDetailPage() {
             <InfoRow
               label="Status"
               value={
-                isPending ? (
+                // cron-tasks never expires a booking allowed without payment.
+                isPending && booking.allow_unpaid ? (
+                  <Badge className="ui-pill-neutral">Allowed without payment</Badge>
+                ) : isPending ? (
                   <PaymentExpiryBadge deadline={booking.payment_deadline} />
                 ) : (
                   <Badge className="ui-pill-success">Resolved</Badge>
