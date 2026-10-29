@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { fixtureNow, slots, tourId } from "../helpers/booking-guest-fixture.cjs";
 
-// Round 2, booking site layering and cookie choice on phones and tablets (R1, R2, R3, R5).
+// Round 2, booking site layering and cookie choice on phones and tablets (R1 to R5).
 const fixtureUrl = "http://127.0.0.1:3117";
 const book = `/book?tour=${tourId}&slot=${slots[0].id}&date=2026-10-03`;
 const phones = [[320, 568], [375, 667], [390, 844]] as const;
@@ -20,6 +20,19 @@ const underCookieBanner = (locator: Locator) => locator.evaluate(el => {
   let layer = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
   while (layer && getComputedStyle(layer).position !== "fixed") layer = layer.parentElement;
   return !!layer && !layer.contains(el) && /cookie/i.test(layer.textContent || "");
+});
+
+// Page text about money or paying (prices, totals, Pay, the secure-payment
+// note) that the floating chat launcher overlaps.
+const underLauncher = (page: Page) => page.evaluate(() => {
+  const launcher = document.querySelector('button[aria-label="Open chat"]')?.getBoundingClientRect();
+  if (!launcher?.width) return [];
+  return [...document.querySelectorAll("main *, footer *")].filter(el => {
+    const text = [...el.childNodes].filter(n => n.nodeType === Node.TEXT_NODE).map(n => n.textContent).join("");
+    if (!/R\s?\d|\bPay\b|secure|card/i.test(text)) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.left < launcher.right && r.right > launcher.left && r.top < launcher.bottom && r.bottom > launcher.top;
+  }).map(el => (el.textContent || "").trim().slice(0, 40));
 });
 
 const toBottom = (page: Page) => page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
@@ -61,6 +74,35 @@ test.describe("with cookies already answered", () => {
     await page.goto("/");
     await expect(page.locator('meta[name="viewport"]')).toHaveAttribute("content", /viewport-fit=cover/);
     await expect(page.locator('meta[name="viewport"]')).toHaveAttribute("content", /width=device-width, initial-scale=1/);
+  });
+
+  test("R4: the chat launcher never sits on prices, totals or Pay", async ({ page }) => {
+    for (const [width, height] of [...phones, [768, 1024], [1024, 768], [1280, 800]] as const) {
+      await page.setViewportSize({ width, height });
+      for (const step of ["calendar", "details", "voucher"]) {
+        if (step === "calendar") await page.goto(book);
+        if (step === "details") await page.getByRole("button", { name: /Continue to details/i }).filter({ visible: true }).click();
+        if (step === "voucher") await page.goto("/voucher");
+        await expect(page.locator("main").getByText(/R\s?\d/).filter({ visible: true }).first()).toBeVisible();
+        for (const at of [0, 0.25, 0.5, 0.75, 1]) {
+          await scrollToFraction(page, at);
+          expect(await underLauncher(page), `${width}x${height} ${step} at ${at * 100}%`).toEqual([]);
+        }
+      }
+    }
+  });
+
+  test("R4: below xl, checkout pages open the chat from the page", async ({ page }) => {
+    await page.setViewportSize({ width: 768, height: 1024 });
+    await page.goto(book);
+    await expect(page.getByRole("button", { name: "Open chat" })).toBeHidden();
+    const prompt = page.getByRole("button", { name: "Chat with us" });
+    await prompt.click();
+    const chat = page.getByRole("dialog", { name: /assistant/ });
+    await expect(chat).toBeVisible();
+    await chat.getByRole("button", { name: "Close chat" }).click();
+    await expect(chat).toBeHidden();
+    await expect(prompt).toBeFocused();
   });
 });
 
