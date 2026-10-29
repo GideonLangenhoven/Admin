@@ -48,8 +48,11 @@ async function openGuestActions(page: Page) {
 test("a confirmed booking with money due offers the main actions on its own page", async ({ page }) => {
   await setup(page);
   const actions = await openGuestActions(page);
-  for (const name of ["Mark Paid", "Payment Link", "Rebook", "Refund", "Cancel", "Edit", "Resend Invoice"])
+  for (const name of ["Mark Paid", "Rebook", "Refund", "Cancel", "Edit", "Resend Invoice"])
     await expect(actions.getByRole("button", { name: new RegExp("^" + name) }), name).toBeEnabled();
+  // Round 2, item 6: part is paid, so the balance goes through Mark Paid, not a payment link.
+  await expect(actions.getByRole("button", { name: /^Payment Link/ })).toBeDisabled();
+  await expect(actions.getByRole("button", { name: /^Payment Link/ })).toContainText("Record the balance with Mark Paid.");
   await expect(actions.getByRole("button", { name: /^Payment Reminder/ })).toBeDisabled();
   await expect(actions.getByRole("button", { name: /^View/ })).toHaveCount(0);
 
