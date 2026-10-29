@@ -47,3 +47,24 @@ test("Add slot offers no past dates and opens the end date on the start's month"
   await expect(page.getByText("December 2026")).toBeVisible();
   await expect(page.locator('[data-day="2026-12-09"]')).toHaveAttribute("data-disabled", "true");
 });
+
+// Round 2, A1: on phones Cancel days and Reopen days live in the ☰ menu, so
+// picking dates left nothing on screen to act on them.
+test("on a phone, picking days brings their actions into view", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await setup(page);
+  await page.goto("/slots");
+  const day = page.getByRole("heading", { name: "Thursday, October 15" });
+  const bar = page.getByRole("region", { name: "Selected days" });
+  await day.click();
+  await expect(bar).toContainText("1 day selected");
+  await bar.getByRole("button", { name: "Clear" }).click();
+  await expect(bar).toBeHidden();
+
+  await day.click();
+  await bar.getByRole("button", { name: "Reopen days" }).click();
+  await expect(page.getByRole("dialog", { name: "Reopen days" })).toBeVisible();
+  await page.getByRole("dialog", { name: "Reopen days" }).getByRole("button", { name: "Cancel" }).click();
+  await bar.getByRole("button", { name: "Cancel days" }).click();
+  await expect(page.getByRole("dialog", { name: "Cancel days (1)" })).toBeVisible();
+});

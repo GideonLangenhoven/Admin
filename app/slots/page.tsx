@@ -893,6 +893,16 @@ function Slots() {
         </div>
       </div>
 
+      {selectedCancelDates.length > 0 && (
+        // Phones keep the day actions in the ☰ menu: picking dates brings them here.
+        <div role="region" aria-label="Selected days" className="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-xl border px-4 py-3 shadow-sm md:hidden" style={{ background: "var(--ck-surface)", borderColor: "var(--ck-border-subtle)" }}>
+          <span className="w-full text-sm font-semibold" style={{ color: "var(--ck-text-strong)" }}>{selectedCancelDates.length} day{selectedCancelDates.length === 1 ? "" : "s"} selected</span>
+          <button type="button" onClick={() => setSelectedCancelDates([])} className="ui-btn ui-btn-ghost min-h-11 flex-auto px-3">Clear</button>
+          <button type="button" onClick={() => openDayAction("reopen")} className="ui-btn ui-btn-soft min-h-11 flex-auto px-3">Reopen days</button>
+          <button type="button" onClick={() => openDayAction("cancel")} className="ui-btn ui-btn-danger min-h-11 flex-auto px-3">Cancel days</button>
+        </div>
+      )}
+
       <div className="anim-fade-up anim-d1">
         <CalendarHeader
           currentDate={currentDate}
