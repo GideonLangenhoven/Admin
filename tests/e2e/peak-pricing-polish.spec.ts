@@ -55,3 +55,17 @@ test("Save tour prices confirms, and names the tours it could not save", async (
   await expect.poll(() => seen.find(n => n.tone === "error"))
     .toEqual({ title: "Prices not saved", message: "Could not save Harbour paddle, Coastal walk. Please try again.", tone: "error" });
 });
+
+// Round 2, 13g: the peak period's end date opened on today's month, not the start's.
+test("Set Peak Period opens the end date on the start's month", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-15T09:00:00Z"));
+  await openPricing(page, { status: 204 });
+  const picker = (label: string) => page.getByText(label, { exact: true }).locator("..").getByRole("button");
+  await picker("Start Date").click();
+  await page.getByRole("button", { name: "Go to the Next Month" }).click();
+  await page.getByRole("button", { name: "Go to the Next Month" }).click();
+  await page.locator('[data-day="2026-12-10"] button').click();
+  await picker("End Date").click();
+  await expect(page.getByText("December 2026")).toBeVisible();
+  await expect(page.locator('[data-day="2026-12-09"]')).toHaveAttribute("data-disabled", "true");
+});

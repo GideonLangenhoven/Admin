@@ -82,3 +82,17 @@ test("Add Slot preselects an active tour", async ({ page }) => {
   const dialog = page.getByRole("dialog", { name: "Add New Slots" });
   await expect(dialog.getByRole("combobox").first()).toHaveValue("10000000-0000-4000-8000-000000000003");
 });
+
+// Round 2, 13g: Bulk Edit's end date opened on today's month, not the start's.
+test("Bulk Edit opens the end date on the start's month", async ({ page }) => {
+  await setup(page);
+  await page.goto("/slots?panel=bulk-edit");
+  const dialog = page.getByRole("dialog", { name: "Bulk Edit Slots" });
+  await dialog.getByRole("button", { name: "Start Date" }).click();
+  await page.getByRole("button", { name: "Go to the Next Month" }).click();
+  await page.getByRole("button", { name: "Go to the Next Month" }).click();
+  await page.locator('[data-day="2026-12-10"] button').click();
+  await dialog.getByRole("button", { name: "End Date" }).click();
+  await expect(page.getByText("December 2026")).toBeVisible();
+  await expect(page.locator('[data-day="2026-12-09"]')).toHaveAttribute("data-disabled", "true");
+});

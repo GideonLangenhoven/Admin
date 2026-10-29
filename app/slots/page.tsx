@@ -1077,7 +1077,7 @@ function Slots() {
                 <label className="block text-sm text-gray-600">
                   End Date (Inclusive)
                   <div className="mt-1">
-                    <DatePicker position="top" value={bulkForm.endDate} onChange={(v) => setBulkForm({ ...bulkForm, endDate: v })} className="py-2.5 w-full border-gray-300" />
+                    <DatePicker position="top" min={bulkForm.startDate} value={bulkForm.endDate} onChange={(v) => setBulkForm({ ...bulkForm, endDate: v })} className="py-2.5 w-full border-gray-300" />
                   </div>
                 </label>
               </div>

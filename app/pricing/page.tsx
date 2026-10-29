@@ -297,7 +297,7 @@ export default function PeakPricingPage() {
           </div>
           <div>
             <label className="text-xs font-medium block mb-1" style={{ color: "var(--ck-text-muted)" }}>End Date</label>
-            <DatePicker alignRight={true} value={endDate} onChange={setEndDate} className="py-2.5" />
+            <DatePicker alignRight={true} min={startDate} value={endDate} onChange={setEndDate} className="py-2.5" />
           </div>
         </div>
 

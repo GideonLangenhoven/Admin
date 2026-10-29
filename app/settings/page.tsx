@@ -2162,7 +2162,8 @@ export default function SettingsPage() {
                                                 value={tourForm.slotEndDate}
                                                 onChange={(v) => setTourForm({ ...tourForm, slotEndDate: v })}
                                                 placeholder="Select end"
-                                                disabled={tourForm.slotStartDate ? { before: new Date(tourForm.slotStartDate + "T00:00:00") } : { before: new Date() }}
+                                                min={tourForm.slotStartDate}
+                                                disabled={{ before: new Date() }}
                                                 compact
                                                 alignRight
                                             />

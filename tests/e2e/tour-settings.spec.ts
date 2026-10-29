@@ -61,3 +61,18 @@ test("weekend closure is reachable for the selected tour and fits a phone", asyn
   expect(await page.locator("main").evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: testInfo.outputPath("weekends-320.png"), animations: "disabled" });
 });
+
+// Round 2, 13g: Generate Slots' end date opened on today's month, not the start's.
+test("Generate Slots opens the end date on the start's month", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-15T09:00:00Z"));
+  await page.goto("/settings#tours");
+  await page.locator('[data-demo-drag="tour.reorder"]').filter({ hasText: "Harbour paddle" }).click();
+  const form = page.getByRole("form", { name: "Tour details" });
+  await form.getByRole("button", { name: "Select start" }).click();
+  await page.getByRole("button", { name: "Go to the Next Month" }).click();
+  await page.getByRole("button", { name: "Go to the Next Month" }).click();
+  await page.locator('[data-day="2026-12-10"] button').click();
+  await form.getByRole("button", { name: "Select end" }).click();
+  await expect(page.getByText("December 2026")).toBeVisible();
+  await expect(page.locator('[data-day="2026-12-09"]')).toHaveAttribute("data-disabled", "true");
+});
