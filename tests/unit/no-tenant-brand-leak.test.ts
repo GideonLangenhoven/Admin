@@ -21,6 +21,7 @@ const BANNED = [
   { pattern: /Cape Kayak/, what: "the origin tenant's brand name" },
   { pattern: /Three Anchor Bay|180 Beach Rd|179 Beach Road/, what: "the origin tenant's street address" },
   { pattern: /ChIJ9a9I09RHzB0Rh9R8O4pM7aQ/, what: "the origin tenant's Google Place ID" },
+  { pattern: /Aonyx|4290176926|070631824/, what: "another tenant's name, VAT or bank account" },
 ];
 
 // Strip comments: an explanation of what was removed is not a leak.
@@ -45,6 +46,17 @@ describe("no shared edge function leaks the origin tenant's identity", () => {
         expect(pattern.test(code), `${fn} still contains ${pattern}`).toBe(false);
       });
     }
+  }
+});
+
+// Round 2, 13f: Settings used one operator's name, address, VAT and bank
+// account as its examples, so every tenant saw them.
+describe("Settings examples belong to no tenant", () => {
+  const code = codeOnly(readFileSync("app/settings/page.tsx", "utf8"));
+  for (const { pattern, what } of BANNED) {
+    it(`Settings does not show ${what}`, () => {
+      expect(pattern.test(code), `app/settings/page.tsx still contains ${pattern}`).toBe(false);
+    });
   }
 });
 

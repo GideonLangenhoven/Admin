@@ -2493,7 +2493,7 @@ export default function SettingsPage() {
                             <div>
                                 <label htmlFor="settings-business-name" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Name <span className="text-[var(--ck-accent)]">(appears in the dashboard header &amp; all emails)</span></label>
                                 <input id="settings-business-name" type="text" value={siteSettings.business_name} onChange={e => setSiteSettings({ ...siteSettings, business_name: e.target.value })}
-                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="e.g. Cape Kayak Adventures" />
+                                    className="ui-control w-full px-3 py-2 text-sm rounded-lg outline-none" placeholder="e.g. Blue Bay Adventures" />
                             </div>
                             <div>
                                 <label htmlFor="settings-business-tagline" className="block text-xs font-medium text-[var(--ck-text-muted)] mb-1">Business Tagline</label>
@@ -3233,7 +3233,7 @@ export default function SettingsPage() {
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Company name (on invoice)</span>
                                 <input type="text" value={invoiceForm.company_name} onChange={e => setInvoiceForm({ ...invoiceForm, company_name: e.target.value })}
-                                    placeholder="e.g. Aonyx Adventures" className="ui-control mt-1 w-full" />
+                                    placeholder="e.g. Blue Bay Adventures (Pty) Ltd" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Registration number</span>
@@ -3243,19 +3243,19 @@ export default function SettingsPage() {
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">VAT number</span>
                                 <input type="text" value={invoiceForm.vat_number} onChange={e => setInvoiceForm({ ...invoiceForm, vat_number: e.target.value })}
-                                    placeholder="e.g. 4290176926" className="ui-control mt-1 w-full" />
+                                    placeholder="e.g. 4123456789" className="ui-control mt-1 w-full" />
                             </label>
                         </div>
                         <div className="mt-4 space-y-3">
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Address line 1</span>
                                 <input type="text" value={invoiceForm.address_line1} onChange={e => setInvoiceForm({ ...invoiceForm, address_line1: e.target.value })}
-                                    placeholder="e.g. 179 Beach Road" className="ui-control mt-1 w-full" />
+                                    placeholder="e.g. 12 Main Road" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Address line 2</span>
                                 <input type="text" value={invoiceForm.address_line2} onChange={e => setInvoiceForm({ ...invoiceForm, address_line2: e.target.value })}
-                                    placeholder="e.g. Three Anchor Bay, Cape Town" className="ui-control mt-1 w-full" />
+                                    placeholder="e.g. Green Point, Cape Town" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Address line 3</span>
@@ -3279,12 +3279,12 @@ export default function SettingsPage() {
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account owner</span>
                                 <input type="text" value={bankForm.account_owner} onChange={e => { setBankForm({ ...bankForm, account_owner: e.target.value }); setBankDirty(true); }}
-                                    placeholder="e.g. Aonyx Adventures" className="ui-control mt-1 w-full" />
+                                    placeholder="e.g. Blue Bay Adventures (Pty) Ltd" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account number</span>
                                 <input type="text" value={bankForm.account_number} onChange={e => { setBankForm({ ...bankForm, account_number: e.target.value }); setBankDirty(true); }}
-                                    placeholder="e.g. 070631824" className="ui-control mt-1 w-full" />
+                                    placeholder="e.g. 1234567890" className="ui-control mt-1 w-full" />
                             </label>
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Account type</span>
@@ -3299,7 +3299,7 @@ export default function SettingsPage() {
                             <label className="block">
                                 <span className="text-xs font-medium text-[var(--ck-text-muted)]">Branch code</span>
                                 <input type="text" value={bankForm.branch_code} onChange={e => { setBankForm({ ...bankForm, branch_code: e.target.value }); setBankDirty(true); }}
-                                    placeholder="e.g. 020909" className="ui-control mt-1 w-full" />
+                                    placeholder="e.g. 051001" className="ui-control mt-1 w-full" />
                             </label>
                         </fieldset>
 
