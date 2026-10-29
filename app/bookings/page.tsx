@@ -1,6 +1,6 @@
 "use client";
 import { pluralize } from "../lib/automation-copy";
-import { Fragment, useEffect, useId, useMemo, useState, useRef } from "react";
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { confirmCancellation } from "../lib/cancellation-choice";
@@ -2314,6 +2314,15 @@ function SlotRows({
   onToggleSelect: (id: string) => void;
 }) {
   const [openActions, setOpenActions] = useState<string | null>(null);
+  // The bottom rows' Actions menu opened off screen: open it upwards there.
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
+  const [actionsMenuUp, setActionsMenuUp] = useState(false);
+  useLayoutEffect(() => {
+    const menu = actionsMenuRef.current, button = menu?.previousElementSibling;
+    if (!menu || !button) return;
+    const { top, bottom } = button.getBoundingClientRect();
+    setActionsMenuUp(bottom + menu.offsetHeight + 8 > window.innerHeight && top > menu.offsetHeight + 8);
+  }, [openActions]);
   const heldLine = `${slot.heldPax} held · ${fmtCurrency(slot.heldDue)} pending`;
   useEffect(() => {
     if (!openActions) return;
@@ -2557,7 +2566,7 @@ function SlotRows({
                       Actions ▾
                     </button>
                     {actionsOpen && (
-                      <div className="absolute right-0 top-full z-30 mt-1 w-40 rounded-lg border border-gray-200 py-1 shadow-lg origin-top-right" style={{ background: "var(--ck-surface-elevated)" }} onClick={(e) => e.stopPropagation()}>
+                      <div ref={actionsMenuRef} className={`absolute right-0 z-30 w-40 rounded-lg border border-gray-200 py-1 shadow-lg ${actionsMenuUp ? "bottom-full mb-1 origin-bottom-right" : "top-full mt-1 origin-top-right"}`} style={{ background: "var(--ck-surface-elevated)" }} onClick={(e) => e.stopPropagation()}>
                         {bookingActions.map((action) => (
                           <ActionMenuItem key={action.label} label={action.label} demoAction={action.demoAction} onClick={() => { action.run(); setOpenActions(null); }} disabled={action.disabled} title={action.title} tone={action.tone} />
                         ))}

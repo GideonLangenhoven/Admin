@@ -63,3 +63,29 @@ for (const width of [1024, 1100, 1199, 1280, 1440]) {
     expect(found.sideways).toBeLessThanOrEqual(1);
   });
 }
+
+// Round 2, 13c: on the bottom rows the Actions menu opened below the screen.
+test("the Actions menu opens upwards only when there is no room below", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/bookings");
+  await expect(page.locator("main thead th").filter({ hasText: "Service" }).first()).toBeVisible();
+  for (const box of await page.getByLabel("Expand All").all()) await box.check();
+  const actions = page.getByRole("button", { name: "Actions ▾", exact: true });
+  await expect(actions.first()).toBeVisible();
+  const open = async (index: number) => {
+    const button = actions.nth(index);
+    await button.evaluate((el, end) => el.scrollIntoView({ block: end ? "end" : "start" }), index > 0);
+    await button.click();
+    const menu = button.locator("xpath=following-sibling::div[1]");
+    await expect(menu).toBeVisible();
+    return { button: (await button.boundingBox())!, menu: (await menu.boundingBox())! };
+  };
+
+  const top = await open(0);
+  expect(top.menu.y).toBeGreaterThanOrEqual(top.button.y + top.button.height);
+  await actions.nth(0).click();
+
+  const last = await open(await actions.count() - 1);
+  expect(last.button.y + last.button.height + last.menu.height).toBeGreaterThan(720); // no room below
+  expect(last.menu.y + last.menu.height).toBeLessThanOrEqual(last.button.y);
+});
