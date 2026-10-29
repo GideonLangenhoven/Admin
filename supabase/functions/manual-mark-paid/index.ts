@@ -13,6 +13,8 @@ function getCors(req: Request) {
     "Access-Control-Allow-Origin": req.headers.get("origin") || "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-tenant-business-id, x-tenant-subdomain, x-tenant-origin, x-voucher-code, x-booking-success-token, x-booking-id, x-booking-waiver-token",
+    // Without it supabase.functions.invoke returns the reply as text.
+    "Content-Type": "application/json",
   };
 }
 

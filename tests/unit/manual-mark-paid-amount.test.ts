@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 import { sourceHandler } from "../helpers/source-handler";
 
@@ -46,7 +47,7 @@ function fixture(booking: Record<string, unknown>, rpcResult: Record<string, unk
   };
   const manualRpc = () => rpc.mock.calls.find(([name]) => name === "account_manual_booking")?.[1];
   const emails = () => fetchImpl.mock.calls.map(([url, init]: any) => ({ url, body: JSON.parse(init.body) }));
-  return { post, writes, manualRpc, emails, whatsapp };
+  return { handler, post, writes, manualRpc, emails, whatsapp };
 }
 
 describe("Mark Paid with an amount", () => {
@@ -95,6 +96,21 @@ describe("Mark Paid with an amount", () => {
     expect(await over.post({ booking_id: "bk-confirmed", amount: 1200 })).toEqual({ status: 409, body: { error: "That is more than the R1000.00 still due." } });
     const raw = fixture(confirmed, { data: null, error: { message: 'null value in column "status" violates not-null constraint' } });
     expect(await raw.post({ booking_id: "bk-confirmed", amount: 500 })).toEqual({ status: 409, body: { error: "The payment could not be recorded. Please try again." } });
+  });
+
+  // Round 2, item 5: the reply was text/plain, so supabase.functions.invoke
+  // handed MarkPaidDialog a string and the toast read "R0.00 by Cash. R0.00 still due".
+  it("replies as JSON, so the admin app's toast gets the amount and the balance", async () => {
+    const f = fixture(confirmed, { data: { ok: true, amount: 500, balance_due: 1000, previous_status: "CONFIRMED" } }, { capturedAfter: 500 });
+    const admin = createClient("https://fixture.invalid", "anon-key", {
+      auth: { persistSession: false },
+      global: { fetch: (input, init) => f.handler(new Request(input, init)) },
+    });
+    const { data, error } = await admin.functions.invoke("manual-mark-paid", {
+      body: { action: "mark_paid", booking_id: "bk-confirmed", amount: 500, payment_method: "Cash", expected_captured: 0 },
+    });
+    expect(error).toBe(null);
+    expect(data).toMatchObject({ amount: 500, balance_due: 1000, paid_in_full: false });
   });
 
   it("says the payment was recorded when only the guest notice fails", async () => {
