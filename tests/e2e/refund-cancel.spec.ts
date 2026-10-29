@@ -55,14 +55,29 @@ function notices(page: Page) {
   return seen;
 }
 
-async function refundAndCancel(page: Page) {
+async function openRefund(page: Page) {
   await page.goto("/bookings");
   await page.getByRole("button", { name: /view guests/i }).first().click();
   const row = page.locator(`[data-booking-id="${BOOKING}"]`).filter({ visible: true }).first();
   await row.getByRole("button", { name: "Guest actions", exact: true }).click();
   await page.locator("[data-mobile-action-sheet]").getByRole("button", { name: /^Refund/ }).click();
+}
+
+async function refundAndCancel(page: Page) {
+  await openRefund(page);
   await page.getByRole("button", { name: "Refund & cancel", exact: true }).click();
 }
+
+// Round 2, A5: the way out of the Refund dialog said "Cancel", next to "Refund & cancel".
+test("the Refund dialog's way out says Keep booking and refunds nothing", async ({ page }) => {
+  const calls = await record(page, { status: 200, json: { ok: true } });
+  await openRefund(page);
+  const dialog = page.locator(".ui-card", { has: page.getByRole("heading", { name: "Refund Booking" }) });
+  await expect(dialog.getByRole("button", { name: "Cancel", exact: true })).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Keep booking", exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(calls.filter(c => c.url.includes("/functions/v1/process-refund"))).toEqual([]);
+});
 
 const directWrites = (calls: Call[]) => calls.filter(c => c.url.includes("/rest/v1/bookings") && c.method === "PATCH");
 

@@ -1710,7 +1710,7 @@ export default function Bookings() {
             />
             <div className="flex justify-end gap-2">
               <button onClick={() => setRefundDialog(null)} disabled={refunding} className="ui-btn ui-btn-ghost disabled:opacity-50">
-                Cancel
+                Keep booking
               </button>
               <button data-demo-action="booking.refund" onClick={processRefund} disabled={refunding || !refundDialog.amount} className="ui-btn ui-btn-danger disabled:opacity-50">
                 {refunding ? "Processing…" : "Refund & cancel"}
