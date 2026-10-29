@@ -71,6 +71,42 @@ jobs:
           ROLLOUT_TEST_PASSWORD: local-ci-only
         run: npm run test:isolation:local
 
+  # Security test A. `npm run build` runs the env check (prebuild) and the bundle scan (postbuild),
+  # so this job fails if a service-role/secret value, or a server env canary, reaches client JS.
+  client-bundle-scan:
+    name: Client bundle secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Placeholder env from .env.example: a fake anon JWT, and a unique canary for every secret-looking name.
+      - name: Placeholder build env
+        run: |
+          node --input-type=module -e '
+            import { readFileSync, appendFileSync } from "node:fs";
+            const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+            const fakeAnon = `${b64({ alg: "HS256", typ: "JWT" })}.${b64({ role: "anon", ref: "ci-placeholder" })}.ci-placeholder-signature`;
+            const out = [];
+            for (const line of readFileSync(".env.example", "utf8").split("\n")) {
+              const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
+              if (!m) continue;
+              let [, name, value] = m;
+              if (name === "NEXT_PUBLIC_SUPABASE_URL") value = "https://ci-placeholder.supabase.co";
+              else if (name === "NEXT_PUBLIC_SUPABASE_ANON_KEY") value = fakeAnon;
+              else if (name.startsWith("SENTRY_")) value = "";
+              else if (/KEY|SECRET|TOKEN|PASSWORD|PASSPHRASE/.test(name) && !/PUBLIC|ANON/.test(name)) value = `ci-canary-${name}-0123456789abcdef`;
+              out.push(`${name}=${value}`);
+            }
+            appendFileSync(process.env.GITHUB_ENV, out.join("\n") + "\n");
+          '
+      - name: Build (prebuild env check, postbuild bundle scan)
+        run: npm run build
+
   smoke-e2e:
     name: Smoke E2E (production booking site)
     runs-on: ubuntu-latest

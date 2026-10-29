@@ -5,17 +5,7 @@
     {
       "grantee": "anon",
       "table_name": "add_ons",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "add_ons",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "add_ons",
-      "privilege_type": "TRIGGER"
     },
     {
       "grantee": "anon",
@@ -25,17 +15,7 @@
     {
       "grantee": "anon",
       "table_name": "booking_add_ons",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "booking_add_ons",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "booking_add_ons",
-      "privilege_type": "TRIGGER"
     },
     {
       "grantee": "anon",
@@ -45,132 +25,12 @@
     {
       "grantee": "anon",
       "table_name": "bookings",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "bookings",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "bookings",
-      "privilege_type": "TRIGGER"
     },
     {
       "grantee": "anon",
       "table_name": "bookings",
       "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chat_faq_entries",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chat_faq_entries",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chat_faq_entries",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chat_faq_entries",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chat_faq_entries",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chat_faq_entries",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chat_faq_entries",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chatbot_avatars",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chatbot_avatars",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chatbot_avatars",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chatbot_avatars",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chatbot_avatars",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chatbot_avatars",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "chatbot_avatars",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "combo_booking_items",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "combo_booking_items",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "combo_booking_items",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "combo_bookings",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "combo_bookings",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "combo_bookings",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "combo_bookings",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "combo_offer_items",
-      "privilege_type": "REFERENCES"
     },
     {
       "grantee": "anon",
@@ -179,233 +39,13 @@
     },
     {
       "grantee": "anon",
-      "table_name": "combo_offer_items",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "combo_offers",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
       "table_name": "combo_offers",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "anon",
-      "table_name": "combo_offers",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "customers",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "customers",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "customers",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
       "table_name": "customers",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "customers",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "customers",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "customers",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "data_subject_requests",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "data_subject_requests",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "data_subject_requests",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "data_subject_requests",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "data_subject_requests",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "data_subject_requests",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "data_subject_requests",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_automation_revisions",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_automation_revisions",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_automation_revisions",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_automation_revisions",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_automation_revisions",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_automation_revisions",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_automation_revisions",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_deliveries",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_deliveries",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_deliveries",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_deliveries",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_deliveries",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_deliveries",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_deliveries",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_journey_status_events",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_journey_status_events",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_journey_status_events",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_journey_status_events",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_journey_status_events",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_journey_status_events",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_journey_status_events",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_permission_events",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_permission_events",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_permission_events",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_permission_events",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_permission_events",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_permission_events",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "marketing_permission_events",
-      "privilege_type": "UPDATE"
     },
     {
       "grantee": "anon",
@@ -414,143 +54,13 @@
     },
     {
       "grantee": "anon",
-      "table_name": "otp_attempts",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "otp_attempts",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "otp_attempts",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "otp_attempts",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "otp_attempts",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "otp_attempts",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "otp_attempts",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "pii_anonymization_log",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "pii_anonymization_log",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "pii_anonymization_log",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "pii_anonymization_log",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "pii_anonymization_log",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "pii_anonymization_log",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "pii_anonymization_log",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "plans",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
       "table_name": "plans",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "anon",
-      "table_name": "plans",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "platform_public_settings",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "platform_public_settings",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "platform_public_settings",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
       "table_name": "platform_public_settings",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "platform_public_settings",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "platform_public_settings",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "platform_public_settings",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "promotion_uses",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "promotion_uses",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "promotion_uses",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "promotions",
-      "privilege_type": "REFERENCES"
     },
     {
       "grantee": "anon",
@@ -559,128 +69,13 @@
     },
     {
       "grantee": "anon",
-      "table_name": "promotions",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "reviews",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "reviews",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "reviews",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "reviews",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "reviews",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "reviews",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "slots",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
       "table_name": "slots",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "anon",
-      "table_name": "slots",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tenant_health",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tenant_health",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tenant_health",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tenant_health",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tenant_health",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tenant_health",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tenant_health",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tour_review_stats",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tour_review_stats",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tour_review_stats",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
       "table_name": "tour_review_stats",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tour_review_stats",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tour_review_stats",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tour_review_stats",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "tours",
-      "privilege_type": "REFERENCES"
     },
     {
       "grantee": "anon",
@@ -689,28 +84,13 @@
     },
     {
       "grantee": "anon",
-      "table_name": "tours",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "anon",
       "table_name": "vouchers",
       "privilege_type": "INSERT"
     },
     {
       "grantee": "anon",
       "table_name": "vouchers",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "vouchers",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "anon",
-      "table_name": "vouchers",
-      "privilege_type": "TRIGGER"
     },
     {
       "grantee": "authenticated",
@@ -725,22 +105,7 @@
     {
       "grantee": "authenticated",
       "table_name": "add_ons",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "add_ons",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "add_ons",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "add_ons",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -750,32 +115,7 @@
     {
       "grantee": "authenticated",
       "table_name": "admin_users",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "admin_users",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "admin_users",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "admin_users",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "admin_users",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "admin_users",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -795,22 +135,7 @@
     {
       "grantee": "authenticated",
       "table_name": "audit_logs",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "audit_logs",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "audit_logs",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "audit_logs",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -830,22 +155,7 @@
     {
       "grantee": "authenticated",
       "table_name": "auto_messages",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "auto_messages",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "auto_messages",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "auto_messages",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -865,22 +175,7 @@
     {
       "grantee": "authenticated",
       "table_name": "billing_line_items",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "billing_line_items",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "billing_line_items",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "billing_line_items",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -900,22 +195,7 @@
     {
       "grantee": "authenticated",
       "table_name": "booking_add_ons",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "booking_add_ons",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "booking_add_ons",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "booking_add_ons",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -940,26 +220,11 @@
     {
       "grantee": "authenticated",
       "table_name": "bookings",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "bookings",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
       "table_name": "bookings",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "bookings",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "bookings",
       "privilege_type": "UPDATE"
     },
     {
@@ -975,22 +240,7 @@
     {
       "grantee": "authenticated",
       "table_name": "broadcasts",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "broadcasts",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "broadcasts",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "broadcasts",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -1010,22 +260,7 @@
     {
       "grantee": "authenticated",
       "table_name": "businesses",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "businesses",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "businesses",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "businesses",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -1040,22 +275,7 @@
     {
       "grantee": "authenticated",
       "table_name": "chat_faq_entries",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "chat_faq_entries",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "chat_faq_entries",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "chat_faq_entries",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -1075,26 +295,11 @@
     {
       "grantee": "authenticated",
       "table_name": "chat_messages",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "chat_messages",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
       "table_name": "chat_messages",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "chat_messages",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "chat_messages",
       "privilege_type": "UPDATE"
     },
     {
@@ -1110,112 +315,12 @@
     {
       "grantee": "authenticated",
       "table_name": "chatbot_avatars",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "chatbot_avatars",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
       "table_name": "chatbot_avatars",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "chatbot_avatars",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "chatbot_avatars",
       "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_booking_items",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_booking_items",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_booking_items",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_booking_items",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_booking_items",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_booking_items",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_booking_items",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_bookings",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_bookings",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_bookings",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_bookings",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_bookings",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_bookings",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_bookings",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_offer_items",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_offer_items",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_offer_items",
-      "privilege_type": "REFERENCES"
     },
     {
       "grantee": "authenticated",
@@ -1224,53 +329,13 @@
     },
     {
       "grantee": "authenticated",
-      "table_name": "combo_offer_items",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_offer_items",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_offer_items",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_offers",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_offers",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_offers",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
       "table_name": "combo_offers",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
-      "table_name": "combo_offers",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_offers",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "combo_offers",
-      "privilege_type": "UPDATE"
+      "table_name": "combo_settlements",
+      "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
@@ -1285,22 +350,7 @@
     {
       "grantee": "authenticated",
       "table_name": "conversations",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "conversations",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "conversations",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "conversations",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -1320,22 +370,7 @@
     {
       "grantee": "authenticated",
       "table_name": "customers",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "customers",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "customers",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "customers",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -1345,37 +380,7 @@
     {
       "grantee": "authenticated",
       "table_name": "data_subject_requests",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "data_subject_requests",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "data_subject_requests",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "data_subject_requests",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "data_subject_requests",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "data_subject_requests",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "data_subject_requests",
-      "privilege_type": "UPDATE"
     },
     {
       "grantee": "authenticated",
@@ -1390,22 +395,7 @@
     {
       "grantee": "authenticated",
       "table_name": "external_booking_credentials",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "external_booking_credentials",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "external_booking_credentials",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "external_booking_credentials",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -1425,22 +415,7 @@
     {
       "grantee": "authenticated",
       "table_name": "external_product_mappings",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "external_product_mappings",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "external_product_mappings",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "external_product_mappings",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -1460,22 +435,7 @@
     {
       "grantee": "authenticated",
       "table_name": "external_webhook_events",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "external_webhook_events",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "external_webhook_events",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "external_webhook_events",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -1490,27 +450,7 @@
     {
       "grantee": "authenticated",
       "table_name": "holds",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "holds",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "holds",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "holds",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "holds",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -1530,22 +470,7 @@
     {
       "grantee": "authenticated",
       "table_name": "idempotency_keys",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "idempotency_keys",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "idempotency_keys",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "idempotency_keys",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -1565,22 +490,7 @@
     {
       "grantee": "authenticated",
       "table_name": "invoices",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "invoices",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "invoices",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "invoices",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -1600,22 +510,7 @@
     {
       "grantee": "authenticated",
       "table_name": "landing_page_orders",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "landing_page_orders",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "landing_page_orders",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "landing_page_orders",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -1640,26 +535,11 @@
     {
       "grantee": "authenticated",
       "table_name": "logs",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "logs",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
       "table_name": "logs",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "logs",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "logs",
       "privilege_type": "UPDATE"
     },
     {
@@ -1675,32 +555,12 @@
     {
       "grantee": "authenticated",
       "table_name": "marketing_automation_enrollments",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_enrollments",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
       "table_name": "marketing_automation_enrollments",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_enrollments",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_enrollments",
       "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_logs",
-      "privilege_type": "DELETE"
     },
     {
       "grantee": "authenticated",
@@ -1710,62 +570,12 @@
     {
       "grantee": "authenticated",
       "table_name": "marketing_automation_logs",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_logs",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_logs",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_logs",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_logs",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_revisions",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_revisions",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_revisions",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_revisions",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
       "table_name": "marketing_automation_revisions",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_revisions",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_revisions",
-      "privilege_type": "UPDATE"
+      "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
@@ -1780,22 +590,7 @@
     {
       "grantee": "authenticated",
       "table_name": "marketing_automation_steps",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_steps",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_steps",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automation_steps",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -1815,22 +610,7 @@
     {
       "grantee": "authenticated",
       "table_name": "marketing_automations",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automations",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automations",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_automations",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -1850,22 +630,7 @@
     {
       "grantee": "authenticated",
       "table_name": "marketing_campaigns",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_campaigns",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_campaigns",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_campaigns",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -1885,22 +650,7 @@
     {
       "grantee": "authenticated",
       "table_name": "marketing_contacts",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_contacts",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_contacts",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_contacts",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -1910,37 +660,7 @@
     {
       "grantee": "authenticated",
       "table_name": "marketing_deliveries",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_deliveries",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_deliveries",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_deliveries",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_deliveries",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_deliveries",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_deliveries",
-      "privilege_type": "UPDATE"
     },
     {
       "grantee": "authenticated",
@@ -1950,37 +670,7 @@
     {
       "grantee": "authenticated",
       "table_name": "marketing_eligible_contacts",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_eligible_contacts",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_eligible_contacts",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_eligible_contacts",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_eligible_contacts",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_eligible_contacts",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_eligible_contacts",
-      "privilege_type": "UPDATE"
     },
     {
       "grantee": "authenticated",
@@ -1995,22 +685,7 @@
     {
       "grantee": "authenticated",
       "table_name": "marketing_events",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_events",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_events",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_events",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -2020,72 +695,12 @@
     {
       "grantee": "authenticated",
       "table_name": "marketing_journey_status_events",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_journey_status_events",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_journey_status_events",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_journey_status_events",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_journey_status_events",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_journey_status_events",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_journey_status_events",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_permission_events",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_permission_events",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_permission_events",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_permission_events",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
       "table_name": "marketing_permission_events",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_permission_events",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_permission_events",
-      "privilege_type": "UPDATE"
+      "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
@@ -2100,22 +715,7 @@
     {
       "grantee": "authenticated",
       "table_name": "marketing_queue",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_queue",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_queue",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_queue",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -2135,22 +735,7 @@
     {
       "grantee": "authenticated",
       "table_name": "marketing_templates",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_templates",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_templates",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_templates",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -2170,22 +755,7 @@
     {
       "grantee": "authenticated",
       "table_name": "marketing_unsubscribe_tokens",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_unsubscribe_tokens",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_unsubscribe_tokens",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_unsubscribe_tokens",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -2205,22 +775,7 @@
     {
       "grantee": "authenticated",
       "table_name": "marketing_usage_monthly",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_usage_monthly",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_usage_monthly",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "marketing_usage_monthly",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -2230,37 +785,7 @@
     {
       "grantee": "authenticated",
       "table_name": "messages",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "messages",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "messages",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "messages",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "messages",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "messages",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "messages",
-      "privilege_type": "UPDATE"
     },
     {
       "grantee": "authenticated",
@@ -2285,26 +810,11 @@
     {
       "grantee": "authenticated",
       "table_name": "ota_integrations",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ota_integrations",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
       "table_name": "ota_integrations",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ota_integrations",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ota_integrations",
       "privilege_type": "UPDATE"
     },
     {
@@ -2320,22 +830,7 @@
     {
       "grantee": "authenticated",
       "table_name": "ota_product_mappings",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ota_product_mappings",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ota_product_mappings",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ota_product_mappings",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -2355,61 +850,11 @@
     {
       "grantee": "authenticated",
       "table_name": "ota_reconciliation_runs",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ota_reconciliation_runs",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
       "table_name": "ota_reconciliation_runs",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ota_reconciliation_runs",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "ota_reconciliation_runs",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "otp_attempts",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "otp_attempts",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "otp_attempts",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "otp_attempts",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "otp_attempts",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "otp_attempts",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "otp_attempts",
       "privilege_type": "UPDATE"
     },
     {
@@ -2425,22 +870,7 @@
     {
       "grantee": "authenticated",
       "table_name": "outbox",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "outbox",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "outbox",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "outbox",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -2460,22 +890,7 @@
     {
       "grantee": "authenticated",
       "table_name": "paid_booking_events",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "paid_booking_events",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "paid_booking_events",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "paid_booking_events",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -2500,26 +915,11 @@
     {
       "grantee": "authenticated",
       "table_name": "peak_period_prices",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "peak_period_prices",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
       "table_name": "peak_period_prices",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "peak_period_prices",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "peak_period_prices",
       "privilege_type": "UPDATE"
     },
     {
@@ -2535,22 +935,7 @@
     {
       "grantee": "authenticated",
       "table_name": "peak_periods",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "peak_periods",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "peak_periods",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "peak_periods",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -2570,62 +955,17 @@
     {
       "grantee": "authenticated",
       "table_name": "pending_reschedules",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "pending_reschedules",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
       "table_name": "pending_reschedules",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "pending_reschedules",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "pending_reschedules",
       "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "pii_anonymization_log",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "pii_anonymization_log",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "pii_anonymization_log",
-      "privilege_type": "REFERENCES"
     },
     {
       "grantee": "authenticated",
       "table_name": "pii_anonymization_log",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "pii_anonymization_log",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "pii_anonymization_log",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "pii_anonymization_log",
-      "privilege_type": "UPDATE"
     },
     {
       "grantee": "authenticated",
@@ -2640,22 +980,7 @@
     {
       "grantee": "authenticated",
       "table_name": "plans",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "plans",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "plans",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "plans",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -2675,22 +1000,7 @@
     {
       "grantee": "authenticated",
       "table_name": "platform_public_settings",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "platform_public_settings",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "platform_public_settings",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "platform_public_settings",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -2710,61 +1020,11 @@
     {
       "grantee": "authenticated",
       "table_name": "policies",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "policies",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
       "table_name": "policies",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "policies",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "policies",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "promotion_uses",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "promotion_uses",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "promotion_uses",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "promotion_uses",
-      "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "promotion_uses",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "promotion_uses",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "promotion_uses",
       "privilege_type": "UPDATE"
     },
     {
@@ -2780,22 +1040,7 @@
     {
       "grantee": "authenticated",
       "table_name": "promotions",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "promotions",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "promotions",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "promotions",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -2805,37 +1050,7 @@
     {
       "grantee": "authenticated",
       "table_name": "referral_uses",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "referral_uses",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "referral_uses",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "referral_uses",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "referral_uses",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "referral_uses",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "referral_uses",
-      "privilege_type": "UPDATE"
     },
     {
       "grantee": "authenticated",
@@ -2850,22 +1065,7 @@
     {
       "grantee": "authenticated",
       "table_name": "referrals",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "referrals",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "referrals",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "referrals",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -2885,22 +1085,7 @@
     {
       "grantee": "authenticated",
       "table_name": "refund_requests",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "refund_requests",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "refund_requests",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "refund_requests",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -2910,32 +1095,7 @@
     {
       "grantee": "authenticated",
       "table_name": "reviews",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "reviews",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "reviews",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "reviews",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "reviews",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "reviews",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -2960,42 +1120,12 @@
     {
       "grantee": "authenticated",
       "table_name": "slots",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "slots",
       "privilege_type": "SELECT"
     },
     {
       "grantee": "authenticated",
       "table_name": "slots",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "slots",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "slots",
       "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "subscriptions",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "subscriptions",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "subscriptions",
-      "privilege_type": "REFERENCES"
     },
     {
       "grantee": "authenticated",
@@ -3004,53 +1134,8 @@
     },
     {
       "grantee": "authenticated",
-      "table_name": "subscriptions",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "subscriptions",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "subscriptions",
-      "privilege_type": "UPDATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tenant_health",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tenant_health",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tenant_health",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
       "table_name": "tenant_health",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tenant_health",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tenant_health",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tenant_health",
-      "privilege_type": "UPDATE"
     },
     {
       "grantee": "authenticated",
@@ -3065,22 +1150,7 @@
     {
       "grantee": "authenticated",
       "table_name": "topup_orders",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "topup_orders",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "topup_orders",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "topup_orders",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -3090,37 +1160,7 @@
     {
       "grantee": "authenticated",
       "table_name": "tour_review_stats",
-      "privilege_type": "DELETE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tour_review_stats",
-      "privilege_type": "INSERT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tour_review_stats",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tour_review_stats",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tour_review_stats",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tour_review_stats",
-      "privilege_type": "TRUNCATE"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tour_review_stats",
-      "privilege_type": "UPDATE"
     },
     {
       "grantee": "authenticated",
@@ -3135,22 +1175,7 @@
     {
       "grantee": "authenticated",
       "table_name": "tours",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tours",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tours",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "tours",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -3170,22 +1195,7 @@
     {
       "grantee": "authenticated",
       "table_name": "trip_photos",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "trip_photos",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "trip_photos",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "trip_photos",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -3205,22 +1215,7 @@
     {
       "grantee": "authenticated",
       "table_name": "usage_counters",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "usage_counters",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "usage_counters",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "usage_counters",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -3240,22 +1235,7 @@
     {
       "grantee": "authenticated",
       "table_name": "vouchers",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "vouchers",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "vouchers",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "vouchers",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -3275,22 +1255,7 @@
     {
       "grantee": "authenticated",
       "table_name": "waitlist",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "waitlist",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "waitlist",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "waitlist",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -3310,22 +1275,7 @@
     {
       "grantee": "authenticated",
       "table_name": "webchat_sessions",
-      "privilege_type": "REFERENCES"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "webchat_sessions",
       "privilege_type": "SELECT"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "webchat_sessions",
-      "privilege_type": "TRIGGER"
-    },
-    {
-      "grantee": "authenticated",
-      "table_name": "webchat_sessions",
-      "privilege_type": "TRUNCATE"
     },
     {
       "grantee": "authenticated",
@@ -8199,6 +6149,15 @@
       "cmd": "SELECT",
       "roles": "{anon,authenticated}",
       "qual": "(active = true)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "combo_settlements",
+      "policyname": "combo_settlements_parties_select",
+      "cmd": "SELECT",
+      "roles": "{authenticated}",
+      "qual": "((collector_business_id = ANY (( SELECT current_business_ids() AS current_business_ids)::uuid[])) OR (owed_business_id = ANY (( SELECT current_business_ids() AS current_business_ids)::uuid[])))",
       "with_check": null
     },
     {

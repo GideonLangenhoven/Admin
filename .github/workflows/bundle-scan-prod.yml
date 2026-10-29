@@ -1,0 +1,22 @@
+name: Production bundle scan
+
+# Security test A, post-deploy half: fetch the live admin pages and scan every script they load.
+# The build gate (npm run build) is what stops a bad bundle shipping; this catches anything that slips past it.
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+  deployment_status:
+
+jobs:
+  scan:
+    if: github.event_name != 'deployment_status' || (github.event.deployment_status.state == 'success' && github.event.deployment_status.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Scan every script the live admin site loads
+        run: node scripts/check-client-bundle-secrets.mjs url https://admin.bookingtours.co.za

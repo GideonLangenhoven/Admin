@@ -24,3 +24,8 @@ jobs:
         
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: npm run check-security-drift
+
+      - name: Check grant allowlist
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: npm run check-grants
