@@ -179,6 +179,41 @@ function BookingHistoryBadge({ booking }: { booking: Booking }) {
   );
 }
 
+// Guest name with a details card: trips, waiver and every note the guest added. Hover opens it on a
+// mouse; tap or click toggles it on touch and keyboard. Native title tooltips never reach touch screens.
+function GuestDetailsPopover({ booking, children, className = "" }: { booking: Booking; children: React.ReactNode; className?: string }) {
+  const tooltipId = useId();
+  const [open, setOpen] = useState(false);
+  const notes = customerNotesTooltip(booking.custom_fields);
+  const trips = booking.previous_booking_count ?? 0;
+  const lastTrip = booking.previous_booking_at
+    ? new Date(booking.previous_booking_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric", timeZone: getAdminTimezone() })
+    : null;
+  return (
+    <span className={"relative inline-flex min-w-0 max-w-full " + className}
+      onPointerEnter={(event) => { if (event.pointerType === "mouse") setOpen(true); }}
+      onPointerLeave={(event) => { if (event.pointerType === "mouse") setOpen(false); }}
+      onKeyDown={(event) => { if (event.key === "Escape") { setOpen(false); event.stopPropagation(); } }}>
+      <button type="button" aria-expanded={open} aria-describedby={open ? tooltipId : undefined}
+        onClick={(event) => { event.stopPropagation(); setOpen(current => !current); }}
+        onBlur={() => setOpen(false)}
+        style={{ color: "inherit", fontWeight: "inherit" }}
+        className="min-w-0 max-w-full cursor-pointer whitespace-normal text-left underline decoration-dotted decoration-slate-300 underline-offset-2 [overflow-wrap:anywhere]">
+        {children}
+      </button>
+      {open && <span id={tooltipId} role="tooltip" className="absolute left-0 top-full z-30 mt-1 w-64 max-w-[calc(100vw-2rem)] text-left text-xs font-normal leading-relaxed">
+        <span className="block rounded-lg border p-3 shadow-lg" style={{ background: "var(--ck-surface)", color: "var(--ck-text-strong)", borderColor: "var(--ck-border-subtle)" }}>
+          <span className="block font-semibold">{booking.customer_name}</span>
+          <span className="block">Previous paid trips: {trips}{lastTrip ? ` · last ${lastTrip}` : ""}</span>
+          <span className="block">Waiver: {booking.waiver_status === "SIGNED" ? "signed" : "outstanding"}</span>
+          <span className="mt-2 block font-semibold">Notes</span>
+          {notes ? <span className="block whitespace-pre-line">{notes}</span> : <span className="block" style={{ color: "var(--ck-text-muted)" }}>No notes</span>}
+        </span>
+      </span>}
+    </span>
+  );
+}
+
 interface SlotGroup {
   timeLabel: string;
   sortKey: string;
@@ -2435,7 +2470,7 @@ function SlotRows({
                       </label>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-base font-semibold leading-snug whitespace-normal [overflow-wrap:anywhere]" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</p>
+                      <p className="text-base font-semibold leading-snug whitespace-normal [overflow-wrap:anywhere]" style={{ color: "var(--ck-text-strong)" }}><GuestDetailsPopover booking={b}>{b.customer_name}</GuestDetailsPopover></p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <StatusBadge status={b.status} />
                         <RefundBadge status={b.refund_status} />
@@ -2468,10 +2503,7 @@ function SlotRows({
                   <div className="flex flex-wrap items-center gap-1 text-left">
                     <span className="inline-flex min-w-0 max-w-full items-start gap-1">
                       <BookingHistoryBadge booking={b} />
-                      <span
-                        title={customerNotesTooltip(b.custom_fields)}
-                        className={"min-w-0 whitespace-normal font-medium text-gray-700 [overflow-wrap:anywhere] lg:pointer-events-auto" + (customerNotesTooltip(b.custom_fields) ? " cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2" : "")}
-                      >{b.customer_name}</span>
+                      <GuestDetailsPopover booking={b} className="font-medium text-gray-700">{b.customer_name}</GuestDetailsPopover>
                     </span>
                     {customerNotesTooltip(b.custom_fields) && (
                       <span title={customerNotesTooltip(b.custom_fields)} className="shrink-0 text-[11px] cursor-help lg:pointer-events-auto" aria-label="Customer added notes">📝</span>
