@@ -624,11 +624,11 @@ export default function Invoices() {
                       </div>
                       <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                         <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
-                          <p className="ui-mono-label !text-[10px]">Paid</p>
+                          <p className="ui-mono-label">Paid</p>
                           <p className="font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{money(pay.amountPaid)}</p>
                         </div>
                         <div className="rounded-lg p-2" style={{ background: "var(--ck-surface-sunken)" }}>
-                          <p className="ui-mono-label !text-[10px]">Booking</p>
+                          <p className="ui-mono-label">Booking</p>
                           <p className="font-mono text-xs font-semibold" style={{ color: "var(--ck-text-strong)" }}>{bookingRef(inv)}</p>
                         </div>
                       </div>
@@ -701,7 +701,7 @@ export default function Invoices() {
                     })}
 
                     <tr className="border-t-2 font-semibold" style={{ borderColor: "var(--ck-border-strong)", background: "var(--ck-surface-sunken)", color: "var(--ck-text-strong)" }}>
-                      <td className="p-3"><span className="ui-mono-label !text-[10px]">Totals</span></td>
+                      <td className="p-3"><span className="ui-mono-label">Totals</span></td>
                       <td className="hidden p-3 lg:table-cell"></td>
                       <td className="p-3"></td>
                       <td className="hidden p-3 lg:table-cell"></td>

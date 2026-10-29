@@ -201,7 +201,7 @@ export default function BroadcastsPage() {
     <div className="max-w-6xl">
       <div className="anim-fade-up mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Broadcasts</h1>
+          <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Broadcasts</h2>
         </div>
         <div className="hidden lg:block">{weatherButton}</div>
       </div>
@@ -220,7 +220,7 @@ export default function BroadcastsPage() {
                 className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[var(--ck-surface-sunken)]" style={{ color: "var(--ck-text)" }} aria-label="Next month"><CaretRight size={14} /></button>
             </div>
             <div className="grid grid-cols-7 gap-1 mb-1">
-              {dayNames.map(d => <div key={d} className="ui-mono-label !text-[10px] text-center py-1">{d}</div>)}
+              {dayNames.map(d => <div key={d} className="ui-mono-label text-center py-1">{d}</div>)}
             </div>
             <div className="grid grid-cols-7 gap-1">
               {Array.from({ length: firstDay }, (_, i) => <div key={"e" + i} />)}
@@ -248,7 +248,7 @@ export default function BroadcastsPage() {
                 );
               })}
             </div>
-            <p className="ui-mono-label !text-[10px] !tracking-[0.06em] text-center mt-2 normal-case">Numbers = booked guests</p>
+            <p className="ui-mono-label !tracking-[0.06em] text-center mt-2 normal-case">Numbers = booked guests</p>
           </div>
 
           <div className="mb-4 lg:hidden">{weatherButton}</div>
@@ -289,7 +289,7 @@ export default function BroadcastsPage() {
                       </div>
                       <div className="text-right">
                         <p className="font-display text-sm font-semibold tabular-nums" style={{ color: booked > 0 ? "var(--ck-success)" : "var(--ck-text-muted)" }}>{booked}</p>
-                        <p className="ui-mono-label !text-[9px]">booked</p>
+                        <p className="ui-mono-label">booked</p>
                       </div>
                     </button>
                   );
@@ -351,11 +351,11 @@ export default function BroadcastsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b" style={{ borderColor: "var(--ck-border-subtle)" }}>
-                      <th className="text-left py-2 ui-mono-label !text-[10px]">Name</th>
-                      <th className="hidden text-left py-2 ui-mono-label !text-[10px] md:table-cell">Tour</th>
-                      <th className="hidden text-left py-2 ui-mono-label !text-[10px] sm:table-cell">Time</th>
-                      <th className="text-center py-2 ui-mono-label !text-[10px]">Pax</th>
-                      <th className="text-center py-2 ui-mono-label !text-[10px]">Channels</th>
+                      <th className="text-left py-2 ui-mono-label">Name</th>
+                      <th className="hidden text-left py-2 ui-mono-label md:table-cell">Tour</th>
+                      <th className="hidden text-left py-2 ui-mono-label sm:table-cell">Time</th>
+                      <th className="text-center py-2 ui-mono-label">Pax</th>
+                      <th className="text-center py-2 ui-mono-label">Channels</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -394,7 +394,7 @@ export default function BroadcastsPage() {
               </div>
               <p className="text-sm mb-4" style={{ color: "var(--ck-text-muted)" }}>Cancels selected departures and sends cancellation notices by WhatsApp and email. Choose whether to offer customer options before confirming.</p>
               <div className="mb-4">
-                <label className="ui-mono-label !text-[10px] block mb-1.5">Reason</label>
+                <label className="ui-mono-label block mb-1.5">Reason</label>
                 <input type="text" value={weatherReason} onChange={e => setWeatherReason(e.target.value)}
                   className="ui-control w-full" />
               </div>
@@ -421,7 +421,7 @@ export default function BroadcastsPage() {
               <h2 className="text-lg font-semibold mb-3" style={{ color: "var(--ck-text-strong)" }}>Compose</h2>
               <div className="space-y-3">
                 <div>
-                  <label className="ui-mono-label !text-[10px] block mb-1.5">WhatsApp Message</label>
+                  <label className="ui-mono-label block mb-1.5">WhatsApp Message</label>
                   <RichTextEditor
                     value={message}
                     onChange={setMessage}

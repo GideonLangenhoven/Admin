@@ -78,7 +78,7 @@ export default function NotificationsPage() {
     return (
       <div className="anim-fade-up max-w-3xl">
         <p className="ui-mono-label mb-2">Outbox queue</p>
-        <h1 className="font-display text-[28px] font-semibold leading-none mb-4" style={{ color: "var(--ck-text-strong)" }}>Failed Notifications</h1>
+        <h2 className="font-display text-[28px] font-semibold leading-none mb-4" style={{ color: "var(--ck-text-strong)" }}>Failed Notifications</h2>
         <div className="ui-card p-6">
           <div className="ui-empty">            <p className="text-[13.5px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Restricted area</p>
             <p className="text-[12.5px]" style={{ color: "var(--ck-text-muted)" }}>You need MAIN_ADMIN access to view failed notifications.</p>
@@ -93,7 +93,7 @@ export default function NotificationsPage() {
       <SectionTabs section="broadcasts" />
       <div>
         <p className="ui-mono-label mb-2">Broadcasts · Outbox queue</p>
-        <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Failed Notifications</h1>
+        <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Failed Notifications</h2>
       </div>
       <p className="text-sm" style={{ color: "var(--ck-text-muted)" }}>
         Failed WhatsApp and booking emails have no retries left. Retry sends WhatsApp now and queues email for the next run.

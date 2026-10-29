@@ -506,7 +506,7 @@ export default function Dashboard() {
     const activeSlotIdx = slotGroups.findIndex(slot => slot.id === activeSlot?.id);
 
     if (loadError && !loading) return <div className={`${styles.workspace} ui-card p-6`} role="alert">
-        <h1 className="text-xl font-semibold">Daily dashboard unavailable</h1><p className="mt-2">{loadError}</p>
+        <h2 className="text-xl font-semibold">Daily dashboard unavailable</h2><p className="mt-2">{loadError}</p>
         <button className="ui-btn ui-btn-primary mt-4" onClick={() => load()}>Try again</button>
         <Link className="ui-btn ui-btn-soft mt-4 ml-2" href="/simple">Simple View</Link>
     </div>;

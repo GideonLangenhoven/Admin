@@ -121,14 +121,14 @@ export default function SensitiveActionsSupportPage() {
   }
 
   if (role !== "SUPER_ADMIN" || readOnly) {
-    return <div className="ui-card max-w-2xl p-6"><h1 className="text-xl font-semibold text-[var(--ck-text-strong)]">Sensitive settings support</h1><p className="mt-2 text-sm text-[var(--ck-text-muted)]">An active Super Admin account is required.</p></div>;
+    return <div className="ui-card max-w-2xl p-6"><h2 className="text-xl font-semibold text-[var(--ck-text-strong)]">Sensitive settings support</h2><p className="mt-2 text-sm text-[var(--ck-text-muted)]">An active Super Admin account is required.</p></div>;
   }
 
   return (
     <main className="max-w-5xl space-y-6">
       <div>
         <a href="/super-admin" className="text-xs font-medium text-[var(--ck-accent)] hover:underline">Super Admin</a>
-        <h1 className="font-display mt-2 text-[28px] font-semibold text-[var(--ck-text-strong)]">Sensitive settings support</h1>
+        <h2 className="font-display mt-2 text-[28px] font-semibold text-[var(--ck-text-strong)]">Sensitive settings support</h2>
         <p className="mt-2 max-w-[70ch] text-sm text-[var(--ck-text-muted)]">Choose an operator. Changes are recorded under your account.</p>
       </div>
 

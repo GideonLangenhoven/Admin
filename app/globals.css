@@ -68,37 +68,37 @@ html.light {
   --ck-chart-6: #6B7F3A;
   --ck-chart-grid: rgba(16, 44, 32, 0.07);
 
-  /* ── Sidebar: the deep-pine rail (dark in BOTH themes — the signature) ── */
-  --ck-sidebar: #0F2B1F;
-  --ck-sidebar-grad-top: #113022;
-  --ck-sidebar-grad-bottom: #0C2117;
-  --ck-sidebar-border: rgba(244, 241, 232, 0.08);
-  --ck-sidebar-text: #B7C9BD;
-  --ck-sidebar-muted: #85998C;
-  --ck-sidebar-hover: rgba(244, 241, 232, 0.055);
-  --ck-sidebar-active-bg: rgba(244, 241, 232, 0.09);
-  --ck-sidebar-active-border: rgba(244, 241, 232, 0.14);
-  --ck-sidebar-active-text: #F6F3EA;
-  --ck-sidebar-icon: #8FA79A;
-  --ck-sidebar-icon-active: #4FE0A6;
+  /* ── Sidebar: on the page ground, split by one hairline; the active item
+     is a neutral ink pill. (Dark theme keeps its own dark values below.) ── */
+  --ck-sidebar: #F7F5F0;
+  --ck-sidebar-grad-top: #F7F5F0;
+  --ck-sidebar-grad-bottom: #F7F5F0;
+  --ck-sidebar-border: rgba(16, 44, 32, 0.09);
+  --ck-sidebar-text: #46534B;
+  --ck-sidebar-muted: #66736B;
+  --ck-sidebar-hover: rgba(16, 44, 32, 0.04);
+  --ck-sidebar-active-bg: rgba(16, 44, 32, 0.07);
+  --ck-sidebar-active-border: rgba(16, 44, 32, 0.12);
+  --ck-sidebar-active-text: #17221C;
+  --ck-sidebar-icon: #66736B;
+  --ck-sidebar-icon-active: #125E40;
 
   --ck-radius-sm: 6px;
   --ck-radius-md: 10px;
   --ck-radius-lg: 14px;
   --ck-radius-xl: 20px;
 
-  /* Layered pine-tinted elevation — contact shadow + soft ambient,
-     cards carry an inset top highlight like lifted paper. */
+  /* Pine-tinted elevation for things that float (menus, popovers, dialogs).
+     Resting cards and the hero carry no shadow: a 1px border separates them. */
   --ck-shadow-sm: 0 1px 2px rgba(15, 43, 31, 0.06), 0 1px 3px rgba(15, 43, 31, 0.04);
   --ck-shadow-md: 0 2px 4px rgba(15, 43, 31, 0.05), 0 10px 24px -8px rgba(15, 43, 31, 0.12);
   --ck-shadow-lg: 0 4px 10px rgba(15, 43, 31, 0.06), 0 28px 56px -20px rgba(15, 43, 31, 0.20);
-  --ck-shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 1px 2px rgba(15, 43, 31, 0.05), 0 10px 28px -14px rgba(15, 43, 31, 0.12);
-  --ck-shadow-card-hover: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 2px 4px rgba(15, 43, 31, 0.06), 0 20px 44px -16px rgba(15, 43, 31, 0.18);
-  --ck-shadow-hero: 0 28px 64px -24px rgba(15, 43, 31, 0.45), 0 4px 12px -4px rgba(15, 43, 31, 0.20);
+  --ck-shadow-card: none;
+  --ck-shadow-card-hover: none;
+  --ck-shadow-hero: none;
   --ck-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
   --ck-skeleton-highlight: rgba(255, 255, 255, 0.60);
-  --ck-noise-opacity: 0.045;
 
   /* Primary button text: white on pine in light mode */
   --ck-btn-primary-text: #ffffff;
@@ -162,12 +162,11 @@ html.dark {
   --ck-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --ck-shadow-md: 0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 26px -10px rgba(0, 0, 0, 0.55);
   --ck-shadow-lg: 0 24px 48px -20px rgba(0, 0, 0, 0.6), 0 4px 12px -6px rgba(0, 0, 0, 0.4);
-  --ck-shadow-card: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px -12px rgba(0, 0, 0, 0.55);
-  --ck-shadow-card-hover: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 4px rgba(0, 0, 0, 0.5), 0 22px 48px -14px rgba(0, 0, 0, 0.65);
-  --ck-shadow-hero: 0 28px 64px -24px rgba(0, 0, 0, 0.75), 0 4px 12px -4px rgba(0, 0, 0, 0.5);
+  --ck-shadow-card: none;
+  --ck-shadow-card-hover: none;
+  --ck-shadow-hero: none;
 
   --ck-skeleton-highlight: rgba(255, 255, 255, 0.05);
-  --ck-noise-opacity: 0.06;
 
   /* Primary button text: ink on mint in dark mode */
   --ck-btn-primary-text: #06130C;
@@ -180,12 +179,7 @@ body {
 
 body {
   margin: 0;
-  /* Warm paper under atmospheric light: a breath of pine top-right,
-     a breath of amber bottom-left. The canvas is alive, never flat. */
-  background:
-    radial-gradient(1100px 700px at 90% -10%, rgba(18, 94, 64, 0.055), transparent 60%),
-    radial-gradient(900px 650px at -8% 108%, rgba(217, 130, 47, 0.05), transparent 55%),
-    var(--ck-bg);
+  background: var(--ck-bg);
   color: var(--ck-text);
   /* cv11/cv02/ss01/ss03 were Inter-only character variants; Plus Jakarta Sans has no
      such features, so only the universal contextual alternates remain. */
@@ -193,25 +187,6 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-}
-
-html.dark body {
-  background:
-    radial-gradient(1100px 700px at 90% -10%, rgba(0, 217, 139, 0.05), transparent 60%),
-    radial-gradient(900px 650px at -8% 108%, rgba(232, 155, 75, 0.04), transparent 55%),
-    var(--ck-bg);
-}
-
-/* Paper grain — sits above the canvas washes, below all content. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
-  background-size: 160px 160px;
-  opacity: var(--ck-noise-opacity);
 }
 
 ::selection {
@@ -248,10 +223,14 @@ body::before {
 
 /* Every table header in the app speaks data: mono, tracked, uppercase.
    Page-level classes may override size/color; the voice stays. */
-th {
-  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+/* Table headers: the text face, sentence case, 12px grey. :root raises the
+   specificity above a single page utility (uppercase, tracking-*, text-[10px]). */
+:root th {
+  font-family: inherit;
+  font-size: 12px;
   font-weight: 500;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 /* Default numeric rendering: proportional for prose, but opt-in tabular via utility */
@@ -348,27 +327,22 @@ th {
     transform: translateY(-1px);
   }
 
-  /* THE card — lifted paper: warm gradient, inset top highlight, layered
-     ambient shadow. Replaces both .ui-surface and hand-rolled bg-white cards. */
+  /* THE card — flat surface, 1px border, no shadow.
+     Replaces both .ui-surface and hand-rolled bg-white cards. */
   .ui-card {
     min-width: 0;
     max-width: 100%;
     border-radius: 16px;
     border: 1px solid var(--ck-border-subtle);
-    background: linear-gradient(180deg, var(--ck-surface) 0%, var(--ck-surface-warm) 100%);
-    box-shadow: var(--ck-shadow-card);
+    background: var(--ck-surface);
   }
 
   .ui-card-hover {
-    transition: transform 180ms var(--ck-ease),
-                box-shadow 180ms var(--ck-ease),
-                border-color 180ms var(--ck-ease);
+    transition: border-color 180ms var(--ck-ease);
   }
 
   .ui-card-hover:hover {
-    transform: translateY(-2px);
     border-color: var(--ck-border-strong);
-    box-shadow: var(--ck-shadow-card-hover);
   }
 
   /* Glass chrome — topbar, sticky headers */
@@ -381,20 +355,17 @@ th {
   /* ── Type voices ──────────────────────────────────────────── */
 
   .ui-section-title {
-    @apply text-[11px] font-medium uppercase;
-    font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-    letter-spacing: 0.12em;
+    @apply text-xs font-medium;
     color: var(--ck-text-muted);
   }
 
-  /* Mono micro-label — the instrument voice (timestamps, chips, captions) */
+  /* Small label (timestamps, chips, captions): the text face, sentence case.
+     The class keeps its old name; it is no longer monospace. */
   .ui-mono-label {
-    font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
     color: var(--ck-text-muted);
+    font-variant-numeric: tabular-nums;
   }
 
   .ui-title-lg {
@@ -462,15 +433,13 @@ th {
     @apply inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium;
   }
 
-  /* Status vocabulary — mono, uppercase, soft wash. One voice for every
+  /* Status vocabulary — sentence case on a soft wash. One voice for every
      status badge in the app. Combine: "ui-status ui-pill-success". */
   .ui-status {
     @apply inline-flex items-center gap-1 rounded-md px-2 py-0.5;
-    font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 10px;
+    font-size: 12px;
     font-weight: 500;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    white-space: nowrap;
   }
 
   .ui-pill-success { background: var(--ck-success-soft); color: var(--ck-success); }
@@ -520,7 +489,8 @@ th {
   .ui-seg-item.is-active {
     background: var(--ck-surface);
     color: var(--ck-text-strong);
-    box-shadow: var(--ck-shadow-sm), inset 0 0 0 1px var(--ck-border-subtle);
+    outline: 1px solid var(--ck-border-subtle);
+    outline-offset: -1px;
   }
 
   /* Icon chip — soft-washed icon container for KPI cards and empty states */
@@ -583,8 +553,7 @@ th {
     color: var(--ck-text-muted);
   }
 
-  /* Signature active-nav treatment — cream pill + amber trail marker,
-     designed for the deep-pine rail. */
+  /* Active nav item — neutral pill + a small amber trail dot. */
   .ui-nav-active {
     position: relative;
     background: var(--ck-sidebar-active-bg);
@@ -593,13 +562,12 @@ th {
   .ui-nav-active::before {
     content: "";
     position: absolute;
-    left: 0;
-    top: 22%;
-    bottom: 22%;
-    width: 3px;
-    border-radius: 3px;
+    left: 3px;
+    top: calc(50% - 2.5px);
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
     background: var(--ck-amber-bright);
-    box-shadow: 0 0 10px rgba(217, 130, 47, 0.5);
   }
 
   .no-scrollbar::-webkit-scrollbar {
@@ -610,17 +578,14 @@ th {
     scrollbar-width: none;
   }
 
-  /* Brand gradient — deep pine. Reserved for the single primary action on a screen. */
+  /* Brand fill — deep pine. Reserved for the single primary action on a screen. */
   .bg-bt-gradient {
-    background: linear-gradient(150deg, #0c1f16 0%, #125e40 120%);
+    background: #125e40;
   }
 
-  /* Night surface — the north-star hero card: pine glow, amber ember, vignette */
+  /* Night surface — the hero card: flat deep pine */
   .bg-bt-dark {
-    background:
-      radial-gradient(120% 150% at 85% -20%, rgba(18, 94, 64, 0.78), transparent 60%),
-      radial-gradient(90% 100% at -10% 115%, rgba(217, 130, 47, 0.14), transparent 55%),
-      linear-gradient(180deg, #10241B 0%, #0A120D 100%);
+    background: #10241B;
   }
 
   /* ── Buttons — one voice, three volumes ───────────────────── */
@@ -649,19 +614,12 @@ th {
   }
 
   .ui-btn-primary {
-    background: linear-gradient(180deg, #176B4B 0%, #125E40 55%, #0F5137 100%);
+    background: var(--ck-accent);
     color: var(--ck-btn-primary-text);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 1px 2px rgba(15, 43, 31, 0.28), 0 8px 20px -8px rgba(18, 94, 64, 0.50);
   }
 
   .ui-btn-primary:hover:not(:disabled) {
-    background: linear-gradient(180deg, #1B7855 0%, #147049 55%, #115C3F 100%);
-    transform: translateY(-1px);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 2px 4px rgba(15, 43, 31, 0.28), 0 12px 26px -8px rgba(18, 94, 64, 0.55);
-  }
-
-  .ui-btn-primary:active:not(:disabled) {
-    transform: translateY(0.5px);
+    background: var(--ck-accent-hover);
   }
 
   .ui-btn-ghost {
@@ -704,16 +662,6 @@ th {
   .anim-d3 { animation-delay: 180ms; }
 }
 
-html.dark .ui-btn-primary {
-  background: linear-gradient(180deg, #21E8A6 0%, #00D98B 60%, #00C47E 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 22px -8px rgba(0, 217, 139, 0.40);
-}
-
-html.dark .ui-btn-primary:hover:not(:disabled) {
-  background: linear-gradient(180deg, #3FEEB2 0%, #21E8A6 60%, #00D98B 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 2px 4px rgba(0, 0, 0, 0.4), 0 12px 28px -8px rgba(0, 217, 139, 0.45);
-}
-
 html.dark .ui-pill-amber {
   color: var(--ck-amber);
 }
@@ -746,9 +694,7 @@ html.dark .ui-progress-fill {
   .ui-skeleton::after {
     animation: none;
   }
-  .ui-card-hover:hover,
-  .ui-surface-hoverable:hover,
-  .ui-btn-primary:hover:not(:disabled) {
+  .ui-surface-hoverable:hover {
     transform: none;
   }
 }

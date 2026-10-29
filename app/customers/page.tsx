@@ -61,7 +61,7 @@ export default function CustomersPage() {
       <div className="anim-fade-up mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="ui-mono-label mb-2">Customers · Directory</p>
-          <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Customers</h1>
+          <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Customers</h2>
           <p className="mt-2 text-[13px]" style={{ color: "var(--ck-text-muted)" }}>Customers ranked by total trips.</p>
         </div>
         <div className="relative w-full sm:w-72">
@@ -79,12 +79,12 @@ export default function CustomersPage() {
       {!loading && rows.length > 0 && (
         <div className="anim-fade-up anim-d1 mb-5 grid grid-cols-2 gap-3 sm:max-w-md">
           <div className="ui-card p-4">
-            <div className="mb-2 flex items-center gap-2.5">              <span className="ui-mono-label !text-[10px]">Total</span>
+            <div className="mb-2 flex items-center gap-2.5">              <span className="ui-mono-label">Total</span>
             </div>
             <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{rows.length}</p>
           </div>
           <div className="ui-card p-4">
-            <div className="mb-2 flex items-center gap-2.5">              <span className="ui-mono-label !text-[10px]">Opted In</span>
+            <div className="mb-2 flex items-center gap-2.5">              <span className="ui-mono-label">Opted In</span>
             </div>
             <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{rows.filter((r) => r.marketing_consent).length}</p>
           </div>
@@ -107,13 +107,13 @@ export default function CustomersPage() {
           <table role="table" className="ui-responsive-table w-full text-sm">
             <thead>
               <tr>
-                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Name</th>
-                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Email</th>
-                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Phone</th>
-                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Trips</th>
-                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Spent</th>
-                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Last Trip</th>
-                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>Marketing</th>
+                <th scope="col" className="ui-mono-label border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Name</th>
+                <th scope="col" className="ui-mono-label border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Email</th>
+                <th scope="col" className="ui-mono-label border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Phone</th>
+                <th scope="col" className="ui-mono-label border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Trips</th>
+                <th scope="col" className="ui-mono-label border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Spent</th>
+                <th scope="col" className="ui-mono-label border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Last Trip</th>
+                <th scope="col" className="ui-mono-label border-b px-4 py-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>Marketing</th>
               </tr>
             </thead>
             <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>

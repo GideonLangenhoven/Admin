@@ -276,7 +276,7 @@ export default function PeakPricingPage() {
     <div className="max-w-5xl space-y-6">
       <div className="anim-fade-up">
         <p className="ui-mono-label mb-2">Revenue</p>
-        <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Pricing Management</h1>
+        <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Pricing Management</h2>
         <p className="mt-1 text-sm" style={{ color: "var(--ck-text-muted)" }}>Set base rates and seasonal prices.</p>
       </div>
 

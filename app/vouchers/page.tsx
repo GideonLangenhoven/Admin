@@ -247,7 +247,7 @@ export default function Vouchers() {
     <div className="max-w-7xl space-y-6">
       <div className="anim-fade-up">
         <p className="ui-mono-label mb-2">Marketing · Vouchers</p>
-        <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Vouchers</h1>
+        <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Vouchers</h2>
       </div>
 
       <SectionTabs section="marketing" />
@@ -404,7 +404,7 @@ export default function Vouchers() {
             <div key={g.dayKey}>
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>{g.dayLabel}</h3>
-                <span className="ui-mono-label !text-[10px]">{g.items.length} vouchers</span>
+                <span className="ui-mono-label">{g.items.length} vouchers</span>
               </div>
               <div className="space-y-3 md:hidden">
                 {g.items.map((v) => (
@@ -437,15 +437,15 @@ export default function Vouchers() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr>
-                      <th className="ui-mono-label !text-[10px] border-b p-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Code</th>
-                      <th className="ui-mono-label !text-[10px] border-b p-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Status</th>
-                      <th className="ui-mono-label !text-[10px] border-b hidden p-3 text-left md:table-cell" style={{ borderColor: "var(--ck-border-subtle)" }}>Type</th>
-                      <th className="ui-mono-label !text-[10px] border-b hidden p-3 text-left lg:table-cell" style={{ borderColor: "var(--ck-border-subtle)" }}>Tour</th>
-                      <th className="ui-mono-label !text-[10px] border-b p-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Value</th>
-                      <th className="ui-mono-label !text-[10px] border-b p-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Recipient</th>
-                      <th className="ui-mono-label !text-[10px] border-b hidden p-3 text-left md:table-cell" style={{ borderColor: "var(--ck-border-subtle)" }}>Buyer</th>
-                      <th className="ui-mono-label !text-[10px] border-b hidden p-3 text-left lg:table-cell" style={{ borderColor: "var(--ck-border-subtle)" }}>Expires</th>
-                      <th className="ui-mono-label !text-[10px] border-b hidden p-3 text-left lg:table-cell" style={{ borderColor: "var(--ck-border-subtle)" }}>Created</th>
+                      <th className="ui-mono-label border-b p-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Code</th>
+                      <th className="ui-mono-label border-b p-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Status</th>
+                      <th className="ui-mono-label border-b hidden p-3 text-left md:table-cell" style={{ borderColor: "var(--ck-border-subtle)" }}>Type</th>
+                      <th className="ui-mono-label border-b hidden p-3 text-left lg:table-cell" style={{ borderColor: "var(--ck-border-subtle)" }}>Tour</th>
+                      <th className="ui-mono-label border-b p-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Value</th>
+                      <th className="ui-mono-label border-b p-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Recipient</th>
+                      <th className="ui-mono-label border-b hidden p-3 text-left md:table-cell" style={{ borderColor: "var(--ck-border-subtle)" }}>Buyer</th>
+                      <th className="ui-mono-label border-b hidden p-3 text-left lg:table-cell" style={{ borderColor: "var(--ck-border-subtle)" }}>Expires</th>
+                      <th className="ui-mono-label border-b hidden p-3 text-left lg:table-cell" style={{ borderColor: "var(--ck-border-subtle)" }}>Created</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y" style={{ "--tw-divide-color": "var(--ck-border-subtle)" } as React.CSSProperties}>

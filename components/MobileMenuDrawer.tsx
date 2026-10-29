@@ -49,11 +49,7 @@ function groupedNav(nav: NavItem[]) {
 }
 
 /* Same deep-pine rail as the desktop sidebar */
-const DRAWER_BG = [
-  "radial-gradient(140% 50% at 50% -8%, rgba(0, 217, 139, 0.07), transparent 60%)",
-  "radial-gradient(120% 45% at 50% 112%, rgba(217, 130, 47, 0.06), transparent 60%)",
-  "linear-gradient(180deg, var(--ck-sidebar-grad-top) 0%, var(--ck-sidebar-grad-bottom) 100%)",
-].join(", ");
+const DRAWER_BG = "var(--ck-sidebar)";
 
 export default function MobileMenuDrawer({ nav, active = false, collapsedGroups, onToggleGroup }: { nav: NavItem[]; active?: boolean; collapsedGroups: Set<string>; onToggleGroup: (label: string) => void }) {
   const [open, setOpen] = useState(false);
@@ -128,10 +124,10 @@ export default function MobileMenuDrawer({ nav, active = false, collapsedGroups,
       >
         <div className="flex shrink-0 items-center justify-between border-b p-5" style={{ borderColor: "var(--ck-sidebar-border)" }}>
           <div className="flex items-center gap-2.5">
-            <BrandMark size={24} variant="ivory" className="shrink-0" />
-            <h1 className="text-[16px] font-semibold tracking-tight truncate" style={{ color: "var(--ck-sidebar-active-text)" }}>
+            <><BrandMark size={24} className="shrink-0 dark:hidden" /><BrandMark size={24} variant="ivory" className="shrink-0 hidden dark:block" /></>
+            <h2 className="text-[16px] font-semibold tracking-tight truncate" style={{ color: "var(--ck-sidebar-active-text)" }}>
               {businessName || "Menu"}
-            </h1>
+            </h2>
           </div>
           <button
             data-mobile-menu-close
@@ -192,7 +188,7 @@ export default function MobileMenuDrawer({ nav, active = false, collapsedGroups,
         <div className="shrink-0 border-t p-3" style={{ borderColor: "var(--ck-sidebar-border)" }}>
           <div
             className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2"
-            style={{ borderColor: "var(--ck-sidebar-border)", background: "rgba(244, 241, 232, 0.06)" }}
+            style={{ borderColor: "var(--ck-sidebar-border)", background: "var(--ck-sidebar-hover)" }}
           >
             <ThemeToggle size="sm" />
             <SignOutButton />

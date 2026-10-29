@@ -64,7 +64,7 @@ function RuleFields({ value, onChange }: { value: RuleDraft; onChange: (patch: P
   const err = gapError(value);
   return (
     <div className="space-y-2">
-      <p className="ui-mono-label !text-[10px]">Package rules</p>
+      <p className="ui-mono-label">Package rules</p>
       <label className="block space-y-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
         If a customer cancels
         <select className="ui-control w-full text-sm" value={value.policy} onChange={(e) => onChange({ policy: e.target.value })}>
@@ -408,7 +408,7 @@ export default function PartnershipsPage() {
       <section className="anim-fade-up anim-d1 ui-card p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-[15px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Partnerships</h3>
-          <span className="ui-mono-label !text-[10px]">{activePartners.length} active</span>
+          <span className="ui-mono-label">{activePartners.length} active</span>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -639,24 +639,24 @@ export default function PartnershipsPage() {
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <p className="ui-mono-label !text-[10px]">Collected by me</p>
+                <p className="ui-mono-label">Collected by me</p>
                 <p className="font-display text-[20px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{Number(s.total_collected_by_me).toLocaleString()}</p>
               </div>
               <div>
-                <p className="ui-mono-label !text-[10px]">I owe partner</p>
+                <p className="ui-mono-label">I owe partner</p>
                 <p className="font-display text-[20px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{Number(s.total_owed_to_partner).toLocaleString()}</p>
               </div>
               <div>
-                <p className="ui-mono-label !text-[10px]">Partner owes me</p>
+                <p className="ui-mono-label">Partner owes me</p>
                 <p className="font-display text-[20px] font-semibold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{Number(s.total_owed_to_me).toLocaleString()}</p>
               </div>
             </div>
             {(s.weekly || []).length > 0 && (
               <div className="ui-table-container overflow-x-auto">
-                <p className="ui-mono-label !text-[10px] mb-1">Owed by week (all unsettled combos)</p>
+                <p className="ui-mono-label mb-1">Owed by week (all unsettled combos)</p>
                 <table role="table" className="ui-responsive-table w-full text-left text-[12.5px]">
                   <thead>
-                    <tr className="ui-mono-label !text-[10px]">
+                    <tr className="ui-mono-label">
                       <th scope="col" className="py-1 pr-3">Week starting</th>
                       <th scope="col" className="py-1 pr-3 text-right">Partner owes me</th>
                       <th scope="col" className="py-1 pr-3 text-right">I owe partner</th>
@@ -680,7 +680,7 @@ export default function PartnershipsPage() {
               <div className="ui-table-container overflow-x-auto">
                 <table role="table" className="ui-responsive-table w-full text-left text-[12.5px]">
                   <thead>
-                    <tr className="ui-mono-label !text-[10px]">
+                    <tr className="ui-mono-label">
                       <th scope="col" className="py-1 pr-3">Date</th>
                       <th scope="col" className="py-1 pr-3">Combo</th>
                       <th scope="col" className="py-1 pr-3 text-right">Total</th>

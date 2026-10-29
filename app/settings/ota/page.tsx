@@ -198,7 +198,7 @@ export default function OtaSettingsPage() {
       <div className="anim-fade-up flex items-center gap-3">
         <div>
           <p className="ui-mono-label mb-1">Admin · Settings</p>
-          <h1 className="font-display text-[26px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>OTA Integrations</h1>
+          <h2 className="font-display text-[26px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>OTA Integrations</h2>
         </div>
       </div>
 

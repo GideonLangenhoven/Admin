@@ -149,7 +149,7 @@ export default function ChatFaqPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="ui-mono-label mb-2">AI · Chat FAQ</p>
-          <h1 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Quick Answers</h1>
+          <h2 className="font-display text-[28px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Quick Answers</h2>
           <p className="text-sm mt-2 max-w-2xl" style={{ color: "var(--ck-text-muted)" }}>
             Set automatic WhatsApp replies for common questions.
           </p>

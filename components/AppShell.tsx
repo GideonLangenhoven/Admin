@@ -89,12 +89,6 @@ function groupNav(items: NavItem[]) {
 
 /* The deep-pine rail: vertical pine gradient with a breath of mint at the
    crown and amber ember at the base — the signature depth move of v3. */
-const SIDEBAR_BG = [
-  "radial-gradient(140% 50% at 50% -8%, rgba(0, 217, 139, 0.07), transparent 60%)",
-  "radial-gradient(120% 45% at 50% 112%, rgba(217, 130, 47, 0.06), transparent 60%)",
-  "linear-gradient(180deg, var(--ck-sidebar-grad-top) 0%, var(--ck-sidebar-grad-bottom) 100%)",
-].join(", ");
-
 export default function AppShell({ children, nav }: { children: React.ReactNode; nav: NavItem[] }) {
   const pathname = usePathname() || "";
   const isSimplePath = pathname === "/simple" || pathname.startsWith("/simple/") || pathname === "/simpleguide" || pathname.startsWith("/simpleguide/");
@@ -219,19 +213,19 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
           fire at the same breakpoint. Tablets use the drawer instead. */}
       <aside
         className={`hidden shrink-0 flex-col border-r transition-[width] duration-200 lg:flex ${collapsed ? "w-20" : "w-64"}`}
-        style={{ background: SIDEBAR_BG, borderColor: "var(--ck-sidebar-border)" }}
+        style={{ background: "var(--ck-sidebar)", borderColor: "var(--ck-sidebar-border)" }}
       >
         <div className="p-6 pb-2">
           <div className={`mb-8 flex items-center ${collapsed ? "justify-center" : "justify-between gap-2"}`}>
             <Link href="/" className={`flex min-w-0 items-center hover:opacity-80 transition-opacity ${collapsed ? "justify-center" : "gap-2.5"}`}>
             {logoUrl ? (
-              <Image src={logoUrl} alt={displayName} width={28} height={28} className="h-7 w-7 rounded-md object-contain p-[1px]" style={{ background: "rgba(244, 241, 232, 0.10)" }} unoptimized />
+              <Image src={logoUrl} alt={displayName} width={28} height={28} className="h-7 w-7 rounded-md object-contain p-[1px]" style={{ background: "var(--ck-sidebar-hover)" }} unoptimized />
             ) : (
-              <BrandMark size={26} variant="ivory" className="shrink-0" />
+              <><BrandMark size={26} className="shrink-0 dark:hidden" /><BrandMark size={26} variant="ivory" className="shrink-0 hidden dark:block" /></>
             )}
             {!collapsed && <div className="min-w-0" style={{ color: "var(--ck-sidebar-active-text)" }}>
               <BrandWordmark className="block text-[15px]" />
-              <h1 className="mt-1 whitespace-normal break-words text-xs font-normal leading-relaxed [overflow-wrap:anywhere]">{displayName}</h1>
+              <p className="mt-1 whitespace-normal break-words text-xs font-normal leading-relaxed [overflow-wrap:anywhere]">{displayName}</p>
             </div>}
             </Link>
             <button
@@ -253,7 +247,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
               value={businessId}
               onChange={(e) => switchOperator(e.target.value)}
               className="w-full rounded-lg border px-2.5 py-2 text-xs font-medium truncate"
-              style={{ borderColor: "var(--ck-sidebar-border)", background: "rgba(244, 241, 232, 0.06)", color: "var(--ck-sidebar-text)" }}
+              style={{ borderColor: "var(--ck-sidebar-border)", background: "var(--ck-sidebar-hover)", color: "var(--ck-sidebar-text)" }}
             >
               {operators.map((op) => (
                 <option key={op.id} value={op.id}>{op.name}</option>
@@ -289,7 +283,7 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
                   type="button"
                   onClick={() => toggleGroup(group.label!)}
                   aria-expanded={showItems}
-                  className="ui-mono-label mt-6 mb-1.5 flex w-full items-center justify-between px-2.5 !text-[10px] transition-colors hover:!text-[var(--ck-sidebar-text)]"
+                  className="ui-mono-label mt-6 mb-1.5 flex w-full items-center justify-between px-2.5 transition-colors hover:!text-[var(--ck-sidebar-text)]"
                   style={{ color: "var(--ck-sidebar-muted)" }}
                 >
                   <span>{group.label}</span>
@@ -345,10 +339,10 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
           style={{ borderColor: "var(--ck-sidebar-border)", color: "var(--ck-sidebar-muted)" }}
           title="Powered by BookingTours"
         >
-          <BrandMark size={14} variant="ivory" className="shrink-0 opacity-70" />
+          <><BrandMark size={14} className="shrink-0 opacity-70 dark:hidden" /><BrandMark size={14} variant="ivory" className="shrink-0 opacity-70 hidden dark:block" /></>
           {!collapsed && (
             <span className="flex items-baseline gap-1.5">
-              <span className="text-[9px] font-medium uppercase" style={{ letterSpacing: "0.1em" }}>Powered by</span>
+              <span className="text-[11px] font-medium">Powered by</span>
               <BrandWordmark className="text-[12px]" />
             </span>
           )}
@@ -360,25 +354,25 @@ export default function AppShell({ children, nav }: { children: React.ReactNode;
           className="ui-glass flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2 lg:px-6"
           style={{ borderColor: "var(--ck-border-subtle)" }}
         >
-          <div className="hidden min-w-0 items-baseline gap-2 lg:flex">
-            <span className="ui-mono-label truncate max-w-[220px]">{displayName}</span>
-            <span className="text-[11px]" style={{ color: "var(--ck-border-strong)" }}>/</span>
-            <span className="ui-mono-label truncate" style={{ color: "var(--ck-text-strong)" }}>{sectionLabel}</span>
+          {/* Breadcrumb; its last item (the screen's name) is the screen's one h1. */}
+          <div className="flex min-w-0 items-center gap-2">
+            <Link href="/" aria-label={displayName} className="flex shrink-0 items-center transition-opacity hover:opacity-80 lg:hidden">
+              {logoUrl ? (
+                <Image src={logoUrl} alt={displayName} width={24} height={24} className="h-6 w-6 rounded object-contain" unoptimized />
+              ) : (
+                <BrandMark size={22} className="shrink-0" />
+              )}
+            </Link>
+            <span className="ui-mono-label hidden truncate max-w-[220px] lg:inline">{displayName}</span>
+            <span className="hidden text-[11px] lg:inline" style={{ color: "var(--ck-border-strong)" }}>/</span>
+            <h1 className="max-w-[40vw] truncate text-base font-semibold capitalize tracking-tight lg:max-w-none lg:text-sm" style={{ color: "var(--ck-text-strong)" }}>{sectionLabel}</h1>
           </div>
-          <Link href="/" className="flex min-w-0 items-center gap-2 transition-opacity hover:opacity-80 lg:hidden">
-            {logoUrl ? (
-              <Image src={logoUrl} alt={displayName} width={24} height={24} className="h-6 w-6 rounded object-contain" unoptimized />
-            ) : (
-              <BrandMark size={22} className="shrink-0" />
-            )}
-            <h1 className="max-w-[30vw] truncate text-base font-semibold tracking-tight" style={{ color: "var(--ck-text-strong)" }}>{displayName}</h1>
-          </Link>
           <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 lg:gap-4">
             {visibleNav.some((item) => item.href === "/simple") && !isSuspended && (
               <Link href="/simple" className="ui-btn ui-btn-soft min-h-11 !px-3 !text-[13px]">Simple View</Link>
             )}
             {clock && (
-              <span className="ui-mono-label hidden lg:flex items-center gap-2 !normal-case !tracking-[0.04em]">
+              <span className="ui-mono-label hidden lg:flex items-center gap-2">
                 <span className="h-[5px] w-[5px] rounded-full motion-safe:animate-pulse" style={{ background: "var(--ck-accent)" }} aria-hidden="true" />
                 {clock}
               </span>

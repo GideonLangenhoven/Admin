@@ -766,7 +766,7 @@ export default function BookingDetailPage() {
           Back
         </button>
         <div className="flex items-center gap-3">
-          <h1 className="font-display text-[24px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Booking {ref}</h1>
+          <h2 className="font-display text-[24px] font-semibold leading-none" style={{ color: "var(--ck-text-strong)" }}>Booking {ref}</h2>
           <Badge className={STATUS_COLORS[booking.status] || "ui-pill-neutral"}>{booking.status}</Badge>
           <Badge className="ui-pill-neutral">{SOURCE_LABELS[booking.source] || booking.source}</Badge>
         </div>

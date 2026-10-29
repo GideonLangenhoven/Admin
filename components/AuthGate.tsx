@@ -681,15 +681,15 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           <div
             className="hidden md:block w-64 shrink-0 border-r"
             style={{
-              background: "linear-gradient(180deg, var(--ck-sidebar-grad-top) 0%, var(--ck-sidebar-grad-bottom) 100%)",
+              background: "var(--ck-sidebar)",
               borderColor: "var(--ck-sidebar-border)",
             }}
           >
             <div className="p-5 space-y-3">
-              <div className="h-8 w-3/4 rounded-lg animate-pulse" style={{ background: "rgba(244, 241, 232, 0.08)" }} />
+              <div className="h-8 w-3/4 rounded-lg animate-pulse" style={{ background: "var(--ck-sidebar-active-bg)" }} />
               <div className="pt-4 space-y-2">
                 {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="h-8 rounded-lg animate-pulse" style={{ background: "rgba(244, 241, 232, 0.05)" }} />
+                  <div key={i} className="h-8 rounded-lg animate-pulse" style={{ background: "var(--ck-sidebar-hover)" }} />
                 ))}
               </div>
             </div>

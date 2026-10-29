@@ -722,7 +722,7 @@ export default function ContactsPage() {
                 <h3 className="text-[17px] font-semibold" style={{ color: "var(--ck-text-strong)" }}>Import Contacts</h3>
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                   {["upload", "map", "preview"].map((s, i) => (
-                    <span key={s} className="ui-mono-label !text-[10px]" style={{ color: csvStep === s ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>
+                    <span key={s} className="ui-mono-label" style={{ color: csvStep === s ? "var(--ck-accent)" : "var(--ck-text-muted)" }}>
                       {i + 1}. {s === "upload" ? "Upload" : s === "map" ? "Map Columns" : "Preview & Import"}
                     </span>
                   ))}
@@ -1082,14 +1082,14 @@ export default function ContactsPage() {
           <table role="table" className="ui-responsive-table w-full min-w-[700px] text-sm">
             <thead>
               <tr>
-                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Email</th>
-                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Name</th>
-                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Phone</th>
-                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>DOB</th>
-                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Tags</th>
-                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>Engagement</th>
-                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>Status</th>
-                <th scope="col" className="ui-mono-label !text-[10px] border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Actions</th>
+                <th scope="col" className="ui-mono-label border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Email</th>
+                <th scope="col" className="ui-mono-label border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Name</th>
+                <th scope="col" className="ui-mono-label border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Phone</th>
+                <th scope="col" className="ui-mono-label border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>DOB</th>
+                <th scope="col" className="ui-mono-label border-b px-4 py-3 text-left" style={{ borderColor: "var(--ck-border-subtle)" }}>Tags</th>
+                <th scope="col" className="ui-mono-label border-b px-4 py-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>Engagement</th>
+                <th scope="col" className="ui-mono-label border-b px-4 py-3 text-center" style={{ borderColor: "var(--ck-border-subtle)" }}>Status</th>
+                <th scope="col" className="ui-mono-label border-b px-4 py-3 text-right" style={{ borderColor: "var(--ck-border-subtle)" }}>Actions</th>
               </tr>
             </thead>
             <tbody>

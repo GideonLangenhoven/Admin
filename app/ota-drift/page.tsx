@@ -52,7 +52,7 @@ export default function OtaDriftPage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">        <h1 className="text-2xl font-bold text-[color:var(--text)]">OTA Drift Monitor</h1>
+      <div className="flex items-center gap-3 mb-6">        <h2 className="text-2xl font-bold text-[color:var(--text)]">OTA Drift Monitor</h2>
         <button onClick={refresh} className="ml-auto p-2 rounded-lg hover:bg-[color:var(--surface2)] text-[color:var(--textMuted)]">
           <ArrowsClockwise size={20} />
         </button>

@@ -141,33 +141,33 @@ export default function AiUsage() {
 
       <div className="anim-fade-up anim-d1 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <div className="ui-card p-4">
-          <div className="mb-2 flex items-center gap-2.5"><span className="ui-mono-label !text-[10px]">Replies</span></div>
+          <div className="mb-2 flex items-center gap-2.5"><span className="ui-mono-label">Replies</span></div>
           <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{replies.toLocaleString()}</p>
           <p className="mt-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
             {included > 0 ? "of " + included.toLocaleString() + " included" : "no cap set"}
           </p>
         </div>
         <div className="ui-card p-4">
-          <div className="mb-2 flex items-center gap-2.5"><span className="ui-mono-label !text-[10px]">Balance</span></div>
+          <div className="mb-2 flex items-center gap-2.5"><span className="ui-mono-label">Balance</span></div>
           <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{included > 0 ? balance.toLocaleString() : "—"}</p>
           <p className="mt-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>
             {included <= 0 ? "no cap set" : balance > 0 ? "replies left this month" : "allowance used up"}
           </p>
         </div>
         <div className="ui-card p-4">
-          <div className="mb-2 flex items-center gap-2.5"><span className="ui-mono-label !text-[10px]">Allowance used</span></div>
+          <div className="mb-2 flex items-center gap-2.5"><span className="ui-mono-label">Allowance used</span></div>
           <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{included > 0 ? pct + "%" : "—"}</p>
           <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full" style={{ background: "var(--ck-border, rgba(0,0,0,0.08))" }}>
             <div className="h-full rounded-full" style={{ width: pct + "%", background: overCeiling || nearLimit ? "var(--ck-danger, #b3261e)" : "var(--ck-accent, #00a86b)" }} />
           </div>
         </div>
         <div className="ui-card p-4">
-          <div className="mb-2 flex items-center gap-2.5"><span className="ui-mono-label !text-[10px]">Overage</span></div>
+          <div className="mb-2 flex items-center gap-2.5"><span className="ui-mono-label">Overage</span></div>
           <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>R{overageZar.toFixed(2)}</p>
           <p className="mt-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>{overageReplies.toLocaleString()} replies over</p>
         </div>
         <div className="ui-card p-4">
-          <div className="mb-2 flex items-center gap-2.5"><span className="ui-mono-label !text-[10px]">Cache hits</span></div>
+          <div className="mb-2 flex items-center gap-2.5"><span className="ui-mono-label">Cache hits</span></div>
           <p className="font-display text-[28px] font-semibold leading-none tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{cacheHitPct}%</p>
           <p className="mt-1 text-[12px]" style={{ color: "var(--ck-text-muted)" }}>{(promptTokens + completionTokens).toLocaleString()} tokens</p>
         </div>
@@ -184,10 +184,10 @@ export default function AiUsage() {
             <table role="table" className="ui-responsive-table w-full text-[13px]">
               <thead>
                 <tr>
-                  <th scope="col" className="px-4 py-3 text-left"><span className="ui-mono-label !text-[10px]">Surface</span></th>
-                  <th scope="col" className="px-4 py-3 text-right"><span className="ui-mono-label !text-[10px]">Calls</span></th>
-                  <th scope="col" className="px-4 py-3 text-right"><span className="ui-mono-label !text-[10px]">Tokens</span></th>
-                  <th scope="col" className="px-4 py-3 text-right"><span className="ui-mono-label !text-[10px]">Counts to allowance</span></th>
+                  <th scope="col" className="px-4 py-3 text-left"><span className="ui-mono-label">Surface</span></th>
+                  <th scope="col" className="px-4 py-3 text-right"><span className="ui-mono-label">Calls</span></th>
+                  <th scope="col" className="px-4 py-3 text-right"><span className="ui-mono-label">Tokens</span></th>
+                  <th scope="col" className="px-4 py-3 text-right"><span className="ui-mono-label">Counts to allowance</span></th>
                 </tr>
               </thead>
               <tbody>

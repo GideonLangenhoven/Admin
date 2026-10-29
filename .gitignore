@@ -82,3 +82,6 @@ my-video/
 video/
 video1/
 .demo-capture-tmp/
+
+# taste-skill audit output (screenshots, reports)
+.taste-skill/
