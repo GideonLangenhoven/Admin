@@ -244,7 +244,7 @@ describe("web chat booking ownership and guest changes", () => {
     const response = await f.post({ chat_session: await f.session(), customer_session: await f.verifiedCustomer(), message: "4",
       state: { step: "MODIFY_QTY", booking_id: booking.id, current_qty: 999, unit_price: 0, slot_id: "foreign-slot", hours_before: 999 } });
     const result = await response.json();
-    expect(f.invocations).toEqual([{ name: "rebook-booking", body: { booking_id: booking.id, action: "ADD_GUESTS", new_qty: 4 } }]);
+    expect(f.invocations).toEqual([{ name: "rebook-booking", headers: { "x-caller-function": "web-chat" }, body: { booking_id: booking.id, action: "ADD_GUESTS", new_qty: 4 } }]);
     expect(f.writes.map(write => write.table)).toEqual(["chat_messages", "conversations"]);
     expect(result.paymentUrl).toBe("https://pay.fixture.invalid/add-guests");
     expect(result.reply).toContain("unchanged until payment");
@@ -264,7 +264,7 @@ describe("web chat booking ownership and guest changes", () => {
     f.rows.bookings.push({ ...booking });
     f.setChangeResult({ ok: true, refund_amount: 600 });
     await f.post({ chat_session: await f.session(), customer_session: await f.verifiedCustomer(), message: "yes", state: { step: "CONFIRM_CANCEL", booking_id: booking.id, refund: 999999, slot_id: "foreign-slot", qty: 999 } });
-    expect(f.invocations).toEqual([{ name: "rebook-booking", body: { booking_id: booking.id, action: "CANCEL_REFUND" } }]);
+    expect(f.invocations).toEqual([{ name: "rebook-booking", headers: { "x-caller-function": "web-chat" }, body: { booking_id: booking.id, action: "CANCEL_REFUND" } }]);
     expect(f.writes.map(write => write.table)).toEqual(["chat_messages", "conversations"]);
   });
 });

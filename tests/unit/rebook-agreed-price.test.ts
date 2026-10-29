@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { sourceHandler } from "../helpers/source-handler";
+import { sourceExports, sourceHandler } from "../helpers/source-handler";
 import { getPaidPortions } from "../../supabase/functions/_shared/vouchers";
 
 // M1: unit_price is the list price a booking was made at; an admin price
@@ -30,15 +30,19 @@ function fixture(booking: Record<string, unknown> = {}, newSlot: Record<string, 
     tours: { data: { base_price_per_person: 850, name: "Harbour paddle" } }, booking_add_ons: { data: extras }, logs: { data: null },
   };
   const fetchImpl = vi.fn(async (url: string) => Response.json(String(url).endsWith("/create-checkout") ? { redirectUrl: "https://pay.invalid/x" } : { ok: true }));
+  const db = { rpc, auth: { getUser: async () => ({ data: { user: { id: "admin-a" } } }) }, from: (t: string) => query(tables[t] ?? { data: null }) };
+  const env = { SUPABASE_URL: "https://fixture.invalid", SUPABASE_SERVICE_ROLE_KEY: SERVICE };
   const handler = sourceHandler("supabase/functions/rebook-booking/index.ts", {
     "../_shared/tenant.ts": {
-      createServiceClient: () => ({ rpc, auth: { getUser: async () => ({ data: { user: { id: "admin-a" } } }) }, from: (t: string) => query(tables[t] ?? { data: null }) }),
+      createServiceClient: () => db,
       getTenantByBusinessId: async () => ({ business: { id: "biz-a" }, credentials: {} }), formatTenantDateTime: () => "Sat 8 Nov, 08:00",
       getBusinessDisplayName: () => "Fixture Tours", getAdminAppOrigins: () => [], normalizePhone: (p: string) => p, sendWhatsappTextForTenant: async () => undefined,
     },
     "../_shared/customer-session.ts": { verifyCustomerSession: async () => ({ valid: false }) },
     "../_shared/vouchers.ts": { getPaidPortions }, "../_shared/combo.ts": {},
-  }, { SUPABASE_URL: "https://fixture.invalid", SUPABASE_SERVICE_ROLE_KEY: SERVICE }, fetchImpl as unknown as typeof fetch);
+    // The real shared helper, wired to this fixture's database.
+    "../_shared/auth.ts": sourceExports("supabase/functions/_shared/auth.ts", { "https://esm.sh/@supabase/supabase-js@2": { createClient: () => db } }, env),
+  }, env, fetchImpl as unknown as typeof fetch);
   const post = async (body: Record<string, unknown>, token = "admin-jwt") => {
     const res = await handler(new Request("https://fixture.invalid/rebook-booking", {
       method: "POST", headers: { Authorization: "Bearer " + token },

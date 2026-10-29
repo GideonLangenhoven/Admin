@@ -18,7 +18,6 @@ import BulkSlotWizard from "../../components/BulkSlotWizard";
 import BookingsMonthCalendar from "../../components/BookingsMonthCalendar";
 
 const SU = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const SK = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
 function TimeInput({ name, value, onChange }: { name?: string; value: string; onChange: (value: string) => void }) {
   return (

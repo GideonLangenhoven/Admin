@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { sourceHandler } from "../helpers/source-handler";
+import { sourceExports, sourceHandler } from "../helpers/source-handler";
 
 const serviceKey = "fixture-service-not-a-real-credential";
 const env = { SUPABASE_URL: "https://fixture.invalid", SUPABASE_SERVICE_ROLE_KEY: serviceKey };
@@ -77,6 +77,8 @@ function processFixture(admin: Admin, options: { authError?: boolean; adminError
     },
     "../_shared/combo.ts": { getComboLegPolicy: async () => null },
     "../_shared/sentry.ts": { withSentry: (_name: string, fn: any) => fn },
+    // The real shared helper, wired to this fixture's database and runtime env.
+    "../_shared/auth.ts": sourceExports("supabase/functions/_shared/auth.ts", { "https://esm.sh/@supabase/supabase-js@2": { createClient: () => db } }, { ...env, ...options.runtimeEnv }),
   }, { ...env, ...options.runtimeEnv });
   const invoke = (credential = "fixture-user-token", header = "authorization") => handler(new Request("https://fixture.invalid/refund", {
     method: "POST",
@@ -171,14 +173,15 @@ describe("process-refund authority", () => {
   });
 
   it.each([
-    ["unknown role", { business_id: "tenant-a", role: "REFUND_AGENT" }],
-    ["super substring", { business_id: "tenant-a", role: "NOT_SUPER_ADMIN_HELPER" }],
-    ["suspended", { business_id: "tenant-a", role: "OPERATOR", suspended: true }],
-    ["read-only demo", { business_id: "tenant-a", role: "OPERATOR", read_only: true }],
-    ["foreign ordinary", { business_id: "tenant-b", role: "MAIN_ADMIN" }],
-  ])("denies %s before any money action", async (_label, admin) => {
+    ["unknown role", { business_id: "tenant-a", role: "REFUND_AGENT" }, 403],
+    ["super substring", { business_id: "tenant-a", role: "NOT_SUPER_ADMIN_HELPER" }, 403],
+    ["suspended", { business_id: "tenant-a", role: "OPERATOR", suspended: true }, 403],
+    ["read-only demo", { business_id: "tenant-a", role: "OPERATOR", read_only: true }, 403],
+    // Another tenant's booking is indistinguishable from a missing one (S5: no existence oracle).
+    ["foreign ordinary", { business_id: "tenant-b", role: "MAIN_ADMIN" }, 404],
+  ])("denies %s before any money action", async (_label, admin, status) => {
     const f = processFixture(admin);
-    expect((await f.invoke()).status).toBe(403);
+    expect((await f.invoke()).status).toBe(status);
     expect(f.moneyActions).toEqual([]);
     expect(f.reissueVoucherPortion).not.toHaveBeenCalled();
   });

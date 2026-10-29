@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { sourceHandler } from "../helpers/source-handler";
+import { sourceExports, sourceHandler } from "../helpers/source-handler";
 import { getPaidPortions } from "../../supabase/functions/_shared/vouchers";
 
 // H2: refund & cancel runs in process-refund. Every guest-visible change sends
@@ -26,7 +26,8 @@ function refundFixture(overrides: Record<string, any> = {}, yocoStatus = "succee
         if (table === "bookings") { if (patch) Object.assign(booking, patch); return { data: { ...booking }, error: null }; }
         if (table === "holds") return { data: [], error: null };
         if (table === "refund_operations") return { data: operations, error: null };
-        if (table === "logs") { logs.push(insert); return { data: null, error: null }; }
+        // The service-key audit row is expected on every internal call; these tests track the guest's timeline.
+        if (table === "logs") { if (insert?.event !== "SERVICE_KEY_CALL") logs.push(insert); return { data: null, error: null }; }
         if (table === "idempotency_keys") return { data: key && keys.has(key) ? { status: keys.get(key) } : null, error: null };
         throw new Error("Unexpected table: " + table);
       };
@@ -77,6 +78,8 @@ function refundFixture(overrides: Record<string, any> = {}, yocoStatus = "succee
     "../_shared/vouchers.ts": { getPaidPortions, reissueVoucherPortion: async () => null },
     "../_shared/combo.ts": { getComboLegPolicy: async () => null },
     "../_shared/sentry.ts": { withSentry: (_name: string, fn: any) => fn },
+    // process-refund authenticates through the real shared helper (here: the service-key path).
+    "../_shared/auth.ts": sourceExports("supabase/functions/_shared/auth.ts", { "https://esm.sh/@supabase/supabase-js@2": { createClient: () => db } }, env),
   }, env, gateway);
   const refund = async (body: Record<string, unknown> = {}) => {
     const response = await handler(new Request("https://fixture.invalid/refund", {

@@ -170,7 +170,9 @@ export default function BroadcastsPage() {
     try {
       // broadcast requires the admin's JWT — it derives the target business
       // from the caller's admin row, not the request body.
-      const token = (await supabase.auth.getSession()).data.session?.access_token || SK;
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      // Fail closed: never substitute the public key for a missing session.
+      if (!token) throw new Error("Your session has expired. Sign in again to send.");
       const r = await fetch(SU + "/functions/v1/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + token, apikey: SK },

@@ -1,11 +1,16 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient, fetchAllRows } from "../_shared/tenant.ts";
 import { withSentry, captureException } from "../_shared/sentry.ts";
+import { isServiceKey, bearerToken } from "../_shared/auth.ts";
 
 const db = createServiceClient();
 const GOOGLE_PLACES_API_KEY = Deno.env.get("GOOGLE_PLACES_API_KEY") || "";
 
-Deno.serve(withSentry("fetch-google-reviews", async (_req: Request) => {
+Deno.serve(withSentry("fetch-google-reviews", async (req: Request) => {
+  // Cron-only: each call spends the platform's Google Places quota across every tenant. pg_cron sends the key as `apikey`.
+  if (!isServiceKey(bearerToken(req)) && !isServiceKey(req.headers.get("apikey") || "")) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
+  }
   if (!GOOGLE_PLACES_API_KEY) {
     return new Response(JSON.stringify({ error: "GOOGLE_PLACES_API_KEY not set" }), {
       status: 503,

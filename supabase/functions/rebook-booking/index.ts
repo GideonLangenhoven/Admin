@@ -14,6 +14,7 @@ import { verifyCustomerSession } from "../_shared/customer-session.ts";
 import { genVoucherCode, getPaidPortions } from "../_shared/vouchers.ts";
 import { guestNeverContacted } from "../_shared/guest-contact.ts";
 import { getComboLegPolicy, validateComboDates } from "../_shared/combo.ts";
+import { requireAuth, canAccessBusiness, auditServiceCall, isServiceKey, bearerToken, AuthError } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -65,10 +66,12 @@ function fail(req: any, msg: string, status: number) {
 type CallerAuthz = { ok: true; isAdmin?: boolean } | { ok: false; status: number; message: string };
 
 async function authorizeCaller(req: any, body: any, booking: any): Promise<CallerAuthz> {
-  const authHeader = req.headers.get("authorization") || req.headers.get("Authorization") || "";
-  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const token = bearerToken(req);
 
-  if (token && token === SUPABASE_KEY) return { ok: true };
+  if (isServiceKey(token)) {
+    await auditServiceCall(supabase, await requireAuth(req), "rebook-booking", booking.business_id);
+    return { ok: true };
+  }
 
   const bookingEmail = String(booking.email || "").toLowerCase();
 
@@ -86,22 +89,23 @@ async function authorizeCaller(req: any, body: any, booking: any): Promise<Calle
   }
 
   if (token) {
-    const { data: userData, error: userErr } = await supabase.auth.getUser(token);
-    const user = userData?.user;
-    if (!userErr && user) {
-      const { data: admin } = await supabase
-        .from("admin_users")
-        .select("business_id, role, suspended, read_only")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (admin && !admin.suspended) {
-        if (admin.read_only) return { ok: false, status: 403, message: "This demonstration account is read-only." };
-        if (admin.role === "SUPER_ADMIN" || admin.business_id === booking.business_id) return { ok: true, isAdmin: true };
-        return { ok: false, status: 403, message: "This booking belongs to a different business." };
+    try {
+      const admin = await requireAuth(req);
+      if (canAccessBusiness(admin, booking.business_id)) return { ok: true, isAdmin: true };
+      return { ok: false, status: 403, message: "This booking belongs to a different business." };
+    } catch (e) {
+      if (!(e instanceof AuthError)) throw e;
+      if (e.kind === "read_only") return { ok: false, status: 403, message: "This demonstration account is read-only." };
+      if (e.kind === "unavailable") return { ok: false, status: 503, message: "We couldn't verify your access just now. Please try again." };
+      if (e.kind === "mfa_required") return { ok: false, status: 403, message: "Multi-factor authentication required." };
+      if (e.kind === "not_admin" && e.user) {
+        // Not an admin: a signed-in customer may manage a booking made with their own email.
+        const userEmail = String(e.user.email || "").toLowerCase();
+        // An unconfirmed address proves nothing: if confirmation were ever relaxed, anyone could register with a guest's email.
+        if (e.user.email_confirmed_at && userEmail && bookingEmail && userEmail === bookingEmail) return { ok: true };
+        return { ok: false, status: 403, message: "This booking does not belong to your account." };
       }
-      const userEmail = String(user.email || "").toLowerCase();
-      if (userEmail && bookingEmail && userEmail === bookingEmail) return { ok: true };
-      return { ok: false, status: 403, message: "This booking does not belong to your account." };
+      // missing or invalid token: fall through to the sign-in prompt
     }
   }
 

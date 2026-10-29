@@ -17,6 +17,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { embedText, sha256Hex } from "../_shared/kb.ts";
+import { isServiceKey, bearerToken, safeEqual } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -199,10 +200,13 @@ async function syncAdminHelp(chunks: AdminChunkInput[]) {
 
 Deno.serve(async (req: Request) => {
   if (req.method !== "POST") return new Response("Not allowed", { status: 405 });
-  // Shared-secret guard: embedding sweeps cost real money, so this function
-  // must not be publicly triggerable. Cron and admin callers send the key.
+  // Shared-secret guard: embedding sweeps cost real money, and admin_chunks replaces the platform-wide
+  // admin help KB, so this function must not be publicly triggerable. Cron and admin callers send the
+  // key (or the service key). Fails closed: an unset KB_SYNC_KEY rejects the shared-secret path.
   const syncKey = Deno.env.get("KB_SYNC_KEY") || "";
-  if (syncKey && req.headers.get("x-kb-sync-key") !== syncKey) {
+  const authorised = (!!syncKey && safeEqual(req.headers.get("x-kb-sync-key") || "", syncKey))
+    || isServiceKey(bearerToken(req)) || isServiceKey(req.headers.get("apikey") || "");
+  if (!authorised) {
     return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } });
   }
   try {

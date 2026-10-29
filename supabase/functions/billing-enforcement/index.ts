@@ -22,6 +22,7 @@
 // nothing. Re-running never re-sends an email or re-writes an audit row.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createServiceClient } from "../_shared/tenant.ts";
+import { isServiceKey, safeEqual } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -109,7 +110,7 @@ Deno.serve(async (req: Request) => {
   // which silently allows everything when its key env is unset.
   const billingKey = req.headers.get("x-billing-key") || "";
   const bearer = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
-  const authorised = (ENFORCEMENT_KEY && billingKey === ENFORCEMENT_KEY) || (!!SUPABASE_KEY && bearer === SUPABASE_KEY);
+  const authorised = (!!ENFORCEMENT_KEY && safeEqual(billingKey, ENFORCEMENT_KEY)) || isServiceKey(bearer);
   if (!authorised) {
     return new Response(JSON.stringify({ ok: false, error: "Unauthorized" }), { status: 401, headers: JSON_HEADERS });
   }

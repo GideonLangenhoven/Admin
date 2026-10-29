@@ -311,11 +311,17 @@ export function getAdminAppOrigins() {
     "https://booking-mu-steel.vercel.app",
     "https://bookingtours.co.za",
     "https://www.bookingtours.co.za",
+  ], devOriginsEnabled() ? [
     "http://localhost:3000",
     "http://localhost:3001",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
-  ])));
+  ] : [])));
+}
+
+// Local-development and Vercel-preview origins are for staging only. Production leaves ALLOW_DEV_ORIGINS unset.
+function devOriginsEnabled() {
+  return Deno.env.get("ALLOW_DEV_ORIGINS") === "true";
 }
 
 export function getBusinessAllowedOrigins(business?: TenantBusiness | null) {
@@ -333,13 +339,18 @@ export function getBusinessAllowedOrigins(business?: TenantBusiness | null) {
   return Array.from(new Set(getAdminAppOrigins().concat(origins)));
 }
 
-// Wildcard patterns for bookingtours.co.za subdomains and trusted Vercel team deploys
+// Wildcard patterns for bookingtours.co.za subdomains (https only; each starts with a dot so a
+// look-alike such as evilbookingtours.co.za cannot match).
 const WILDCARD_ORIGINS = [
   ".admin.bookingtours.co.za",
   ".booking.bookingtours.co.za",
   ".bookingtours.co.za",
-  "-jerrys-projects-f4e4eaf9.vercel.app",
 ];
+
+// Vercel preview deployments of the two apps (staging only, see devOriginsEnabled). A bare suffix match on the
+// team slug is not safe: anyone can create a team whose slug ends in it. Vercel's own form is
+// <project>-<9-char deployment hash>-<team slug>, so match exactly that.
+const PREVIEW_ORIGIN = /^(caepweb-admin|booking)-[a-z0-9]{9}-jerrys-projects-f4e4eaf9\.vercel\.app$/;
 
 export function isAllowedOrigin(origin: string, allowedOrigins: string[]) {
   if (!origin) return false;
@@ -347,10 +358,12 @@ export function isAllowedOrigin(origin: string, allowedOrigins: string[]) {
   if (allowedOrigins.includes(origin)) return true;
   // Wildcard match: any *.admin.bookingtours.co.za or *.booking.bookingtours.co.za
   try {
-    const hostname = new URL(origin).hostname;
+    const { protocol, hostname } = new URL(origin);
+    if (protocol !== "https:") return false;
     for (let i = 0; i < WILDCARD_ORIGINS.length; i++) {
       if (hostname.endsWith(WILDCARD_ORIGINS[i])) return true;
     }
+    if (devOriginsEnabled() && PREVIEW_ORIGIN.test(hostname)) return true;
   } catch (_) { /* invalid URL */ }
   return false;
 }

@@ -36,7 +36,8 @@ async function getAuthenticatedEmail(req: Request) {
   const jwt = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!jwt) return "";
   const { data, error } = await supabase.auth.getUser(jwt);
-  if (error || !data.user?.email) return "";
+  // Only a confirmed address is a verified identity (see rebook-booking authorizeCaller).
+  if (error || !data.user?.email || !data.user.email_confirmed_at) return "";
   return data.user.email.toLowerCase();
 }
 

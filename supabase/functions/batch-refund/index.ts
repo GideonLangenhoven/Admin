@@ -125,7 +125,7 @@ Deno.serve(async (req: any) => {
     const initialAuditError = await audit("batch_refund_started");
     if (initialAuditError) return respond({ error: "Could not persist batch refund audit" }, 503);
 
-    const downstreamHeaders: Record<string, string> = { "Content-Type": "application/json" };
+    const downstreamHeaders: Record<string, string> = { "Content-Type": "application/json", "x-caller-function": "batch-refund" };
     const authorization = req.headers.get("authorization") || req.headers.get("Authorization");
     const apiKey = req.headers.get("apikey");
     if (authorization) downstreamHeaders.Authorization = authorization;

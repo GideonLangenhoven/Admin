@@ -1,16 +1,18 @@
 // IMPORTANT: This function uses the service role key, which BYPASSES RLS.
 // Every query against a tenant-owned table MUST include .eq("business_id", X).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createServiceClient, formatTenantDate, formatTenantDateTime, getBusinessDisplayName, getTenantByBusinessId, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
+import { createServiceClient, formatTenantDate, formatTenantDateTime, getAdminAppOrigins, getBusinessDisplayName, getTenantByBusinessId, isAllowedOrigin, sendWhatsappTextForTenant } from "../_shared/tenant.ts";
 import { getWaiverContext } from "../_shared/waiver.ts";
-import { requireAuth, canAccessBusiness } from "../_shared/auth.ts";
+import { requireAuth, canAccessBusiness, auditServiceCall } from "../_shared/auth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 function getCors(req: Request) {
+  const origins = getAdminAppOrigins();
+  const origin = req.headers.get("origin") || "";
   return {
-    "Access-Control-Allow-Origin": req.headers.get("origin") || "*",
+    "Access-Control-Allow-Origin": isAllowedOrigin(origin, origins) ? origin : origins[0],
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-tenant-business-id, x-tenant-subdomain, x-tenant-origin, x-voucher-code, x-booking-success-token, x-booking-id, x-booking-waiver-token",
     // Without it supabase.functions.invoke returns the reply as text.
@@ -102,12 +104,12 @@ Deno.serve(async (req: Request) => {
     const supabase = createServiceClient();
     const bookingRes = await supabase.from("bookings").select("*, slots(start_time), tours(name)").eq("id", body.booking_id).maybeSingle();
     const booking = bookingRes.data;
-    if (!booking) return new Response(JSON.stringify({ error: "Booking not found" }), { status: 404, headers: getCors(req) });
-
-    // Tenant guard: admin can only mark-paid bookings from their own business
-    if (!canAccessBusiness(auth, booking.business_id)) {
-      return new Response(JSON.stringify({ error: "You can only mark bookings for your own business as paid" }), { status: 403, headers: getCors(req) });
+    // Tenant guard: admin can only mark-paid bookings from their own business.
+    // "No such booking" and "not your booking" get the same answer so IDs cannot be probed.
+    if (!booking || !canAccessBusiness(auth, booking.business_id)) {
+      return new Response(JSON.stringify({ error: "Booking not found" }), { status: 404, headers: getCors(req) });
     }
+    await auditServiceCall(supabase, auth, "manual-mark-paid", booking.business_id);
 
     const tenant = await getTenantByBusinessId(supabase, booking.business_id);
     const brandName = getBusinessDisplayName(tenant.business);

@@ -34,10 +34,10 @@ function fixture(booking: Record<string, unknown>, rpcResult: Record<string, unk
     "../_shared/tenant.ts": {
       createServiceClient: () => ({ from, rpc }), getTenantByBusinessId: async () => ({ business: { id: "biz-a", currency: "ZAR" }, credentials: {} }),
       getBusinessDisplayName: () => "Fixture Tours", formatTenantDate: () => "27 Oct 2026", formatTenantDateTime: () => "Sat 8 Nov, 08:00",
-      sendWhatsappTextForTenant: whatsapp,
+      sendWhatsappTextForTenant: whatsapp, getAdminAppOrigins: () => ["https://fixture.invalid"], isAllowedOrigin: () => true,
     },
     "../_shared/waiver.ts": { getWaiverContext: async () => ({ waiverStatus: "PENDING", waiverLink: "https://waiver.invalid/x" }) },
-    "../_shared/auth.ts": { requireAuth: async () => ({ userId: "admin-a", businessId: "biz-a" }), canAccessBusiness: (_auth: unknown, id: string) => id === "biz-a" },
+    "../_shared/auth.ts": { requireAuth: async () => ({ userId: "admin-a", businessId: "biz-a" }), canAccessBusiness: (_auth: unknown, id: string) => id === "biz-a", auditServiceCall: async () => undefined },
   }, { SUPABASE_URL: "https://fixture.invalid", SUPABASE_SERVICE_ROLE_KEY: "fixture-service" }, fetchImpl as unknown as typeof fetch);
   const post = async (body: Record<string, unknown>) => {
     const res = await handler(new Request("https://fixture.invalid/manual-mark-paid", {
