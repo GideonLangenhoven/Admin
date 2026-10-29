@@ -71,11 +71,11 @@ describe("mobile-first implementation contract", () => {
     const chat = source("booking/app/components/ChatWidget.tsx");
     expect(chat).toContain('role="dialog"');
     expect(chat).toContain('aria-modal="true"');
-    expect(chat).toContain("bottom-0 top-0 z-50");
+    expect(chat).toContain("bottom-0 top-0 z-chat");
     expect(chat).toContain("calc(100dvh-3rem)");
     expect(chat).toContain('window.matchMedia("(prefers-reduced-motion: reduce)")');
     expect(chat).toContain("!reduceMotion && !avatarFailed");
-    expect(chat).toContain("launcherRef.current?.focus()");
+    expect(chat).toContain("(returnFocusRef.current ?? launcherRef.current)?.focus()");
   });
 
   it("applies the all-operator hero rule", () => {
