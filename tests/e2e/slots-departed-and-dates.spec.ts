@@ -68,3 +68,17 @@ test("on a phone, picking days brings their actions into view", async ({ page })
   await bar.getByRole("button", { name: "Cancel days" }).click();
   await expect(page.getByRole("dialog", { name: "Cancel days (1)" })).toBeVisible();
 });
+
+// Round 2, 13e: Add Slot preselected the first tour by name even when that
+// tour was inactive.
+test("Add Slot preselects an active tour", async ({ page }) => {
+  await setup(page);
+  await page.route("**/rest/v1/tours*", route => route.fulfill({ json: [
+    { id: "10000000-0000-4000-8000-000000000008", name: "Coastal walk", active: false },
+    { id: "10000000-0000-4000-8000-000000000003", name: "Harbour paddle", active: true },
+  ] }));
+  await page.goto("/slots");
+  await page.getByRole("button", { name: "Add Slot", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Add New Slots" });
+  await expect(dialog.getByRole("combobox").first()).toHaveValue("10000000-0000-4000-8000-000000000003");
+});

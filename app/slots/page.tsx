@@ -386,7 +386,7 @@ function Slots() {
   useEffect(() => { load(); }, [currentDate, viewMode, businessId]);
 
   async function loadTours() {
-    const { data } = await supabase.from("tours").select("id, name, business_id").eq("business_id", businessId).order("name");
+    const { data } = await supabase.from("tours").select("id, name, business_id, active").eq("business_id", businessId).order("name");
     if (data) setTours(data);
   }
 
@@ -805,7 +805,7 @@ function Slots() {
   }
 
   function openAddSlot() {
-    if (tours.length > 0) setAddForm(f => ({ ...f, tourId: f.tourId || tours[0].id }));
+    if (tours.length > 0) setAddForm(f => ({ ...f, tourId: f.tourId || tours.find(t => t.active)?.id || "" }));
     setShowAddSlot(true);
   }
 
