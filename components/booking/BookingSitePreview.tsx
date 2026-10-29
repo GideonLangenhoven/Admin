@@ -39,7 +39,6 @@ export default function BookingSitePreview({ siteSettings, tours }: { siteSettin
   });
   const name = siteSettings.business_name || "Book Your Tour";
   const base = (siteSettings.booking_site_url || "").replace(/\/+$/, "");
-  const actionLabel = siteSettings.card_cta_label || "Book Now";
   const visibleTours = tours.filter(tour => tour.active && !tour.hidden);
 
   return (
@@ -94,8 +93,7 @@ export default function BookingSitePreview({ siteSettings, tours }: { siteSettin
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={tour.image_url} alt={tour.name + " tour"} loading="lazy" />
                 ) : undefined}
-                actionLabel={actionLabel}
-                onSelect={base ? () => window.open(base + "/book?tour=" + tour.id, "_blank", "noopener,noreferrer") : undefined} />
+                href={base ? base + "/book?tour=" + tour.id : "#"} target={base ? "_blank" : undefined} />
             ))}
           </div>
           {visibleTours.length === 0 && <p className="py-12 text-center">Your visible tours will appear here.</p>}

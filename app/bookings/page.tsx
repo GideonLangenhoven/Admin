@@ -159,25 +159,44 @@ interface Booking {
   } | null;
 }
 
-function BookingHistoryBadge({ booking }: { booking: Booking }) {
+// Customer name doubles as the trigger for booking history, customer notes and
+// extras: hover/focus on desktop, tap on mobile. Plain text when there's nothing to show.
+function CustomerNameDetails({ booking, className }: { booking: Booking; className: string }) {
   const tooltipId = useId();
-  const [showHistory, setShowHistory] = useState(false);
-  if (!booking.previous_booking_count || !booking.previous_booking_at) return null;
-  const date = new Date(booking.previous_booking_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric", timeZone: getAdminTimezone() });
-  const countLabel = `${booking.previous_booking_count} previous paid booking${booking.previous_booking_count === 1 ? "" : "s"}`;
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    // Touch browsers don't blur the button on an outside tap, so close explicitly.
+    const close = (event: PointerEvent) => { if (!wrapRef.current?.contains(event.target as Node)) setOpen(false); };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open]);
+  const count = booking.previous_booking_count || 0;
+  const lastBooked = count && booking.previous_booking_at
+    ? new Date(booking.previous_booking_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric", timeZone: getAdminTimezone() })
+    : null;
+  const notes = customerNotesTooltip(booking.custom_fields);
+  const addOns = booking.add_ons || [];
+  if (!lastBooked && !notes && addOns.length === 0) return <span className={className}>{booking.customer_name}</span>;
   return (
-    <span className="relative inline-flex shrink-0" onMouseEnter={() => setShowHistory(true)} onMouseLeave={() => setShowHistory(false)} onBlur={() => setShowHistory(false)}
-      onKeyDown={(event) => { if (event.key === "Escape") { setShowHistory(false); event.stopPropagation(); } }}>
-      <button type="button" aria-label={`${countLabel} for ${booking.customer_name}`} aria-describedby={showHistory ? tooltipId : undefined}
-        onFocus={() => setShowHistory(true)} onClick={(event) => { event.stopPropagation(); setShowHistory(true); }}
-        className="inline-flex min-h-11 min-w-11 cursor-help items-center justify-center rounded-full px-1.5 text-xs font-semibold tabular-nums focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 lg:min-h-6 lg:min-w-6"
-        style={{ background: "var(--ck-surface-sunken)", color: "var(--ck-text-muted)", border: "1px solid var(--ck-border-subtle)" }}>
-        {booking.previous_booking_count}
+    <span ref={wrapRef} className="relative inline-flex min-w-0 max-w-full" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}
+      onKeyDown={(event) => { if (event.key === "Escape") { setOpen(false); event.stopPropagation(); } }}>
+      <button type="button" aria-expanded={open} aria-describedby={open ? tooltipId : undefined}
+        onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onClick={(event) => { event.stopPropagation(); setOpen(true); }}
+        className={className + " cursor-help text-left underline decoration-dotted decoration-slate-300 underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"}>
+        {booking.customer_name}
       </button>
-      {showHistory && <span id={tooltipId} role="tooltip" className="absolute bottom-full left-0 z-30 w-52 max-w-[calc(100vw-7rem)] pb-2 text-left text-xs font-normal leading-relaxed">
-        <span className="block rounded-lg border p-3 shadow-lg" style={{ background: "var(--ck-surface)", color: "var(--ck-text-strong)", borderColor: "var(--ck-border-subtle)" }}>
-          <span className="block font-semibold">{countLabel}</span>
-          <span className="block">Last booking: {date}</span>
+      {open && <span id={tooltipId} role="tooltip" className="absolute bottom-full left-0 z-30 w-64 max-w-[calc(100vw-4rem)] pb-2 text-left text-xs font-normal leading-relaxed">
+        <span className="block space-y-2 rounded-lg border p-3 shadow-lg" style={{ background: "var(--ck-surface)", color: "var(--ck-text-strong)", borderColor: "var(--ck-border-subtle)" }}>
+          {lastBooked && <>
+            <span className="block"><span className="font-semibold">Previous bookings:</span> {count}</span>
+            <span className="block"><span className="font-semibold">Last booked:</span> {lastBooked}</span>
+          </>}
+          {notes && <span className="block"><span className="block font-semibold">Notes</span><span className="block whitespace-pre-line [overflow-wrap:anywhere]">{notes}</span></span>}
+          {addOns.length > 0 && <span className="block"><span className="block font-semibold">Extras</span>
+            {addOns.map((ao, idx) => <span key={idx} className="block">{ao.qty > 1 ? `${ao.qty}× ` : ""}{ao.name}</span>)}
+          </span>}
         </span>
       </span>}
     </span>
@@ -2445,7 +2464,6 @@ function SlotRows({
                 <div className="px-4 py-4">
                   <div className="flex items-start gap-3">
                     <div className="flex w-11 shrink-0 flex-col items-start gap-1">
-                      <BookingHistoryBadge booking={b} />
                       <label className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl">
                         <input type="checkbox" checked={selected.has(b.id)} onChange={() => onToggleSelect(b.id)}
                           className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -2453,7 +2471,7 @@ function SlotRows({
                       </label>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-base font-semibold leading-snug whitespace-normal [overflow-wrap:anywhere]" style={{ color: "var(--ck-text-strong)" }}>{b.customer_name}</p>
+                      <p className="text-base font-semibold leading-snug" style={{ color: "var(--ck-text-strong)" }}><CustomerNameDetails booking={b} className="min-h-11 whitespace-normal [overflow-wrap:anywhere]" /></p>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <StatusBadge status={b.status} />
                         <RefundBadge status={b.refund_status} />
@@ -2484,16 +2502,7 @@ function SlotRows({
               <td className="p-1.5 lg:p-3 pl-2 text-gray-400" colSpan={1}>
                 <div className="flex flex-col gap-0.5">
                   <div className="flex flex-wrap items-center gap-1 text-left">
-                    <span className="inline-flex min-w-0 max-w-full items-start gap-1">
-                      <BookingHistoryBadge booking={b} />
-                      <span
-                        title={customerNotesTooltip(b.custom_fields)}
-                        className={"min-w-0 whitespace-normal font-medium text-gray-700 [overflow-wrap:anywhere] lg:pointer-events-auto" + (customerNotesTooltip(b.custom_fields) ? " cursor-help underline decoration-dotted decoration-slate-300 underline-offset-2" : "")}
-                      >{b.customer_name}</span>
-                    </span>
-                    {customerNotesTooltip(b.custom_fields) && (
-                      <span title={customerNotesTooltip(b.custom_fields)} className="shrink-0 text-[11px] cursor-help lg:pointer-events-auto" aria-label="Customer added notes">📝</span>
-                    )}
+                    <CustomerNameDetails booking={b} className="min-w-0 whitespace-normal font-medium text-gray-700 [overflow-wrap:anywhere]" />
                     {b.waiver_status === "SIGNED"
                       ? <span title="Waiver signed" className="shrink-0" style={{ color: "var(--ck-success)" }}>✓</span>
                       : <span title="Waiver not signed" className="shrink-0 text-[10px]" style={{ color: "var(--ck-amber)" }}>W</span>}
@@ -2512,15 +2521,6 @@ function SlotRows({
                       </button>
                     )}
                   </div>
-                  {b.add_ons && b.add_ons.length > 0 && (
-                    <div className="flex flex-wrap gap-1 pl-[18px] lg:pl-0">
-                      {b.add_ons.map((ao, idx) => (
-                        <span key={idx} className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: "var(--ck-amber-soft)", color: "var(--ck-amber)" }}>
-                          {ao.qty > 1 ? `${ao.qty}× ` : "+ "}{ao.name}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                   {b.pending_reschedule && (() => {
                     const pr = b.pending_reschedule;
                     const exp = pr.expiresAt ? new Date(pr.expiresAt).getTime() : 0;

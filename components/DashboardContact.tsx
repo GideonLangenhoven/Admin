@@ -14,6 +14,6 @@ export default function DashboardContact({ booking, requestWaiver = false }: { b
       <a className="ui-btn ui-btn-soft !h-11 !w-11 !min-w-11 !rounded-full !p-0" href={`https://wa.me/${phone}`} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp ${customer}`} title={`WhatsApp ${customer}`}><WhatsappLogo size={18} aria-hidden="true" /></a>
       <a className="ui-btn ui-btn-soft !h-11 !w-11 !min-w-11 !rounded-full !p-0" href={`tel:+${phone}`} aria-label={`Phone ${customer}`} title={`Phone ${customer}`}><Phone size={18} aria-hidden="true" /></a>
     </> : null}
-    {validEmail ? requestWaiver && booking.waiver_status !== "SIGNED" ? <BookingWaiverEmail booking={booking} /> : <a className="ui-btn ui-btn-soft !h-11 !w-11 !min-w-11 !rounded-full !p-0" href={`mailto:${encodeURIComponent(email).replace("%40", "@")}`} aria-label={`Email ${customer}`} title={`Email ${customer}`}><EnvelopeSimple size={18} aria-hidden="true" /></a> : null}
+    {validEmail ? requestWaiver && booking.waiver_status !== "SIGNED" ? <BookingWaiverEmail booking={booking} /> : <a className="ui-btn ui-btn-soft !h-11 !w-11 !min-w-11 !rounded-full !p-0" href={`mailto:${encodeURIComponent(email).replace("%40", "@")}`} aria-label={`Email ${customer}`} title={`Email ${customer} (opens your mail app)`}><EnvelopeSimple size={18} aria-hidden="true" /></a> : null}
   </div>;
 }

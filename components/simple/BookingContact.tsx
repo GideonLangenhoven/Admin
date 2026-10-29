@@ -24,7 +24,7 @@ export default function BookingContact({ booking, requestWaiver = false }: { boo
         </>
       )}
       {validEmail && (requestWaiver && booking.waiver_status !== "SIGNED" ? <BookingWaiverEmail booking={booking} /> :
-        <a href={`mailto:${encodeURIComponent(email).replace("%40", "@")}`} className="ui-btn ui-btn-soft !h-11 !w-11 !min-w-11 !rounded-full !p-0" aria-label={`Email ${customer}`} title={`Email ${customer}`}>
+        <a href={`mailto:${encodeURIComponent(email).replace("%40", "@")}`} className="ui-btn ui-btn-soft !h-11 !w-11 !min-w-11 !rounded-full !p-0" aria-label={`Email ${customer}`} title={`Email ${customer} (opens your mail app)`}>
           <EnvelopeSimple size={18} aria-hidden="true" />
         </a>
       )}
