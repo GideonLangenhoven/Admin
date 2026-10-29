@@ -36,7 +36,7 @@ const server=createServer(async(req,res)=>{
   res.writeHead(403);res.end('{"message":"Synthetic fixture refuses writes and providers"}');return;
  }
  const table=url.pathname.split('/').pop();
- let rows=table==='businesses'?[{marketing_email_usage:0,marketing_included_emails:500,marketing_overage_rate_zar:0.15}]:[];
+ const rows=table==='businesses'?[{marketing_email_usage:0,marketing_included_emails:500,marketing_overage_rate_zar:0.15}]:[];
  if(req.headers.prefer?.includes('count=exact'))res.setHeader('Content-Range',`0-${Math.max(0,rows.length-1)}/${rows.length}`);
  res.end(JSON.stringify(req.headers.accept?.includes('vnd.pgrst.object')?rows[0]||null:rows));
 });

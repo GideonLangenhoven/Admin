@@ -37,7 +37,7 @@ async function main() {
       const context=await browser.newContext({viewport:{width,height:950}}),page=await context.newPage(),errors=[];
       page.on('pageerror',e=>errors.push(e.message));
       await page.addInitScript(({role,email,businessId})=>{localStorage.setItem('ck_admin_role',role);localStorage.setItem('ck_admin_email',email);localStorage.setItem('ck_admin_name','Example Owner');localStorage.setItem('ck_admin_business_id',businessId);},{role:routeName==='settings'?'MAIN_ADMIN':'SUPER_ADMIN',email:routeName==='settings'?owner.email:'platform@example.invalid',businessId:business.id});
-      let failure=false,requests=[];
+      let failure=false;const requests=[];
       await page.route('**/*',async route=>{
         const req=route.request(),url=new URL(req.url());
         if(url.hostname==='contact.test'&&req.isNavigationRequest())return route.fulfill({contentType:'text/html',body:html});

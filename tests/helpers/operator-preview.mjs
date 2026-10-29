@@ -55,7 +55,7 @@ const server=createServer(async(req,res)=>{
  if(table==='businesses')rows=[{id:fixture.business_id,name:'Example Tours (synthetic)',currency:'ZAR',timezone:'Africa/Johannesburg',booking_custom_fields:state.questions,meeting_point:'Synthetic harbour'}];
  if(table==='tours')rows=[{id:'10000000-0000-4000-8000-000000000003',business_id:fixture.business_id,name:'Harbour paddle',base_price_per_person:100,active:true},{id:'10000000-0000-4000-8000-000000000008',business_id:fixture.business_id,name:'Coastal walk',base_price_per_person:100,active:true}];
  if(table==='slots'){
-  const gtes=url.searchParams.getAll('start_time');let start=gtes.find(v=>v.startsWith('gte.'))?.slice(4)||'',end=gtes.find(v=>v.startsWith('lt.'))?.slice(3)||'z';rows=futureSlots(start,end);
+  const gtes=url.searchParams.getAll('start_time');const start=gtes.find(v=>v.startsWith('gte.'))?.slice(4)||'',end=gtes.find(v=>v.startsWith('lt.'))?.slice(3)||'z';rows=futureSlots(start,end);
  }
  if(table==='bookings'){
   rows=url.searchParams.has('payment_failed_at')?[]:state.bookings;

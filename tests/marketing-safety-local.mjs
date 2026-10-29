@@ -76,7 +76,7 @@ try {
  await db.query("UPDATE marketing_queue SET contact_id=$1 WHERE id=$2",[id(26),id(31)]);
  // Find a valid IANA timezone currently in the permitted daytime window, without changing the system clock.
  await db.query("UPDATE businesses SET timezone=(SELECT name FROM pg_timezone_names WHERE name LIKE 'Etc/GMT%' AND extract(hour from now() AT TIME ZONE name) BETWEEN 9 AND 18 LIMIT 1) WHERE id=$1",[id(1)]);
- let reserved=await reserve('queue/31',26);assert.equal(reserved.reason,'reserved');
+ const reserved=await reserve('queue/31',26);assert.equal(reserved.reason,'reserved');
  assert.equal((await reserve('queue/31',26)).reason,'delivery_sending','worker crash never causes blind resend');
  await db.query("UPDATE marketing_deliveries SET status='reconcile',provider_id='fixture-provider-1' WHERE id=$1",[reserved.id]);
  assert.equal((await reserve('queue/31',26)).reason,'delivery_reconcile');

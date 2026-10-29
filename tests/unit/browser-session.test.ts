@@ -5,15 +5,15 @@ import { describe, expect, it, vi } from 'vitest';
 import { sourceFunction } from '../helpers/source-handler';
 
 function scope(path: string, values: Map<string,string>) {
-  const module = { exports: {} as any };
+  const mod = { exports: {} as any };
   runInNewContext(ts.transpileModule(readFileSync('app/lib/browser-session.ts','utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-  }).outputText, { module, exports: module.exports, window: { location: { pathname: path } }, localStorage: {
+  }).outputText, { module: mod, exports: mod.exports, window: { location: { pathname: path } }, localStorage: {
     getItem: (key:string) => values.get(key) ?? null,
     setItem: (key:string,value:string) => values.set(key,value),
     removeItem: (key:string) => values.delete(key),
   }});
-  return module.exports;
+  return mod.exports;
 }
 
 describe('independent guide and operator sessions', () => {
