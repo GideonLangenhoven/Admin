@@ -8,10 +8,24 @@ const enabled = (b: GuestActionBooking) => guestActions(b).filter(a => !a.disabl
 const base = { phone: "0820000000", payment_url: null, allow_unpaid: false };
 
 describe("Guest action registry", () => {
-  it("a confirmed booking with money due can be paid, linked, rebooked, refunded and cancelled", () => {
-    expect(enabled({ ...base, status: "CONFIRMED", total_amount: 200, total_captured: 100 })).toEqual([
-      "view", "edit", "whatsapp", "whatsapp-device", "rebook", "mark-paid", "payment-link", "allow-unpaid", "refund", "resend-invoice", "cancel",
+  it("a confirmed booking with money due can be paid, linked, rebooked and cancelled", () => {
+    expect(enabled({ ...base, status: "CONFIRMED", total_amount: 200, total_captured: 0 })).toEqual([
+      "view", "edit", "whatsapp", "whatsapp-device", "rebook", "mark-paid", "payment-link", "allow-unpaid", "resend-invoice", "cancel",
     ]);
+  });
+
+  // Round 2, item 6: create-checkout refuses a link once part is paid (a link
+  // is priced for the full amount), so the action must not offer one.
+  it("a part-paid booking takes its balance with Mark Paid, and says why there is no link", () => {
+    const actions = guestActions({ ...base, status: "CONFIRMED", total_amount: 200, total_captured: 100 });
+    const reason = "Part is already paid. Record the balance with Mark Paid.";
+    expect(actions.filter(a => !a.disabled).map(a => a.key)).toEqual([
+      "view", "edit", "whatsapp", "whatsapp-device", "rebook", "mark-paid", "allow-unpaid", "refund", "resend-invoice", "cancel",
+    ]);
+    for (const key of ["payment-link", "payment-reminder"]) {
+      expect(actions.find(a => a.key === key), key).toMatchObject({ disabled: true, title: reason });
+    }
+    expect(actions.find(a => a.key === "payment-link")!.description).toBe(reason);
   });
 
   it("a paid booking offers no payment actions", () => {

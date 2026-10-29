@@ -48,6 +48,9 @@ export function bookingPaidAmount(b: GuestActionBooking) {
 export function guestActions(b: GuestActionBooking, busy: { action?: boolean; link?: boolean; invoice?: boolean; reschedule?: boolean } = {}): GuestAction[] {
   const paid = isPaid(b);
   const cancelled = b.status === "CANCELLED";
+  // A payment link is priced for the full amount, so create-checkout refuses
+  // one once part is paid (prepare_booking_checkout): the balance goes through Mark Paid.
+  const partPaid = !paid && !cancelled && amountReceived(b) > 0 ? "Part is already paid. Record the balance with Mark Paid." : undefined;
   const confirmed = ["PAID", "CONFIRMED", "COMPLETED"].includes(b.status);
   const devicePhone = contactPhoneNumber(b.phone);
   return [
@@ -57,8 +60,8 @@ export function guestActions(b: GuestActionBooking, busy: { action?: boolean; li
     { key: "whatsapp-device", label: "WhatsApp on device", description: "Open this number in WhatsApp.", disabled: !devicePhone, title: !devicePhone ? "Add a valid phone number first." : undefined, tone: "green" },
     { key: "rebook", label: "Rebook", description: "Move this party to another available departure.", disabled: busy.action },
     { key: "mark-paid", label: "Mark Paid", description: "Record money received outside online checkout.", disabled: busy.action || paid, tone: "green" },
-    { key: "payment-link", label: busy.link ? "Generating…" : "Payment Link", demoAction: "booking.payment", description: "Send a link for the balance due.", disabled: busy.link || paid || cancelled, tone: "blue" },
-    { key: "payment-reminder", label: "Payment Reminder", description: "Resend the booking’s existing checkout link.", disabled: busy.action || paid || cancelled || !b.payment_url, title: !b.payment_url ? "Send a payment link first." : undefined, tone: "amber" },
+    { key: "payment-link", label: busy.link ? "Generating…" : "Payment Link", demoAction: "booking.payment", description: partPaid || "Send a link for the balance due.", disabled: busy.link || paid || cancelled || !!partPaid, title: partPaid, tone: "blue" },
+    { key: "payment-reminder", label: "Payment Reminder", description: "Resend the booking’s existing checkout link.", disabled: busy.action || paid || cancelled || !!partPaid || !b.payment_url, title: partPaid || (!b.payment_url ? "Send a payment link first." : undefined), tone: "amber" },
     { key: "allow-unpaid", label: b.allow_unpaid ? "Require Payment" : "Allow Without Payment", description: b.allow_unpaid ? "Restore reminders and the payment deadline." : "Keep places for pay on arrival.", disabled: busy.action || paid || cancelled },
     ...(b.pending_reschedule ? [{ key: "reschedule-link" as const, label: "Reschedule Payment Link", demoAction: "booking.reschedule-link", description: "Request the reschedule balance.", disabled: busy.reschedule, tone: "blue" as const }] : []),
     { key: "refund", label: "Refund", demoAction: "booking.refund", description: "Review the eligible refund before submitting it.", disabled: busy.action || bookingPaidAmount(b) <= 0 || cancelled, title: bookingPaidAmount(b) <= 0 ? "Nothing to refund: no payment received." : undefined, tone: "amber" },
