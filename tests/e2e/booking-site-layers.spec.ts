@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { fixtureNow, slots, tourId } from "../helpers/booking-guest-fixture.cjs";
 
-// Round 2, booking site layering on phones and tablets (R1, R2).
+// Round 2, booking site layering on phones and tablets (R1, R2, R3).
 const fixtureUrl = "http://127.0.0.1:3117";
 const book = `/book?tour=${tourId}&slot=${slots[0].id}&date=2026-10-03`;
 const phones = [[320, 568], [375, 667], [390, 844]] as const;
@@ -89,4 +89,24 @@ test.describe("on a first visit", () => {
       }
     }
   });
+
+  for (const [width, height] of [[375, 667], [768, 1024]] as const) {
+    test(`R3: at ${width}px the chat launcher waits until the cookie banner is answered`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await page.goto("/");
+      // Kayak and Aonyx have no bottom nav, so their launcher sits at the
+      // screen edge, on the banner: test that worst case.
+      await page.evaluate(() => document.body.removeAttribute("data-mobile-bottom-nav"));
+      const banner = page.locator("div.fixed").filter({ hasText: /cookies/i }).last();
+      const launcher = page.getByRole("button", { name: "Open chat" });
+      await expect(banner).toBeVisible();
+      for (const button of await banner.getByRole("button").all()) {
+        expect(await unobstructed(button), `${await button.textContent()} is tappable`).toBe(true);
+      }
+      await expect(launcher).toBeHidden();
+      await banner.getByRole("button").first().click();
+      await expect(banner).toBeHidden();
+      await expect(launcher).toBeVisible();
+    });
+  }
 });
