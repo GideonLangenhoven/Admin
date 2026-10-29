@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { fixtureNow, slots, tourId } from "../helpers/booking-guest-fixture.cjs";
 
-// Round 2, booking site layering on phones and tablets (R1, R2, R3).
+// Round 2, booking site layering and cookie choice on phones and tablets (R1, R2, R3, R5).
 const fixtureUrl = "http://127.0.0.1:3117";
 const book = `/book?tour=${tourId}&slot=${slots[0].id}&date=2026-10-03`;
 const phones = [[320, 568], [375, 667], [390, 844]] as const;
@@ -109,4 +109,34 @@ test.describe("on a first visit", () => {
       await expect(launcher).toBeVisible();
     });
   }
+
+  test("R5: the cookie banner offers a real choice, remembers it and reopens from the footer", async ({ page }) => {
+    await page.goto("/");
+    const banner = page.locator("[data-cookie-banner]");
+    const consent = () => page.evaluate(() => localStorage.getItem("cookie-consent"));
+    for (const name of ["Accept all", "Reject non-essential", "Settings"]) await expect(banner.getByRole("button", { name })).toBeVisible();
+    // Opaque: a solid colour (rgba would be see-through) and no frosted blur.
+    const look = await banner.locator("section").evaluate(el => ({ bg: getComputedStyle(el).backgroundColor, blur: getComputedStyle(el).backdropFilter }));
+    expect(look.bg).toMatch(/^rgb\(/);
+    expect(look.blur).toBe("none");
+
+    await banner.getByRole("button", { name: "Reject non-essential" }).click();
+    await expect(banner).toBeHidden();
+    expect(await consent()).toBe("essential");
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Fresh air. A different perspective." })).toBeVisible();
+    await expect(banner).toBeHidden();
+
+    const settings = page.locator("footer").getByRole("button", { name: "Cookie settings" });
+    await settings.click();
+    const performance = banner.getByRole("checkbox", { name: /Performance/ });
+    await expect(performance).toBeFocused();
+    await expect(performance).not.toBeChecked();
+    await expect(banner.getByRole("checkbox", { name: /Essential/ })).toBeDisabled();
+    await performance.check();
+    await banner.getByRole("button", { name: "Save choices" }).click();
+    await expect(banner).toBeHidden();
+    await expect(settings).toBeFocused();
+    expect(await consent()).toBe("all");
+  });
 });
