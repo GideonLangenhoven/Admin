@@ -22,7 +22,7 @@ function automationFixture(eligibility = "eligible") {
        if(write){writes.push({table,value:write});if(table==="marketing_deliveries")status=write.status;return Promise.resolve(resolve({error:null}));}
        const data:any={marketing_automations:{id:"journey",business_id:"tenant",status:"active",trigger_type:"manual"},
          businesses:{business_name:"Fixture",subdomain:"fixture"},marketing_automation_steps:[{id:"step",position:0,step_type:"send_email",config:{template_id:"template"}}],
-         marketing_contacts:{id:"contact",email:"synthetic@example.invalid",status:"active",tags:[]},marketing_templates:{html_content:"<body>{{unsubscribe_url}}</body>",subject_line:"Fixture"}};
+         marketing_contacts:{id:"contact",email:"synthetic@guests.bookingtours.co.za",status:"active",tags:[]},marketing_templates:{html_content:"<body>{{unsubscribe_url}}</body>",subject_line:"Fixture"}};
        return Promise.resolve(resolve({data:data[table]||null,error:null}));
      }};return q;
  };
