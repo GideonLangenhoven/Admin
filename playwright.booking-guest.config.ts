@@ -1,7 +1,7 @@
 import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
-  testDir: "./tests/e2e", testMatch: ["booking-guest.spec.ts", "booking-account-surfaces.spec.ts", "booking-site-polish.spec.ts"], workers: 1, fullyParallel: false,
+  testDir: "./tests/e2e", testMatch: ["booking-guest.spec.ts", "booking-account-surfaces.spec.ts", "booking-site-polish.spec.ts", "booking-site-layers.spec.ts"], workers: 1, fullyParallel: false,
   timeout: 45_000, expect: { timeout: 10_000 }, reporter: [["list"]],
   outputDir: "/private/tmp/capekayak-booking-guest-results",
   webServer: [
