@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "../lib/supabase";
 import { DatePicker } from "../../components/DatePicker";
 import { useBusinessContext } from "../../components/BusinessContext";
-import { amountReceived, amountRefunded, netReceived, derivePaymentMethod, financialTotals } from "../lib/report-accounting";
+import { amountReceived, amountRefunded, refundInFlight, netReceived, derivePaymentMethod, financialTotals } from "../lib/report-accounting";
 import { groupBookingPeriods, groupReportRows, type ReportPeriod } from "../lib/report-booking-periods";
 import ReportPeriodGroup, { ReportPeriodPicker } from "../../components/ReportPeriodGroup";
 import { fetchAllRowsResult } from "../../supabase/functions/_shared/pagination";
@@ -966,6 +966,7 @@ function ReportsContent() {
               {group.rows.map(b => {
                 const received = amountReceived(b);
                 const refunded = amountRefunded(b);
+                const pending = refundInFlight(b);
                 const method = derivePaymentMethod(b);
                 return (
                   <div key={b.id} className="border-t p-4">
@@ -988,6 +989,7 @@ function ReportsContent() {
                       </div>
                     </div>
                     {refunded > 0 && <p className="mt-2 text-xs" style={{ color: "var(--ck-danger)" }}>Refunded {fmtCurrency(refunded)}</p>}
+                    {pending > 0 && <p className="mt-2 text-xs" style={{ color: "var(--ck-warning)" }}>Refund pending {fmtCurrency(pending)}</p>}
                   </div>
                 );
               })}
@@ -1012,6 +1014,7 @@ function ReportsContent() {
                     const due = Number(b.total_amount || 0);
                     const received = amountReceived(b);
                     const refunded = amountRefunded(b);
+                    const pending = refundInFlight(b);
                     const method = derivePaymentMethod(b);
                     return (
                       <tr key={b.id} className="transition-colors hover:bg-[var(--ck-surface-sunken)]">
@@ -1021,7 +1024,7 @@ function ReportsContent() {
                         <td className="p-3 text-xs" style={{ color: method === "Unrecorded" ? "var(--ck-warning)" : "var(--ck-text-muted)" }}>{method || "—"}</td>
                         <td className="p-3 text-right tabular-nums" style={{ color: "var(--ck-text-muted)" }}>{fmtCurrency(due)}</td>
                         <td className="p-3 text-right tabular-nums" style={{ color: received > 0 ? "var(--ck-success)" : "var(--ck-text-muted)" }}>{received > 0 ? fmtCurrency(received) : "—"}</td>
-                        <td className="p-3 text-right tabular-nums" style={{ color: refunded > 0 ? "var(--ck-danger)" : "var(--ck-text-muted)" }}>{refunded > 0 ? "-" + fmtCurrency(refunded) : "—"}</td>
+                        <td className="p-3 text-right tabular-nums" style={{ color: refunded > 0 ? "var(--ck-danger)" : pending > 0 ? "var(--ck-warning)" : "var(--ck-text-muted)" }}>{refunded > 0 ? "-" + fmtCurrency(refunded) : pending > 0 ? "Pending " + fmtCurrency(pending) : "—"}</td>
                         <td className="p-3 text-right font-bold tabular-nums" style={{ color: "var(--ck-text-strong)" }}>{fmtCurrency(received - refunded)}</td>
                         <td className="p-3 text-center"><span className={statusPill(b.status)}>{b.status}</span></td>
                       </tr>

@@ -13,12 +13,15 @@ const invoice = (n: number, number: string, total: number, method: string) => ({
 const invoices = [
   invoice(1, "INV-00007", 730, "Pending"), invoice(2, "INV-00004", 610, "Pending"),
   invoice(3, "INV-00009", 500, "Pending"), invoice(4, "INV-00010", 400, "Yoco"),
+  invoice(5, "INV-00011", 500, "Cash"),
 ];
 const bookings = [
   { id: id(51), status: "CANCELLED", total_amount: 730, total_captured: 0, created_at: "2026-10-19T08:00:00Z" },
   { id: id(52), status: "CANCELLED", total_amount: 610, total_captured: 0, created_at: "2026-10-18T08:00:00Z" },
   { id: id(53), status: "PENDING", total_amount: 500, total_captured: 0, created_at: "2026-10-20T08:00:00Z" },
   { id: id(54), status: "PAID", total_amount: 400, total_captured: 400, created_at: "2026-10-20T08:00:00Z" },
+  // Round 2, 13b: cancelled, refund reserved, bank transfer not made yet.
+  { id: id(55), status: "CANCELLED", total_amount: 500, total_captured: 500, total_refunded: 500, refund_status: "MANUAL_EFT_REQUIRED", created_at: "2026-10-20T08:00:00Z" },
 ];
 
 test.use({ viewport: { width: 1280, height: 900 } });
@@ -57,12 +60,12 @@ test("the invoices page shows each booking's real state and only counts what is 
   // en-ZA formats R500,00 (decimal comma) in some ICU builds, R500.00 in others.
   const rand = (n: number) => new RegExp(`^R${n}[.,]00$`);
   await expect(page.getByText("Outstanding total").locator("..").locator("p").nth(1)).toHaveText(rand(500));
-  for (const [number, status, due] of [["INV-00007", "cancelled", 0], ["INV-00004", "cancelled", 0], ["INV-00009", "unpaid", 500], ["INV-00010", "paid", 0]] as const) {
+  for (const [number, status, due] of [["INV-00007", "cancelled", 0], ["INV-00004", "cancelled", 0], ["INV-00009", "unpaid", 500], ["INV-00010", "paid", 0], ["INV-00011", "refund pending", 0]] as const) {
     const row = page.locator("tr", { hasText: number });
     await expect(row.locator(".ui-status")).toHaveText(status);
     await expect(row.locator("td").nth(7)).toHaveText(rand(due));
   }
-  expect(bookingQueries.every(q => q.includes(`business_id=eq.${BUSINESS}`))).toBe(true);
+  expect(bookingQueries.every(q => q.includes(`business_id=eq.${BUSINESS}`) && q.includes("refund_status"))).toBe(true);
 });
 
 test("resending takes amounts from the booking, and a cancelled unpaid booking has nothing to resend", async ({ page }) => {

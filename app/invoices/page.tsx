@@ -152,6 +152,7 @@ const STATUS_PILL: Record<InvoiceStatus, string> = {
   "CANCELLED": "ui-pill-neutral",
   "REFUNDED": "ui-pill-ocean",
   "PARTIALLY REFUNDED": "ui-pill-ocean",
+  "REFUND PENDING": "ui-pill-warning",
 };
 
 function StatusBadge({ status }: { status: InvoiceStatus }) {
@@ -422,7 +423,7 @@ export default function Invoices() {
     if (bookingIds.length > 0) {
       const { data: bookingRows } = await supabase
         .from("bookings")
-        .select("id, created_at, status, total_amount, total_captured, total_refunded, refund_amount, refund_processed_at")
+        .select("id, created_at, status, total_amount, total_captured, total_refunded, refund_amount, refund_processed_at, refund_status")
         .eq("business_id", businessId)
         .in("id", bookingIds);
       bookingMap = new Map(((bookingRows || []) as BookingRow[]).map((b) => [b.id, b]));

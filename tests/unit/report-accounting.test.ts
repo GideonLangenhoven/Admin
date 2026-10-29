@@ -27,6 +27,12 @@ describe("amountRefunded", () => {
     expect(amountRefunded({ refund_amount: 250 })).toBe(0);
     expect(amountRefunded({ refund_amount: 250, refund_processed_at: "2026-07-01T00:00:00Z" })).toBe(250);
   });
+  it("does not count a refund still on its way to the guest (Round 2, 13b)", () => {
+    // reserve_refund_request adds the refund to total_refunded when it is reserved.
+    expect(amountRefunded({ total_refunded: 500, refund_status: "MANUAL_EFT_REQUIRED" })).toBe(0);
+    expect(amountRefunded({ total_refunded: 500, refund_status: "REFUND_PENDING" })).toBe(0);
+    expect(amountRefunded({ total_refunded: 500, refund_status: "REFUNDED", refund_processed_at: "2026-10-29T08:00:00Z" })).toBe(500);
+  });
 });
 
 describe("netReceived / amountOutstanding", () => {
@@ -107,6 +113,8 @@ describe("invoiceState", () => {
     ["cancelled and refunded in full", { status: "CANCELLED", total_amount: 500, total_captured: 500, total_refunded: 500 }, { status: "REFUNDED", paid: 500, refunded: 500, due: 0 }],
     ["cancelled with a policy part-refund", { status: "CANCELLED", total_amount: 500, total_captured: 500, total_refunded: 250 }, { status: "PARTIALLY REFUNDED", paid: 500, refunded: 250, due: 0 }],
     ["guests reduced on a live booking", { status: "PAID", total_amount: 400, total_captured: 500, total_refunded: 100 }, { status: "PARTIALLY REFUNDED", paid: 500, refunded: 100, due: 0 }],
+    ["cancelled, refund awaiting bank transfer", { status: "CANCELLED", total_amount: 500, total_captured: 500, total_refunded: 500, refund_status: "MANUAL_EFT_REQUIRED" }, { status: "REFUND PENDING", paid: 500, refunded: 0, due: 0 }],
+    ["cancelled, card refund pending", { status: "CANCELLED", total_amount: 500, total_captured: 500, total_refunded: 500, refund_status: "REFUND_PENDING" }, { status: "REFUND PENDING", paid: 500, refunded: 0, due: 0 }],
   ])("%s", (_label, booking, expected) => {
     expect(invoiceState(booking)).toEqual(expected);
   });

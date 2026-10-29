@@ -14,6 +14,7 @@ export type MoneyBooking = {
   total_refunded?: number | null;
   refund_amount?: number | null;
   refund_processed_at?: string | null;
+  refund_status?: string | null;
   voucher_amount_paid?: number | null;
   voucher_code?: string | null;
   payment_method?: string | null;
@@ -35,10 +36,22 @@ export function amountReceived(b: MoneyBooking): number {
   return 0;
 }
 
+/**
+ * Money reserved for a refund that has not reached the customer yet:
+ * reserve_refund_request adds a refund to total_refunded before the card
+ * refund or bank transfer goes out.
+ */
+export function refundInFlight(b: MoneyBooking): number {
+  // ponytail: an earlier completed refund on the same booking also reads as
+  // pending until this one lands (none live 2026-10-29); split by
+  // refund_operations server-side if that starts to happen.
+  return ["REFUND_PENDING", "MANUAL_EFT_REQUIRED"].includes(String(b.refund_status || "")) ? Number(b.total_refunded || 0) : 0;
+}
+
 /** Money returned to the customer. */
 export function amountRefunded(b: MoneyBooking): number {
   const refunded = Number(b.total_refunded || 0);
-  if (refunded > 0) return refunded;
+  if (refunded > 0) return refunded - refundInFlight(b);
   // refund_amount alone is a REQUESTED figure; only count it once processed.
   if (b.refund_processed_at) return Number(b.refund_amount || 0);
   return 0;
@@ -57,7 +70,7 @@ export function amountOutstanding(b: MoneyBooking): number {
   return Math.max(0, due - amountReceived(b));
 }
 
-export type InvoiceStatus = "PAID" | "PARTIALLY PAID" | "UNPAID" | "CANCELLED" | "REFUNDED" | "PARTIALLY REFUNDED";
+export type InvoiceStatus = "PAID" | "PARTIALLY PAID" | "UNPAID" | "CANCELLED" | "REFUNDED" | "PARTIALLY REFUNDED" | "REFUND PENDING";
 
 /**
  * An invoice's real state, from its booking. The invoice row itself keeps the
@@ -67,7 +80,8 @@ export function invoiceState(b: MoneyBooking): { status: InvoiceStatus; paid: nu
   const paid = amountReceived(b);
   const refunded = amountRefunded(b);
   const due = amountOutstanding(b);
-  const status: InvoiceStatus = refunded > 0 ? (refunded >= paid ? "REFUNDED" : "PARTIALLY REFUNDED")
+  const status: InvoiceStatus = refundInFlight(b) > 0 ? "REFUND PENDING"
+    : refunded > 0 ? (refunded >= paid ? "REFUNDED" : "PARTIALLY REFUNDED")
     : ["CANCELLED", "EXPIRED"].includes(String(b.status || "")) ? "CANCELLED"
     : due <= 0 ? "PAID"
     : paid > 0 ? "PARTIALLY PAID" : "UNPAID";
