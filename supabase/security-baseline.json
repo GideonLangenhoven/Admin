@@ -5887,7 +5887,7 @@
       "policyname": "arrival_approvals_read",
       "cmd": "SELECT",
       "roles": "{authenticated}",
-      "qual": "(business_id = ANY (current_business_ids()))",
+      "qual": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))",
       "with_check": null
     },
     {
@@ -6373,7 +6373,7 @@
       "policyname": "guide_self",
       "cmd": "SELECT",
       "roles": "{authenticated}",
-      "qual": "((user_id = auth.uid()) AND (NOT suspended) AND (NOT must_set_password))",
+      "qual": "((( SELECT auth.uid() AS uid) = user_id) AND (NOT suspended) AND (NOT must_set_password))",
       "with_check": null
     },
     {
@@ -7030,7 +7030,7 @@
       "policyname": "operator_booking_requests_read",
       "cmd": "SELECT",
       "roles": "{authenticated}",
-      "qual": "(business_id = ANY (current_business_ids()))",
+      "qual": "(business_id IN ( SELECT unnest(( SELECT current_business_ids() AS current_business_ids)) AS unnest))",
       "with_check": null
     },
     {
