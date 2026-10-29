@@ -2295,7 +2295,7 @@ export default function SettingsPage() {
                                     <label className="flex items-center gap-1.5 text-xs font-medium text-[var(--ck-text-muted)] cursor-pointer select-none whitespace-nowrap">
                                         <input type="checkbox" checked={q.required}
                                             onChange={e => setBookingQuestions(prev => prev.map((p, j) => j === i ? { ...p, required: e.target.checked } : p))}
-                                            className="h-3.5 w-3.5 rounded border-gray-300 accent-[var(--ck-accent)]" />
+                                            className="rounded border-gray-300 accent-[var(--ck-accent)]" />
                                         Required
                                     </label>
                                     <button type="button" aria-label="Remove question"

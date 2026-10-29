@@ -308,6 +308,14 @@ th {
     max-width: 100%;
   }
 
+  /* min-width: 0 above let flex rows squash these to a sliver (4px beside long text).
+     A size utility on the input still wins: utilities come later at equal specificity. */
+  .admin-main :where(input[type="checkbox"], input[type="radio"]) {
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+  }
+
   .ui-table-container {
     container: admin-table / inline-size;
     min-width: 0;
